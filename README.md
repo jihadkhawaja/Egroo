@@ -2,7 +2,7 @@
 
 ![Xamarin Chat Signal Icon](docs/icon.png)
 
-![Xamarin Chat Signal Icon](docs/ios.jpeg)
+![Xamarin Chat Signal Icon](docs/ios.png)
 
 # Features/goals
 - Material UI
