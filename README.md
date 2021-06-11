@@ -13,7 +13,7 @@
 
 ![Xamarin Chat Signal Icon](docs/ios.png)
 
-# Future updates
+# Future updates (★ 100)
 - Add Friends tab
 - Chatting Rooms
 - Chat Moderation
