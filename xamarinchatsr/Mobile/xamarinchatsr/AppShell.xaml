@@ -44,7 +44,7 @@
                 <FontImageSource FontFamily="{StaticResource MaterialFontFamilySolid}" Glyph="{x:Static helpers:IconFont.Comments}" />
             </Tab.Icon>
         </Tab>
-        <Tab Title="Settings" Route="SettingsPage">
+        <Tab Title="{x:Static resource:AppResources.tabsettingstitle}" Route="SettingsPage">
             <ShellContent ContentTemplate="{DataTemplate views:SettingsPage}" />
             <Tab.Icon>
                 <FontImageSource FontFamily="{StaticResource MaterialFontFamilySolid}" Glyph="{x:Static helpers:IconFont.Cog}" />

@@ -11,10 +11,8 @@ namespace xamarinchatsr
 {
     public partial class App : Application
     {
-        public static bool isDebug = false;
-        public static bool adsEnabled = true;
-
-        public static bool viewdAD = false;
+        //set to false in production
+        public static bool isDebug = true;
 
         public static AppSettings appSettings;
         public static CultureInfo cultureInfo;
@@ -31,6 +29,7 @@ namespace xamarinchatsr
         public const string playStoreAppBaseURL = "https://play.google.com/store/apps/details?id=";
         public const string AppName = "Xamarin Chat SR";
         public const string hubConnectionURL = "";
+        public const string feedback = "https://twitter.com/jihadkhawaja";
 
         public App()
         {

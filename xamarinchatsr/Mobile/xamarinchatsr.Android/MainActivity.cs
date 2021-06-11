@@ -7,7 +7,7 @@ using Plugin.CurrentActivity;
 
 namespace xamarinchatsr.Droid
 {
-    [Activity(Label = "Xamarin Chat SR", Icon = "@mipmap/ic_launcher", Theme = "@style/MainTheme", MainLauncher = true, NoHistory = false,
+    [Activity(Label = "Xamarin Chat SignalR", Icon = "@mipmap/ic_launcher", Theme = "@style/MainTheme", MainLauncher = true, NoHistory = false,
         ScreenOrientation = ScreenOrientation.Portrait, LaunchMode = LaunchMode.SingleTask, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation)]
     public class MainActivity : global::Xamarin.Forms.Platform.Android.FormsAppCompatActivity
     {

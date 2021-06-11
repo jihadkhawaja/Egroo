@@ -89,10 +89,18 @@ namespace xamarinchatsr.Views
         /// <param name="e"></param>
         private async void TapGestureRecognizer_Tapped(object sender, EventArgs e)
         {
-            if (await Launcher.TryOpenAsync(new Uri("https://twitter.com/jihadkhawaja")))
+            try
             {
-                //success
+                if (await Launcher.TryOpenAsync(new Uri(App.feedback)))
+                {
+                    //success
+                }
+                else
+                {
+                    await Browser.OpenAsync(new Uri(App.feedback), BrowserLaunchMode.SystemPreferred);
+                }
             }
+            catch { }
         }
 
         /// <summary>
@@ -222,7 +230,7 @@ namespace xamarinchatsr.Views
         /// <param name="e"></param>
         private async void TapGestureRecognizer_Tapped_3(object sender, EventArgs e)
         {
-            string content = "Economy, Fuel & Gold day by day data to fulfill the Lebanese needs.";
+            string content = "Chat with friends now!";
 
             string shareTitle = "Available on Apple App Store and Google Play Store";
             string links = string.Format("Download on iOS {0}\n Download on Android {1}", App.appStoreAppBaseURL + App.iOSAppID, App.playStoreAppBaseURL + App.playStoreAppID);
