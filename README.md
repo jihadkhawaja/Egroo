@@ -2,8 +2,6 @@
 
 ![Xamarin Chat Signal Icon](docs/icon.png)
 
-![Xamarin Chat Signal Icon](docs/ios.png)
-
 # Features/goals
 - Material UI
 - Modern Global Chat
@@ -12,6 +10,8 @@
 - Dark & Light Theme
 - Multiple Language Support
 - App Share & Rate
+
+![Xamarin Chat Signal Icon](docs/ios.png)
 
 # Future updates
 - Add Friends tab
