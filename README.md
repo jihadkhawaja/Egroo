@@ -1,8 +1,8 @@
 # Xamarin Chat Signal
 
-![Xamarin Chat Signal Icon](docs/icon.png =128x128)
+![Xamarin Chat Signal Icon](docs/icon.png)
 
-![Xamarin Chat Signal Icon](docs/ios.jpeg =621x1344)
+![Xamarin Chat Signal Icon](docs/ios.jpeg)
 
 # Features/goals
 - Material UI
