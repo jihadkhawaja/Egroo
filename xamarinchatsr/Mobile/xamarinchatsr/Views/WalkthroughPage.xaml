@@ -1,0 +1,62 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="xamarinchatsr.Views.WalkthroughPage"
+    xmlns="http://xamarin.com/schemas/2014/forms"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    BackgroundColor="#0D0D0D">
+    <ContentPage.Content>
+        <AbsoluteLayout>
+            <CarouselView
+                x:Name="TheCarousel"
+                AbsoluteLayout.LayoutBounds="0,0,1,1"
+                AbsoluteLayout.LayoutFlags="All"
+                IndicatorView="indicatorview"
+                PositionChanged="TheCarousel_PositionChanged">
+                <CarouselView.ItemTemplate>
+                    <DataTemplate>
+                        <AbsoluteLayout>
+                            <StackLayout
+                                Padding="50"
+                                AbsoluteLayout.LayoutBounds="0.5,0.3,AutoSize,AutoSize"
+                                AbsoluteLayout.LayoutFlags="PositionProportional"
+                                HorizontalOptions="Center"
+                                Spacing="50">
+
+                                <Label
+                                    FontFamily="{StaticResource MaterialFontFamilySolid}"
+                                    HorizontalOptions="Center"
+                                    HorizontalTextAlignment="Center"
+                                    Text="{Binding ImageSource}"
+                                    TextColor="#F2F2F2"
+                                    VerticalOptions="Center">
+                                    <Label.FontSize>
+                                        <OnPlatform x:TypeArguments="x:Double">
+                                            <On Platform="iOS" Value="100" />
+                                            <On Platform="Android" Value="100" />
+                                        </OnPlatform>
+                                    </Label.FontSize>
+                                </Label>
+                                <Label
+                                    FontAttributes="Bold"
+                                    FontSize="Medium"
+                                    HorizontalOptions="Center"
+                                    HorizontalTextAlignment="Center"
+                                    LineHeight="1.25"
+                                    Text="{Binding Context}"
+                                    TextColor="#F2F2F2"
+                                    VerticalOptions="Center" />
+                            </StackLayout>
+                        </AbsoluteLayout>
+                    </DataTemplate>
+                </CarouselView.ItemTemplate>
+            </CarouselView>
+            <IndicatorView
+                x:Name="indicatorview"
+                AbsoluteLayout.LayoutBounds="0.5,0.95,100,100"
+                AbsoluteLayout.LayoutFlags="PositionProportional"
+                IndicatorColor="#F2B591"
+                IndicatorSize="10"
+                SelectedIndicatorColor="#F2F2F2" />
+        </AbsoluteLayout>
+    </ContentPage.Content>
+</ContentPage>
