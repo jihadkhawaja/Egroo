@@ -204,13 +204,7 @@ namespace xamarinchatsr.ViewModel
                             cm.IsYourMessage = false;
 
                         Messages.Add(cm);
-
-                        //if(App.CurrentPage != "ChatPage")
-                        //    totalnewmessages++;
                     }
-
-                    //if (App.CurrentPage != "ChatPage")
-                    //    MessagingCenter.Send(this, "ChangeTextBadge", totalnewmessages.ToString());
 
                     MessagingCenter.Send<ChatViewModel>(this, "ScrollToEnd");
                 });
