@@ -28,7 +28,11 @@ namespace xamarinchatsr
         public const string playStoreAppID = "";
         public const string playStoreAppBaseURL = "https://play.google.com/store/apps/details?id=";
         public const string AppName = "Xamarin Chat SR";
+
+        //SignalR Web URL example (http://localhost:2736) where the chat web app is hosted
         public const string hubConnectionURL = "";
+
+        //follow me and give this repo a star if you liked it <3
         public const string feedback = "https://twitter.com/jihadkhawaja";
 
         public App()
