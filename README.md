@@ -1,4 +1,4 @@
-# Xamarin Chat Signal
+# Xamarin Chat SignalR
 
 ![Xamarin Chat Signal Icon](docs/icon.png)
 
