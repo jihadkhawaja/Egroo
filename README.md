@@ -27,6 +27,8 @@
 2. Open the project and head to App.cs and setup the hubconnection url (line 33, PCL project).
 3. Launch the Android or iOS project.
 
+[Youtube Tutorial](https://youtu.be/_MbalDbK5V8) (5 min)
+
 ## Tested Environment
 
 ### Android

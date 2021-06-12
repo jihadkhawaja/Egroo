@@ -42,15 +42,12 @@ namespace xamarinchatsrWeb
                 options.EnableEndpointRouting = false;
             });
 
-            services.AddMvc();
+            services.AddMvc().AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.WriteIndented = true;
+            });
 
             services.AddSignalR();
-            services.AddMvc();
-            services.AddMvc()
-           .AddJsonOptions(options =>
-           {
-               options.JsonSerializerOptions.WriteIndented = true;
-           });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
