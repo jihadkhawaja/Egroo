@@ -43,7 +43,7 @@ iPhone & iPads
 ### Follow me on twitter
 [Twitter](https://twitter.com/jihadkhawaja)
 
-![Screenshot 1](images/Screenshot1.png)
-![Screenshot 2](images/Screenshot1.png)
-![Screenshot 3](images/Screenshot1.png)
-![Screenshot 4](images/Screenshot1.png)
+![Screenshot 1](docs/Screenshot1.png)
+![Screenshot 2](docs/Screenshot1.png)
+![Screenshot 3](docs/Screenshot1.png)
+![Screenshot 4](docs/Screenshot1.png)
