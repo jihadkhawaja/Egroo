@@ -44,6 +44,6 @@ iPhone & iPads
 [Twitter](https://twitter.com/jihadkhawaja)
 
 ![Screenshot 1](docs/Screenshot1.png)
-![Screenshot 2](docs/Screenshot1.png)
-![Screenshot 3](docs/Screenshot1.png)
-![Screenshot 4](docs/Screenshot1.png)
+![Screenshot 2](docs/Screenshot2.png)
+![Screenshot 3](docs/Screenshot3.png)
+![Screenshot 4](docs/Screenshot4.png)
