@@ -12,7 +12,6 @@
 - App Share & Rate
 - Multiple Serialization Methods with Encryption
 
-![Xamarin Chat SignalR](docs/ios.png)
 ![Screenshot 1](docs/Screenshot1.png)
 ![Screenshot 2](docs/Screenshot2.png)
 
@@ -21,6 +20,8 @@
 - Chatting Rooms
 - Chat Moderation
 - UWP Support
+
+![Xamarin Chat SignalR](docs/ios.png)
 
 # Usage
 
@@ -46,5 +47,8 @@ iPhone & iPads
 [Twitter](https://twitter.com/jihadkhawaja)
 
 # Screenshots
+
+![Screenshot 1](docs/Screenshot1.png)
+![Screenshot 2](docs/Screenshot2.png)
 ![Screenshot 3](docs/Screenshot3.png)
 ![Screenshot 4](docs/Screenshot4.png)
