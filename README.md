@@ -1,6 +1,6 @@
 # Xamarin Chat SignalR
 
-![Xamarin Chat Signal Icon](docs/icon.png)
+![Xamarin Chat SignalR Icon](docs/icon.png)
 
 # Features/goals
 - Material UI
@@ -12,7 +12,9 @@
 - App Share & Rate
 - Multiple Serialization Methods with Encryption
 
-![Xamarin Chat Signal Icon](docs/ios.png)
+![Xamarin Chat SignalR](docs/ios.png)
+![Screenshot 1](docs/Screenshot1.png)
+![Screenshot 2](docs/Screenshot2.png)
 
 # Future updates (★ 100)
 - Add Friends tab
@@ -43,7 +45,6 @@ iPhone & iPads
 ### Follow me on twitter
 [Twitter](https://twitter.com/jihadkhawaja)
 
-![Screenshot 1](docs/Screenshot1.png)
-![Screenshot 2](docs/Screenshot2.png)
+# Screenshots
 ![Screenshot 3](docs/Screenshot3.png)
 ![Screenshot 4](docs/Screenshot4.png)
