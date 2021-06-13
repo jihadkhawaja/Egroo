@@ -271,7 +271,28 @@ namespace xamarinchatsr.ViewModel
             if (!string.IsNullOrEmpty(App.appSettings.chatUserName) && !overwrite)
             {
                 chatmessage.UserName = SavingManager.JsonSerialization.ReadFromJsonFile<AppSettings>("appsettings/user").chatUserName;
-                UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                switch (App.appSettings.language)
+                {
+                    case "en":
+                        UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                        break;
+
+                    case "ar":
+                        UserName = $"{chatmessage.UserName} {AppResources.loggedas}";
+                        break;
+
+                    case "en-US":
+                        UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                        break;
+
+                    case "ar-LB":
+                        UserName = $"{chatmessage.UserName} {AppResources.loggedas}";
+                        break;
+
+                    default:
+                        UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                        break;
+                }
                 return;
             }
 
@@ -286,7 +307,28 @@ namespace xamarinchatsr.ViewModel
                 App.appSettings.chatUserName = results;
 
             chatmessage.UserName = App.appSettings.chatUserName;
-            UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+            switch (App.appSettings.language)
+            {
+                case "en":
+                    UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                    break;
+
+                case "ar":
+                    UserName = $"{chatmessage.UserName} {AppResources.loggedas}";
+                    break;
+
+                case "en-US":
+                    UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                    break;
+
+                case "ar-LB":
+                    UserName = $"{chatmessage.UserName} {AppResources.loggedas}";
+                    break;
+
+                default:
+                    UserName = $"{AppResources.loggedas} {chatmessage.UserName}";
+                    break;
+            }
 
             SavingManager.JsonSerialization.WriteToJsonFile<AppSettings>("appsettings/user", App.appSettings);
         }
