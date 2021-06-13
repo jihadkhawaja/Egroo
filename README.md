@@ -12,6 +12,7 @@
 - App Share & Rate
 - Multiple Serialization Methods with Encryption
 - Tab badges
+- Font Awesome
 
 ![Screenshot 1](docs/Screenshot1.png)
 ![Screenshot 2](docs/Screenshot2.png)
@@ -51,7 +52,12 @@ iPhone & iPads
 
 # Screenshots
 
+## Chat
+
 ![Screenshot 1](docs/Screenshot1.png)
 ![Screenshot 2](docs/Screenshot2.png)
+
+## Settings
+
 ![Screenshot 3](docs/Screenshot3.png)
 ![Screenshot 4](docs/Screenshot4.png)
