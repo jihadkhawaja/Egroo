@@ -14,18 +14,13 @@
 - Tab badges
 - Font Awesome
 
+### Light Theme
+
 ![Screenshot 1](docs/Screenshot1.png)
+
+### Dark Theme
+
 ![Screenshot 2](docs/Screenshot2.png)
-
-# Future updates
-- Add Friends tab
-- Chatting Rooms
-- Chat Moderation
-- Notifications
-- UWP Support
-- .NET 6 Support
-
-![Xamarin Chat SignalR](docs/ios.png)
 
 # Usage
 
@@ -44,6 +39,16 @@ Phone & Tablets
 ### iOS
 iPhone & iPads
 10.0 -> 14.5
+
+# Future updates
+- Add Friends tab
+- Chatting Rooms
+- Chat Moderation
+- Notifications
+- UWP Support
+- .NET 6 Support
+
+![Xamarin Chat SignalR](docs/ios.png)
 
 ### Follow me on twitter
 [Twitter](https://twitter.com/jihadkhawaja)
