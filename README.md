@@ -17,7 +17,7 @@
 ![Screenshot 1](docs/Screenshot1.png)
 ![Screenshot 2](docs/Screenshot2.png)
 
-# Future updates (★ 100)
+# Future updates
 - Add Friends tab
 - Chatting Rooms
 - Chat Moderation
@@ -45,19 +45,5 @@ Phone & Tablets
 iPhone & iPads
 10.0 -> 14.5
 
-## ★ Star this repo to help others find it
-
 ### Follow me on twitter
 [Twitter](https://twitter.com/jihadkhawaja)
-
-# Screenshots
-
-## Chat
-
-![Screenshot 1](docs/Screenshot1.png)
-![Screenshot 2](docs/Screenshot2.png)
-
-## Settings
-
-![Screenshot 3](docs/Screenshot3.png)
-![Screenshot 4](docs/Screenshot4.png)
