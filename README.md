@@ -2,7 +2,7 @@
 
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
-# Features/goals
+# Features
 - Material UI
 - Modern Global Chat
 - Walkthrough
@@ -41,6 +41,7 @@ iPhone & iPads
 10.0 -> 14.5
 
 # Future updates
+- Use a database instead of Json serializations
 - Add Friends tab
 - Chatting Rooms
 - Chat Moderation
