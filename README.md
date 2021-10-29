@@ -50,6 +50,3 @@ iPhone & iPads
 - .NET 6 Support
 
 ![Xamarin Chat SignalR](docs/ios.png)
-
-### Follow me on twitter
-[Twitter](https://twitter.com/jihadkhawaja)
