@@ -1,0 +1,113 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="MobileChat.Views.SettingsPage"
+    xmlns="http://xamarin.com/schemas/2014/forms"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:helpers="clr-namespace:MobileChat.Helpers"
+    Title="Settings"
+    FlowDirection="LeftToRight">
+    <ContentPage.Content>
+        <ScrollView VerticalScrollBarVisibility="Never">
+            <Grid BackgroundColor="{DynamicResource PageBackgroundColorPrimary}" RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <!--  Theme  -->
+                <StackLayout Grid.Row="0" Spacing="20">
+                    <StackLayout
+                        Padding="10"
+                        BackgroundColor="{DynamicResource PageBackgroundColorSecondary}"
+                        Orientation="Horizontal"
+                        Spacing="10">
+                        <Label
+                            Margin="10"
+                            FontFamily="{StaticResource MaterialFontFamilySolid}"
+                            FontSize="Large"
+                            Text="{x:Static helpers:IconFont.Moon}"
+                            TextColor="{DynamicResource PrimaryTextColor}" />
+                        <Label
+                            FontAttributes="Bold"
+                            FontSize="Medium"
+                            Text="Light"
+                            TextColor="{DynamicResource PrimaryTextColor}"
+                            VerticalTextAlignment="Center" />
+                        <Switch
+                            x:Name="themeswitch"
+                            Margin="10"
+                            HorizontalOptions="EndAndExpand"
+                            IsToggled="True"
+                            OnColor="{DynamicResource PageBackgroundColorPrimary}"
+                            ThumbColor="{DynamicResource SecondaryColor}"
+                            Toggled="Switch_Toggled" />
+                    </StackLayout>
+                    <!--  Share  -->
+                    <StackLayout
+                        Padding="10"
+                        BackgroundColor="{DynamicResource PageBackgroundColorSecondary}"
+                        Orientation="Horizontal"
+                        Spacing="10">
+                        <Label
+                            Margin="10"
+                            FontFamily="{StaticResource MaterialFontFamilySolid}"
+                            FontSize="Large"
+                            Text="{x:Static helpers:IconFont.Heart}"
+                            TextColor="{DynamicResource PrimaryTextColor}" />
+                        <Label
+                            FontAttributes="Bold"
+                            FontSize="Medium"
+                            Text="Share App"
+                            TextColor="{DynamicResource PrimaryTextColor}"
+                            VerticalTextAlignment="Center" />
+                        <Label
+                            Margin="10"
+                            FontFamily="{StaticResource MaterialFontFamilySolid}"
+                            FontSize="Large"
+                            HorizontalOptions="FillAndExpand"
+                            HorizontalTextAlignment="End"
+                            Text="{x:Static helpers:IconFont.ArrowRight}"
+                            TextColor="{DynamicResource PrimaryTextColor}"
+                            VerticalTextAlignment="Center" />
+                        <StackLayout.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped_3" />
+                        </StackLayout.GestureRecognizers>
+                    </StackLayout>
+                </StackLayout>
+                <!--  Social Media & Feedback  -->
+                <Grid Grid.Row="1" Padding="10">
+                    <StackLayout
+                        BackgroundColor="{DynamicResource PageBackgroundColorPrimary}"
+                        HorizontalOptions="Center"
+                        Spacing="20"
+                        VerticalOptions="Center">
+                        <Label
+                            FontAttributes="None"
+                            FontSize="Medium"
+                            HorizontalTextAlignment="Center"
+                            Text="Feedback"
+                            TextColor="{DynamicResource PrimaryTextColor}" />
+                        <StackLayout BackgroundColor="{DynamicResource PageBackgroundColorPrimary}">
+                            <Image HeightRequest="25" WidthRequest="25">
+                                <Image.Source>
+                                    <FontImageSource
+                                        FontFamily="{StaticResource MaterialFontFamilyBrand}"
+                                        Glyph="{x:Static helpers:IconFont.Twitter}"
+                                        Color="{DynamicResource PrimaryTextColor}" />
+                                </Image.Source>
+                            </Image>
+                            <Label
+                                FlowDirection="LeftToRight"
+                                HorizontalOptions="Center"
+                                Text="@jihadkhawaja"
+                                TextColor="{DynamicResource PrimaryTextColor}" />
+                            <StackLayout.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
+                            </StackLayout.GestureRecognizers>
+                        </StackLayout>
+                    </StackLayout>
+                </Grid>
+            </Grid>
+        </ScrollView>
+    </ContentPage.Content>
+</ContentPage>
