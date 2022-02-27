@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ResourceDictionary
+    x:Class="MobileChat.Themes.Dark"
+    xmlns="http://xamarin.com/schemas/2014/forms"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <Color x:Key="PageBackgroundColorPrimary">#0D0D0D</Color>
+    <Color x:Key="PageBackgroundColorSecondary">#262223</Color>
+    <Color x:Key="NavigationBarColor">#262223</Color>
+    <Color x:Key="PrimaryColor">#F25922</Color>
+    <Color x:Key="SecondaryColor">#F2B591</Color>
+    <Color x:Key="PrimaryTextColor">#F2F2F2</Color>
+    <Color x:Key="SecondaryTextColor">#F2B591</Color>
+    <Color x:Key="SenderColor">#262223</Color>
+    <Color x:Key="ReceiverColor">#F2B591</Color>
+    <Color x:Key="SenderTextColor">#F2F2F2</Color>
+    <Color x:Key="ReceiverTextColor">#0D0D0D</Color>
+    <Color x:Key="TransparentColor">Transparent</Color>
+</ResourceDictionary>
