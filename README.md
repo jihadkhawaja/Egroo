@@ -3,5 +3,5 @@
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
 # In Progress
-- Port views ✔️
-- Port backend
+- [x] Port views
+- [ ] Port backend
