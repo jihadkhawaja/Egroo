@@ -1,0 +1,16 @@
+﻿@using MobileChat.MAUI.Shared.Components
+@inject NavigationManager NavigationManager
+@page "/chat"
+@page "/chat/{ChannelId}/{Title}"
+
+<h3>@Title</h3>
+<h4>Current Channel @ChannelId</h4>
+
+<ChatView />
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string ChannelId { get; set; }
+}
