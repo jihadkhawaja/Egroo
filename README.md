@@ -1,4 +1,4 @@
-# MAUI Chat SignalR Client
+# MAUI Chat SignalR
 
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
