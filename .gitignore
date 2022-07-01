@@ -9,6 +9,8 @@
 *.user
 *.userosscache
 *.sln.docstates
+[Mm]igrations/
+appsecrets.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -332,4 +334,3 @@ ASALocalRun/
 
 # Local History for Visual Studio
 .localhistory/
-src/Web/appsecrets.json

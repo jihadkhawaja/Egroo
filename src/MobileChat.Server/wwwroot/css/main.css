@@ -1,0 +1,17 @@
+﻿html,
+body {
+    background-color: #0e0e0e;
+    color: #fefefe;
+    font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+.home-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 10px;
+}
+
+a{
+    color: darkorange;
+}

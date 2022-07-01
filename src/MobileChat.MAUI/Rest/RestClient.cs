@@ -1,13 +1,9 @@
-﻿using System;
-using System.IO;
-using System.Net;
-using System.Net.Http;
+﻿using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
-namespace MobileChat.RestClient
+namespace MobileChat.MAUI.Rest
 {
     public enum AuthType
     {
@@ -23,13 +19,10 @@ namespace MobileChat.RestClient
     public class RestClient<T>
     {
         private string ResponseTxt = string.Empty;
-        //public Users users = new Users();
 
         public string GetResponse()
         {
-            string res = ResponseTxt;
-            //ResponseTxt = string.Empty;
-            return res;
+            return ResponseTxt;
         }
 
         public Task<T> GetResponseModel()
@@ -42,9 +35,9 @@ namespace MobileChat.RestClient
         {
             try
             {
-                HttpClient httpClient = new HttpClient();
+                HttpClient httpClient = new();
 
-                System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 byte[] authToken;
                 switch (authType)
@@ -77,16 +70,16 @@ namespace MobileChat.RestClient
             }
             catch (Exception)
             {
-                return default(T);
+                return default;
             }
         }
 
         public async Task<bool> PostAsync(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
-            HttpClient httpClient = new HttpClient();
+            HttpClient httpClient = new();
             byte[] authToken;
 
-            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
             switch (authType)
             {
@@ -118,54 +111,6 @@ namespace MobileChat.RestClient
             ResponseTxt = await result.Content.ReadAsStringAsync();
 
             return result.IsSuccessStatusCode;
-        }
-
-        public async Task<bool> PostHTTPSAsync(T t, string WebServiceUrl)
-        {
-            HttpClient httpClient = new HttpClient();
-
-            //https://stackoverflow.com/questions/22251689/make-https-call-using-httpclient
-            //specify to use TLS 1.2 as default connection
-            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-            string json = JsonSerializer.Serialize(t);
-
-            HttpContent httpContent = new StringContent(json);
-
-            httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-
-            HttpResponseMessage result = await httpClient.PostAsync(WebServiceUrl, httpContent);
-
-            return result.IsSuccessStatusCode;
-        }
-
-        public Task<bool> PostHTTPSAsyncRaw(string json, string WebServiceUrl)
-        {
-            try
-            {
-                HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create(WebServiceUrl);
-
-                System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
-
-                httpWebRequest.ContentType = "application/json";
-                httpWebRequest.Method = "POST";
-
-                using (StreamWriter streamWriter = new StreamWriter(httpWebRequest.GetRequestStream()))
-                {
-                    streamWriter.Write(json);
-                }
-
-                HttpWebResponse httpResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-                using (StreamReader streamReader = new StreamReader(httpResponse.GetResponseStream()))
-                {
-                    string result = streamReader.ReadToEnd();
-                }
-                return Task.FromResult(true);
-            }
-            catch (Exception)
-            {
-                return Task.FromResult(false);
-            }
         }
     }
 }

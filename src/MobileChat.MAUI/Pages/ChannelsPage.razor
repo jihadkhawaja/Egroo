@@ -1,0 +1,45 @@
+﻿@page "/channels"
+@using JihadKhawaja.SignalR.Client.Chat.Models
+@using MobileChat.MAUI.Shared.Components
+@inject NavigationManager NavigationManager
+
+<MudText GutterBottom Align="Align.Left" Typo="Typo.h4">Channels</MudText>
+<MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+    @foreach (var channel in UserChannels)
+    {
+        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Elevation="2" onclick="@(() => OpenChannel(channel))">
+            <MudGrid Justify="Justify.SpaceBetween">
+                <MudItem Class="mt-3">
+                    <ChannelView Title=@channel.Title Users="User1, User2, User3" />
+                </MudItem>
+                <MudItem>
+                    <MudStack Spacing="0">
+                            <MudButton>Edit</MudButton>
+                            <MudButton Color="Color.Error">Delete</MudButton>
+                    </MudStack>
+                </MudItem>
+            </MudGrid>
+        </MudPaper>
+    }
+</MudStack>
+
+@code{
+    public IEnumerable<Channel> UserChannels { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        UserChannels = new Channel[6]
+        {
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 1", DateCreated = DateTime.UtcNow },
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 2", DateCreated = DateTime.UtcNow },
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 3", DateCreated = DateTime.UtcNow },
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 4", DateCreated = DateTime.UtcNow },
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 5", DateCreated = DateTime.UtcNow },
+            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 6", DateCreated = DateTime.UtcNow }
+        };
+
+        return base.OnInitializedAsync();
+    }
+
+    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id}/{channel.Title}");
+}
