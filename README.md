@@ -13,7 +13,7 @@
 # Requirements
 - **dotnet 6.0** (Required), you can use [Visual Studio 2022](https://visualstudio.microsoft.com/vs/preview/) or install [dotnet-6.0 sdk and runtime](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) and use your favorite editor like [Visual Studio Code](https://code.visualstudio.com/)
 - [PostgreSQL (Npgsql)](https://www.postgresql.org/) or your preferred database engine (Required)
-- [pgAdmin](https://www.pgadmin.org/) (optinal)
+- [pgAdmin](https://www.pgadmin.org/) to view and edit the PostgreSQL database (optinal)
 
 # Usage
 ## Client
