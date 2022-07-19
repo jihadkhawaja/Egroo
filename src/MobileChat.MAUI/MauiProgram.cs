@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components.WebView.Maui;
+﻿using JihadKhawaja.SignalR.Client.Chat.Interfaces;
+using JihadKhawaja.SignalR.Client.Chat.Services;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI
@@ -7,7 +8,7 @@ namespace MobileChat.MAUI
     {
         public static MauiApp CreateMauiApp()
         {
-            var builder = MauiApp.CreateBuilder();
+            MauiAppBuilder builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
                 .ConfigureFonts(fonts =>
@@ -20,6 +21,9 @@ namespace MobileChat.MAUI
             builder.Services.AddBlazorWebViewDeveloperTools();
 #endif
             builder.Services.AddMudServices();
+
+            //chat services
+            builder.Services.AddScoped<IChat, ChatService>();
 
             return builder.Build();
         }

@@ -10,7 +10,7 @@ namespace MobileChat.Server.Authorization
     {
         public static async Task<dynamic> GenerateJwtToken(User user, string jwtsecret)
         {
-            var claims = new List<Claim>
+            List<Claim> claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.Username),
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
@@ -18,7 +18,7 @@ namespace MobileChat.Server.Authorization
                 new Claim(JwtRegisteredClaimNames.Exp, new DateTimeOffset(DateTime.Now.AddSeconds(30)).ToUnixTimeSeconds().ToString()),
             };
 
-            var token = new JwtSecurityToken(
+            JwtSecurityToken token = new JwtSecurityToken(
                 new JwtHeader(
                     new SigningCredentials(
                         new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtsecret)), SecurityAlgorithms.HmacSha256)),

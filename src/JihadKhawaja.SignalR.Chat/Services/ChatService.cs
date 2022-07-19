@@ -1,15 +1,10 @@
 ﻿using JihadKhawaja.SignalR.Client.Chat.Interfaces;
 using JihadKhawaja.SignalR.Client.Chat.Models;
 using Microsoft.AspNetCore.SignalR.Client;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace JihadKhawaja.SignalR.Client.Chat.Services
 {
-    internal class ChatService : IChat
+    public class ChatService : IChat
     {
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
