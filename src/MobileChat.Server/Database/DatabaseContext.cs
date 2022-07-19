@@ -14,11 +14,7 @@ namespace MobileChat.Server.Database
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
-#if DEBUG
             options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"));
-#else
-            options.UseNpgsql(Configuration.GetConnectionString("ProductionConnection"));
-#endif
         }
 
         public DbSet<User> Users { get; set; }
