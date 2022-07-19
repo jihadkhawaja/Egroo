@@ -8,10 +8,10 @@
 <h3>@Title</h3>
 <h4>Current Channel @ChannelId</h4>
 
-@foreach (var message in ChatService.ReceiveMessageHistory(GetChannelId()).Result)
+@*@foreach (var message in ChatService.ReceiveMessageHistory(GetChannelId()).Result)
 {
     <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
-}
+}*@
 
 @code {
     [Parameter]

@@ -30,7 +30,10 @@ namespace MobileChat.MAUI
         protected override async void OnStart()
         {
             ConnectionCancellationTokenSource = new();
-            await SignalR.Connect(ConnectionCancellationTokenSource);
+            if(await SignalR.Connect(ConnectionCancellationTokenSource))
+            {
+                Console.WriteLine("Connected!");
+            }
         }
     }
 }
