@@ -1,0 +1,32 @@
+﻿@page "/chat"
+@page "/chat/{ChannelId}/{Title}"
+@using JihadKhawaja.SignalR.Client.Chat.Interfaces
+@using MobileChat.MAUI.Shared.Components
+@inject NavigationManager NavigationManager
+@inject IChat ChatService
+
+<h3>@Title</h3>
+<h4>Current Channel @ChannelId</h4>
+
+@foreach (var message in ChatService.ReceiveMessageHistory(GetChannelId()).Result)
+{
+    <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
+}
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string ChannelId { get; set; }
+
+    private Guid GetChannelId()
+    {
+        Guid id;
+        if(Guid.TryParse(ChannelId, out id))
+        {
+            return id;
+        }
+
+        return Guid.Empty;
+    }
+}

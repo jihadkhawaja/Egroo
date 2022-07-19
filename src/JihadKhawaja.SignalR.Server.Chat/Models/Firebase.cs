@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace JihadKhawaja.SignalR.Server.Chat.Models
+﻿namespace JihadKhawaja.SignalR.Server.Chat.Models
 {
     public class Firebase
     {

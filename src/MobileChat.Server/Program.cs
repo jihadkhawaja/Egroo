@@ -1,5 +1,6 @@
 using JihadKhawaja.SignalR.Server.Chat.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MobileChat.Server.Database;
 using MobileChat.Server.Helpers;
@@ -45,6 +46,12 @@ builder.Services.AddScoped<IMessage, MessageService>();
 builder.Services.AddScoped<IChannel, ChannelService>();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+    db.Database.Migrate();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
