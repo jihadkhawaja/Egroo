@@ -68,13 +68,7 @@ dotnet restore
   }
 }
 ```
-3. Set your database connection strings in appsettings.json
-```
-"ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Database=mobilechatdb;Trusted_Connection=True;",
-    "ProductionConnection": "Server=localhost;Database=databasename;User Id=SA;Password=password;"
-  }
-```
+3. Set your database connection strings in **appsettings.json** and **appsettings.Development.json**
 4. Test your database connection, in the Package Manager Console (Ctrl+`)
 ```
 Add-Migration [your migration name]
