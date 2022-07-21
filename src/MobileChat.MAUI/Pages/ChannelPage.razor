@@ -1,5 +1,4 @@
-﻿@page "/chat"
-@page "/chat/{ChannelId}/{Title}"
+﻿@page "/chat/{ChannelId}/{Title}"
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
 @using JihadKhawaja.SignalR.Client.Chat.Models
 @using MobileChat.MAUI.Shared.Components
@@ -79,7 +78,7 @@
         return await ChatService.ReceiveMessageHistory(GetChannelId());
     }
 
-    private Task SendMessage()
+    private async Task SendMessage()
     {
         Message message = new()
         {
@@ -90,6 +89,6 @@
 
         Messages.Add(message);
 
-        return Task.CompletedTask;
+        await ChatService.SendMessage(message);
     }
 }

@@ -41,7 +41,7 @@ namespace MobileChat.Server.Services
 
                 if (!ContainUser(userid).Result)
                 {
-                    ChannelUser channelCreator = new ChannelUser
+                    ChannelUser channelCreator = new()
                     {
                         ChannelId = channelid,
                         UserId = userid,
@@ -82,7 +82,7 @@ namespace MobileChat.Server.Services
 
         public Task<HashSet<User>> GetUsers(Guid channelid)
         {
-            HashSet<User> channelUsers = new HashSet<User>();
+            HashSet<User> channelUsers = new();
             try
             {
                 List<ChannelUser> users = context.ChannelUsers.Where(x => x.ChannelId == channelid).ToList();
@@ -107,7 +107,7 @@ namespace MobileChat.Server.Services
 
         public Task<HashSet<Channel>> GetUserChannels(Guid userid)
         {
-            HashSet<Channel> channels = new HashSet<Channel>();
+            HashSet<Channel> channels = new();
             try
             {
                 List<ChannelUser> users = context.ChannelUsers.Where(x => x.UserId == userid).ToList();

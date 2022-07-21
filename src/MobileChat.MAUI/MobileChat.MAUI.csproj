@@ -51,11 +51,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <PackageReference Include="FluentValidation" Version="11.1.0" />
 	  <PackageReference Include="MudBlazor" Version="6.0.12" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\JihadKhawaja.SignalR.Chat\JihadKhawaja.SignalR.Client.Chat.csproj" />
+	  <ProjectReference Include="..\JihadKhawaja.SignalR.Client.Chat\JihadKhawaja.SignalR.Client.Chat.csproj" />
 	</ItemGroup>
 
 </Project>

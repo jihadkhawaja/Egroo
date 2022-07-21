@@ -1,4 +1,4 @@
-﻿using JihadKhawaja.SignalR.Client.Chat.Core;
+﻿using JihadKhawaja.SignalR.Client.Chat;
 
 namespace MobileChat.MAUI
 {
@@ -20,7 +20,7 @@ namespace MobileChat.MAUI
         public App()
         {
             // Initialize client chat signalr service with your server chat hub url
-            SignalR.Initialize(hubConnectionURL);
+            ClientChat.Initialize(hubConnectionURL);
 
             InitializeComponent();
 
@@ -30,7 +30,7 @@ namespace MobileChat.MAUI
         protected override async void OnStart()
         {
             ConnectionCancellationTokenSource = new();
-            if(await SignalR.Connect(ConnectionCancellationTokenSource))
+            if (await ClientChat.SignalR.Connect(ConnectionCancellationTokenSource))
             {
                 Console.WriteLine("Connected!");
             }
