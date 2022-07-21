@@ -7,10 +7,15 @@ using MobileChat.Server.Helpers;
 using MobileChat.Server.Hubs;
 using MobileChat.Server.Interfaces;
 using MobileChat.Server.Services;
+using Serilog;
 using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//logger
+builder.Host.UseSerilog((ctx, lc) => lc
+    .ReadFrom.Configuration(ctx.Configuration));
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -34,7 +39,13 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters.ClockSkew = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddAuthorization();
-builder.Services.AddCors();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", builder =>
+    builder.AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader());
+});
 
 builder.Services.AddSignalR();
 
@@ -56,6 +67,10 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseExceptionHandler("/Error");
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -65,6 +80,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 
 app.UseRouting();
+
+app.UseCors("CorsPolicy");
 
 //hubs
 app.UseEndpoints(endpoints =>

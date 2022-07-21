@@ -31,7 +31,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
-                Message entry = context.Messages.Single(x => x.Id == id);
+                Message entry = context.Messages.FirstOrDefault(x => x.Id == id);
 
                 if (entry is not null)
                 {
@@ -51,14 +51,14 @@ namespace MobileChat.Server.Services
 
         public Task<Message> ReadById(Guid id)
         {
-            return Task.FromResult(context.Messages.Single(x => x.Id == id));
+            return Task.FromResult(context.Messages.FirstOrDefault(x => x.Id == id));
         }
 
         public Task<bool> Update(Message entry)
         {
             try
             {
-                Message dbentry = context.Messages.Single(x => x.Id == entry.Id);
+                Message dbentry = context.Messages.FirstOrDefault(x => x.Id == entry.Id);
 
                 if (dbentry is not null)
                 {

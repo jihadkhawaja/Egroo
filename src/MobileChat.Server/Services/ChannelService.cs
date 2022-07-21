@@ -30,7 +30,7 @@ namespace MobileChat.Server.Services
 
         public Task<Channel> ReadById(Guid id)
         {
-            return Task.FromResult(context.Channels.Single(x => x.Id == id));
+            return Task.FromResult(context.Channels.FirstOrDefault(x => x.Id == id));
         }
 
         public Task<bool> AddUsers(Guid userid, Guid channelid, params string[] usernames)
@@ -53,7 +53,7 @@ namespace MobileChat.Server.Services
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    Guid currentuserid = context.Users.Single(x => x.Username == usernames[i]).Id;
+                    Guid currentuserid = context.Users.FirstOrDefault(x => x.Username == usernames[i]).Id;
 
                     if (ContainUser(currentuserid).Result)
                     {
@@ -88,7 +88,7 @@ namespace MobileChat.Server.Services
                 List<ChannelUser> users = context.ChannelUsers.Where(x => x.ChannelId == channelid).ToList();
                 foreach (ChannelUser user in users)
                 {
-                    channelUsers.Add(context.Users.Single(x => x.Id == user.UserId));
+                    channelUsers.Add(context.Users.FirstOrDefault(x => x.Id == user.UserId));
                 }
             }
             catch (Exception e)
@@ -113,7 +113,7 @@ namespace MobileChat.Server.Services
                 List<ChannelUser> users = context.ChannelUsers.Where(x => x.UserId == userid).ToList();
                 foreach (ChannelUser user in users)
                 {
-                    channels.Add(context.Channels.Single(x => x.Id == user.ChannelId));
+                    channels.Add(context.Channels.FirstOrDefault(x => x.Id == user.ChannelId));
                 }
             }
             catch (Exception e)

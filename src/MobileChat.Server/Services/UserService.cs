@@ -31,17 +31,17 @@ namespace MobileChat.Server.Services
 
         public Task<User> ReadById(Guid id)
         {
-            return Task.FromResult(context.Users.Single(x => x.Id == id));
+            return Task.FromResult(context.Users.FirstOrDefault(x => x.Id == id));
         }
 
         public Task<User> ReadByEmail(string email)
         {
-            return Task.FromResult(context.Users.Single(x => x.Email == email));
+            return Task.FromResult(context.Users.FirstOrDefault(x => x.Email == email));
         }
 
         public Task<User> ReadByUsername(string username)
         {
-            return Task.FromResult(context.Users.Single(x => x.Username == username));
+            return Task.FromResult(context.Users.FirstOrDefault(x => x.Username == username));
         }
 
         public Task<HashSet<User>> ReadAll()
@@ -53,7 +53,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
-                User dbentry = context.Users.Single(x => x.Id == entry.Id);
+                User dbentry = context.Users.FirstOrDefault(x => x.Id == entry.Id);
 
                 if (dbentry is not null)
                 {
@@ -78,7 +78,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
-                User entry = context.Users.Single(x => x.Id == id);
+                User entry = context.Users.FirstOrDefault(x => x.Id == id);
 
                 if (entry is not null)
                 {
@@ -105,7 +105,7 @@ namespace MobileChat.Server.Services
 
                 if (PatternMatchHelper.IsEmail(emailorusername))
                 {
-                    dbentry = context.Users.Single(x => x.Email == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Email == emailorusername);
 
                     if (dbentry is not null)
                     {
@@ -114,7 +114,7 @@ namespace MobileChat.Server.Services
                 }
                 else
                 {
-                    dbentry = context.Users.Single(x => x.Username == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Username == emailorusername);
 
                     if (dbentry is not null)
                     {
@@ -137,11 +137,11 @@ namespace MobileChat.Server.Services
 
                 if (PatternMatchHelper.IsEmail(emailorusername))
                 {
-                    dbentry = context.Users.Single(x => x.Email == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Email == emailorusername);
                 }
                 else
                 {
-                    dbentry = context.Users.Single(x => x.Username == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Username == emailorusername);
                 }
 
                 return Task.FromResult(true);
@@ -176,19 +176,19 @@ namespace MobileChat.Server.Services
                 if (PatternMatchHelper.IsEmail(friendEmailorusername))
                 {
                     //get user id from email
-                    User user = context.Users.SingleOrDefault(x => x.Id == userId);
+                    User user = context.Users.FirstOrDefault(x => x.Id == userId);
                     if (user == null)
                     {
                         return Task.FromResult(false);
                     }
                     //get friend id from email
-                    User friendUser = context.Users.SingleOrDefault(x => x.Email == friendEmailorusername);
+                    User friendUser = context.Users.FirstOrDefault(x => x.Email == friendEmailorusername);
                     if (friendUser == null)
                     {
                         return Task.FromResult(false);
                     }
 
-                    if (context.UsersFriends.SingleOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id) != null)
+                    if (context.UsersFriends.FirstOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id) != null)
                     {
                         return Task.FromResult(false);
                     }
@@ -200,19 +200,19 @@ namespace MobileChat.Server.Services
                 else
                 {
                     //get user id from username
-                    User user = context.Users.SingleOrDefault(x => x.Id == userId);
+                    User user = context.Users.FirstOrDefault(x => x.Id == userId);
                     if (user == null)
                     {
                         return Task.FromResult(false);
                     }
                     //get friend id from username
-                    User friendUser = context.Users.SingleOrDefault(x => x.Username == friendEmailorusername);
+                    User friendUser = context.Users.FirstOrDefault(x => x.Username == friendEmailorusername);
                     if (friendUser == null)
                     {
                         return Task.FromResult(false);
                     }
 
-                    if (context.UsersFriends.SingleOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id) != null)
+                    if (context.UsersFriends.FirstOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id) != null)
                     {
                         return Task.FromResult(false);
                     }
@@ -243,19 +243,19 @@ namespace MobileChat.Server.Services
                 if (PatternMatchHelper.IsEmail(friendEmailorusername))
                 {
                     //get user id from email
-                    User user = context.Users.SingleOrDefault(x => x.Id == userId);
+                    User user = context.Users.FirstOrDefault(x => x.Id == userId);
                     if (user == null)
                     {
                         return Task.FromResult(false);
                     }
                     //get friend id from email
-                    User friendUser = context.Users.SingleOrDefault(x => x.Email == friendEmailorusername);
+                    User friendUser = context.Users.FirstOrDefault(x => x.Email == friendEmailorusername);
                     if (friendUser == null)
                     {
                         return Task.FromResult(false);
                     }
 
-                    UserFriend entry = context.UsersFriends.SingleOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id);
+                    UserFriend entry = context.UsersFriends.FirstOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id);
                     if (entry is null)
                     {
                         return Task.FromResult(false);
@@ -266,19 +266,19 @@ namespace MobileChat.Server.Services
                 else
                 {
                     //get user id from username
-                    User user = context.Users.SingleOrDefault(x => x.Id == userId);
+                    User user = context.Users.FirstOrDefault(x => x.Id == userId);
                     if (user == null)
                     {
                         return Task.FromResult(false);
                     }
                     //get friend id from username
-                    User friendUser = context.Users.SingleOrDefault(x => x.Username == friendEmailorusername);
+                    User friendUser = context.Users.FirstOrDefault(x => x.Username == friendEmailorusername);
                     if (friendUser == null)
                     {
                         return Task.FromResult(false);
                     }
 
-                    UserFriend entry = context.UsersFriends.SingleOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id);
+                    UserFriend entry = context.UsersFriends.FirstOrDefault(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id);
                     if (entry is null)
                     {
                         return Task.FromResult(false);
@@ -300,7 +300,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
-                User user = context.Users.SingleOrDefault(x => x.Id == userId);
+                User user = context.Users.FirstOrDefault(x => x.Id == userId);
                 if (user == null)
                 {
                     return Task.FromResult(string.Empty);
@@ -319,7 +319,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
-                User user = context.Users.SingleOrDefault(x => x.ConnectionId == connectionid);
+                User user = context.Users.FirstOrDefault(x => x.ConnectionId == connectionid);
                 if (user == null)
                 {
                     return Task.FromResult<User>(null);
