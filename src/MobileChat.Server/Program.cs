@@ -94,7 +94,7 @@ JsonSerializerOptions jsonSerializerOptions = new()
 {
     WriteIndented = true,
 };
-app.MapPost(builder.Configuration.GetSection("Api")["BaseUrl"] + "/signup", async (string username, string password, IUser service) =>
+app.MapPost(builder.Configuration.GetSection("Api")["BaseUrl"] + "/v1/signup", async (string username, string password, IUser service) =>
 {
     if (await service.UserExist(username))
     {
@@ -117,7 +117,7 @@ app.MapPost(builder.Configuration.GetSection("Api")["BaseUrl"] + "/signup", asyn
 
     return Results.BadRequest();
 }).AllowAnonymous();
-app.MapPost(builder.Configuration.GetSection("Api")["BaseUrl"] + "/signin", async (string username, string password, IUser service) =>
+app.MapPost(builder.Configuration.GetSection("Api")["BaseUrl"] + "/v1/signin", async (string username, string password, IUser service) =>
 {
     if (!await service.UserExist(username))
     {

@@ -1,23 +1,67 @@
 ﻿@page "/chat"
 @page "/chat/{ChannelId}/{Title}"
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
+@using JihadKhawaja.SignalR.Client.Chat.Models
 @using MobileChat.MAUI.Shared.Components
 @inject NavigationManager NavigationManager
 @inject IChat ChatService
 
-<h3>@Title</h3>
-<h4>Current Channel @ChannelId</h4>
+<MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
+<MudText Typo="Typo.h6" GutterBottom>Current Channel @ChannelId</MudText>
 
-@*@foreach (var message in ChatService.ReceiveMessageHistory(GetChannelId()).Result)
-{
-    <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
-}*@
+<MudGrid>
+    <MudItem xs="12" md=12>
+        <MudPaper Height="400px" Elevation="0" Class="pa-4" Style="overflow:auto;">
+            @if (Messages.Count() == 0)
+            {
+                <MudText>No Messages</MudText>
+            }
+            else
+            {
+                <MudStack>
+                    @foreach (var message in Messages)
+                    {
+                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
+                    }
+                </MudStack>
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md=12>
+        <MudStack Row>
+            <MudTextField @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
+            <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
+            OnClick="SendMessage"/>
+        </MudStack>
+    </MudItem>
+</MudGrid>
 
 @code {
     [Parameter]
     public string Title { get; set; }
     [Parameter]
     public string ChannelId { get; set; }
+
+    private List<Message> Messages { get; set; }
+
+    private string InputContent { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Messages = new();
+
+        await base.OnInitializedAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Messages = (await GetMessages()).ToList();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
 
     private Guid GetChannelId()
     {
@@ -28,5 +72,24 @@
         }
 
         return Guid.Empty;
+    }
+
+    private async Task<IEnumerable<Message>> GetMessages()
+    {
+        return await ChatService.ReceiveMessageHistory(GetChannelId());
+    }
+
+    private Task SendMessage()
+    {
+        Message message = new()
+        {
+            Id = Guid.NewGuid(),
+            ChannelId = GetChannelId(),
+            Content = InputContent
+        };
+
+        Messages.Add(message);
+
+        return Task.CompletedTask;
     }
 }
