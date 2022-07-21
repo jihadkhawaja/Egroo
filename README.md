@@ -35,6 +35,24 @@ dotnet restore
       "Microsoft.Hosting.Lifetime": "Information"
     }
   },
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "File",
+        "Args": {
+          "path": "log.txt",
+          "rollingInterval": "Day"
+        }
+      },
+      {
+        "Name": "Console",
+        "Args": {
+          "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
+        }
+      }
+    ]
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=yourpassowrd;Database=mobilechatdb;"
   },
