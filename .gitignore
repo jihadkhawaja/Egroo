@@ -7,6 +7,8 @@
 appsettings.json
 appsettings.Development.json
 appsecrets.json
+images/
+[Ll]og*.txt
 
 # User-specific files
 *.rsuser
