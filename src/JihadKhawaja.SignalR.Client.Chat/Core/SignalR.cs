@@ -2,18 +2,17 @@
 
 namespace JihadKhawaja.SignalR.Client.Chat.Core
 {
-    public static class SignalR
+    public class SignalR
     {
-        public static HubConnection HubConnection { get; private set; }
+        public HubConnection HubConnection { get; private set; }
 
-        public static event Func<Exception, Task> Reconnecting;
-        public static event Func<string, Task> Reconnected;
-        public static event Func<Exception, Task> Closed;
-        public static bool Initialize(string url)
+        public event Func<Exception, Task> Reconnecting;
+        public event Func<string, Task> Reconnected;
+        public event Func<Exception, Task> Closed;
+
+        public SignalR(string url)
         {
-            try
-            {
-                HubConnection = new HubConnectionBuilder()
+            HubConnection = new HubConnectionBuilder()
                 .WithAutomaticReconnect(new TimeSpan[5]
                 {
                     new TimeSpan(0,0,0),
@@ -25,43 +24,38 @@ namespace JihadKhawaja.SignalR.Client.Chat.Core
                 .WithUrl(url)
                 .Build();
 
-                SubscribeHubEvents();
-
-                return true;
-            }
-            catch { }
-
-            return false;
+            SubscribeHubEvents();
         }
-        private static void SubscribeHubEvents()
+
+        private void SubscribeHubEvents()
         {
             HubConnection.Reconnected += HubConnection_Reconnected;
             HubConnection.Reconnecting += HubConnection_Reconnecting;
             HubConnection.Closed += HubConnection_Closed;
         }
 
-        private static Task HubConnection_Reconnecting(Exception arg)
+        private Task HubConnection_Reconnecting(Exception arg)
         {
             Reconnecting?.Invoke(arg);
 
             return Task.CompletedTask;
         }
 
-        private static Task HubConnection_Reconnected(string arg)
+        private Task HubConnection_Reconnected(string arg)
         {
             Reconnected?.Invoke(arg);
 
             return Task.CompletedTask;
         }
 
-        private static Task HubConnection_Closed(Exception arg)
+        private Task HubConnection_Closed(Exception arg)
         {
             Closed?.Invoke(arg);
 
             return Task.CompletedTask;
         }
 
-        public static async Task<bool> Connect(CancellationTokenSource cts)
+        public async Task<bool> Connect(CancellationTokenSource cts)
         {
             try
             {
@@ -88,7 +82,7 @@ namespace JihadKhawaja.SignalR.Client.Chat.Core
 
             return false;
         }
-        public static async Task<bool> Disconnect()
+        public async Task<bool> Disconnect()
         {
             try
             {

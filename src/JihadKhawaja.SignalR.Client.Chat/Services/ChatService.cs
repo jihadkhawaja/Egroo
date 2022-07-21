@@ -8,56 +8,56 @@ namespace JihadKhawaja.SignalR.Client.Chat.Services
     {
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<KeyValuePair<Guid, bool>>("SignUp", displayname, username, email, password);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<KeyValuePair<Guid, bool>>("SignUp", displayname, username, email, password);
         }
 
         public async Task<KeyValuePair<Guid, bool>> SignIn(string emailorusername, string password)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<KeyValuePair<Guid, bool>>("SignIn", emailorusername, password);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<KeyValuePair<Guid, bool>>("SignIn", emailorusername, password);
         }
 
         public async Task<bool> SendMessage(Message message)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<bool>("SendMessage", message);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<bool>("SendMessage", message);
         }
 
         public async Task<bool> AddFriend(Guid userId, string friendEmailorusername)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<bool>("AddFriend", userId, friendEmailorusername);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<bool>("AddFriend", userId, friendEmailorusername);
         }
 
         public async Task<bool> RemoveFriend(Guid userId, string friendEmailorusername)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<bool>("RemoveFriend", userId, friendEmailorusername);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<bool>("RemoveFriend", userId, friendEmailorusername);
         }
 
         public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", userId, usernames);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", userId, usernames);
         }
         public async Task<User[]> GetChannelUsers(Guid channelid)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<User[]>("GetChannelUsers", channelid);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<User[]>("GetChannelUsers", channelid);
         }
 
         public Task<Channel[]> GetUserChannels(Guid userid)
         {
-            return Core.SignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels", userid);
+            return ClientChat.SignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels", userid);
         }
 
         public async Task<Message[]> ReceiveMessageHistory(Guid channelid)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistory", channelid);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistory", channelid);
         }
 
         public async Task<Message[]> ReceiveMessageHistoryRange(Guid channelid, int index, int range)
         {
-            return await Core.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistoryRange", channelid, index, range);
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistoryRange", channelid, index, range);
         }
 
         public Task<string> GetUserDisplayName(Guid userId)
         {
-            return Core.SignalR.HubConnection.InvokeAsync<string>("GetUserDisplayName", userId);
+            return ClientChat.SignalR.HubConnection.InvokeAsync<string>("GetUserDisplayName", userId);
         }
     }
 }

@@ -11,7 +11,7 @@ using Serilog;
 using System.Text;
 using System.Text.Json;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 //logger
 builder.Host.UseSerilog((ctx, lc) => lc
@@ -56,11 +56,11 @@ builder.Services.AddScoped<IUser, UserService>();
 builder.Services.AddScoped<IMessage, MessageService>();
 builder.Services.AddScoped<IChannel, ChannelService>();
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+using (IServiceScope scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+    DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
     db.Database.Migrate();
 }
 
