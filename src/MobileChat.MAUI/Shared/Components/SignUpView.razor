@@ -1,4 +1,4 @@
-﻿@page "/signin"
+﻿@page "/signup"
 
 @using FluentValidation
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
@@ -7,28 +7,40 @@
 @inject IChat ChatService
 @inject NavigationManager NavigationManager
 
-<MudText GutterBottom Color="Color.Secondary">Sign In</MudText>
-<MudText>Don't have an account? <span><MudButton Link="signup">Sign Up</MudButton></span></MudText>
+<MudText GutterBottom Color="Color.Secondary">Sign Up</MudText>
+<MudText>Already have an account? <span><MudButton Link="signin">Sign In</MudButton></span></MudText>
 
 <MudGrid Class="mt-8" Justify="Justify.FlexStart">
     <MudItem xs="12" sm="8" md="6">
         <MudCard Elevation="25" Class="rounded-lg pb-4">
             <MudCardHeader>
                 <CardHeaderContent>
-                    <MudText Typo="Typo.h5" Align="Align.Start">Create Account</MudText>
+                    <MudText Typo="Typo.h5" Align="Align.Center">Create Account</MudText>
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
                 <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
+                    <MudTextField @bind-Value="model.DisplayName"
+                                  For="@(() => model.DisplayName)"
+                                  Immediate="true"
+                                  Label="Display Name" InputType="InputType.Text" />
+
                     <MudTextField @bind-Value="model.Username"
                                   For="@(() => model.Username)"
                                   Immediate="true"
-                                  Label="Username" />
+                                  Label="Username" ErrorText="Invalid username." />
 
                     <MudTextField @bind-Value="model.Password"
                                   For="@(() => model.Password)"
                                   Immediate="true"
-                                  Label="Password" InputType="InputType.Password" />
+                                  T="string" Label="Password" HelperText="Choose a strong password" @ref="pwField1"
+                                  InputType="InputType.Password"
+                                  Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))" Required="true"
+                                  RequiredError="Password is required!" />
+
+                    <MudTextField T="string"
+                                  Label="Password" HelperText="Repeat the password" InputType="InputType.Password"
+                                  Validation="@(new Func<string, string>(PasswordMatch))" />
 
                 </MudForm>
             </MudCardContent>
@@ -45,6 +57,7 @@
 
     UserFluentValidator UserValidator;
 
+    MudTextField<string> pwField1;
     User model = new User();
     bool IsBusy = false;
 
@@ -69,16 +82,16 @@
         }
 
         User user = new User
-        {
-            Id = Guid.NewGuid(),
-            DisplayName = model.DisplayName,
-            Email = model.Email.ToLower(),
-            Password = model.Password,
-            Permission = 0,
-            DateCreated = DateTime.UtcNow,
-        };
+            {
+                Id = Guid.NewGuid(),
+                DisplayName = model.DisplayName,
+                Email = model.Email.ToLower(),
+                Password = model.Password,
+                Permission = 0,
+                DateCreated = DateTime.UtcNow,
+            };
 
-        KeyValuePair<Guid, bool> values = await ChatService.SignIn(user.Username, user.Password);
+        KeyValuePair<Guid, bool> values = await ChatService.SignUp(user.DisplayName, user.Username, user.Email, user.Password);
 
         //create user
         if (values.Value)
@@ -93,6 +106,30 @@
         }
 
         IsBusy = false;
+    }
+
+    private IEnumerable<string> PasswordStrength(string pw)
+    {
+        if (string.IsNullOrWhiteSpace(pw))
+        {
+            yield return "Password is required!";
+            yield break;
+        }
+        if (pw.Length < 8)
+            yield return "Password must be at least of length 8";
+        if (!Regex.IsMatch(pw, @"[A-Z]"))
+            yield return "Password must contain at least one capital letter";
+        if (!Regex.IsMatch(pw, @"[a-z]"))
+            yield return "Password must contain at least one lowercase letter";
+        if (!Regex.IsMatch(pw, @"[0-9]"))
+            yield return "Password must contain at least one digit";
+    }
+
+    private string PasswordMatch(string arg)
+    {
+        if (pwField1.Value != arg)
+            return "Passwords don't match";
+        return null;
     }
 
     public class UserFluentValidator : AbstractValidator<User>

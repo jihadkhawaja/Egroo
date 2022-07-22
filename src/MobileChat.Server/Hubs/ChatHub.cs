@@ -1,4 +1,5 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
+﻿using JihadKhawaja.SignalR.Server.Chat.Interfaces;
+using JihadKhawaja.SignalR.Server.Chat.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR;
 using MobileChat.Server.Helpers;
@@ -6,7 +7,7 @@ using MobileChat.Server.Interfaces;
 
 namespace MobileChat.Server.Hubs
 {
-    public class ChatHub : Hub
+    public class ChatHub : Hub, IChatHub
     {
         public ChatHub(IUser userService, IMessage messageService, IChannel channelService)
         {
