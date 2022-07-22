@@ -1,5 +1,7 @@
 ﻿using JihadKhawaja.SignalR.Client.Chat.Interfaces;
 using JihadKhawaja.SignalR.Client.Chat.Services;
+using MobileChat.MAUI.Interfaces;
+using MobileChat.MAUI.Services;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI
@@ -23,6 +25,7 @@ namespace MobileChat.MAUI
             builder.Services.AddMudServices();
 
             //chat services
+            builder.Services.AddScoped<ISaveFile, SaveFileService>();
             builder.Services.AddScoped<IChat, ChatService>();
 
             return builder.Build();

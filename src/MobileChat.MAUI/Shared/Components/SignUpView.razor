@@ -4,6 +4,8 @@
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
 @using JihadKhawaja.SignalR.Client.Chat.Models
 @using System.Text.RegularExpressions
+@using MobileChat.MAUI.Interfaces
+@inject ISaveFile SaveFileService
 @inject IChat ChatService
 @inject NavigationManager NavigationManager
 
@@ -29,6 +31,11 @@
                                   For="@(() => model.Username)"
                                   Immediate="true"
                                   Label="Username" ErrorText="Invalid username." />
+
+                    <MudTextField @bind-Value="model.Email"
+                                  For="@(() => model.Email)"
+                                  Immediate="true"
+                                  Label="Email (Optinal)" ErrorText="Invalid username." />
 
                     <MudTextField @bind-Value="model.Password"
                                   For="@(() => model.Password)"
@@ -81,21 +88,17 @@
             return;
         }
 
-        User user = new User
-            {
-                Id = Guid.NewGuid(),
-                DisplayName = model.DisplayName,
-                Email = model.Email.ToLower(),
-                Password = model.Password,
-                Permission = 0,
-                DateCreated = DateTime.UtcNow,
-            };
-
-        KeyValuePair<Guid, bool> values = await ChatService.SignUp(user.DisplayName, user.Username, user.Email, user.Password);
+        KeyValuePair<Guid, bool> values = await ChatService.SignUp(model.DisplayName, model.Username, model.Email, model.Password);
 
         //create user
         if (values.Value)
         {
+            model.Id = values.Key;
+
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+            SaveFileService.CreateDirectory(path);
+            SaveFileService.WriteToJsonFile<User>("user.json", path, model);
+
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 
             NavigationManager.NavigateTo("/");
@@ -145,7 +148,8 @@
 
             RuleFor(x => x.Username)
                 .Cascade(CascadeMode.Stop)
-                .NotEmpty();
+                .NotEmpty()
+                .Length(3, 100);
         }
 
         public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>

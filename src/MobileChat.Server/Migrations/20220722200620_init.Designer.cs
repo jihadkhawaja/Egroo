@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MobileChat.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20220719154826_init")]
+    [Migration("20220722200620_init")]
     partial class init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -40,9 +40,9 @@ namespace MobileChat.Server.Migrations
 
             modelBuilder.Entity("JihadKhawaja.SignalR.Server.Chat.Models.ChannelUser", b =>
                 {
-                    b.Property<decimal>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ChannelId")
                         .HasColumnType("uuid");
@@ -101,41 +101,34 @@ namespace MobileChat.Server.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("About")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("AvatarUrl")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("ConnectionId")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTime>("DateCreated")
+                    b.Property<DateTime?>("DateCreated")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("DisplayName")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("FirebaseToken")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("FirstName")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<bool>("IsOnline")
                         .HasColumnType("boolean");
 
                     b.Property<string>("LastName")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Password")

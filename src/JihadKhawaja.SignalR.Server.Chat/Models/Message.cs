@@ -11,11 +11,11 @@ namespace JihadKhawaja.SignalR.Server.Chat.Models
         [Required]
         public Guid ChannelId { get; set; }
         public bool Sent { get; set; }
-        public DateTime DateSent { get; set; }
+        public DateTime? DateSent { get; set; }
         public bool Seen { get; set; }
-        public DateTime DateSeen { get; set; }
+        public DateTime? DateSeen { get; set; }
         [Required]
         public string Content { get; set; }
-        public DateTime DateCreated { get; set; }
+        public DateTime? DateCreated { get; set; }
     }
 }
