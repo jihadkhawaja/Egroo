@@ -78,20 +78,12 @@ dotnet restore
 }
 
 ```
-2. Create appsecrets.json file and add your own Jwt like below, include it in project solution to be created on build.
-```
-{
-  "Secrets": {
-    "Jwt": "your Jwt here example: cACLPY7=*Pe5K%?3"
-  }
-}
-```
-3. Set your database connection strings in **appsettings.json** and **appsettings.Development.json**
-4. Test your database connection, in the Package Manager Console (Ctrl+`)
+2. Set your database connection strings in **appsettings.json** and **appsettings.Development.json**
+3. Test your database connection, in the Package Manager Console (Ctrl+`)
 ```
 Add-Migration [your migration name]
 ```
-5. Updating the database is automated from the code but you can test it manually
+4. Updating the database is automated from the code but you can test it manually
 ```
 Update-Database
 ```
