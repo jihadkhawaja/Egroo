@@ -4,6 +4,9 @@
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
 @using JihadKhawaja.SignalR.Client.Chat.Models
 @using System.Text.RegularExpressions
+@using MobileChat.MAUI.Helpers
+@using MobileChat.MAUI.Interfaces
+@inject ISaveFile SaveFileService
 @inject IChat ChatService
 @inject NavigationManager NavigationManager
 
@@ -15,21 +18,22 @@
         <MudCard Elevation="25" Class="rounded-lg pb-4">
             <MudCardHeader>
                 <CardHeaderContent>
-                    <MudText Typo="Typo.h5" Align="Align.Start">Create Account</MudText>
+                    <MudText Typo="Typo.h5" Align="Align.Start">Log in Account</MudText>
                 </CardHeaderContent>
             </MudCardHeader>
             <MudCardContent>
-                <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
-                    <MudTextField @bind-Value="model.Username"
-                                  For="@(() => model.Username)"
-                                  Immediate="true"
-                                  Label="Username" />
+                <MudForm @ref="@form" ValidationDelay="0">
+                    <MudTextField @bind-Value="@EmailOrUsername"
+                                Immediate="true"
+                                Required="true"
+                                Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                Label="Email or Username" />
 
-                    <MudTextField @bind-Value="model.Password"
-                                  For="@(() => model.Password)"
-                                  Immediate="true"
-                                  Label="Password" InputType="InputType.Password" />
-
+                    <MudTextField @bind-Value="@Password"
+                                Immediate="true"
+                                Required="true"
+                                Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                Label="Password" InputType="InputType.Password" />
                 </MudForm>
             </MudCardContent>
             <MudCardActions Class="d-flex justify-center">
@@ -43,16 +47,17 @@
     [Inject] ISnackbar Snackbar { get; set; }
     MudForm form;
 
-    UserFluentValidator UserValidator;
-
-    User model = new User();
+    string EmailOrUsername { get; set; }
+    string Password { get; set; }
     bool IsBusy = false;
 
-    protected override void OnInitialized()
+    private IEnumerable<string> NotEmpty(string text)
     {
-        UserValidator = new UserFluentValidator(ChatService);
-
-        base.OnInitialized();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            yield return "Field is required!";
+            yield break;
+        }
     }
 
     private async Task Submit()
@@ -68,21 +73,30 @@
             return;
         }
 
-        User user = new User
-        {
-            Id = Guid.NewGuid(),
-            DisplayName = model.DisplayName,
-            Email = model.Email.ToLower(),
-            Password = model.Password,
-            Permission = 0,
-            DateCreated = DateTime.UtcNow,
-        };
+        KeyValuePair<Guid, bool> values = await ChatService.SignIn(EmailOrUsername, Password);
 
-        KeyValuePair<Guid, bool> values = await ChatService.SignIn(user.Username, user.Password);
-
-        //create user
+        //check user
         if (values.Value)
         {
+            User user = new()
+            {
+                Id = values.Key,
+                Password = Password
+            };
+
+            if (PatternMatchHelper.IsEmail(EmailOrUsername))
+            {
+                user.Email = EmailOrUsername;
+            }
+            else
+            {
+                user.Username = EmailOrUsername;
+            };
+
+            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+            SaveFileService.CreateDirectory(path);
+            SaveFileService.WriteToJsonFile<User>("user.json", path, user);
+
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 
             NavigationManager.NavigateTo("/");
@@ -93,30 +107,5 @@
         }
 
         IsBusy = false;
-    }
-
-    public class UserFluentValidator : AbstractValidator<User>
-    {
-        private readonly IChat ChatService;
-        public UserFluentValidator(IChat ChatService)
-        {
-            this.ChatService = ChatService;
-
-            RuleFor(x => x.DisplayName)
-                .NotEmpty()
-                .Length(3, 100);
-
-            RuleFor(x => x.Username)
-                .Cascade(CascadeMode.Stop)
-                .NotEmpty();
-        }
-
-        public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
-        {
-            var result = await ValidateAsync(ValidationContext<User>.CreateWithOptions((User)model, x => x.IncludeProperties(propertyName)));
-            if (result.IsValid)
-                return Array.Empty<string>();
-            return result.Errors.Select(e => e.ErrorMessage);
-        };
     }
 }

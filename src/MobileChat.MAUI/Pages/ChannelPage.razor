@@ -1,8 +1,11 @@
 ﻿@page "/chat/{ChannelId}/{Title}"
+
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
 @using JihadKhawaja.SignalR.Client.Chat.Models
+@using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Shared.Components
 @inject NavigationManager NavigationManager
+@inject ISaveFile SaveFileService
 @inject IChat ChatService
 
 <MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
@@ -45,8 +48,13 @@
 
     private string InputContent { get; set; }
 
+    private User CurrentUser { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
+        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path);
+
         Messages = new();
 
         await base.OnInitializedAsync();
@@ -57,6 +65,8 @@
         if (firstRender)
         {
             Messages = (await GetMessages()).ToList();
+
+            await InvokeAsync(StateHasChanged);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -73,7 +83,7 @@
         return Guid.Empty;
     }
 
-    private async Task<IEnumerable<Message>> GetMessages()
+    private async Task<Message[]> GetMessages()
     {
         return await ChatService.ReceiveMessageHistory(GetChannelId());
     }
@@ -84,11 +94,15 @@
         {
             Id = Guid.NewGuid(),
             ChannelId = GetChannelId(),
-            Content = InputContent
+            Content = InputContent,
+            SenderId = CurrentUser.Id,
+            DateCreated = DateTime.UtcNow,
+            DateSent = DateTime.UtcNow,
+            DisplayName = CurrentUser.DisplayName,
         };
 
-        Messages.Add(message);
-
         await ChatService.SendMessage(message);
+
+        Messages.Add(message);
     }
 }

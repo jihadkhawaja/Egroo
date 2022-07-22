@@ -1,47 +1,128 @@
 ﻿@page "/channels"
+
 @using JihadKhawaja.SignalR.Client.Chat.Interfaces
 @using JihadKhawaja.SignalR.Client.Chat.Models
+@using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Shared.Components
 @inject NavigationManager NavigationManager
+@inject ISaveFile SaveFileService
 @inject IChat ChatService
 
-<MudText GutterBottom Align="Align.Left" Typo="Typo.h3">Channels</MudText>
-<MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-    @foreach (var channel in UserChannels)
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate />
+}
+else if (!IsSignedIn)
+{
+    <SignInView />
+}
+else
+{
+    <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.h3">Channels</MudText>
+        <MudButton OnClick="CreateChannel" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
+    </MudStack>
+    @if (CurrentUserChannels is null)
     {
-        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Elevation="2" onclick="@(() => OpenChannel(channel))">
-            <MudGrid Justify="Justify.SpaceBetween">
-                <MudItem Class="mt-3">
-                    <ChannelView Title=@channel.Title Users="User1, User2, User3" />
-                </MudItem>
-                <MudItem>
-                    <MudStack Spacing="0">
-                        <MudButton>Edit</MudButton>
-                        <MudButton Color="Color.Error">Delete</MudButton>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudPaper>
+        <MudText GutterBottom Typo="Typo.h6">No channels yet..</MudText>
     }
-</MudStack>
+    else
+    {
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+            @foreach (var channel in CurrentUserChannels)
+            {
+                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Elevation="2" onclick="@(() => OpenChannel(channel))">
+                    <MudGrid Justify="Justify.SpaceBetween">
+                        <MudItem Class="mt-3">
+                            <ChannelView Title=@channel.Title Users="@channel.Id.ToString()" />
+                        </MudItem>
+                        <MudItem>
+                            <MudStack Spacing="0">
+                                <MudButton>Edit</MudButton>
+                                <MudButton Color="Color.Error">Delete</MudButton>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudStack>
+    }
+}
 
 @code{
-    public IEnumerable<Channel> UserChannels { get; set; }
+    public IEnumerable<Channel> CurrentUserChannels { get; set; }
+
+    private User CurrentUser { get; set; }
+
+    private bool IsSignedIn { get; set; }
+
+    private bool IsBusy { get; set; } = true;
 
     protected override Task OnInitializedAsync()
     {
-        UserChannels = new Channel[6]
-        {
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 1", DateCreated = DateTime.UtcNow },
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 2", DateCreated = DateTime.UtcNow },
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 3", DateCreated = DateTime.UtcNow },
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 4", DateCreated = DateTime.UtcNow },
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 5", DateCreated = DateTime.UtcNow },
-            new Channel { Id = Guid.NewGuid(), Title = "Text Channel 6", DateCreated = DateTime.UtcNow }
-        };
+        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path);
 
         return base.OnInitializedAsync();
     }
 
-    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id}/{channel.Title}");
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+        {
+            if (CurrentUser is not null)
+            {
+                IsBusy = true;
+
+                KeyValuePair<Guid, bool> values = await ChatService.SignIn(CurrentUser.Username, CurrentUser.Password);
+                IsSignedIn = values.Value;
+
+                if (IsSignedIn)
+                {
+                    CurrentUserChannels = await GetChannels();
+                }
+
+                IsBusy = false;
+
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task<Channel[]> GetChannels()
+    {
+        Channel[] channels = await ChatService.GetUserChannels(CurrentUser.Id);
+
+        for (int i = 0; i < channels.Length; i++)
+        {
+            User[] friends = await ChatService.GetChannelUsers(channels[i].Id);
+            foreach (User friend in friends)
+            {
+                channels[i].Title += ", ";
+
+                if (friend.Id == CurrentUser.Id)
+                {
+                    channels[i].Title = channels[i].Title.Insert(0, "You");
+                }
+                else
+                {
+                    channels[i].Title += await ChatService.GetUserDisplayName(friend.Id);
+                }
+            }
+
+            channels[i].Title = channels[i].Title.TrimEnd(',', ' ');
+        }
+
+        return channels;
+    }
+
+    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{channel.Title}");
+
+    private async Task CreateChannel()
+    {
+        await ChatService.CreateChannel(CurrentUser.Id, CurrentUser.Username);
+        CurrentUserChannels = await GetChannels();
+    }
 }

@@ -137,14 +137,17 @@ namespace MobileChat.Server.Services
 
                 if (PatternMatchHelper.IsEmail(emailorusername))
                 {
-                    dbentry = context.Users.FirstOrDefault(x => x.Email == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Email == emailorusername && x.Password == password);
                 }
                 else
                 {
-                    dbentry = context.Users.FirstOrDefault(x => x.Username == emailorusername);
+                    dbentry = context.Users.FirstOrDefault(x => x.Username == emailorusername && x.Password == password);
                 }
 
-                return Task.FromResult(true);
+                if(dbentry is not null)
+                {
+                    return Task.FromResult(true);
+                }
             }
             catch (Exception e)
             {

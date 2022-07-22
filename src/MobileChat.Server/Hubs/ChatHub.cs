@@ -135,6 +135,11 @@ namespace MobileChat.Server.Hubs
 
         public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
         {
+            if(usernames.Length == 0)
+            {
+                return null;
+            }
+
             Channel channel = new()
             {
                 Id = Guid.NewGuid(),

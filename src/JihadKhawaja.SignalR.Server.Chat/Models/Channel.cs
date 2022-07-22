@@ -6,6 +6,6 @@ namespace JihadKhawaja.SignalR.Server.Chat.Models
     {
         [Key]
         public Guid Id { get; set; }
-        public DateTime DateCreated { get; set; }
+        public DateTime? DateCreated { get; set; }
     }
 }

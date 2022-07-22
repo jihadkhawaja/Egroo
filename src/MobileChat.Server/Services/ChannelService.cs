@@ -1,4 +1,5 @@
 ﻿using JihadKhawaja.SignalR.Server.Chat.Models;
+using Microsoft.EntityFrameworkCore;
 using MobileChat.Server.Database;
 using MobileChat.Server.Interfaces;
 
@@ -18,14 +19,12 @@ namespace MobileChat.Server.Services
             {
                 context.Channels.Add(entry);
                 context.SaveChanges();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return Task.FromResult(false);
-            }
 
-            return Task.FromResult(true);
+                return Task.FromResult(true);
+            }
+            catch { }
+            
+            return Task.FromResult(false);
         }
 
         public Task<Channel> ReadById(Guid id)
@@ -39,18 +38,6 @@ namespace MobileChat.Server.Services
             {
                 ChannelUser[] channelUsers = new ChannelUser[usernames.Length];
 
-                if (!ContainUser(userid).Result)
-                {
-                    ChannelUser channelCreator = new()
-                    {
-                        ChannelId = channelid,
-                        UserId = userid,
-                        DateCreated = DateTime.UtcNow
-                    };
-
-                    context.ChannelUsers.Add(channelCreator);
-                }
-
                 for (int i = 0; i < usernames.Length; i++)
                 {
                     Guid currentuserid = context.Users.FirstOrDefault(x => x.Username == usernames[i]).Id;
@@ -62,22 +49,21 @@ namespace MobileChat.Server.Services
 
                     channelUsers[i] = new ChannelUser()
                     {
+                        Id = Guid.NewGuid(),
                         ChannelId = channelid,
                         UserId = currentuserid,
-                        DateCreated = DateTime.UtcNow
+                        DateCreated = DateTime.UtcNow,
                     };
                 }
 
                 context.ChannelUsers.AddRange(channelUsers);
                 context.SaveChanges();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.Message);
-                return Task.FromResult(false);
-            }
 
-            return Task.FromResult(true);
+                return Task.FromResult(true);
+            }
+            catch { }
+
+            return Task.FromResult(false);
         }
 
         public Task<HashSet<User>> GetUsers(Guid channelid)
