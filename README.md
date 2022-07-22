@@ -55,9 +55,6 @@ dotnet restore
   },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=yourpassowrd;Database=mobilechatdb;"
-  },
-  "Api": {
-    "BaseUrl": "/api/v1"
   }
 }
 ```
