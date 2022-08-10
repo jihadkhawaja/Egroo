@@ -39,7 +39,7 @@ dotnet restore
       {
         "Name": "File",
         "Args": {
-          "path": "log.txt",
+          "path": "logs/log.txt",
           "rollingInterval": "Day"
         }
       },
