@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-namespace JihadKhawaja.SignalR.Client.Chat.Models
+namespace MobileChat.Shared.Models
 {
     public class Message
     {
@@ -10,7 +11,7 @@ namespace JihadKhawaja.SignalR.Client.Chat.Models
         public Guid SenderId { get; set; }
         [Required]
         public Guid ChannelId { get; set; }
-        [Required]
+        [NotMapped]
         public string DisplayName { get; set; }
         public bool Sent { get; set; }
         public DateTime? DateSent { get; set; }

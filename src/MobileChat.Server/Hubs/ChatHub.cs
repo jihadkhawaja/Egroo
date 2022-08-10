@@ -1,9 +1,8 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Interfaces;
-using JihadKhawaja.SignalR.Server.Chat.Models;
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR;
 using MobileChat.Server.Helpers;
 using MobileChat.Server.Interfaces;
+using MobileChat.Shared.Models;
 
 namespace MobileChat.Server.Hubs
 {
@@ -135,7 +134,7 @@ namespace MobileChat.Server.Hubs
 
         public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
         {
-            if(usernames.Length == 0)
+            if (usernames.Length == 0)
             {
                 return null;
             }

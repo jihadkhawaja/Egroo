@@ -7,9 +7,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.MAUI", "MobileCh
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.Server", "MobileChat.Server\MobileChat.Server.csproj", "{1EDC6F16-E37D-4344-9CD6-D15B786B8F02}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JihadKhawaja.SignalR.Client.Chat", "JihadKhawaja.SignalR.Client.Chat\JihadKhawaja.SignalR.Client.Chat.csproj", "{48D03A6A-ED6B-4976-A4A4-738055B43EC8}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.Client", "MobileChat.Client\MobileChat.Client.csproj", "{48D03A6A-ED6B-4976-A4A4-738055B43EC8}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JihadKhawaja.SignalR.Server.Chat", "JihadKhawaja.SignalR.Server.Chat\JihadKhawaja.SignalR.Server.Chat.csproj", "{3720A4AA-806A-452D-AA3A-3745B5A6C53F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.Shared", "MobileChat.Shared\MobileChat.Shared.csproj", "{3720A4AA-806A-452D-AA3A-3745B5A6C53F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

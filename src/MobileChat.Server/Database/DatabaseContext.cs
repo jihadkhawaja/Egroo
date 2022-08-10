@@ -1,5 +1,5 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using MobileChat.Shared.Models;
 
 namespace MobileChat.Server.Database
 {

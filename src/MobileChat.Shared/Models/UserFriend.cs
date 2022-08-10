@@ -1,15 +1,15 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace JihadKhawaja.SignalR.Server.Chat.Models
+namespace MobileChat.Shared.Models
 {
-    public class ChannelUser
+    public class UserFriend
     {
         [Key]
-        public Guid Id { get; set; }
-        [Required]
-        public Guid ChannelId { get; set; }
+        public ulong Id { get; set; }
         [Required]
         public Guid UserId { get; set; }
+        [Required]
+        public Guid FriendUserId { get; set; }
         public DateTime? DateCreated { get; set; }
     }
 }

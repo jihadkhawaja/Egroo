@@ -1,4 +1,4 @@
-﻿using JihadKhawaja.SignalR.Client.Chat;
+﻿using MobileChat.Client;
 
 namespace MobileChat.MAUI
 {

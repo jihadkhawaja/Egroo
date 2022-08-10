@@ -1,4 +1,4 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
+﻿using MobileChat.Shared.Models;
 
 namespace MobileChat.Server.Interfaces
 {

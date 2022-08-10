@@ -1,8 +1,8 @@
-﻿using JihadKhawaja.SignalR.Client.Chat.Interfaces;
-using JihadKhawaja.SignalR.Client.Chat.Models;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
+using MobileChat.Client.Interfaces;
+using MobileChat.Shared.Models;
 
-namespace JihadKhawaja.SignalR.Client.Chat.Services
+namespace MobileChat.Client.Services
 {
     public class ChatService : IChat
     {

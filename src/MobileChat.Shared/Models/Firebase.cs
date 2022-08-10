@@ -1,4 +1,4 @@
-﻿namespace JihadKhawaja.SignalR.Server.Chat.Models
+﻿namespace MobileChat.Shared.Models
 {
     public class Firebase
     {

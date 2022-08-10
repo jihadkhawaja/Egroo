@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 
-namespace JihadKhawaja.SignalR.Client.Chat.Core
+namespace MobileChat.Client.Core
 {
     public class SignalR
     {
