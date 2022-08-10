@@ -87,5 +87,8 @@ If your database is setup correctly you should find the database along with your
 
 ---
 
-#### :grey_exclamation: Notice
+#### Notice
 This project is under heavy refactoring and development, You may contribute once a release is published.
+
+#### Discord
+Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
