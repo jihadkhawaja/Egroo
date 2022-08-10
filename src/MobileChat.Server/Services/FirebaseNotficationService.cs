@@ -1,6 +1,6 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
-using MobileChat.Server.Interfaces;
+﻿using MobileChat.Server.Interfaces;
 using MobileChat.Server.Rest;
+using MobileChat.Shared.Models;
 using System.Text.Json;
 
 namespace MobileChat.Server.Services

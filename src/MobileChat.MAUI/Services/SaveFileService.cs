@@ -168,7 +168,7 @@ namespace MobileChat.MAUI.Services
 
                 return JsonSerializer.Deserialize<T>(fileContents);
             }
-            catch 
+            catch
             {
                 return default;
             }

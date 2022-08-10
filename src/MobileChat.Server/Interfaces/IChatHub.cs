@@ -1,6 +1,6 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
+﻿using MobileChat.Shared.Models;
 
-namespace JihadKhawaja.SignalR.Server.Chat.Interfaces
+namespace MobileChat.Server.Interfaces
 {
     public interface IChatHub
     {

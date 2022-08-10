@@ -1,42 +1,44 @@
 ﻿@page "/chat/{ChannelId}/{Title}"
 
-@using JihadKhawaja.SignalR.Client.Chat.Interfaces
-@using JihadKhawaja.SignalR.Client.Chat.Models
+@using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Shared.Components
+@using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChat ChatService
 
-<MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
-<MudText Typo="Typo.h6" GutterBottom>Current Channel @ChannelId</MudText>
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
+    <MudText Typo="Typo.h6" GutterBottom>Current Channel @ChannelId</MudText>
 
-<MudGrid>
-    <MudItem xs="12" md=12>
-        <MudPaper Height="400px" Elevation="0" Class="pa-4" Style="overflow:auto;">
-            @if (Messages.Count() == 0)
-            {
-                <MudText>No Messages</MudText>
-            }
-            else
-            {
-                <MudStack>
-                    @foreach (var message in Messages)
-                    {
-                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
-                    }
-                </MudStack>
-            }
-        </MudPaper>
-    </MudItem>
-    <MudItem xs="12" md=12>
-        <MudStack Row>
-            <MudTextField @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
-            <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
-            OnClick="SendMessage"/>
-        </MudStack>
-    </MudItem>
-</MudGrid>
+    <MudGrid>
+        <MudItem xs="12" md=12>
+            <MudPaper Height="400px" Elevation="0" Class="pa-4" Style="overflow:auto;">
+                @if (Messages.Count() == 0)
+                {
+                    <MudText>No Messages</MudText>
+                }
+                else
+                {
+                    <MudStack>
+                        @foreach (var message in Messages)
+                        {
+                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md=12>
+            <MudStack Row>
+                <MudTextField @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
+                <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
+                OnClick="SendMessage"/>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
     [Parameter]
@@ -90,19 +92,33 @@
 
     private async Task SendMessage()
     {
+        if (string.IsNullOrEmpty(InputContent) || string.IsNullOrWhiteSpace(InputContent))
+        {
+            return;
+        }
+
+        InputContent = InputContent.Trim();
+
         Message message = new()
         {
             Id = Guid.NewGuid(),
             ChannelId = GetChannelId(),
+            DisplayName = CurrentUser.DisplayName,
             Content = InputContent,
             SenderId = CurrentUser.Id,
             DateCreated = DateTime.UtcNow,
-            DateSent = DateTime.UtcNow,
-            DisplayName = CurrentUser.DisplayName,
+            DateSent = DateTime.UtcNow
         };
 
         await ChatService.SendMessage(message);
 
         Messages.Add(message);
+
+        InputContent = string.Empty;
+    }
+
+    private async Task<string> GetUserName(Guid userid)
+    {
+       return await ChatService.GetUserDisplayName(userid);
     }
 }

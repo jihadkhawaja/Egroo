@@ -1,7 +1,6 @@
-﻿using JihadKhawaja.SignalR.Server.Chat.Models;
-using Microsoft.EntityFrameworkCore;
-using MobileChat.Server.Database;
+﻿using MobileChat.Server.Database;
 using MobileChat.Server.Interfaces;
+using MobileChat.Shared.Models;
 
 namespace MobileChat.Server.Services
 {
@@ -23,7 +22,7 @@ namespace MobileChat.Server.Services
                 return Task.FromResult(true);
             }
             catch { }
-            
+
             return Task.FromResult(false);
         }
 

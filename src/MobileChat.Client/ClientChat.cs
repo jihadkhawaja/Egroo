@@ -1,4 +1,4 @@
-﻿namespace JihadKhawaja.SignalR.Client.Chat
+﻿namespace MobileChat.Client
 {
     public static class ClientChat
     {

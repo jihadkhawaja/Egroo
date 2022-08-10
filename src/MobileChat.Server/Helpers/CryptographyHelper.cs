@@ -9,7 +9,7 @@ namespace MobileChat.Server.Helpers
             byte[] salt;
             RandomNumberGenerator.Create().GetBytes(salt = new byte[16]);
 
-            Rfc2898DeriveBytes pbkdf2 = new Rfc2898DeriveBytes(value, salt, 100000);
+            Rfc2898DeriveBytes pbkdf2 = new(value, salt, 100000);
             byte[] hash = pbkdf2.GetBytes(20);
 
             byte[] hashBytes = new byte[36];
@@ -30,7 +30,7 @@ namespace MobileChat.Server.Helpers
             byte[] salt = new byte[16];
             Array.Copy(hashBytes, 0, salt, 0, 16);
             /* Compute the hash on the password the user entered */
-            Rfc2898DeriveBytes pbkdf2 = new Rfc2898DeriveBytes(password, salt, 100000);
+            Rfc2898DeriveBytes pbkdf2 = new(password, salt, 100000);
             byte[] hash = pbkdf2.GetBytes(20);
             /* Compare the results */
             for (int i = 0; i < 20; i++)

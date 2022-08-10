@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace JihadKhawaja.SignalR.Client.Chat.Models
+namespace MobileChat.Shared.Models
 {
     public class User
     {

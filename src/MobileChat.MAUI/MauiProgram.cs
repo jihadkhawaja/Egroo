@@ -1,5 +1,5 @@
-﻿using JihadKhawaja.SignalR.Client.Chat.Interfaces;
-using JihadKhawaja.SignalR.Client.Chat.Services;
+﻿using MobileChat.Client.Interfaces;
+using MobileChat.Client.Services;
 using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Services;
 using MudBlazor.Services;
