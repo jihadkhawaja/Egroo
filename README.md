@@ -79,7 +79,7 @@ Add-Migration [your migration name]
 ```
 Update-Database
 ```
-If your database is setup correctly you should find the database along with your models tables added to it.
+_If your database is setup correctly you should find the database along with your models tables added to it._
 
 #### Notice
 This project is under heavy refactoring and development, You may contribute once a release is published.
