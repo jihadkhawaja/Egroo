@@ -2,10 +2,6 @@
 
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
-|:warning: WARNING|
-|:---------------------------|
-|Don't use this branch for production|
-
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki/MAUI)
 
