@@ -87,7 +87,14 @@
 
     private async Task<Message[]> GetMessages()
     {
-        return await ChatService.ReceiveMessageHistory(GetChannelId());
+        var messages = await ChatService.ReceiveMessageHistory(GetChannelId());
+
+        foreach(var msg in messages)
+        {
+            msg.DisplayName = await GetUserName(msg.SenderId);
+        }
+        
+        return messages;
     }
 
     private async Task SendMessage()
