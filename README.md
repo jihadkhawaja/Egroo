@@ -12,7 +12,7 @@ Find everything you need to get started at the [Wiki](https://github.com/jihadkh
 
 # Usage
 ## Solution
-Set multiple project startup by right clicking the solution and then properties and select multiple startup project. Select MobileChat.MAUI and Mobilechat.Server to start, Position the MobileChat.Server above MobileChat.MAUI to start before it.
+Set multiple project startup by right clicking the solution and then properties and select multiple startup project. Select MobileChat.MAUI and MobileChat.Server to start, Position the MobileChat.Server above MobileChat.MAUI to start before it.
 
 ## Client
 1. Install the MAUI preview package when installing the Visual Studio 2022 Preview
