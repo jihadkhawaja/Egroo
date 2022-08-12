@@ -87,9 +87,14 @@ else
                 }
 
                 IsBusy = false;
-
-                await InvokeAsync(StateHasChanged);
             }
+            else
+            {
+                IsSignedIn = false;
+                IsBusy = false;
+            }
+
+            await InvokeAsync(StateHasChanged);
         }
 
         await base.OnAfterRenderAsync(firstRender);
