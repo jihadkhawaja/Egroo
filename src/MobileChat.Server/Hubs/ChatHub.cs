@@ -3,51 +3,61 @@ using Microsoft.AspNetCore.SignalR;
 using MobileChat.Server.Helpers;
 using MobileChat.Server.Interfaces;
 using MobileChat.Shared.Models;
+using Channel = MobileChat.Shared.Models.Channel;
+using Message = MobileChat.Shared.Models.Message;
 
 namespace MobileChat.Server.Hubs
 {
     public class ChatHub : Hub, IChatHub
     {
-        public ChatHub(IUser userService, IMessage messageService, IChannel channelService)
+        [Inject]
+        private IEntity<User> UserService { get; set; }
+        [Inject]
+        private IEntity<UserFriend> UserFriendsService { get; set; }
+        [Inject]
+        private IEntity<Channel> ChannelService { get; set; }
+        [Inject]
+        private IEntity<ChannelUser> ChannelUsersService { get; set; }
+        [Inject]
+        private IEntity<Message> MessageService { get; set; }
+        public ChatHub(IEntity<User> UserService, IEntity<UserFriend> UserFriendsService,
+            IEntity<Channel> ChannelService, IEntity<ChannelUser> ChannelUsersService,
+            IEntity<Message> MessageService)
         {
-            UserService = userService;
-            MessageService = messageService;
-            ChannelService = channelService;
+            this.UserService = UserService;
+            this.UserFriendsService = UserFriendsService;
+            this.ChannelService = ChannelService;
+            this.ChannelUsersService = ChannelUsersService;
+            this.MessageService = MessageService;
         }
 
-        [Inject]
-        private IUser UserService { get; set; }
-        [Inject]
-        private IMessage MessageService { get; set; }
-        [Inject]
-        private IChannel ChannelService { get; set; }
-        public override Task OnConnectedAsync()
+        public override async Task OnConnectedAsync()
         {
             //set user IsOnline true when he connects or reconnects
-            User connectedUser = UserService.ReadByConnectionId(Context.ConnectionId).Result;
+            User connectedUser = (await UserService.Read(x => x.ConnectionId == Context.ConnectionId)).FirstOrDefault();
             if (connectedUser != null)
             {
                 connectedUser.IsOnline = true;
-                UserService.Update(connectedUser);
+                await UserService.Update(connectedUser);
             }
 
-            return base.OnConnectedAsync();
+            await base.OnConnectedAsync();
         }
-        public override Task OnDisconnectedAsync(Exception exception)
+        public override async Task OnDisconnectedAsync(Exception exception)
         {
             //set user IsOnline false when he disconnects
-            User connectedUser = UserService.ReadByConnectionId(Context.ConnectionId).Result;
+            User connectedUser = (await UserService.Read(x => x.ConnectionId == Context.ConnectionId)).FirstOrDefault();
             if (connectedUser != null)
             {
                 connectedUser.IsOnline = false;
-                UserService.Update(connectedUser);
+                await UserService.Update(connectedUser);
             }
 
-            return base.OnDisconnectedAsync(exception);
+            await base.OnDisconnectedAsync(exception);
         }
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
-            if (await UserService.UserExist(username))
+            if ((await UserService.Read(x => x.Username == username)).FirstOrDefault() != null)
             {
                 return new KeyValuePair<Guid, bool>(Guid.Empty, false);
             }
@@ -64,7 +74,8 @@ namespace MobileChat.Server.Hubs
                 IsOnline = true
             };
 
-            if (await UserService.Create(user))
+            User[] users = new User[1] { user };
+            if (await UserService.Create(users))
             {
                 return new KeyValuePair<Guid, bool>(user.Id, true);
             }
@@ -73,19 +84,19 @@ namespace MobileChat.Server.Hubs
         }
         public async Task<KeyValuePair<Guid, bool>> SignIn(string emailorusername, string password)
         {
-            if (!await UserService.UserExist(emailorusername))
-            {
-                return new KeyValuePair<Guid, bool>(Guid.Empty, false);
-            }
-
-            if (!await UserService.SignIn(emailorusername, password))
-            {
-                return new KeyValuePair<Guid, bool>(Guid.Empty, false);
-            }
-
             if (PatternMatchHelper.IsEmail(emailorusername))
             {
-                User registeredUser = await UserService.ReadByEmail(emailorusername);
+                if ((await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault() == null)
+                {
+                    return new KeyValuePair<Guid, bool>(Guid.Empty, false);
+                }
+
+                if ((await UserService.Read(x => x.Email == emailorusername && x.Password == password)).FirstOrDefault() == null)
+                {
+                    return new KeyValuePair<Guid, bool>(Guid.Empty, false);
+                }
+
+                User registeredUser = (await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault();
                 registeredUser.ConnectionId = Context.ConnectionId;
                 registeredUser.IsOnline = true;
                 await UserService.Update(registeredUser);
@@ -94,7 +105,17 @@ namespace MobileChat.Server.Hubs
             }
             else
             {
-                User registeredUser = await UserService.ReadByUsername(emailorusername);
+                if ((await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault() == null)
+                {
+                    return new KeyValuePair<Guid, bool>(Guid.Empty, false);
+                }
+
+                if ((await UserService.Read(x => x.Username == emailorusername && x.Password == password)).FirstOrDefault() == null)
+                {
+                    return new KeyValuePair<Guid, bool>(Guid.Empty, false);
+                }
+
+                User registeredUser = (await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault();
                 registeredUser.ConnectionId = Context.ConnectionId;
                 registeredUser.IsOnline = true;
                 await UserService.Update(registeredUser);
@@ -104,31 +125,36 @@ namespace MobileChat.Server.Hubs
         }
         public async Task<bool> ChangePassword(string emailorusername, string newpassword)
         {
-            if (await UserService.UserExist(emailorusername))
+            if (PatternMatchHelper.IsEmail(emailorusername))
             {
-                if (PatternMatchHelper.IsEmail(emailorusername))
+                if ((await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault() == null)
                 {
-                    User registeredUser = await UserService.ReadByEmail(emailorusername);
-                    registeredUser.Password = newpassword;
-                    await UserService.Update(registeredUser);
-
-                    return true;
+                    return false;
                 }
-                else
-                {
-                    User registeredUser = await UserService.ReadByUsername(emailorusername);
-                    registeredUser.Password = newpassword;
-                    await UserService.Update(registeredUser);
 
-                    return true;
-                }
+                User registeredUser = (await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault();
+                registeredUser.Password = newpassword;
+                await UserService.Update(registeredUser);
+
+                return true;
             }
+            else
+            {
+                if ((await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault() == null)
+                {
+                    return false;
+                }
 
-            return false;
+                User registeredUser = (await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault();
+                registeredUser.Password = newpassword;
+                await UserService.Update(registeredUser);
+
+                return true;
+            }
         }
         public async Task<string> GetUserDisplayName(Guid userId)
         {
-            string displayname = await UserService.GetDisplayName(userId);
+            string displayname = (await UserService.Read(x => x.Id == userId)).FirstOrDefault().DisplayName;
             return displayname;
         }
 
@@ -145,14 +171,61 @@ namespace MobileChat.Server.Hubs
                 DateCreated = DateTime.UtcNow,
             };
 
-            await ChannelService.Create(channel);
-            await ChannelService.AddUsers(userId, channel.Id, usernames);
+            Channel[] channels = new Channel[1] { channel };
+            await ChannelService.Create(channels);
+            await AddChannelUsers(userId, channel.Id, usernames);
 
             return channel;
         }
+        public async Task<bool> AddChannelUsers(Guid userid, Guid channelid, params string[] usernames)
+        {
+            try
+            {
+                ChannelUser[] channelUsers = new ChannelUser[usernames.Length];
+
+                for (int i = 0; i < usernames.Length; i++)
+                {
+                    Guid currentuserid = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault().Id;
+
+                    if (ChannelContainUser(currentuserid).Result)
+                    {
+                        continue;
+                    }
+
+                    channelUsers[i] = new ChannelUser()
+                    {
+                        Id = Guid.NewGuid(),
+                        ChannelId = channelid,
+                        UserId = currentuserid,
+                        DateCreated = DateTime.UtcNow,
+                    };
+                }
+
+                await ChannelUsersService.Create(channelUsers);
+
+                return true;
+            }
+            catch { }
+
+            return false;
+        }
+        public async Task<bool> ChannelContainUser(Guid userid)
+        {
+            return (await ChannelUsersService.Read(x => x.UserId == userid)).FirstOrDefault() != null;
+        }
         public async Task<User[]> GetChannelUsers(Guid channelid)
         {
-            HashSet<User> channelUsers = await ChannelService.GetUsers(channelid);
+            HashSet<User> channelUsers = new();
+            try
+            {
+                List<ChannelUser> currentChannelUsers = (await ChannelUsersService.Read(x => x.ChannelId == channelid)).ToList();
+                foreach (ChannelUser user in currentChannelUsers)
+                {
+                    channelUsers.Add((await UserService.Read(x => x.Id == user.UserId)).FirstOrDefault());
+                }
+            }
+            catch { }
+
             //only send users ids and display names
             List<User> users = new();
             foreach (User user in channelUsers)
@@ -163,11 +236,22 @@ namespace MobileChat.Server.Hubs
                     DisplayName = user.DisplayName
                 });
             }
+
             return users.ToArray();
         }
         public async Task<Channel[]> GetUserChannels(Guid userid)
         {
-            HashSet<Channel> userChannels = await ChannelService.GetUserChannels(userid);
+            HashSet<Channel> userChannels = new();
+            try
+            {
+                List<ChannelUser> users = (await ChannelUsersService.Read(x => x.UserId == userid)).ToList();
+                foreach (ChannelUser user in users)
+                {
+                    userChannels.Add((await ChannelService.Read(x => x.Id == user.ChannelId)).FirstOrDefault());
+                }
+            }
+            catch { }
+
             return userChannels.ToArray();
         }
 
@@ -191,11 +275,17 @@ namespace MobileChat.Server.Hubs
             //save msg to db
             message.Sent = true;
             message.DateSent = DateTime.UtcNow;
-            if (await MessageService.Create(message))
+
+            Message[] messages = new Message[1] { message };
+            if (await MessageService.Create(messages))
             {
-                foreach (User user in await ChannelService.GetUsers(message.ChannelId))
+                foreach (User user in await GetChannelUsers(message.ChannelId))
                 {
-                    await Clients.Client(user.ConnectionId).SendAsync("ReceiveMessage", message);
+                    try
+                    {
+                        await Clients.Client(user.ConnectionId).SendAsync("ReceiveMessage", message);
+                    }
+                    catch { }
                 }
 
                 return true;
@@ -223,7 +313,7 @@ namespace MobileChat.Server.Hubs
             //save msg to db
             if (await MessageService.Update(message))
             {
-                foreach (User user in await ChannelService.GetUsers(message.ChannelId))
+                foreach (User user in await GetChannelUsers(message.ChannelId))
                 {
                     await Clients.Client(user.ConnectionId).SendAsync("ReceiveMessage", message);
                 }
@@ -235,35 +325,143 @@ namespace MobileChat.Server.Hubs
         }
         public async Task<Message[]> ReceiveMessageHistory(Guid channelId)
         {
-            HashSet<Message> msgs = await ChannelService.GetChannelMessages(channelId);
+            HashSet<Message> msgs = (await MessageService.Read(x => x.ChannelId == channelId)).ToHashSet();
             return msgs.ToArray();
         }
         public async Task<Message[]> ReceiveMessageHistoryRange(Guid channelId, int index, int range)
         {
-            HashSet<Message> msgs = (await ChannelService.GetChannelMessages(channelId)).Skip(index).Take(range).ToHashSet();
+            HashSet<Message> msgs = (await ReceiveMessageHistory(channelId)).Skip(index).Take(range).ToHashSet();
             return msgs.ToArray();
         }
         public async Task<bool> AddFriend(Guid userId, string friendEmailorusername)
         {
-            if (await UserService.AddFriend(userId, friendEmailorusername))
-            {
-                return true;
-            }
-            else
+            if (string.IsNullOrEmpty(friendEmailorusername))
             {
                 return false;
             }
+
+            try
+            {
+                if (PatternMatchHelper.IsEmail(friendEmailorusername))
+                {
+                    //get user id from email
+                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    if (user == null)
+                    {
+                        return false;
+                    }
+                    //get friend id from email
+                    User friendUser = (await UserService.Read(x => x.Email == friendEmailorusername)).FirstOrDefault();
+                    if (friendUser == null)
+                    {
+                        return false;
+                    }
+
+                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    {
+                        return false;
+                    }
+
+                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                    UserFriend[] entries = new UserFriend[1] { entry };
+                    await UserFriendsService.Create(entries);
+                }
+                else
+                {
+                    //get user id from username
+                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    if (user == null)
+                    {
+                        return false;
+                    }
+                    //get friend id from username
+                    User friendUser = (await UserService.Read(x => x.Username == friendEmailorusername)).FirstOrDefault();
+                    if (friendUser == null)
+                    {
+                        return false;
+                    }
+
+                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    {
+                        return false;
+                    }
+
+                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                    UserFriend[] entries = new UserFriend[1] { entry };
+                    await UserFriendsService.Create(entries);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return true;
         }
         public async Task<bool> RemoveFriend(Guid userId, string friendEmailorusername)
         {
-            if (await UserService.RemoveFriend(userId, friendEmailorusername))
-            {
-                return true;
-            }
-            else
+            if (string.IsNullOrEmpty(friendEmailorusername))
             {
                 return false;
             }
+
+            try
+            {
+                if (PatternMatchHelper.IsEmail(friendEmailorusername))
+                {
+                    //get user id from email
+                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    if (user == null)
+                    {
+                        return false;
+                    }
+                    //get friend id from email
+                    User friendUser = (await UserService.Read(x => x.Email == friendEmailorusername)).FirstOrDefault();
+                    if (friendUser == null)
+                    {
+                        return false;
+                    }
+
+                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    {
+                        return false;
+                    }
+
+                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                    
+                    await UserFriendsService.Delete(x => x.Id == entry.Id);
+                }
+                else
+                {
+                    //get user id from username
+                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    if (user == null)
+                    {
+                        return false;
+                    }
+                    //get friend id from username
+                    User friendUser = (await UserService.Read(x => x.Username == friendEmailorusername)).FirstOrDefault();
+                    if (friendUser == null)
+                    {
+                        return false;
+                    }
+
+                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    {
+                        return false;
+                    }
+
+                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+
+                    await UserFriendsService.Delete(x => x.Id == entry.Id);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }

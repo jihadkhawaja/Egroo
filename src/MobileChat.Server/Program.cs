@@ -3,7 +3,9 @@ using MobileChat.Server.Database;
 using MobileChat.Server.Hubs;
 using MobileChat.Server.Interfaces;
 using MobileChat.Server.Services;
+using MobileChat.Shared.Models;
 using Serilog;
+using System.Security.Principal;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -15,9 +17,11 @@ builder.Services.AddSignalR();
 builder.Services.AddDbContext<DataContext>();
 
 //services
-builder.Services.AddScoped<IUser, UserService>();
-builder.Services.AddScoped<IMessage, MessageService>();
-builder.Services.AddScoped<IChannel, ChannelService>();
+builder.Services.AddScoped<IEntity<User>, EntityService<User>>();
+builder.Services.AddScoped<IEntity<UserFriend>, EntityService<UserFriend>>();
+builder.Services.AddScoped<IEntity<Channel>, EntityService<Channel>>();
+builder.Services.AddScoped<IEntity<ChannelUser>, EntityService<ChannelUser>>();
+builder.Services.AddScoped<IEntity<Message>, EntityService<Message>>();
 
 WebApplication app = builder.Build();
 
