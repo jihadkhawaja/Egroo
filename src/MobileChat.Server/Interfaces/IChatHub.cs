@@ -12,6 +12,8 @@ namespace MobileChat.Server.Interfaces
         Task<bool> RemoveFriend(Guid userId, string friendEmailorusername);
 
         Task<Channel> CreateChannel(Guid userId, params string[] usernames);
+        Task<bool> AddChannelUsers(Guid userid, Guid channelid, params string[] usernames);
+        Task<bool> ChannelContainUser(Guid userid);
         Task<User[]> GetChannelUsers(Guid channelid);
         Task<Channel[]> GetUserChannels(Guid userid);
 

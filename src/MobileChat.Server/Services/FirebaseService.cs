@@ -5,10 +5,10 @@ using System.Text.Json;
 
 namespace MobileChat.Server.Services
 {
-    public class FirebaseNotficationService : IFirebaseNotification
+    public class FirebaseService : IFirebase
     {
         private readonly RestClient RestClient;
-        public FirebaseNotficationService()
+        public FirebaseService()
         {
             RestClient = new RestClient();
         }
