@@ -9,54 +9,56 @@
 @inject IChat ChatService
 @inject NavigationManager NavigationManager
 
-<MudText GutterBottom Color="Color.Secondary">Sign Up</MudText>
-<MudText>Already have an account? <span><MudButton Link="signin">Sign In</MudButton></span></MudText>
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign Up</MudText>
+    <MudText>Already have an account? <span><MudButton Link="signin">Sign In</MudButton></span></MudText>
 
-<MudGrid Class="mt-8" Justify="Justify.FlexStart">
-    <MudItem xs="12" sm="8" md="6">
-        <MudCard Elevation="25" Class="rounded-lg pb-4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h5" Align="Align.Center">Create Account</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
-                    <MudTextField @bind-Value="model.DisplayName"
-                                  For="@(() => model.DisplayName)"
-                                  Immediate="true"
-                                  Label="Display Name" InputType="InputType.Text" />
+    <MudGrid Class="mt-8" Justify="Justify.Center">
+        <MudItem xs="12" sm="8" md="6">
+            <MudCard Elevation="25" Class="rounded-lg pb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h5" Align="Align.Center">Create Account</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
+                        <MudTextField @bind-Value="model.DisplayName"
+                                      For="@(() => model.DisplayName)"
+                                      Immediate="true"
+                                      Label="Display Name" InputType="InputType.Text" />
 
-                    <MudTextField @bind-Value="model.Username"
-                                  For="@(() => model.Username)"
-                                  Immediate="true"
-                                  Label="Username" ErrorText="Invalid username." />
+                        <MudTextField @bind-Value="model.Username"
+                                      For="@(() => model.Username)"
+                                      Immediate="true"
+                                      Label="Username" ErrorText="Invalid username." />
 
-                    <MudTextField @bind-Value="model.Email"
-                                  For="@(() => model.Email)"
-                                  Immediate="true"
-                                  Label="Email (Optinal)" ErrorText="Invalid username." />
+                        <MudTextField @bind-Value="model.Email"
+                                      For="@(() => model.Email)"
+                                      Immediate="true"
+                                      Label="Email (Optinal)" ErrorText="Invalid username." />
 
-                    <MudTextField @bind-Value="model.Password"
-                                  For="@(() => model.Password)"
-                                  Immediate="true"
-                                  T="string" Label="Password" HelperText="Choose a strong password" @ref="pwField1"
-                                  InputType="InputType.Password"
-                                  Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))" Required="true"
-                                  RequiredError="Password is required!" />
+                        <MudTextField @bind-Value="model.Password"
+                                      For="@(() => model.Password)"
+                                      Immediate="true"
+                                      T="string" Label="Password" HelperText="Choose a strong password" @ref="pwField1"
+                                      InputType="InputType.Password"
+                                      Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))" Required="true"
+                                      RequiredError="Password is required!" />
 
-                    <MudTextField T="string"
-                                  Label="Password" HelperText="Repeat the password" InputType="InputType.Password"
-                                  Validation="@(new Func<string, string>(PasswordMatch))" />
+                        <MudTextField T="string"
+                                      Label="Password" HelperText="Repeat the password" InputType="InputType.Password"
+                                      Validation="@(new Func<string, string>(PasswordMatch))" />
 
-                </MudForm>
-            </MudCardContent>
-            <MudCardActions Class="d-flex justify-center">
-                <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">Submit</MudButton>
-            </MudCardActions>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+                    </MudForm>
+                </MudCardContent>
+                <MudCardActions Class="d-flex justify-center">
+                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">Submit</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
     [Inject] ISnackbar Snackbar { get; set; }
