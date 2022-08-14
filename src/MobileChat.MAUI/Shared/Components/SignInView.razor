@@ -10,38 +10,40 @@
 @inject IChat ChatService
 @inject NavigationManager NavigationManager
 
-<MudText GutterBottom Color="Color.Secondary">Sign In</MudText>
-<MudText>Don't have an account? <span><MudButton Link="signup">Sign Up</MudButton></span></MudText>
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign In</MudText>
+    <MudText>Don't have an account? <span><MudButton Link="signup">Sign Up</MudButton></span></MudText>
 
-<MudGrid Class="mt-8" Justify="Justify.FlexStart">
-    <MudItem xs="12" sm="8" md="6">
-        <MudCard Elevation="25" Class="rounded-lg pb-4">
-            <MudCardHeader>
-                <CardHeaderContent>
-                    <MudText Typo="Typo.h5" Align="Align.Start">Log in Account</MudText>
-                </CardHeaderContent>
-            </MudCardHeader>
-            <MudCardContent>
-                <MudForm @ref="@form" ValidationDelay="0">
-                    <MudTextField @bind-Value="@EmailOrUsername"
-                                Immediate="true"
-                                Required="true"
-                                Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                Label="Email or Username" />
+    <MudGrid Class="mt-8" Justify="Justify.Center">
+        <MudItem xs="12" sm="8" md="6">
+            <MudCard Elevation="25" Class="rounded-lg pb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h5" Align="Align.Start">Log in Account</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudForm @ref="@form" ValidationDelay="0">
+                        <MudTextField @bind-Value="@EmailOrUsername"
+                                    Immediate="true"
+                                    Required="true"
+                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                    Label="Email or Username" />
 
-                    <MudTextField @bind-Value="@Password"
-                                Immediate="true"
-                                Required="true"
-                                Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                Label="Password" InputType="InputType.Password" />
-                </MudForm>
-            </MudCardContent>
-            <MudCardActions Class="d-flex justify-center">
-                <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">Submit</MudButton>
-            </MudCardActions>
-        </MudCard>
-    </MudItem>
-</MudGrid>
+                        <MudTextField @bind-Value="@Password"
+                                    Immediate="true"
+                                    Required="true"
+                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                    Label="Password" InputType="InputType.Password" />
+                    </MudForm>
+                </MudCardContent>
+                <MudCardActions Class="d-flex justify-center">
+                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">Submit</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
 
 @code {
     [Inject] ISnackbar Snackbar { get; set; }
