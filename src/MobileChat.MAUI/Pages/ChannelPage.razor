@@ -2,42 +2,43 @@
 
 @using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces
+@using MobileChat.MAUI.Models
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChat ChatService
+@inject SessionStorage SessionStorage
+@inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
-    <MudText Typo="Typo.h6" GutterBottom>Current Channel @ChannelId</MudText>
+    <MudStack Row AlignItems="AlignItems.Start" Justify="Justify.FlexStart">
+        <MudIconButton Icon="@Icons.Filled.ArrowBack" Size="Size.Large" Link="/channels"/>
+        <MudText Typo="Typo.h3" GutterBottom>@Title</MudText>
+    </MudStack>
 
-    <MudGrid>
-        <MudItem xs="12" md=12>
-            <MudPaper Height="400px" Elevation="0" Class="pa-4" Style="overflow:auto;">
-                @if (Messages.Count() == 0)
-                {
-                    <MudText>No Messages</MudText>
-                }
-                else
-                {
-                    <MudStack>
-                        @foreach (var message in Messages)
-                        {
-                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
-                        }
-                    </MudStack>
-                }
-            </MudPaper>
-        </MudItem>
-        <MudItem xs="12" md=12>
-            <MudStack Row>
-                <MudTextField @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
-                <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
-                OnClick="SendMessage"/>
-            </MudStack>
-        </MudItem>
-    </MudGrid>
+    <MudStack>
+        <MudPaper id="messages-container" Elevation="0" Class="pa-4" Style="height: calc(100vh - 260px); overflow:auto;">
+            @if (Messages.Count() == 0)
+            {
+                <MudText>No Messages</MudText>
+            }
+            else
+            {
+                <MudStack>
+                    @foreach (var message in Messages)
+                    {
+                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
+                    }
+                </MudStack>
+            }
+        </MudPaper>
+        <MudStack Row>
+            <MudTextField DisableUnderLine @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
+            <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
+                           OnClick="SendMessage" />
+        </MudStack>
+    </MudStack>
 </MudContainer>
 
 @code {
@@ -50,13 +51,8 @@
 
     private string InputContent { get; set; }
 
-    private User CurrentUser { get; set; }
-
     protected override async Task OnInitializedAsync()
     {
-        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path);
-
         Messages = new();
 
         await base.OnInitializedAsync();
@@ -69,6 +65,8 @@
             Messages = (await GetMessages()).ToList();
 
             await InvokeAsync(StateHasChanged);
+
+            ScrollToMessagesEnd();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -93,7 +91,7 @@
         {
             msg.DisplayName = await GetUserName(msg.SenderId);
         }
-        
+
         return messages;
     }
 
@@ -110,9 +108,9 @@
         {
             Id = Guid.NewGuid(),
             ChannelId = GetChannelId(),
-            DisplayName = CurrentUser.DisplayName,
+            DisplayName = await ChatService.GetUserDisplayName(SessionStorage.User.Id),
             Content = InputContent,
-            SenderId = CurrentUser.Id,
+            SenderId = SessionStorage.User.Id,
             DateCreated = DateTime.UtcNow,
             DateSent = DateTime.UtcNow
         };
@@ -122,10 +120,19 @@
         Messages.Add(message);
 
         InputContent = string.Empty;
+
+        await InvokeAsync(StateHasChanged);
+
+        ScrollToMessagesEnd();
     }
 
     private async Task<string> GetUserName(Guid userid)
     {
-       return await ChatService.GetUserDisplayName(userid);
+        return await ChatService.GetUserDisplayName(userid);
+    }
+
+    private void ScrollToMessagesEnd()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToEnd", "messages-container");
     }
 }

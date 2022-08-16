@@ -10,12 +10,8 @@
         string RemoveSpecialCharacters(string str);
 
         string EncryptDecrypt(string textToEncrypt, int key);
-        int GetLengthenedIntFromString(string text, int length = 3);
 
-        void WriteToXmlFile<T>(string fileName, string path, T objectToWrite, bool append = false) where T : new();
-        T ReadFromXmlFile<T>(string fileName, string path) where T : new();
-
-        void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false) where T : new();
-        T ReadFromJsonFile<T>(string fileName, string path) where T : new();
+        void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false, bool encrypt = false, int key = 757) where T : new();
+        T ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new();
     }
 }

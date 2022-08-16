@@ -3,11 +3,13 @@
 
 @using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces
+@using MobileChat.MAUI.Models
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChat ChatService
+@inject SessionStorage SessionStorage
 
 @if (IsBusy)
 {
@@ -30,18 +32,30 @@ else
         }
         else
         {
+            if(addFriendPopOverIsOpen)
+            {
+                <MudPaper Outlined="true" Class="pa-2 mb-4">
+                    <MudStack>
+                        <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
+                        <MudTextField T="string" Placeholder="username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
+                        <MudButton OnClick="AddUserToChannel">Send Request</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+            
             <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
                 @foreach (var channel in CurrentUserChannels)
                 {
-                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Elevation="2" onclick="@(() => OpenChannel(channel))">
+                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel))">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem Class="mt-3">
                                 <ChannelView Title=@channel.Title Users="@channel.Id.ToString()" />
                             </MudItem>
                             <MudItem>
-                                <MudStack Spacing="0">
-                                    <MudButton>Edit</MudButton>
-                                    <MudButton Color="Color.Error">Delete</MudButton>
+                                <MudStack Row Style="height:100%;">
+                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.PersonAdd" OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Id))" />
+                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit" Disabled/>
+                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error" Disabled />
                                 </MudStack>
                             </MudItem>
                         </MudGrid>
@@ -61,10 +75,16 @@ else
 
     private bool IsBusy { get; set; } = true;
 
+    private bool addFriendPopOverIsOpen;
+
+    private string usernameToAdd { get; set; }
+
+    private Guid selectedChannel { get; set; }
+
     protected override Task OnInitializedAsync()
     {
         string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path);
+        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);
 
         return base.OnInitializedAsync();
     }
@@ -82,6 +102,7 @@ else
 
                 if (IsSignedIn)
                 {
+                    SessionStorage.User = CurrentUser;
                     CurrentUserChannels = await GetChannels();
                 }
 
@@ -97,6 +118,20 @@ else
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public void ToggleAddFriendPopOverIsOpen(Guid channelid)
+    {
+        if (addFriendPopOverIsOpen)
+        {
+            addFriendPopOverIsOpen = false;
+            selectedChannel = Guid.Empty;
+        }
+        else
+        {
+            addFriendPopOverIsOpen = true;
+            selectedChannel = channelid;
+        }
     }
 
     private async Task<Channel[]> GetChannels()
@@ -132,5 +167,25 @@ else
     {
         await ChatService.CreateChannel(CurrentUser.Id, CurrentUser.Username);
         CurrentUserChannels = await GetChannels();
+    }
+
+    private void DeleteChannel()
+    {
+        //todo
+    }
+
+    private void EditChannel()
+    {
+        //todo
+    }
+
+    private void AddUserToChannel()
+    {
+        if(selectedChannel == Guid.Empty)
+        {
+            return;
+        }
+
+        //todo
     }
 }

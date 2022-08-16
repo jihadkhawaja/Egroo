@@ -1,7 +1,6 @@
 ﻿using MobileChat.MAUI.Interfaces;
 using System.Text;
 using System.Text.Json;
-using System.Xml.Serialization;
 
 namespace MobileChat.MAUI.Services
 {
@@ -73,73 +72,7 @@ namespace MobileChat.MAUI.Services
             return outSb.ToString();
         }
 
-        public int GetLengthenedIntFromString(string text, int length = 3)
-        {
-            string a = text;
-            string b = string.Empty;
-
-            for (int i = 0; i < a.Length; i++)
-            {
-                if (Char.IsDigit(a[i]))
-                {
-                    b += a[i];
-                }
-            }
-
-            b = b[..3];
-
-            if (b.Length > 0)
-            {
-                return int.Parse(b);
-            }
-            else
-            {
-                return 756;
-            }
-        }
-
-        public void WriteToXmlFile<T>(string fileName, string path, T objectToWrite, bool append = false) where T : new()
-        {
-            TextWriter writer = null;
-            try
-            {
-                XmlSerializer serializer = new(typeof(T));
-                writer = new StreamWriter(Path.Combine(path, fileName), append);
-                serializer.Serialize(writer, objectToWrite);
-            }
-            catch { }
-            finally
-            {
-                if (writer != null)
-                {
-                    writer.Close();
-                }
-            }
-        }
-
-        public T ReadFromXmlFile<T>(string fileName, string path) where T : new()
-        {
-            TextReader reader = null;
-            try
-            {
-                XmlSerializer serializer = new(typeof(T));
-                reader = new StreamReader(Path.Combine(path, fileName));
-                return (T)serializer.Deserialize(reader);
-            }
-            catch
-            {
-                return default;
-            }
-            finally
-            {
-                if (reader != null)
-                {
-                    reader.Close();
-                }
-            }
-        }
-
-        public void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false) where T : new()
+        public void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false, bool encrypt = false, int key = 757) where T : new()
         {
             TextWriter writer = null;
             try
@@ -147,7 +80,14 @@ namespace MobileChat.MAUI.Services
                 string contentsToWriteToFile = JsonSerializer.Serialize(objectToWrite);
                 writer = new StreamWriter(Path.Combine(path, fileName), append);
 
-                writer.Write(contentsToWriteToFile);
+                if(encrypt)
+                {
+                    writer.Write(EncryptDecrypt(contentsToWriteToFile, key));
+                }
+                else
+                {
+                    writer.Write(contentsToWriteToFile);
+                }
             }
             catch { }
             finally
@@ -158,7 +98,7 @@ namespace MobileChat.MAUI.Services
                 }
             }
         }
-        public T ReadFromJsonFile<T>(string fileName, string path) where T : new()
+        public T ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new()
         {
             TextReader reader = null;
             try
@@ -166,7 +106,14 @@ namespace MobileChat.MAUI.Services
                 reader = new StreamReader(Path.Combine(path, fileName));
                 string fileContents = reader.ReadToEnd();
 
-                return JsonSerializer.Deserialize<T>(fileContents);
+                if (isEncrypted)
+                {
+                    return JsonSerializer.Deserialize<T>(EncryptDecrypt(fileContents, key));
+                }
+                else
+                {
+                    return JsonSerializer.Deserialize<T>(fileContents);
+                }
             }
             catch
             {
