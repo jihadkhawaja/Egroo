@@ -1,6 +1,7 @@
 ﻿using MobileChat.Client.Interfaces;
 using MobileChat.Client.Services;
 using MobileChat.MAUI.Interfaces;
+using MobileChat.MAUI.Models;
 using MobileChat.MAUI.Services;
 using MudBlazor.Services;
 
@@ -27,6 +28,7 @@ namespace MobileChat.MAUI
             //chat services
             builder.Services.AddScoped<ISaveFile, SaveFileService>();
             builder.Services.AddScoped<IChat, ChatService>();
+            builder.Services.AddScoped<SessionStorage>();
 
             return builder.Build();
         }

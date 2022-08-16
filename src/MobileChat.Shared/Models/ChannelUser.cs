@@ -10,6 +10,7 @@ namespace MobileChat.Shared.Models
         public Guid ChannelId { get; set; }
         [Required]
         public Guid UserId { get; set; }
+        public bool IsAdmin { get; set; }
         public DateTime? DateCreated { get; set; }
     }
 }

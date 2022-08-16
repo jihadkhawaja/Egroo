@@ -18,19 +18,6 @@ namespace MobileChat.MAUI.Rest
     /// </summary>
     public class RestClient<T>
     {
-        private string ResponseTxt = string.Empty;
-
-        public string GetResponse()
-        {
-            return ResponseTxt;
-        }
-
-        public Task<T> GetResponseModel()
-        {
-            T taskModels = JsonSerializer.Deserialize<T>(GetResponse());
-            return Task.FromResult(taskModels);
-        }
-
         public async Task<T> GetAsync(string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
             try
@@ -62,8 +49,6 @@ namespace MobileChat.MAUI.Rest
 
                 string json = await httpClient.GetStringAsync(WebServiceUrl);
 
-                ResponseTxt = json;
-
                 T taskModels = JsonSerializer.Deserialize<T>(json);
 
                 return taskModels;
@@ -74,7 +59,7 @@ namespace MobileChat.MAUI.Rest
             }
         }
 
-        public async Task<bool> PostAsync(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
+        public async Task<KeyValuePair<bool,string>> PostAsync(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
             HttpClient httpClient = new();
             byte[] authToken;
@@ -108,9 +93,10 @@ namespace MobileChat.MAUI.Rest
             httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
 
             HttpResponseMessage result = await httpClient.PostAsync(WebServiceUrl, httpContent);
-            ResponseTxt = await result.Content.ReadAsStringAsync();
 
-            return result.IsSuccessStatusCode;
+            string resultText = await result.Content.ReadAsStringAsync();
+
+            return new KeyValuePair<bool, string>(result.IsSuccessStatusCode, resultText);
         }
     }
 }

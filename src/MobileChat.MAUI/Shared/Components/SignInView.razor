@@ -97,11 +97,11 @@
 
             string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
             SaveFileService.CreateDirectory(path);
-            SaveFileService.WriteToJsonFile<User>("user.json", path, user);
+            SaveFileService.WriteToJsonFile<User>("user.json", path, user, false, true);
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 
-            NavigationManager.NavigateTo("/");
+            NavigationManager.NavigateTo("/", true);
         }
         else
         {
