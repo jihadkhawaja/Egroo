@@ -88,3 +88,13 @@ _If your database is setup correctly you should find the database along with you
 
 #### Discord
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
+
+#### Sponsors
+
+<div>
+    <a href="https://www.jetbrains.com/" align="right"><img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg" alt="JetBrains" class="logo-footer" width="72" align="left">
+    <a>
+    <br/>
+        
+Special thanks to [JetBrains](https://jb.gg/OpenSourceSupport) for supporting us with open-source licenses for their IDEs. </a>
+</div>
