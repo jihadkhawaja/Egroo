@@ -1,10 +1,10 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
-using MobileChat.Client.Interfaces;
+using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
 
 namespace MobileChat.Client.Services
 {
-    public class ChatService : IChat
+    public class ChatService : IChatHub
     {
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
@@ -35,6 +35,10 @@ namespace MobileChat.Client.Services
         {
             return await ClientChat.SignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", userId, usernames);
         }
+        public async Task<bool> AddChannelUsers(Guid userId, Guid channelId, params string[] friendEmailorusername)
+        {
+            return await ClientChat.SignalR.HubConnection.InvokeAsync<bool>("AddChannelUsers", userId, channelId, friendEmailorusername);
+        }
         public async Task<User[]> GetChannelUsers(Guid channelid)
         {
             return await ClientChat.SignalR.HubConnection.InvokeAsync<User[]>("GetChannelUsers", channelid);
@@ -58,6 +62,31 @@ namespace MobileChat.Client.Services
         public Task<string> GetUserDisplayName(Guid userId)
         {
             return ClientChat.SignalR.HubConnection.InvokeAsync<string>("GetUserDisplayName", userId);
+        }
+
+        public Task<string> GetUserUsername(Guid userId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<string>("GetUserUsername", userId);
+        }
+
+        public Task<bool> ChangePassword(string emailorusername, string newpassword)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<UserFriend[]> GetUserFriends(Guid userId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<UserFriend[]>("GetUserFriends", userId);
+        }
+
+        public Task<bool> ChannelContainUser(Guid userid)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<bool> UpdateMessage(Message message)
+        {
+            throw new NotImplementedException();
         }
     }
 }

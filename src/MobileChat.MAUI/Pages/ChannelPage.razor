@@ -1,13 +1,13 @@
 ﻿@page "/chat/{ChannelId}/{Title}"
 
-@using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Models
 @using MobileChat.MAUI.Shared.Components
+@using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
-@inject IChat ChatService
+@inject IChatHub ChatService
 @inject SessionStorage SessionStorage
 @inject IJSRuntime JSRuntime
 
@@ -47,16 +47,9 @@
     [Parameter]
     public string ChannelId { get; set; }
 
-    private List<Message> Messages { get; set; }
+    private List<Message> Messages { get; set; } = new();
 
     private string InputContent { get; set; }
-
-    protected override async Task OnInitializedAsync()
-    {
-        Messages = new();
-
-        await base.OnInitializedAsync();
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

@@ -1,6 +1,6 @@
 ﻿namespace MobileChat.MAUI.Interfaces
 {
-    internal interface ISaveFile
+    public interface ISaveFile
     {
         void DeleteFile(string fileName, string path);
         void DeleteDirectory(string dirName, string path);

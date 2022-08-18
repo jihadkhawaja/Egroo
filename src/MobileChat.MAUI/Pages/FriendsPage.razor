@@ -1,0 +1,150 @@
+﻿@page "/friends"
+
+@using MobileChat.MAUI.Interfaces
+@using MobileChat.MAUI.Models
+@using MobileChat.MAUI.Shared.Components
+@using MobileChat.Shared.Interfaces
+@using MobileChat.Shared.Models
+@inject NavigationManager NavigationManager
+@inject ISaveFile SaveFileService
+@inject IChatHub ChatService
+@inject SessionStorage SessionStorage
+@inject ISnackbar Snackbar
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate />
+}
+else if (!IsSignedIn)
+{
+    <SignInView />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+        <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h3">Friends</MudText>
+            <MudButton OnClick="ToggleAddFriendPopOverIsOpen" Size="Size.Large" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Friend</MudButton>
+        </MudStack>
+        @if (addFriendPopOverIsOpen)
+        {
+            <MudPaper Outlined="true" Class="pa-2 mb-4">
+                <MudStack>
+                    <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
+                    <MudTextField T="string" Placeholder="username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
+                    <MudButton OnClick="AddFriend">Send Request</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+            @foreach (var friend in UserFriends)
+            {
+                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                    <MudGrid Justify="Justify.SpaceBetween">
+                        <MudItem Class="mt-3">
+                            <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                        </MudItem>
+                        <MudItem>
+                            <MudStack Row Style="height:100%;">
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error" Disabled />
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudStack>
+    </MudContainer>
+}
+
+@code {
+    public IEnumerable<User> UserFriends { get; set; }
+
+    private bool IsSignedIn { get; set; }
+
+    private bool IsBusy { get; set; } = true;
+
+    private bool addFriendPopOverIsOpen;
+
+    private string usernameToAdd { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (SessionStorage.User is not null)
+            {
+                IsBusy = true;
+
+                KeyValuePair<Guid, bool> values = await ChatService.SignIn(SessionStorage.User.Username, SessionStorage.User.Password);
+                IsSignedIn = values.Value;
+
+                if (IsSignedIn)
+                {
+                    SessionStorage.User = SessionStorage.User;
+                    UserFriends = await GetFriends();
+                }
+
+                IsBusy = false;
+            }
+            else
+            {
+                IsSignedIn = false;
+                IsBusy = false;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public void ToggleAddFriendPopOverIsOpen()
+    {
+        if (addFriendPopOverIsOpen)
+        {
+            addFriendPopOverIsOpen = false;
+        }
+        else
+        {
+            addFriendPopOverIsOpen = true;
+        }
+    }
+
+    private async Task<User[]> GetFriends()
+    {
+        UserFriend[] users = await ChatService.GetUserFriends(SessionStorage.User.Id);
+        User[] friends = new User[users.Length];
+
+        for (int i = 0; i < users.Length; i++)
+        {
+            User user = new User();
+            user.Id = users[i].FriendUserId;
+            user.DisplayName = await ChatService.GetUserDisplayName(users[i].FriendUserId);
+            user.Username = await ChatService.GetUserUsername(users[i].FriendUserId);
+            friends[i] = user;
+        }
+
+        return friends;
+    }
+
+    private async Task AddFriend()
+    {
+        if (string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))
+        {
+            return;
+        }
+
+        if (await ChatService.AddFriend(SessionStorage.User.Id, usernameToAdd))
+        {
+            Snackbar.Add($"Added user", Severity.Success);
+
+            ToggleAddFriendPopOverIsOpen();
+            usernameToAdd = string.Empty;
+        }
+        else
+        {
+            Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+}

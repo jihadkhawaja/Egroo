@@ -2,11 +2,13 @@
 
 @using FluentValidation
 @using System.Text.RegularExpressions
-@using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces;
+@using MobileChat.MAUI.Models
+@using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
 @inject ISaveFile SaveFileService
-@inject IChat ChatService
+@inject IChatHub ChatService
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
@@ -101,6 +103,8 @@
             SaveFileService.CreateDirectory(path);
             SaveFileService.WriteToJsonFile<User>("user.json", path, model, false, true);
 
+            SessionStorage.User = model;
+
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 
             NavigationManager.NavigateTo("/", true);
@@ -139,8 +143,8 @@
 
     public class UserFluentValidator : AbstractValidator<User>
     {
-        private readonly IChat ChatService;
-        public UserFluentValidator(IChat ChatService)
+        private readonly IChatHub ChatService;
+        public UserFluentValidator(IChatHub ChatService)
         {
             this.ChatService = ChatService;
 

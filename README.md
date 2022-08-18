@@ -6,7 +6,7 @@
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki/MAUI)
 
 # Requirements
-- **dotnet 6.0**, You can use [Visual Studio 2022 Preview](https://visualstudio.microsoft.com/vs/preview/) or install [dotnet-6.0 sdk and runtime](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) and use your favorite editor like [Visual Studio Code](https://code.visualstudio.com/) (Required)
+- **dotnet 6.0**, You can use [Visual Studio 2022 17.3 or higher](https://visualstudio.microsoft.com/downloads/) or install [dotnet-6.0 sdk and runtime](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) and use your favorite editor like [Visual Studio Code](https://code.visualstudio.com/) (Required)
 - [PostgreSQL (Npgsql)](https://www.postgresql.org/) or your preferred database engine (Required)
 - [pgAdmin](https://www.pgadmin.org/) to view and edit the PostgreSQL database (optinal)
 
@@ -82,11 +82,14 @@ Add-Migration [your migration name]
 ```
 Update-Database
 ```
-_If your database is setup correctly you should find the database along with your models tables added to it._
+
+If your database is setup correctly you should find the database along with your models tables added to it.
+
+If you're database not updating delete your old database and try again otherwise open an issue.
 
 ---
 
-#### Discord
+### Community
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
 
 #### Sponsors
