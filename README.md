@@ -85,7 +85,7 @@ Update-Database
 
 If your database is setup correctly you should find the database along with your models tables added to it.
 
-If you're database not updating delete your old database and try again otherwise open an issue.
+If your database not updating delete your old database and try again otherwise open an issue.
 
 ---
 
