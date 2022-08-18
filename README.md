@@ -2,11 +2,6 @@
 
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_auth.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_friends.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_channels.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_channel.png)
-
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki/MAUI)
 
@@ -93,6 +88,13 @@ If your database is setup correctly you should find the database along with your
 If your database not updating delete your old database and try again otherwise open an issue.
 
 ---
+
+### Showcase
+
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_auth.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_friends.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_channels.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_channel.png)
 
 ### Community
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
