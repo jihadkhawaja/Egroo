@@ -1,8 +1,9 @@
-﻿using MobileChat.Client.Interfaces;
-using MobileChat.Client.Services;
+﻿using MobileChat.Client.Services;
 using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Models;
 using MobileChat.MAUI.Services;
+using MobileChat.Shared.Interfaces;
+using MobileChat.Shared.Models;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI
@@ -25,12 +26,25 @@ namespace MobileChat.MAUI
 #endif
             builder.Services.AddMudServices();
 
+            //general services
+            builder.Services.AddSingleton<SessionStorage>();
+            builder.Services.AddSingleton<ISaveFile, SaveFileService>();
             //chat services
-            builder.Services.AddScoped<ISaveFile, SaveFileService>();
-            builder.Services.AddScoped<IChat, ChatService>();
-            builder.Services.AddScoped<SessionStorage>();
+            builder.Services.AddScoped<IChatHub, ChatService>();
 
-            return builder.Build();
+            var app = builder.Build();
+
+            //get local cached user credentials
+            using (IServiceScope scope = app.Services.CreateScope())
+            {
+                var SaveFileService = scope.ServiceProvider.GetRequiredService<ISaveFile>();
+                var SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
+
+                string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+                SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);
+            }
+
+            return app;
         }
     }
 }

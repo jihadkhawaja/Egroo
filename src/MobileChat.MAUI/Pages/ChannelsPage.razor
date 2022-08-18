@@ -1,15 +1,16 @@
 ﻿@page "/"
 @page "/channels"
 
-@using MobileChat.Client.Interfaces
 @using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Models
 @using MobileChat.MAUI.Shared.Components
+@using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
-@inject IChat ChatService
+@inject IChatHub ChatService
 @inject SessionStorage SessionStorage
+@inject ISnackbar Snackbar
 
 @if (IsBusy)
 {
@@ -32,13 +33,13 @@ else
         }
         else
         {
-            if(addFriendPopOverIsOpen)
+            @if(addFriendPopOverIsOpen)
             {
                 <MudPaper Outlined="true" Class="pa-2 mb-4">
                     <MudStack>
-                        <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
-                        <MudTextField T="string" Placeholder="username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
-                        <MudButton OnClick="AddUserToChannel">Send Request</MudButton>
+                        <MudText GutterBottom Typo="Typo.body1">Add Friend To Channel</MudText>
+                        <MudTextField T="string" Placeholder="friend username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
+                        <MudButton OnClick="AddUserToChannel">Add</MudButton>
                     </MudStack>
                 </MudPaper>
             }
@@ -46,10 +47,10 @@ else
             <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
                 @foreach (var channel in CurrentUserChannels)
                 {
-                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickabe-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel))">
+                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel))">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem Class="mt-3">
-                                <ChannelView Title=@channel.Title Users="@channel.Id.ToString()" />
+                                <ScopeView Title=@channel.Title Subtitle="@channel.Id.ToString()" />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
@@ -69,8 +70,6 @@ else
 @code{
     public IEnumerable<Channel> CurrentUserChannels { get; set; }
 
-    private User CurrentUser { get; set; }
-
     private bool IsSignedIn { get; set; }
 
     private bool IsBusy { get; set; } = true;
@@ -79,30 +78,21 @@ else
 
     private string usernameToAdd { get; set; }
 
-    private Guid selectedChannel { get; set; }
-
-    protected override Task OnInitializedAsync()
-    {
-        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-        CurrentUser = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);
-
-        return base.OnInitializedAsync();
-    }
+    private Guid selectedChannelId { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if(firstRender)
         {
-            if (CurrentUser is not null)
+            if (SessionStorage.User is not null)
             {
                 IsBusy = true;
 
-                KeyValuePair<Guid, bool> values = await ChatService.SignIn(CurrentUser.Username, CurrentUser.Password);
+                KeyValuePair<Guid, bool> values = await ChatService.SignIn(SessionStorage.User.Username, SessionStorage.User.Password);
                 IsSignedIn = values.Value;
 
                 if (IsSignedIn)
                 {
-                    SessionStorage.User = CurrentUser;
                     CurrentUserChannels = await GetChannels();
                 }
 
@@ -125,18 +115,18 @@ else
         if (addFriendPopOverIsOpen)
         {
             addFriendPopOverIsOpen = false;
-            selectedChannel = Guid.Empty;
+            selectedChannelId = Guid.Empty;
         }
         else
         {
             addFriendPopOverIsOpen = true;
-            selectedChannel = channelid;
+            selectedChannelId = channelid;
         }
     }
 
     private async Task<Channel[]> GetChannels()
     {
-        Channel[] channels = await ChatService.GetUserChannels(CurrentUser.Id);
+        Channel[] channels = await ChatService.GetUserChannels(SessionStorage.User.Id);
 
         for (int i = 0; i < channels.Length; i++)
         {
@@ -145,7 +135,7 @@ else
             {
                 channels[i].Title += ", ";
 
-                if (friend.Id == CurrentUser.Id)
+                if (friend.Id == SessionStorage.User.Id)
                 {
                     channels[i].Title = channels[i].Title.Insert(0, "You");
                 }
@@ -165,7 +155,7 @@ else
 
     private async Task CreateChannel()
     {
-        await ChatService.CreateChannel(CurrentUser.Id, CurrentUser.Username);
+        await ChatService.CreateChannel(SessionStorage.User.Id, SessionStorage.User.Username);
         CurrentUserChannels = await GetChannels();
     }
 
@@ -179,13 +169,27 @@ else
         //todo
     }
 
-    private void AddUserToChannel()
+    private async Task AddUserToChannel()
     {
-        if(selectedChannel == Guid.Empty)
+        if (selectedChannelId == Guid.Empty 
+            || string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))
         {
             return;
         }
 
-        //todo
+        if (await ChatService.AddChannelUsers(SessionStorage.User.Id, selectedChannelId, usernameToAdd))
+        {
+            Snackbar.Add($"Added {usernameToAdd} to the channel", Severity.Success);
+
+            selectedChannelId = Guid.Empty;
+            usernameToAdd = string.Empty;
+            ToggleAddFriendPopOverIsOpen(Guid.Empty);
+
+            await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Add {usernameToAdd} as a friend first", Severity.Error);
+        }
     }
 }

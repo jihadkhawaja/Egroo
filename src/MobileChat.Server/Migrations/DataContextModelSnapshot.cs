@@ -150,9 +150,9 @@ namespace MobileChat.Server.Migrations
 
             modelBuilder.Entity("MobileChat.Shared.Models.UserFriend", b =>
                 {
-                    b.Property<decimal>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("DateCreated")
                         .HasColumnType("timestamp with time zone");

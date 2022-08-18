@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MobileChat.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20220816140953_adminuser")]
-    partial class adminuser
+    [Migration("20220818192010_init")]
+    partial class init
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -152,9 +152,9 @@ namespace MobileChat.Server.Migrations
 
             modelBuilder.Entity("MobileChat.Shared.Models.UserFriend", b =>
                 {
-                    b.Property<decimal>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("numeric(20,0)");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("DateCreated")
                         .HasColumnType("timestamp with time zone");

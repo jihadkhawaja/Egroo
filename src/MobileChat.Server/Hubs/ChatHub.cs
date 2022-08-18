@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.SignalR;
 using MobileChat.Server.Helpers;
 using MobileChat.Server.Interfaces;
+using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
 using Channel = MobileChat.Shared.Models.Channel;
 using Message = MobileChat.Shared.Models.Message;
@@ -155,7 +156,15 @@ namespace MobileChat.Server.Hubs
         public async Task<string> GetUserDisplayName(Guid userId)
         {
             string displayname = (await UserService.Read(x => x.Id == userId)).FirstOrDefault().DisplayName;
+
             return displayname;
+        }
+
+        public async Task<string> GetUserUsername(Guid userId)
+        {
+            string username = (await UserService.Read(x => x.Id == userId)).FirstOrDefault().Username;
+
+            return username;
         }
 
         public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
@@ -185,7 +194,13 @@ namespace MobileChat.Server.Hubs
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    Guid currentuserid = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault().Id;
+                    var currentuser = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault();
+                    if(currentuser is null)
+                    {
+                        return false;
+                    }
+
+                    Guid currentuserid = currentuser.Id;
 
                     if (ChannelContainUser(currentuserid).Result)
                     {
@@ -199,6 +214,11 @@ namespace MobileChat.Server.Hubs
                         UserId = currentuserid,
                         DateCreated = DateTime.UtcNow,
                     };
+
+                    if (userid == currentuserid)
+                    {
+                        channelUsers[i].IsAdmin = true;
+                    }
                 }
 
                 await ChannelUsersService.Create(channelUsers);
@@ -462,6 +482,11 @@ namespace MobileChat.Server.Hubs
             }
 
             return true;
+        }
+
+        public async Task<UserFriend[]> GetUserFriends(Guid userId)
+        {
+            return (await UserFriendsService.Read(x => x.UserId == userId)).ToArray();
         }
     }
 }

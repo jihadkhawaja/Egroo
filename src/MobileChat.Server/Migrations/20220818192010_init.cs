@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -13,7 +14,7 @@ namespace MobileChat.Server.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -27,7 +28,8 @@ namespace MobileChat.Server.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ChannelId = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    IsAdmin = table.Column<bool>(type: "boolean", nullable: false),
+                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -42,11 +44,11 @@ namespace MobileChat.Server.Migrations
                     SenderId = table.Column<Guid>(type: "uuid", nullable: false),
                     ChannelId = table.Column<Guid>(type: "uuid", nullable: false),
                     Sent = table.Column<bool>(type: "boolean", nullable: false),
-                    DateSent = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    DateSent = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Seen = table.Column<bool>(type: "boolean", nullable: false),
-                    DateSeen = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    DateSeen = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Content = table.Column<string>(type: "text", nullable: false),
-                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -81,10 +83,10 @@ namespace MobileChat.Server.Migrations
                 name: "UsersFriends",
                 columns: table => new
                 {
-                    Id = table.Column<decimal>(type: "numeric(20,0)", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<Guid>(type: "uuid", nullable: false),
                     FriendUserId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    DateCreated = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {
