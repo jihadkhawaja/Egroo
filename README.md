@@ -2,6 +2,11 @@
 
 ![Xamarin Chat SignalR Icon](docs/icon.png)
 
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_auth.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_friends.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_channels.png)
+![Xamarin Chat SignalR Icon](docs/mobilechat_1_channel.png)
+
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki/MAUI)
 
