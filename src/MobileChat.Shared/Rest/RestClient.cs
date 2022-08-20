@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
-namespace MobileChat.Server.Rest
+namespace MobileChat.Shared.Rest
 {
     public enum AuthType
     {
@@ -16,9 +16,9 @@ namespace MobileChat.Server.Rest
     /// RestClient implements methods for calling CRUD operations
     /// using HTTP.
     /// </summary>
-    public class RestClient
+    public class RestClient<T>
     {
-        public async Task<T> GetAsync<T>(string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
+        public async Task<T> GetAsync(string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
             try
             {
@@ -59,7 +59,7 @@ namespace MobileChat.Server.Rest
             }
         }
 
-        public async Task<string> PostAsync<T>(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
+        public async Task<KeyValuePair<bool, string>> PostAsync(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
             HttpClient httpClient = new();
             byte[] authToken;
@@ -94,7 +94,9 @@ namespace MobileChat.Server.Rest
 
             HttpResponseMessage result = await httpClient.PostAsync(WebServiceUrl, httpContent);
 
-            return await result.Content.ReadAsStringAsync();
+            string resultText = await result.Content.ReadAsStringAsync();
+
+            return new KeyValuePair<bool, string>(result.IsSuccessStatusCode, resultText);
         }
     }
 }

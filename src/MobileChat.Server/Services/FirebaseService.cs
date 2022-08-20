@@ -1,26 +1,33 @@
 ﻿using MobileChat.Server.Interfaces;
-using MobileChat.Server.Rest;
 using MobileChat.Shared.Models;
+using MobileChat.Shared.Rest;
 using System.Text.Json;
 
 namespace MobileChat.Server.Services
 {
     public class FirebaseService : IFirebase
     {
-        private readonly RestClient RestClient;
+        private readonly RestClient<Firebase.Message> RestClient;
         public FirebaseService()
         {
-            RestClient = new RestClient();
+            RestClient = new RestClient<Firebase.Message>();
         }
         public async Task<bool> Send(string token, string title, string message)
         {
-            Firebase.Response response = JsonSerializer.Deserialize<Firebase.Response>(await RestClient.PostAsync(new Firebase.Message()
+            KeyValuePair<bool, string> messageResponse = await RestClient.PostAsync(new Firebase.Message()
             {
                 To = token,
                 Data = new Firebase.Data() { Message = title, Body = message },
             }, "https://fcm.googleapis.com/fcm/send",
             "",
-            AuthType.Token));
+            AuthType.Token);
+
+            if (!messageResponse.Key)
+            {
+                return false;
+            }
+
+            Firebase.Response response = JsonSerializer.Deserialize<Firebase.Response>(messageResponse.Value);
 
             if (response.Success == 1)
             {
@@ -34,13 +41,20 @@ namespace MobileChat.Server.Services
 
         public async Task<bool> SendAll(string title, string message)
         {
-            Firebase.Response response = JsonSerializer.Deserialize<Firebase.Response>(await RestClient.PostAsync(new Firebase.Message()
+            KeyValuePair<bool, string> messageResponse = await RestClient.PostAsync(new Firebase.Message()
             {
                 To = "general",
                 Data = new Firebase.Data() { Message = title, Body = message },
             }, "https://fcm.googleapis.com/fcm/send",
             "",
-            AuthType.Token));
+            AuthType.Token);
+
+            if (!messageResponse.Key)
+            {
+                return false;
+            }
+
+            Firebase.Response response = JsonSerializer.Deserialize<Firebase.Response>(messageResponse.Value);
 
             if (response.Success == 1)
             {

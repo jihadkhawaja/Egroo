@@ -25,21 +25,27 @@ namespace MobileChat.Server.Services
             return Task.FromResult(false);
         }
 
-        public Task Delete(Func<T, bool> predicate)
+        public Task<bool> Delete(Func<T, bool> predicate)
         {
-            var User = context.Set<T>().Where(predicate);
-            if (User != null)
+            try
             {
-                context.Set<T>().RemoveRange(User);
-                context.SaveChanges();
-            }
+                IEnumerable<T> User = context.Set<T>().Where(predicate);
+                if (User != null)
+                {
+                    context.Set<T>().RemoveRange(User);
+                    context.SaveChanges();
+                }
 
-            return Task.CompletedTask;
+                return Task.FromResult(true);
+            }
+            catch { }
+
+            return Task.FromResult(false);
         }
 
         public Task<IEnumerable<T>> Read(Func<T, bool> predicate)
         {
-            var result = context.Set<T>().AsNoTracking().Where(predicate);
+            IEnumerable<T> result = context.Set<T>().AsNoTracking().Where(predicate);
             return Task.FromResult(result);
         }
 

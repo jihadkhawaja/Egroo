@@ -13,12 +13,18 @@ namespace MobileChat.Shared.Interfaces
         Task<bool> AddFriend(Guid userId, string friendEmailorusername);
         Task<bool> RemoveFriend(Guid userId, string friendEmailorusername);
         Task<UserFriend[]> GetUserFriends(Guid userId);
+        Task<UserFriend[]> GetUserFriendRequests(Guid userId);
+        Task<bool> GetUserIsFriend(Guid userId, Guid friendId);
+        Task<bool> AcceptFriend(Guid userId, Guid friendId);
+        Task<bool> DenyFriend(Guid userId, Guid friendId);
         //channels
         Task<Channel> CreateChannel(Guid userId, params string[] usernames);
-        Task<bool> AddChannelUsers(Guid userid, Guid channelid, params string[] usernames);
-        Task<bool> ChannelContainUser(Guid userid);
-        Task<User[]> GetChannelUsers(Guid channelid);
-        Task<Channel[]> GetUserChannels(Guid userid);
+        Task<bool> DeleteChannel(Guid channelId, Guid userId);
+        Task<bool> AddChannelUsers(Guid userId, Guid channelId, params string[] usernames);
+        Task<bool> ChannelContainUser(Guid channelId, Guid userId);
+        Task<User[]> GetChannelUsers(Guid channelId);
+        Task<Channel[]> GetUserChannels(Guid userId);
+        Task<bool> IsChannelAdmin(Guid channelId, Guid userId);
         //messages
         Task<bool> SendMessage(Message message);
         Task<bool> UpdateMessage(Message message);

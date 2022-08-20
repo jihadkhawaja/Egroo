@@ -1,7 +1,30 @@
 ﻿@page "/settings"
+
+@using MobileChat.MAUI.Interfaces
+@using MobileChat.MAUI.Models
+@using MobileChat.MAUI.Shared.Components
+@using MobileChat.Shared.Interfaces
+@using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
+@inject ISaveFile SaveFileService
+@inject SessionStorage SessionStorage
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
-    <MudText Typo="Typo.h6" GutterBottom Color="Color.Secondary">To be implemented</MudText>
+    <MudButton Color="Color.Error" EndIcon="@Icons.Filled.Logout" OnClick="SignOut">Log Out</MudButton>
 </MudContainer>
+
+@code{
+    private Task SignOut()
+    {
+        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
+        SaveFileService.CreateDirectory(path);
+        SaveFileService.DeleteDirectory(path);
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
+
+        return Task.CompletedTask;
+    }
+}

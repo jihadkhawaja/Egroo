@@ -32,13 +32,13 @@ namespace MobileChat.MAUI
             //chat services
             builder.Services.AddScoped<IChatHub, ChatService>();
 
-            var app = builder.Build();
+            MauiApp app = builder.Build();
 
             //get local cached user credentials
             using (IServiceScope scope = app.Services.CreateScope())
             {
-                var SaveFileService = scope.ServiceProvider.GetRequiredService<ISaveFile>();
-                var SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
+                ISaveFile SaveFileService = scope.ServiceProvider.GetRequiredService<ISaveFile>();
+                SessionStorage SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
 
                 string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
                 SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);

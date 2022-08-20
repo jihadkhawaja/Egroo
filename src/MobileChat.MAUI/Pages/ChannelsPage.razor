@@ -47,16 +47,25 @@ else
             <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
                 @foreach (var channel in CurrentUserChannels)
                 {
-                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel))">
+                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem Class="mt-3">
-                                <ScopeView Title=@channel.Title Subtitle="@channel.Id.ToString()" />
+                                <ScopeView Title=@channel.Key.Title Subtitle="@channel.Key.DateCreated.Value.ToShortDateString()" />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.PersonAdd" OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Id))" />
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit" Disabled/>
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error" Disabled />
+                                    @if (channel.Value)
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Add" OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit" Disabled/>
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                    }
+                                    else
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                    }
                                 </MudStack>
                             </MudItem>
                         </MudGrid>
@@ -68,7 +77,7 @@ else
 }
 
 @code{
-    public IEnumerable<Channel> CurrentUserChannels { get; set; }
+    public IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
 
     private bool IsSignedIn { get; set; }
 
@@ -124,31 +133,40 @@ else
         }
     }
 
-    private async Task<Channel[]> GetChannels()
+    private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
     {
         Channel[] channels = await ChatService.GetUserChannels(SessionStorage.User.Id);
+        bool[] currentUserIsAdmin = new bool[channels.Length];
+
+        KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];
 
         for (int i = 0; i < channels.Length; i++)
         {
             User[] friends = await ChatService.GetChannelUsers(channels[i].Id);
+
+            channels[i].Title = string.Empty;
             foreach (User friend in friends)
             {
-                channels[i].Title += ", ";
-
                 if (friend.Id == SessionStorage.User.Id)
                 {
-                    channels[i].Title = channels[i].Title.Insert(0, "You");
+                    channels[i].Title += $"{await ChatService.GetUserDisplayName(friend.Id)} (You)";
                 }
                 else
                 {
                     channels[i].Title += await ChatService.GetUserDisplayName(friend.Id);
                 }
+
+                channels[i].Title += ", ";
             }
 
             channels[i].Title = channels[i].Title.TrimEnd(',', ' ');
+
+            bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User.Id);
+
+            results[i] = new KeyValuePair<Channel, bool>(channels[i], isChannelAdmin);
         }
 
-        return channels;
+        return results;
     }
 
     private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{channel.Title}");
@@ -156,12 +174,22 @@ else
     private async Task CreateChannel()
     {
         await ChatService.CreateChannel(SessionStorage.User.Id, SessionStorage.User.Username);
+
         CurrentUserChannels = await GetChannels();
     }
 
-    private void DeleteChannel()
+    private async Task DeleteChannel(Guid channelId)
     {
-        //todo
+        if (await ChatService.DeleteChannel(channelId, SessionStorage.User.Id))
+        {
+            Snackbar.Add($"Channel deleted", Severity.Success);
+
+            CurrentUserChannels = await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
     }
 
     private void EditChannel()
@@ -185,11 +213,16 @@ else
             usernameToAdd = string.Empty;
             ToggleAddFriendPopOverIsOpen(Guid.Empty);
 
-            await GetChannels();
+            CurrentUserChannels = await GetChannels();
         }
         else
         {
             Snackbar.Add($"Add {usernameToAdd} as a friend first", Severity.Error);
         }
+    }
+
+    private async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
+    {
+        return await ChatService.IsChannelAdmin(channelId, userId);
     }
 }

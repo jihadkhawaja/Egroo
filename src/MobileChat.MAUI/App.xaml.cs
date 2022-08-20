@@ -1,9 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
-using MobileChat.Client;
-using MobileChat.MAUI.Interfaces;
-using MobileChat.MAUI.Models;
-using MobileChat.MAUI.Services;
-using MobileChat.Shared.Models;
+﻿using MobileChat.Client;
 
 namespace MobileChat.MAUI
 {
@@ -21,7 +16,7 @@ namespace MobileChat.MAUI
         public const string hubConnectionURL = "your address here" + hubName;
 #endif
 
-        public CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
+        public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
         public App()
         {
             // Initialize client chat signalr service with your server chat hub url
@@ -34,11 +29,26 @@ namespace MobileChat.MAUI
 
         protected override async void OnStart()
         {
+            await Connect();
+        }
+
+        public static async Task Connect()
+        {
             //connect to the server through SignalR chathub
             ConnectionCancellationTokenSource = new();
             if (await ClientChat.SignalR.Connect(ConnectionCancellationTokenSource))
             {
                 Console.WriteLine("Connected!");
+            }
+        }
+
+        public static async Task Disconnect()
+        {
+            //connect to the server through SignalR chathub
+            ConnectionCancellationTokenSource = new();
+            if (await ClientChat.SignalR.Disconnect())
+            {
+                Console.WriteLine("Disconnected!");
             }
         }
     }

@@ -5,7 +5,6 @@ using MobileChat.Server.Interfaces;
 using MobileChat.Server.Services;
 using MobileChat.Shared.Models;
 using Serilog;
-using System.Security.Principal;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
