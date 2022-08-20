@@ -14,11 +14,11 @@ namespace MobileChat.MAUI.Services
             }
         }
 
-        public void DeleteDirectory(string dirName, string path)
+        public void DeleteDirectory(string path)
         {
-            if (Directory.Exists(Path.Combine(path, dirName)))
+            if (Directory.Exists(path))
             {
-                Directory.Delete(Path.Combine(path, dirName), true);
+                Directory.Delete(path, true);
             }
         }
 
@@ -80,7 +80,7 @@ namespace MobileChat.MAUI.Services
                 string contentsToWriteToFile = JsonSerializer.Serialize(objectToWrite);
                 writer = new StreamWriter(Path.Combine(path, fileName), append);
 
-                if(encrypt)
+                if (encrypt)
                 {
                     writer.Write(EncryptDecrypt(contentsToWriteToFile, key));
                 }
@@ -92,10 +92,7 @@ namespace MobileChat.MAUI.Services
             catch { }
             finally
             {
-                if (writer != null)
-                {
-                    writer.Close();
-                }
+                writer?.Close();
             }
         }
         public T ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new()
@@ -121,10 +118,7 @@ namespace MobileChat.MAUI.Services
             }
             finally
             {
-                if (reader != null)
-                {
-                    reader.Close();
-                }
+                reader?.Close();
             }
         }
     }

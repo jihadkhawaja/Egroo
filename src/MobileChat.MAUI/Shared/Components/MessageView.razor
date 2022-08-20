@@ -1,11 +1,33 @@
-﻿<MudPaper Class="pa-2" Elevation="0" Square Outlined>
-    <MudText>@DisplayName</MudText>
-    <MudText>@Content</MudText>
-</MudPaper>
+﻿@if(IsCurrentUser)
+{
+    <MudPaper Class="pa-2" Elevation="0" Outlined>
+        <MudStack Row>
+            <MudText Color="Color.Primary">@DisplayName</MudText>
+            <MudSpacer />
+            <MudText>@Date</MudText>
+        </MudStack>
+        <MudText>@Content</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudPaper Class="pa-2" Elevation="0" Outlined>
+        <MudStack Row>
+            <MudText>@DisplayName</MudText>
+            <MudSpacer />
+            <MudText>@Date</MudText>
+        </MudStack>
+        <MudText>@Content</MudText>
+    </MudPaper>
+}
 
 @code {
     [Parameter]
     public string DisplayName { get; set; }
     [Parameter]
     public string Content { get; set; }
+    [Parameter]
+    public string Date { get; set; }
+    [Parameter]
+    public bool IsCurrentUser { get; set; }
 }

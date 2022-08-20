@@ -28,7 +28,8 @@
                 <MudStack>
                     @foreach (var message in Messages)
                     {
-                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" />
+                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToString("dddd, dd MMMM yyyy hh:mm tt")"
+                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                     }
                 </MudStack>
             }
@@ -127,5 +128,17 @@
     private void ScrollToMessagesEnd()
     {
         JSRuntime.InvokeVoidAsync("scrollToEnd", "messages-container");
+    }
+
+    private bool IsCurrentUserMessage(Guid senderid)
+    {
+        if (senderid == SessionStorage.User.Id)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 }

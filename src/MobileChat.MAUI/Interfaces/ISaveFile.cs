@@ -3,7 +3,7 @@
     public interface ISaveFile
     {
         void DeleteFile(string fileName, string path);
-        void DeleteDirectory(string dirName, string path);
+        void DeleteDirectory(string path);
         bool CheckFileExist(string fileName, string path);
         void CreateDirectory(params string[] dirPath);
 

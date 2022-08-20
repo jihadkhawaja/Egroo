@@ -182,6 +182,7 @@ namespace MobileChat.Server.Hubs
 
             Channel[] channels = new Channel[1] { channel };
             await ChannelService.Create(channels);
+
             await AddChannelUsers(userId, channel.Id, usernames);
 
             return channel;
@@ -194,15 +195,15 @@ namespace MobileChat.Server.Hubs
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    var currentuser = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault();
-                    if(currentuser is null)
+                    User currentuser = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault();
+                    if (currentuser is null)
                     {
                         return false;
                     }
 
                     Guid currentuserid = currentuser.Id;
 
-                    if (ChannelContainUser(currentuserid).Result)
+                    if (await ChannelContainUser(channelid, currentuserid))
                     {
                         continue;
                     }
@@ -229,9 +230,9 @@ namespace MobileChat.Server.Hubs
 
             return false;
         }
-        public async Task<bool> ChannelContainUser(Guid userid)
+        public async Task<bool> ChannelContainUser(Guid channelid, Guid userid)
         {
-            return (await ChannelUsersService.Read(x => x.UserId == userid)).FirstOrDefault() != null;
+            return (await ChannelUsersService.Read(x => x.ChannelId == channelid && x.UserId == userid)).FirstOrDefault() != null;
         }
         public async Task<User[]> GetChannelUsers(Guid channelid)
         {
@@ -377,7 +378,8 @@ namespace MobileChat.Server.Hubs
                         return false;
                     }
 
-                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    if ((await UserFriendsService.Read(x => (x.UserId == user.Id && x.FriendUserId == friendUser.Id)
+                    || (x.FriendUserId == user.Id && x.UserId == friendUser.Id))).FirstOrDefault() != null)
                     {
                         return false;
                     }
@@ -401,12 +403,13 @@ namespace MobileChat.Server.Hubs
                         return false;
                     }
 
-                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    if ((await UserFriendsService.Read(x => (x.UserId == user.Id && x.FriendUserId == friendUser.Id)
+                    || (x.FriendUserId == user.Id && x.UserId == friendUser.Id))).FirstOrDefault() != null)
                     {
                         return false;
                     }
 
-                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                    UserFriend entry = new() { Id = Guid.NewGuid(), UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
                     UserFriend[] entries = new UserFriend[1] { entry };
                     await UserFriendsService.Create(entries);
                 }
@@ -442,13 +445,14 @@ namespace MobileChat.Server.Hubs
                         return false;
                     }
 
-                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    if ((await UserFriendsService.Read(x => (x.UserId == user.Id && x.FriendUserId == friendUser.Id)
+                    || (x.FriendUserId == user.Id && x.UserId == friendUser.Id))).FirstOrDefault() != null)
                     {
                         return false;
                     }
 
                     UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-                    
+
                     await UserFriendsService.Delete(x => x.Id == entry.Id);
                 }
                 else
@@ -466,14 +470,16 @@ namespace MobileChat.Server.Hubs
                         return false;
                     }
 
-                    if ((await UserFriendsService.Read(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id)).FirstOrDefault() != null)
+                    if ((await UserFriendsService.Read(x => (x.UserId == user.Id && x.FriendUserId == friendUser.Id)
+                    || (x.FriendUserId == user.Id && x.UserId == friendUser.Id))).FirstOrDefault() == null)
                     {
                         return false;
                     }
 
                     UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
 
-                    await UserFriendsService.Delete(x => x.Id == entry.Id);
+                    await UserFriendsService.Delete(x => (x.UserId == user.Id && x.FriendUserId == friendUser.Id)
+                    || (x.FriendUserId == user.Id && x.UserId == friendUser.Id));
                 }
             }
             catch
@@ -486,7 +492,77 @@ namespace MobileChat.Server.Hubs
 
         public async Task<UserFriend[]> GetUserFriends(Guid userId)
         {
-            return (await UserFriendsService.Read(x => x.UserId == userId)).ToArray();
+            return (await UserFriendsService.Read(x => (x.UserId == userId && x.IsAccepted) || (x.FriendUserId == userId && x.IsAccepted))).ToArray();
+        }
+
+        public async Task<UserFriend[]> GetUserFriendRequests(Guid userId)
+        {
+            return (await UserFriendsService.Read(x => x.FriendUserId == userId && !x.IsAccepted)).ToArray();
+        }
+
+        public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
+        {
+            UserFriend result = (await UserFriendsService.Read(x => x.UserId == userId && x.FriendUserId == friendId && x.IsAccepted)).FirstOrDefault();
+
+            if (result is null)
+            {
+                return false;
+            }
+
+            return result.IsAccepted;
+        }
+
+        public async Task<bool> AcceptFriend(Guid userId, Guid friendId)
+        {
+            UserFriend friendRequest = (await UserFriendsService.Read(x => x.UserId == friendId && x.FriendUserId == userId && !x.IsAccepted)).FirstOrDefault();
+
+            if (friendRequest is null)
+            {
+                return false;
+            }
+
+            friendRequest.IsAccepted = true;
+
+            return await UserFriendsService.Update(friendRequest);
+        }
+
+        public async Task<bool> DenyFriend(Guid userId, Guid friendId)
+        {
+            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == userId && !x.IsAccepted);
+        }
+
+        public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
+        {
+            ChannelUser channelAdmin = (await ChannelUsersService.Read(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin)).FirstOrDefault();
+
+            if (channelAdmin is null)
+            {
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        public async Task<bool> DeleteChannel(Guid channelId, Guid userId)
+        {
+            if (!await IsChannelAdmin(channelId, userId))
+            {
+                return false;
+            }
+
+            if (!await ChannelUsersService.Delete(x => x.ChannelId == channelId))
+            {
+                return false;
+            }
+
+            if (!await MessageService.Delete(x => x.ChannelId == channelId))
+            {
+                return false;
+            }
+
+            return await ChannelService.Delete(x => x.Id == channelId);
         }
     }
 }

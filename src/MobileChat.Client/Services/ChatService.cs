@@ -69,6 +69,11 @@ namespace MobileChat.Client.Services
             return ClientChat.SignalR.HubConnection.InvokeAsync<string>("GetUserUsername", userId);
         }
 
+        public Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("GetUserIsFriend", userId, friendId);
+        }
+
         public Task<bool> ChangePassword(string emailorusername, string newpassword)
         {
             throw new NotImplementedException();
@@ -79,14 +84,39 @@ namespace MobileChat.Client.Services
             return ClientChat.SignalR.HubConnection.InvokeAsync<UserFriend[]>("GetUserFriends", userId);
         }
 
-        public Task<bool> ChannelContainUser(Guid userid)
+        public Task<UserFriend[]> GetUserFriendRequests(Guid userId)
         {
-            throw new NotImplementedException();
+            return ClientChat.SignalR.HubConnection.InvokeAsync<UserFriend[]>("GetUserFriendRequests", userId);
+        }
+
+        public Task<bool> ChannelContainUser(Guid channelId, Guid userId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("ChannelContainUser", channelId, userId);
         }
 
         public Task<bool> UpdateMessage(Message message)
         {
-            throw new NotImplementedException();
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("message", message);
+        }
+
+        public Task<bool> AcceptFriend(Guid userId, Guid friendId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("AcceptFriend", userId, friendId);
+        }
+
+        public Task<bool> DenyFriend(Guid userId, Guid friendId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("DenyFriend", userId, friendId);
+        }
+
+        public Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("IsChannelAdmin", channelId, userId);
+        }
+
+        public Task<bool> DeleteChannel(Guid channelId, Guid userId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("DeleteChannel", channelId, userId);
         }
     }
 }

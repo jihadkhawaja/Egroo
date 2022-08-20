@@ -38,6 +38,27 @@ else
         }
 
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+            @foreach (var friendRequests in UserFriendRequests)
+            {
+                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                    <MudGrid Justify="Justify.SpaceBetween">
+                        <MudItem Class="mt-3">
+                            <ScopeView Title=@friendRequests.DisplayName Subtitle=@friendRequests.Username />
+                        </MudItem>
+                        <MudItem>
+                            <MudStack Row Style="height:100%;">
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Check" Color="Color.Success" 
+                                OnClick="@(async () => await AcceptFriendRequest(friendRequests.Id))" />
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Close" Color="Color.Error" 
+                                OnClick="@(async () => await DenyFriendRequest(friendRequests.Id))" />
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudStack>
+
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
             @foreach (var friend in UserFriends)
             {
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
@@ -47,7 +68,8 @@ else
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
-                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error" Disabled />
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(async () => await RemoveFriend(friend.Username))" />
                             </MudStack>
                         </MudItem>
                     </MudGrid>
@@ -58,6 +80,7 @@ else
 }
 
 @code {
+    public IEnumerable<User> UserFriendRequests { get; set; }
     public IEnumerable<User> UserFriends { get; set; }
 
     private bool IsSignedIn { get; set; }
@@ -82,7 +105,7 @@ else
                 if (IsSignedIn)
                 {
                     SessionStorage.User = SessionStorage.User;
-                    UserFriends = await GetFriends();
+                    await RefetchData();
                 }
 
                 IsBusy = false;
@@ -111,6 +134,12 @@ else
         }
     }
 
+    private async Task RefetchData()
+    {
+        UserFriendRequests = await GetFriendsRequest();
+        UserFriends = await GetFriends();
+    }
+
     private async Task<User[]> GetFriends()
     {
         UserFriend[] users = await ChatService.GetUserFriends(SessionStorage.User.Id);
@@ -118,14 +147,42 @@ else
 
         for (int i = 0; i < users.Length; i++)
         {
-            User user = new User();
-            user.Id = users[i].FriendUserId;
-            user.DisplayName = await ChatService.GetUserDisplayName(users[i].FriendUserId);
-            user.Username = await ChatService.GetUserUsername(users[i].FriendUserId);
-            friends[i] = user;
+            if (SessionStorage.User.Id == users[i].FriendUserId)
+            {
+                User user = new User();
+                user.Id = users[i].UserId;
+                user.DisplayName = await ChatService.GetUserDisplayName(users[i].UserId);
+                user.Username = await ChatService.GetUserUsername(users[i].UserId);
+                friends[i] = user;
+            }
+            else
+            {
+                User user = new User();
+                user.Id = users[i].FriendUserId;
+                user.DisplayName = await ChatService.GetUserDisplayName(users[i].FriendUserId);
+                user.Username = await ChatService.GetUserUsername(users[i].FriendUserId);
+                friends[i] = user;
+            }
         }
 
         return friends;
+    }
+
+    private async Task<User[]> GetFriendsRequest()
+    {
+        UserFriend[] users = await ChatService.GetUserFriendRequests(SessionStorage.User.Id);
+        User[] friendRequests = new User[users.Length];
+
+        for (int i = 0; i < users.Length; i++)
+        {
+            User user = new User();
+            user.Id = users[i].UserId;
+            user.DisplayName = await ChatService.GetUserDisplayName(users[i].UserId);
+            user.Username = await ChatService.GetUserUsername(users[i].UserId);
+            friendRequests[i] = user;
+        }
+
+        return friendRequests;
     }
 
     private async Task AddFriend()
@@ -137,14 +194,54 @@ else
 
         if (await ChatService.AddFriend(SessionStorage.User.Id, usernameToAdd))
         {
-            Snackbar.Add($"Added user", Severity.Success);
+            Snackbar.Add($"Friend request sent!", Severity.Success);
 
             ToggleAddFriendPopOverIsOpen();
             usernameToAdd = string.Empty;
+
+            await RefetchData();
         }
         else
         {
             Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+
+    private async Task RemoveFriend(string friendusername)
+    {
+        if (await ChatService.RemoveFriend(SessionStorage.User.Id, friendusername))
+        {
+            Snackbar.Add($"Removed {friendusername} from friends", Severity.Success);
+
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+
+    private async Task AcceptFriendRequest(Guid friendid)
+    {
+        if(await ChatService.AcceptFriend(SessionStorage.User.Id, friendid))
+        {
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+
+    private async Task DenyFriendRequest(Guid friendid)
+    {
+        if(await ChatService.DenyFriend(SessionStorage.User.Id, friendid))
+        {
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
         }
     }
 }
