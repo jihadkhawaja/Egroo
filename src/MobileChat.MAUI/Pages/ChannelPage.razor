@@ -159,9 +159,9 @@
 
             Messages.Add(message);
 
-            ScrollToMessagesEnd();
-
             await InvokeAsync(StateHasChanged);
+
+            ScrollToMessagesEnd();
         });
     }
 }
