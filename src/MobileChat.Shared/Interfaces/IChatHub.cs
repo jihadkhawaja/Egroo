@@ -7,7 +7,7 @@ namespace MobileChat.Shared.Interfaces
         //users
         Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password);
         Task<KeyValuePair<Guid, bool>> SignIn(string emailorusername, string password);
-        Task<bool> ChangePassword(string emailorusername, string newpassword);
+        Task<bool> ChangePassword(string emailorusername, string oldpassword, string newpassword);
         Task<string> GetUserDisplayName(Guid userId);
         Task<string> GetUserUsername(Guid userId);
         Task<bool> AddFriend(Guid userId, string friendEmailorusername);

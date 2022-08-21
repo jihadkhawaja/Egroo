@@ -124,16 +124,17 @@ namespace MobileChat.Server.Hubs
                 return new KeyValuePair<Guid, bool>(registeredUser.Id, true);
             }
         }
-        public async Task<bool> ChangePassword(string emailorusername, string newpassword)
+        public async Task<bool> ChangePassword(string emailorusername, string oldpassword, string newpassword)
         {
             if (PatternMatchHelper.IsEmail(emailorusername))
             {
-                if ((await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault() == null)
+                User registeredUser = (await UserService.Read(x => x.Email == emailorusername && x.Password == oldpassword)).FirstOrDefault();
+
+                if(registeredUser is null)
                 {
                     return false;
                 }
 
-                User registeredUser = (await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault();
                 registeredUser.Password = newpassword;
                 await UserService.Update(registeredUser);
 
@@ -141,12 +142,13 @@ namespace MobileChat.Server.Hubs
             }
             else
             {
-                if ((await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault() == null)
+                User registeredUser = (await UserService.Read(x => x.Username == emailorusername && x.Password == oldpassword)).FirstOrDefault();
+
+                if (registeredUser is null)
                 {
                     return false;
                 }
 
-                User registeredUser = (await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault();
                 registeredUser.Password = newpassword;
                 await UserService.Update(registeredUser);
 
@@ -254,7 +256,8 @@ namespace MobileChat.Server.Hubs
                 users.Add(new User
                 {
                     Id = user.Id,
-                    DisplayName = user.DisplayName
+                    DisplayName = user.DisplayName,
+                    ConnectionId = user.ConnectionId,
                 });
             }
 

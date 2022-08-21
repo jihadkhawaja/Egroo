@@ -74,7 +74,7 @@ namespace MobileChat.Client.Services
             return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("GetUserIsFriend", userId, friendId);
         }
 
-        public Task<bool> ChangePassword(string emailorusername, string newpassword)
+        public Task<bool> ChangePassword(string emailorusername, string oldpassword, string newpassword)
         {
             throw new NotImplementedException();
         }

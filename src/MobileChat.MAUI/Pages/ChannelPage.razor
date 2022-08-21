@@ -1,5 +1,7 @@
 ﻿@page "/chat/{ChannelId}/{Title}"
 
+@using Microsoft.AspNetCore.SignalR.Client
+@using MobileChat.Client
 @using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Models
 @using MobileChat.MAUI.Shared.Components
@@ -57,6 +59,8 @@
         if (firstRender)
         {
             Messages = (await GetMessages()).ToList();
+
+            HubEvents();
 
             await InvokeAsync(StateHasChanged);
 
@@ -140,5 +144,24 @@
         {
             return false;
         }
+    }
+
+    private void HubEvents()
+    {
+        ClientChat.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        {
+            if (message.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            message.DisplayName = await GetUserName(message.SenderId);
+
+            Messages.Add(message);
+
+            ScrollToMessagesEnd();
+
+            await InvokeAsync(StateHasChanged);
+        });
     }
 }
