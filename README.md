@@ -19,7 +19,8 @@ Set multiple project startup by right clicking the solution and then properties 
 2. Inside the project apply this command in the developer console in Visual Studio when you first launch the project
 ```
 dotnet restore
-``` 
+```
+3. Set the Hub Connection URL [here](https://github.com/jihadkhawaja/MobileChat/blob/development-maui/src/MobileChat.MAUI/App.xaml.cs#L12)
 
 ## Server
 1. Create **appsettings.json** (Production) and **appsettings.Development.json** (Development) files in the server project root then set the "Build Action" to "Content" and "Copy to Output Directory" to "Copy if newer" for each file.
