@@ -48,7 +48,11 @@
         {
             _isDarkMode = await _mudThemeProvider.GetSystemPreference();
 
-            IsConnected = GetIsConnected();
+            while(!IsConnected)
+            {
+                IsConnected = GetIsConnected();
+                await Task.Delay(300);
+            }
 
             await InvokeAsync(StateHasChanged);
         }

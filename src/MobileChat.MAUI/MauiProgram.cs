@@ -41,7 +41,12 @@ namespace MobileChat.MAUI
                 SessionStorage SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
 
                 string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-                SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);
+
+                try
+                {
+                    SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("user.json", path, true);
+                }
+                catch { }
             }
 
             return app;
