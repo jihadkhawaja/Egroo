@@ -38,17 +38,16 @@ namespace MobileChat.MAUI
             ConnectionCancellationTokenSource = new();
             if (await ClientChat.SignalR.Connect(ConnectionCancellationTokenSource))
             {
-                Console.WriteLine("Connected!");
+                //client connected
             }
         }
 
         public static async Task Disconnect()
         {
-            //connect to the server through SignalR chathub
-            ConnectionCancellationTokenSource = new();
+            //disconnect from the server through SignalR chathub
             if (await ClientChat.SignalR.Disconnect())
             {
-                Console.WriteLine("Disconnected!");
+                //client disconnected
             }
         }
     }

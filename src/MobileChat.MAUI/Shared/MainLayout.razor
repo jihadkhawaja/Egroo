@@ -1,4 +1,5 @@
-﻿@using MobileChat.MAUI.Models
+﻿@using MobileChat.Client
+@using MobileChat.MAUI.Models
 @inherits LayoutComponentBase
 
 @inject SessionStorage SessionStorage
@@ -8,6 +9,14 @@
 <MudSnackbarProvider />
 
 <MudLayout>
+    @if (!IsConnected)
+    {
+        <MudProgressLinear Indeterminate />
+        <MudText Typo="Typo.h6" Align="Align.Center" Class="pa-10">Connecting... Please wait</MudText>
+
+        return;
+    }
+
     @if (SessionStorage.User is not null)
     {
         <MudAppBar Elevation="0">
@@ -31,17 +40,36 @@
 
     bool _drawerOpen = true;
 
+    private bool IsConnected { get; set; }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             _isDarkMode = await _mudThemeProvider.GetSystemPreference();
-            StateHasChanged();
+
+            IsConnected = GetIsConnected();
+
+            await InvokeAsync(StateHasChanged);
         }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
-    void DrawerToggle()
+    private void DrawerToggle()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    private bool GetIsConnected()
+    {
+        if (ClientChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
     }
 }
