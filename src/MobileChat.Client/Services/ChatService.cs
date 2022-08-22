@@ -118,5 +118,10 @@ namespace MobileChat.Client.Services
         {
             return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("DeleteChannel", channelId, userId);
         }
+
+        public Task<bool> LeaveChannel(Guid userId, Guid channelId)
+        {
+            return ClientChat.SignalR.HubConnection.InvokeAsync<bool>("LeaveChannel", userId, channelId);
+        }
     }
 }
