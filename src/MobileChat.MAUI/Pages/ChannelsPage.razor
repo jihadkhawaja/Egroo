@@ -63,8 +63,8 @@ else
                                     }
                                     else
                                     {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
-                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.ExitToApp" Color="Color.Error"
+                                       OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
                                     }
                                 </MudStack>
                             </MudItem>
@@ -224,5 +224,17 @@ else
     private async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
     {
         return await ChatService.IsChannelAdmin(channelId, userId);
+    }
+
+    private async Task LeaveChannel(Guid channelId)
+    {
+        if (await ChatService.LeaveChannel(SessionStorage.User.Id, channelId))
+        {
+            CurrentUserChannels = await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
     }
 }

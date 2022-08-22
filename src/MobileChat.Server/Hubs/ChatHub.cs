@@ -58,6 +58,9 @@ namespace MobileChat.Server.Hubs
         }
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
+            username = username.ToLower();
+            email = email.ToLower();
+
             if ((await UserService.Read(x => x.Username == username)).FirstOrDefault() != null)
             {
                 return new KeyValuePair<Guid, bool>(Guid.Empty, false);
@@ -85,6 +88,8 @@ namespace MobileChat.Server.Hubs
         }
         public async Task<KeyValuePair<Guid, bool>> SignIn(string emailorusername, string password)
         {
+            emailorusername = emailorusername.ToLower();
+
             if (PatternMatchHelper.IsEmail(emailorusername))
             {
                 if ((await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault() == null)
@@ -566,6 +571,11 @@ namespace MobileChat.Server.Hubs
             }
 
             return await ChannelService.Delete(x => x.Id == channelId);
+        }
+
+        public async Task<bool> LeaveChannel(Guid userId, Guid channelId)
+        {
+            return await ChannelUsersService.Delete(x => x.UserId == userId && x.ChannelId == channelId);
         }
     }
 }

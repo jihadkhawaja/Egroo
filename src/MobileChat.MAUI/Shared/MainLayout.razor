@@ -11,8 +11,10 @@
 <MudLayout>
     @if (!IsConnected)
     {
-        <MudProgressLinear Indeterminate />
-        <MudText Typo="Typo.h6" Align="Align.Center" Class="pa-10">Connecting... Please wait</MudText>
+        <div style="width:100vw;height:100vh;background-color:#27272fff">
+            <MudProgressLinear Indeterminate Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting to server</MudText>
+        </div>
 
         return;
     }
@@ -21,6 +23,9 @@
     {
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+            <MudSpacer />
+            <MudAvatar Color="Color.Primary">@SessionStorage.User.Username.ToUpper()[0]</MudAvatar>
+            <MudText Class="ml-4">@SessionStorage.User.Username</MudText>
         </MudAppBar>
         <MudDrawer @bind-Open="_drawerOpen" Elevation="1">
             <MudDrawerHeader>
