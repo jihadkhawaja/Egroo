@@ -99,9 +99,8 @@
         {
             model.Id = values.Key;
 
-            string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-            SaveFileService.CreateDirectory(path);
-            SaveFileService.WriteToJsonFile<User>("user.json", path, model, false, true);
+            SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
+            SaveFileService.WriteToJsonFile<User>("user.json", SessionStorage.AppDataPath, model, false, true);
 
             SessionStorage.User = model;
 

@@ -49,11 +49,11 @@ namespace MobileChat.Server.Services
             return Task.FromResult(result);
         }
 
-        public Task<bool> Update(T newentity)
+        public Task<bool> Update(T[] newentities)
         {
             try
             {
-                context.Set<T>().Update(newentity);
+                context.Set<T>().UpdateRange(newentities);
                 context.SaveChanges();
 
                 return Task.FromResult(true);
