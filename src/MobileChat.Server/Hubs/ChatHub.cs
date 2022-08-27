@@ -39,7 +39,9 @@ namespace MobileChat.Server.Hubs
             if (connectedUser != null)
             {
                 connectedUser.IsOnline = true;
-                await UserService.Update(connectedUser);
+
+                User[] connectedUsers = new User[1] { connectedUser };
+                await UserService.Update(connectedUsers);
             }
 
             await base.OnConnectedAsync();
@@ -51,7 +53,9 @@ namespace MobileChat.Server.Hubs
             if (connectedUser != null)
             {
                 connectedUser.IsOnline = false;
-                await UserService.Update(connectedUser);
+
+                User[] connectedUsers = new User[1] { connectedUser };
+                await UserService.Update(connectedUsers);
             }
 
             await base.OnDisconnectedAsync(exception);
@@ -105,7 +109,9 @@ namespace MobileChat.Server.Hubs
                 User registeredUser = (await UserService.Read(x => x.Email == emailorusername)).FirstOrDefault();
                 registeredUser.ConnectionId = Context.ConnectionId;
                 registeredUser.IsOnline = true;
-                await UserService.Update(registeredUser);
+
+                User[] users = new User[1] { registeredUser };
+                await UserService.Update(users);
 
                 return new KeyValuePair<Guid, bool>(registeredUser.Id, true);
             }
@@ -124,7 +130,9 @@ namespace MobileChat.Server.Hubs
                 User registeredUser = (await UserService.Read(x => x.Username == emailorusername)).FirstOrDefault();
                 registeredUser.ConnectionId = Context.ConnectionId;
                 registeredUser.IsOnline = true;
-                await UserService.Update(registeredUser);
+
+                User[] users = new User[1] { registeredUser };
+                await UserService.Update(users);
 
                 return new KeyValuePair<Guid, bool>(registeredUser.Id, true);
             }
@@ -141,7 +149,9 @@ namespace MobileChat.Server.Hubs
                 }
 
                 registeredUser.Password = newpassword;
-                await UserService.Update(registeredUser);
+
+                User[] users = new User[1] { registeredUser };
+                await UserService.Update(users);
 
                 return true;
             }
@@ -155,7 +165,9 @@ namespace MobileChat.Server.Hubs
                 }
 
                 registeredUser.Password = newpassword;
-                await UserService.Update(registeredUser);
+
+                User[] users = new User[1] { registeredUser };
+                await UserService.Update(users);
 
                 return true;
             }
@@ -339,8 +351,9 @@ namespace MobileChat.Server.Hubs
                 return false;
             }
 
+            Message[] messages = new Message[1] { message };
             //save msg to db
-            if (await MessageService.Update(message))
+            if (await MessageService.Update(messages))
             {
                 foreach (User user in await GetChannelUsers(message.ChannelId))
                 {
@@ -531,7 +544,8 @@ namespace MobileChat.Server.Hubs
 
             friendRequest.IsAccepted = true;
 
-            return await UserFriendsService.Update(friendRequest);
+            UserFriend[] friendRequests = new UserFriend[1] { friendRequest };
+            return await UserFriendsService.Update(friendRequests);
         }
 
         public async Task<bool> DenyFriend(Guid userId, Guid friendId)
