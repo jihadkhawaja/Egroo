@@ -11,21 +11,21 @@ namespace MobileChat.Server.Services
         {
             this.context = context;
         }
-        public Task<bool> Create(T[] entity)
+        public async Task<bool> Create(T[] entity)
         {
             try
             {
                 context.Set<T>().AddRange(entity);
-                context.SaveChanges();
+                await context.SaveChangesAsync();
 
-                return Task.FromResult(true);
+                return true;
             }
             catch { }
 
-            return Task.FromResult(false);
+            return false;
         }
 
-        public Task<bool> Delete(Func<T, bool> predicate)
+        public async Task<bool> Delete(Func<T, bool> predicate)
         {
             try
             {
@@ -33,14 +33,14 @@ namespace MobileChat.Server.Services
                 if (User != null)
                 {
                     context.Set<T>().RemoveRange(User);
-                    context.SaveChanges();
+                    await context.SaveChangesAsync();
                 }
 
-                return Task.FromResult(true);
+                return true;
             }
             catch { }
 
-            return Task.FromResult(false);
+            return false;
         }
 
         public Task<IEnumerable<T>> Read(Func<T, bool> predicate)
@@ -49,18 +49,18 @@ namespace MobileChat.Server.Services
             return Task.FromResult(result);
         }
 
-        public Task<bool> Update(T[] newentities)
+        public async Task<bool> Update(T[] newentities)
         {
             try
             {
                 context.Set<T>().UpdateRange(newentities);
-                context.SaveChanges();
+                await context.SaveChangesAsync();
 
-                return Task.FromResult(true);
+                return true;
             }
             catch { }
 
-            return Task.FromResult(false);
+            return false;
         }
     }
 }

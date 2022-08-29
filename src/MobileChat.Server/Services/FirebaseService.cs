@@ -7,10 +7,10 @@ namespace MobileChat.Server.Services
 {
     public class FirebaseService : IFirebase
     {
-        private readonly RestClient<Firebase.Message> RestClient;
-        public FirebaseService()
+        private readonly RestClient RestClient;
+        public FirebaseService(RestClient RestClient)
         {
-            RestClient = new RestClient<Firebase.Message>();
+            this.RestClient = RestClient;
         }
         public async Task<bool> Send(string token, string title, string message)
         {

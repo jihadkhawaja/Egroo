@@ -115,8 +115,6 @@
 
         await ChatService.SendMessage(message);
 
-        Messages.Add(message);
-
         InputContent = string.Empty;
 
         await InvokeAsync(StateHasChanged);
