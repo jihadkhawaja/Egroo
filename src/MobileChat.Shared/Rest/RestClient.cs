@@ -16,14 +16,18 @@ namespace MobileChat.Shared.Rest
     /// RestClient implements methods for calling CRUD operations
     /// using HTTP.
     /// </summary>
-    public class RestClient<T>
+    public class RestClient
     {
-        public async Task<T> GetAsync(string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
+        private readonly HttpClient httpClient;
+        public RestClient(HttpClient httpClient)
+        {
+            this.httpClient = httpClient;
+        }
+
+        public async Task<T> GetAsync<T>(string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
             try
             {
-                HttpClient httpClient = new();
-
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
 
                 byte[] authToken;
@@ -59,9 +63,8 @@ namespace MobileChat.Shared.Rest
             }
         }
 
-        public async Task<KeyValuePair<bool, string>> PostAsync(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
+        public async Task<KeyValuePair<bool, string>> PostAsync<T>(T t, string WebServiceUrl, string authKey = null, AuthType authType = AuthType.None)
         {
-            HttpClient httpClient = new();
             byte[] authToken;
 
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
