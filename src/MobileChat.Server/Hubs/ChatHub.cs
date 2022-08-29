@@ -63,7 +63,11 @@ namespace MobileChat.Server.Hubs
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {
             username = username.ToLower();
-            email = email.ToLower();
+
+            if(!string.IsNullOrWhiteSpace(email))
+            {
+                email = email.ToLower();
+            }
 
             if ((await UserService.Read(x => x.Username == username)).FirstOrDefault() != null)
             {
