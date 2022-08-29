@@ -16,10 +16,14 @@ Find everything you need to get started at the [Wiki](https://github.com/jihadkh
 
 # Showcase
 
+## Windows
 ![Xamarin Chat SignalR Icon](docs/mobilechat_1_auth.png)
 ![Xamarin Chat SignalR Icon](docs/mobilechat_1_friends.png)
 ![Xamarin Chat SignalR Icon](docs/mobilechat_1_channels.png)
 ![Xamarin Chat SignalR Icon](docs/mobilechat_1_channel.png)
+
+## Android
+![Xamarin Chat SignalR Icon](docs/mobilechat_android.png)
 
 ### Community
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
