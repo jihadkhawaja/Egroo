@@ -45,7 +45,7 @@ namespace MobileChat.Server.Services
 
         public Task<IEnumerable<T>> Read(Func<T, bool> predicate)
         {
-            IEnumerable<T> result = context.Set<T>().Where(predicate).ToHashSet().AsEnumerable();
+            IEnumerable<T> result = context.Set<T>().AsNoTracking().Where(predicate).ToHashSet().AsEnumerable();
             return Task.FromResult(result);
         }
 
@@ -53,6 +53,7 @@ namespace MobileChat.Server.Services
         {
             try
             {
+                context.ChangeTracker.Clear();
                 context.Set<T>().UpdateRange(newentities);
                 await context.SaveChangesAsync();
 
