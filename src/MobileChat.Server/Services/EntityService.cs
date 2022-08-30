@@ -11,7 +11,7 @@ namespace MobileChat.Server.Services
         {
             this.context = context;
         }
-        public async Task<bool> Create(T[] entity)
+        public async Task<bool> Create(IEnumerable<T> entity)
         {
             try
             {
@@ -49,7 +49,7 @@ namespace MobileChat.Server.Services
             return Task.FromResult(result);
         }
 
-        public async Task<bool> Update(T[] newentities)
+        public async Task<bool> Update(IEnumerable<T> newentities)
         {
             try
             {
