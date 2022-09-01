@@ -54,8 +54,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="FluentValidation" Version="11.2.0" />
-	  <PackageReference Include="MudBlazor" Version="6.0.14" />
+	  <PackageReference Include="FluentValidation" Version="11.2.1" />
+	  <PackageReference Include="MudBlazor" Version="6.0.15" />
 	</ItemGroup>
 
 	<ItemGroup>
