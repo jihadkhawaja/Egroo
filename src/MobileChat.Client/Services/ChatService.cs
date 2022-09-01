@@ -4,7 +4,7 @@ using MobileChat.Shared.Models;
 
 namespace MobileChat.Client.Services
 {
-    public class ChatService : IChatHub
+    public class ChatService : IChatAuth, IChatUser, IChatChannel, IChatMessage
     {
         public async Task<KeyValuePair<Guid, bool>> SignUp(string displayname, string username, string email, string password)
         {

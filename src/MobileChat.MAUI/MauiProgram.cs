@@ -1,9 +1,9 @@
 ﻿using MobileChat.Client.Services;
 using MobileChat.MAUI.Interfaces;
-using MobileChat.MAUI.Models;
 using MobileChat.MAUI.Services;
 using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
+using MudBlazor.Charts;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI
@@ -30,7 +30,11 @@ namespace MobileChat.MAUI
             builder.Services.AddSingleton<SessionStorage>();
             builder.Services.AddSingleton<ISaveFile, SaveFileService>();
             //chat services
-            builder.Services.AddScoped<IChatHub, ChatService>();
+            builder.Services.AddScoped<ChatService>();
+            builder.Services.AddScoped<IChatAuth>(x => x.GetRequiredService<ChatService>());
+            builder.Services.AddScoped<IChatUser>(x => x.GetRequiredService<ChatService>());
+            builder.Services.AddScoped<IChatChannel>(x => x.GetRequiredService<ChatService>());
+            builder.Services.AddScoped<IChatMessage>(x => x.GetRequiredService<ChatService>());
 
             MauiApp app = builder.Build();
 
