@@ -25,6 +25,9 @@ Find everything you need to get started at the [Wiki](https://github.com/jihadkh
 ## Android
 ![Xamarin Chat SignalR Icon](docs/mobilechat_android.png)
 
+### Contribution
+Feel free to fork and **contribute** or **open an issue**. All contributions are welcome!
+
 ### Community
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
 
