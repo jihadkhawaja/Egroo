@@ -1,9 +1,19 @@
 version: '2.2'
 
 services:
+  postgres:
+    container_name: 'postgres'
+    image: postgres
+    environment:
+      # Your Password For Postgres DB
+      POSTGRES_PASSWORD: "YourPassword"
+    networks:
+      - chatserver-network
+    ports:
+      - "5432:5432"
+
   web:
     container_name: 'chat-server'
-    image: 'jihadkhawaja/chat-server:latest'
     build:
       context: ../../src
       dockerfile: MobileChat.Server/Dockerfile
@@ -13,17 +23,6 @@ services:
       - "postgres"
     networks:
       - chatserver-network
-
-  postgres:
-    container_name: 'postgres'
-    image: postgres
-    environment:
-    # Your Password For Postgres DB
-      POSTGRES_PASSWORD: "YourPassword"
-    networks:
-      - chatserver-network
-    ports:
-      - "5432:5432"
 
 networks:
   chatserver-network:
