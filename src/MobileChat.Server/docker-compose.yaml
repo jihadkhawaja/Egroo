@@ -18,7 +18,7 @@ services:
     container_name: 'postgres'
     image: postgres
     environment:
-      # change this for a "real" app!
+    # Your-Password-In-appsettings.json
       POSTGRES_PASSWORD: "Your-Password-In-appsettings.json"
     networks:
       - chatserver-network
