@@ -1,4 +1,12 @@
 {
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:27100",
+      "sslPort": 44351
+    }
+  },
   "profiles": {
     "Server": {
       "commandName": "Project",
@@ -6,6 +14,14 @@
       "launchBrowser": false,
       "launchUrl": "chathub",
       "applicationUrl": "http://localhost:5175",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": false,
+      "launchUrl": "chathub",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

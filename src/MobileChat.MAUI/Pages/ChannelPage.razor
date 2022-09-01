@@ -3,13 +3,14 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using MobileChat.Client
 @using MobileChat.MAUI.Interfaces
-@using MobileChat.MAUI.Models
+@using MobileChat.MAUI.Services
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
-@inject IChatHub ChatService
+@inject IChatUser ChatUserService
+@inject IChatMessage ChatMessageService
 @inject SessionStorage SessionStorage
 @inject IJSRuntime JSRuntime
 
@@ -83,7 +84,7 @@
 
     private async Task<Message[]> GetMessages()
     {
-        var messages = await ChatService.ReceiveMessageHistory(GetChannelId());
+        var messages = await ChatMessageService.ReceiveMessageHistory(GetChannelId());
 
         foreach(var msg in messages)
         {
@@ -106,14 +107,14 @@
         {
             Id = Guid.NewGuid(),
             ChannelId = GetChannelId(),
-            DisplayName = await ChatService.GetUserDisplayName(SessionStorage.User.Id),
+                DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
             Content = InputContent,
             SenderId = SessionStorage.User.Id,
             DateCreated = DateTime.UtcNow,
             DateSent = DateTime.UtcNow
         };
 
-        await ChatService.SendMessage(message);
+        await ChatMessageService.SendMessage(message);
 
         InputContent = string.Empty;
 
@@ -124,7 +125,7 @@
 
     private async Task<string> GetUserName(Guid userid)
     {
-        return await ChatService.GetUserDisplayName(userid);
+        return await ChatUserService.GetUserDisplayName(userid);
     }
 
     private void ScrollToMessagesEnd()
