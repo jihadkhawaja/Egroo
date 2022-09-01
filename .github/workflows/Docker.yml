@@ -1,0 +1,21 @@
+name: Docker
+
+on:
+  push:
+    branches: [ "development-maui" ]
+  pull_request:
+    branches: [ "development-maui" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # docker-compose check
+      - name: docker-compose check
+        working-directory: ./src/MobileChat.Server
+        run: docker-compose up -d
