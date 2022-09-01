@@ -3,7 +3,6 @@ using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Services;
 using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
-using MudBlazor.Charts;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI

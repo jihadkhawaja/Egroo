@@ -1,6 +1,4 @@
-﻿using MobileChat.Shared.Models;
-
-namespace MobileChat.Shared.Interfaces
+﻿namespace MobileChat.Shared.Interfaces
 {
     public interface IChatAuth
     {
