@@ -1,4 +1,4 @@
-![Xamarin Chat SignalR Icon](docs/icon.png)
+![MobileChat Icon](docs/icon.png)
 
 # About
 MAUI Client with ASP.NET SignalR Server.
@@ -12,18 +12,18 @@ Self-host chatting solution with cross-platform client application.
 - iOS 14 or higher
 
 # Documentation
-Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki/MAUI)
+Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki)
 
 # Showcase
 
 ## Windows
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_auth.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_friends.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_channels.png)
-![Xamarin Chat SignalR Icon](docs/mobilechat_1_channel.png)
+![mobilechat_1_auth](docs/mobilechat_1_auth.png)
+![mobilechat_1_friends](docs/mobilechat_1_friends.png)
+![mobilechat_1_channels](docs/mobilechat_1_channels.png)
+![mobilechat_1_channel](docs/mobilechat_1_channel.png)
 
 ## Android
-![Xamarin Chat SignalR Icon](docs/mobilechat_android.png)
+![mobilechat_android](docs/mobilechat_android.png)
 
 ### Contribution
 Feel free to fork and **contribute** or **open an issue**. All contributions are welcome!
