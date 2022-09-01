@@ -2,13 +2,15 @@
 @page "/channels"
 
 @using MobileChat.MAUI.Interfaces
-@using MobileChat.MAUI.Models
+@using MobileChat.MAUI.Services
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
-@inject IChatHub ChatService
+@inject IChatAuth ChatAuthService
+@inject IChatUser ChatUserService
+@inject IChatChannel ChatChannelService
 @inject SessionStorage SessionStorage
 @inject ISnackbar Snackbar
 
@@ -97,7 +99,7 @@ else
             {
                 IsBusy = true;
 
-                KeyValuePair<Guid, bool> values = await ChatService.SignIn(SessionStorage.User.Username, SessionStorage.User.Password);
+                KeyValuePair<Guid, bool> values = await ChatAuthService.SignIn(SessionStorage.User.Username, SessionStorage.User.Password);
                 IsSignedIn = values.Value;
 
                 if (IsSignedIn)
@@ -135,25 +137,25 @@ else
 
     private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
     {
-        Channel[] channels = await ChatService.GetUserChannels(SessionStorage.User.Id);
+        Channel[] channels = await ChatChannelService.GetUserChannels(SessionStorage.User.Id);
         bool[] currentUserIsAdmin = new bool[channels.Length];
 
         KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];
 
         for (int i = 0; i < channels.Length; i++)
         {
-            User[] friends = await ChatService.GetChannelUsers(channels[i].Id);
+            User[] friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
 
             channels[i].Title = string.Empty;
             foreach (User friend in friends)
             {
                 if (friend.Id == SessionStorage.User.Id)
                 {
-                    channels[i].Title += $"{await ChatService.GetUserDisplayName(friend.Id)} (You)";
+                    channels[i].Title += $"{await ChatUserService.GetUserDisplayName(friend.Id)} (You)";
                 }
                 else
                 {
-                    channels[i].Title += await ChatService.GetUserDisplayName(friend.Id);
+                    channels[i].Title += await ChatUserService.GetUserDisplayName(friend.Id);
                 }
 
                 channels[i].Title += ", ";
@@ -173,14 +175,14 @@ else
 
     private async Task CreateChannel()
     {
-        await ChatService.CreateChannel(SessionStorage.User.Id, SessionStorage.User.Username);
+        await ChatChannelService.CreateChannel(SessionStorage.User.Id, SessionStorage.User.Username);
 
         CurrentUserChannels = await GetChannels();
     }
 
     private async Task DeleteChannel(Guid channelId)
     {
-        if (await ChatService.DeleteChannel(channelId, SessionStorage.User.Id))
+        if (await ChatChannelService.DeleteChannel(channelId, SessionStorage.User.Id))
         {
             Snackbar.Add($"Channel deleted", Severity.Success);
 
@@ -205,7 +207,7 @@ else
             return;
         }
 
-        if (await ChatService.AddChannelUsers(SessionStorage.User.Id, selectedChannelId, usernameToAdd))
+        if (await ChatChannelService.AddChannelUsers(SessionStorage.User.Id, selectedChannelId, usernameToAdd))
         {
             Snackbar.Add($"Added {usernameToAdd} to the channel", Severity.Success);
 
@@ -223,12 +225,12 @@ else
 
     private async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
     {
-        return await ChatService.IsChannelAdmin(channelId, userId);
+        return await ChatChannelService.IsChannelAdmin(channelId, userId);
     }
 
     private async Task LeaveChannel(Guid channelId)
     {
-        if (await ChatService.LeaveChannel(SessionStorage.User.Id, channelId))
+        if (await ChatChannelService.LeaveChannel(SessionStorage.User.Id, channelId))
         {
             CurrentUserChannels = await GetChannels();
         }
