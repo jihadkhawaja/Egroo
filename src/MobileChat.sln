@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.Client", "Mobile
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.Shared", "MobileChat.Shared\MobileChat.Shared.csproj", "{3720A4AA-806A-452D-AA3A-3745B5A6C53F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MobileChat.Client.Test", "MobileChat.Client.Test\MobileChat.Client.Test.csproj", "{E3915E24-9B03-4575-994F-6AB03D50C925}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{3720A4AA-806A-452D-AA3A-3745B5A6C53F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3720A4AA-806A-452D-AA3A-3745B5A6C53F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3720A4AA-806A-452D-AA3A-3745B5A6C53F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E3915E24-9B03-4575-994F-6AB03D50C925}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E3915E24-9B03-4575-994F-6AB03D50C925}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E3915E24-9B03-4575-994F-6AB03D50C925}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E3915E24-9B03-4575-994F-6AB03D50C925}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

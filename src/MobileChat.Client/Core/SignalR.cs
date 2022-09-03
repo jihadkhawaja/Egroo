@@ -55,14 +55,21 @@ namespace MobileChat.Client.Core
             return Task.CompletedTask;
         }
 
-        public async Task<bool> Connect(CancellationTokenSource cts)
+        public async Task<bool> Connect(CancellationTokenSource cts = default)
         {
             try
             {
-                await HubConnection.StartAsync(cts.Token);
+                if(cts is not null)
+                {
+                    await HubConnection.StartAsync(cts.Token);
+                }
+                else
+                {
+                    await HubConnection.StartAsync();
+                }
 
                 //return true on success and false if cancelled
-                if (cts.IsCancellationRequested)
+                if (cts is not null && cts.IsCancellationRequested)
                 {
                     return false;
                 }
