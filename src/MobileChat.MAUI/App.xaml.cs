@@ -20,7 +20,7 @@ namespace MobileChat.MAUI
         public App()
         {
             // Initialize client chat signalr service with your server chat hub url
-            ClientChat.Initialize(hubConnectionURL);
+            Connection.Initialize(hubConnectionURL);
 
             InitializeComponent();
 
@@ -36,7 +36,7 @@ namespace MobileChat.MAUI
         {
             //connect to the server through SignalR chathub
             ConnectionCancellationTokenSource = new();
-            if (await ClientChat.SignalR.Connect(ConnectionCancellationTokenSource))
+            if (await Client.Connection.SignalR.Connect(ConnectionCancellationTokenSource))
             {
                 //client connected
             }
@@ -45,7 +45,7 @@ namespace MobileChat.MAUI
         public static async Task Disconnect()
         {
             //disconnect from the server through SignalR chathub
-            if (await ClientChat.SignalR.Disconnect())
+            if (await Client.Connection.SignalR.Disconnect())
             {
                 //client disconnected
             }

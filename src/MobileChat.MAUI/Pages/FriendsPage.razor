@@ -5,19 +5,15 @@
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChatUser ChatUserService
-@inject SessionStorage SessionStorage
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
 {
     <MudProgressLinear Indeterminate />
-}
-else if (!IsSignedIn)
-{
-    <SignInView />
 }
 else
 {
@@ -80,10 +76,10 @@ else
 }
 
 @code {
-    public IEnumerable<User> UserFriendRequests { get; set; }
-    public IEnumerable<User> UserFriends { get; set; }
+    [Inject] IDialogService DialogService { get; set; }
 
-    private bool IsSignedIn { get; set; }
+    private IEnumerable<User> UserFriendRequests { get; set; }
+    private IEnumerable<User> UserFriends { get; set; }
 
     private bool IsBusy { get; set; } = true;
 
@@ -95,19 +91,7 @@ else
     {
         if (firstRender)
         {
-            if (SessionStorage.User is not null)
-            {
-                IsSignedIn = true;
-                await RefetchData();
-            }
-            else
-            {
-                IsSignedIn = false;
-            }
-
-            IsBusy = false;
-
-            await InvokeAsync(StateHasChanged);
+            await RefetchData();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -127,8 +111,14 @@ else
 
     private async Task RefetchData()
     {
+        IsBusy = true;
+
         UserFriendRequests = await GetFriendsRequest();
         UserFriends = await GetFriends();
+
+        IsBusy = false;
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task<User[]> GetFriends()
@@ -200,6 +190,16 @@ else
 
     private async Task RemoveFriend(string friendusername)
     {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to remove friend?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
         if (await ChatUserService.RemoveFriend(SessionStorage.User.Id, friendusername))
         {
             Snackbar.Add($"Removed {friendusername} from friends", Severity.Success);

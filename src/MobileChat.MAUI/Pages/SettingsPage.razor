@@ -5,9 +5,9 @@
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
-@inject SessionStorage SessionStorage
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
@@ -15,8 +15,20 @@
 </MudContainer>
 
 @code{
-    private Task SignOut()
+    [Inject] IDialogService DialogService { get; set; }
+
+    private async Task SignOut()
     {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to log out?",
+            yesText: "Log Out", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
         string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
         SaveFileService.CreateDirectory(path);
         SaveFileService.DeleteDirectory(path);
@@ -24,7 +36,5 @@
         SessionStorage.User = null;
 
         NavigationManager.NavigateTo("/", true);
-
-        return Task.CompletedTask;
     }
 }
