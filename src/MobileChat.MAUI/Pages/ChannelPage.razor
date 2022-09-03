@@ -7,11 +7,11 @@
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
-@inject SessionStorage SessionStorage
 @inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
@@ -147,7 +147,7 @@
 
     private void HubEvents()
     {
-        ClientChat.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        Connection.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {

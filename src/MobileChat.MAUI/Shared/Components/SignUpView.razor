@@ -6,11 +6,11 @@
 @using MobileChat.MAUI.Services
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 @inject IChatUser ChatUserService
-@inject SessionStorage SessionStorage
-@inject NavigationManager NavigationManager
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign Up</MudText>

@@ -93,6 +93,7 @@ namespace MobileChat.Server.Hubs
                 {
                     Id = user.Id,
                     DisplayName = user.DisplayName,
+                    Username = user.Username,
                     ConnectionId = user.ConnectionId,
                 });
             }

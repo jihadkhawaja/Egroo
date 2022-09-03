@@ -2,7 +2,7 @@
 
 namespace MobileChat.Client
 {
-    public static class ClientChat
+    public static class Connection
     {
         public static SignalR SignalR { get; private set; }
         public static void Initialize(string url)

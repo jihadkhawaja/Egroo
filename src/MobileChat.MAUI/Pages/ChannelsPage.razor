@@ -6,12 +6,12 @@
 @using MobileChat.MAUI.Shared.Components
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 @inject IChatUser ChatUserService
 @inject IChatChannel ChatChannelService
-@inject SessionStorage SessionStorage
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -27,7 +27,8 @@ else
     <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
         <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h6">Channels</MudText>
-            <MudButton OnClick="CreateChannel" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
+            <MudButton OnClick="CreateChannel" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" 
+            StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
         </MudStack>
         @if (CurrentUserChannels is null)
         {
@@ -58,10 +59,12 @@ else
                                 <MudStack Row Style="height:100%;">
                                     @if (channel.Value)
                                     {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Add" OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit" Disabled/>
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Add" 
+                                        OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit"
+                                        OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.Title)))" />
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
-                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                        OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
                                     }
                                     else
                                     {
@@ -79,7 +82,9 @@ else
 }
 
 @code{
-    public IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
+    [Inject] IDialogService DialogService { get; set; }
+
+    private IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
 
     private bool IsSignedIn { get; set; }
 
@@ -182,6 +187,16 @@ else
 
     private async Task DeleteChannel(Guid channelId)
     {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to delete channel?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
         if (await ChatChannelService.DeleteChannel(channelId, SessionStorage.User.Id))
         {
             Snackbar.Add($"Channel deleted", Severity.Success);
@@ -192,11 +207,6 @@ else
         {
             Snackbar.Add($"Something went wrong!", Severity.Error);
         }
-    }
-
-    private void EditChannel()
-    {
-        //todo
     }
 
     private async Task AddUserToChannel()
@@ -238,5 +248,10 @@ else
         {
             Snackbar.Add($"Something went wrong!", Severity.Error);
         }
+    }
+
+    private void NavigateTo(string link)
+    {
+        NavigationManager.NavigateTo(link);
     }
 }

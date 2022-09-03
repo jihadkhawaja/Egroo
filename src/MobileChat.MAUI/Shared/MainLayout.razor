@@ -72,7 +72,7 @@
 
     private bool GetIsConnected()
     {
-        if (ClientChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        if (Connection.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
         {
             return true;
         }

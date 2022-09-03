@@ -29,11 +29,10 @@ namespace MobileChat.MAUI
             builder.Services.AddSingleton<SessionStorage>();
             builder.Services.AddSingleton<ISaveFile, SaveFileService>();
             //chat services
-            builder.Services.AddScoped<ChatService>();
-            builder.Services.AddScoped<IChatAuth>(x => x.GetRequiredService<ChatService>());
-            builder.Services.AddScoped<IChatUser>(x => x.GetRequiredService<ChatService>());
-            builder.Services.AddScoped<IChatChannel>(x => x.GetRequiredService<ChatService>());
-            builder.Services.AddScoped<IChatMessage>(x => x.GetRequiredService<ChatService>());
+            builder.Services.AddScoped<IChatAuth, ChatAuthService>();
+            builder.Services.AddScoped<IChatUser, ChatUserService>();
+            builder.Services.AddScoped<IChatChannel, ChatChannelService>();
+            builder.Services.AddScoped<IChatMessage, ChatMessageService>();
 
             MauiApp app = builder.Build();
 
