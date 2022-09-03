@@ -35,8 +35,8 @@ namespace MobileChat.MAUI
         public static async Task Connect()
         {
             //connect to the server through SignalR chathub
-            //ConnectionCancellationTokenSource = new();
-            if (await Connection.SignalR.Connect())
+            ConnectionCancellationTokenSource = new();
+            if (await Connection.SignalR.Connect(ConnectionCancellationTokenSource))
             {
                 //client connected
             }
