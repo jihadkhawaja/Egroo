@@ -59,7 +59,7 @@ namespace MobileChat.Client.Core
         {
             try
             {
-                if(cts is not null)
+                if (cts is not null)
                 {
                     await HubConnection.StartAsync(cts.Token);
                 }
