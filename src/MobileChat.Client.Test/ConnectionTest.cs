@@ -1,6 +1,3 @@
-using Microsoft.VisualStudio.TestPlatform.ObjectModel;
-using Newtonsoft.Json.Linq;
-
 namespace MobileChat.Client.Test
 {
     [TestClass]

@@ -25,12 +25,12 @@ namespace MobileChat.Client.Services
         {
             return Connection.SignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels", userid);
         }
-  
+
         public Task<bool> ChannelContainUser(Guid channelId, Guid userId)
         {
             return Connection.SignalR.HubConnection.InvokeAsync<bool>("ChannelContainUser", channelId, userId);
         }
-   
+
         public Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
         {
             return Connection.SignalR.HubConnection.InvokeAsync<bool>("IsChannelAdmin", channelId, userId);

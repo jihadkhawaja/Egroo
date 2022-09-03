@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using MobileChat.Shared.Interfaces;
-using MobileChat.Shared.Models;
 
 namespace MobileChat.Client.Services
 {
