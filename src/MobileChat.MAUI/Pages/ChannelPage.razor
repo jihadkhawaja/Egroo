@@ -38,9 +38,9 @@
             }
         </MudPaper>
         <MudStack Row>
-            <MudTextField DisableUnderLine @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" />
+            <MudTextField @ref="inputMudTextField" DisableUnderLine @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" @onkeydown="@EnterPressed" />
             <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
-                           OnClick="SendMessage" />
+                           OnClick="SendMessage" ButtonType="ButtonType.Submit"/>
         </MudStack>
     </MudStack>
 </MudContainer>
@@ -53,6 +53,7 @@
 
     private List<Message> Messages { get; set; } = new();
 
+    MudTextField<string> inputMudTextField { get; set; }
     private string InputContent { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -118,9 +119,21 @@
 
         InputContent = string.Empty;
 
+        await inputMudTextField.Clear();
+
         await InvokeAsync(StateHasChanged);
 
         ScrollToMessagesEnd();
+    }
+
+    public async Task EnterPressed(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            await Task.Delay(150);
+
+            await SendMessage();
+        }
     }
 
     private async Task<string> GetUserName(Guid userid)
