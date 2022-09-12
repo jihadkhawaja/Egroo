@@ -27,32 +27,41 @@ namespace MobileChat.Server.Hubs
             this.ChannelUsersService = ChannelUsersService;
             this.MessageService = MessageService;
         }
-
         public override async Task OnConnectedAsync()
         {
-            //set user IsOnline true when he connects or reconnects
-            User connectedUser = (await UserService.Read(x => x.ConnectionId == Context.ConnectionId)).FirstOrDefault();
-            if (connectedUser != null)
-            {
-                connectedUser.IsOnline = true;
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
 
-                User[] connectedUsers = new User[1] { connectedUser };
-                await UserService.Update(connectedUsers);
+            //set user IsOnline true when he connects or reconnects
+            if (!string.IsNullOrWhiteSpace(Token))
+            {
+                User connectedUser = (await UserService.Read(x => x.Token == Token)).FirstOrDefault();
+                if (connectedUser != null)
+                {
+                    connectedUser.ConnectionId = Context.ConnectionId;
+                    connectedUser.IsOnline = true;
+
+                    User[] connectedUsers = new User[1] { connectedUser };
+                    await UserService.Update(connectedUsers);
+                }
             }
 
             await base.OnConnectedAsync();
         }
-
         public override async Task OnDisconnectedAsync(Exception exception)
         {
-            //set user IsOnline false when he disconnects
-            User connectedUser = (await UserService.Read(x => x.ConnectionId == Context.ConnectionId)).FirstOrDefault();
-            if (connectedUser != null)
-            {
-                connectedUser.IsOnline = false;
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
 
-                User[] connectedUsers = new User[1] { connectedUser };
-                await UserService.Update(connectedUsers);
+            //set user IsOnline false when he disconnects
+            if (!string.IsNullOrWhiteSpace(Token))
+            {
+                User connectedUser = (await UserService.Read(x => x.Token == Token)).FirstOrDefault();
+                if (connectedUser != null)
+                {
+                    connectedUser.IsOnline = false;
+
+                    User[] connectedUsers = new User[1] { connectedUser };
+                    await UserService.Update(connectedUsers);
+                }
             }
 
             await base.OnDisconnectedAsync(exception);

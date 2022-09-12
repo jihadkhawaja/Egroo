@@ -1,11 +1,15 @@
-﻿using MobileChat.Shared.Interfaces;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
 
 namespace MobileChat.Server.Hubs
 {
     public partial class ChatHub : IChatChannel
     {
-        public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<Channel> CreateChannel(params string[] usernames)
         {
             if (usernames.Length == 0)
             {
@@ -21,25 +25,29 @@ namespace MobileChat.Server.Hubs
             Channel[] channels = new Channel[1] { channel };
             await ChannelService.Create(channels);
 
-            await AddChannelUsers(userId, channel.Id, usernames);
+            await AddChannelUsers(channel.Id, usernames);
 
             return channel;
         }
-        public async Task<bool> AddChannelUsers(Guid userid, Guid channelid, params string[] usernames)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> AddChannelUsers(Guid channelid, params string[] usernames)
         {
             try
             {
+                string Token = Context.GetHttpContext().Request.Query["access_token"];
+                Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
                 ChannelUser[] channelUsers = new ChannelUser[usernames.Length];
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    User currentuser = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault();
-                    if (currentuser is null)
+                    User userToAdd = (await UserService.Read(x => x.Username == usernames[i])).FirstOrDefault();
+                    if (userToAdd is null)
                     {
                         return false;
                     }
 
-                    Guid currentuserid = currentuser.Id;
+                    Guid currentuserid = userToAdd.Id;
 
                     if (await ChannelContainUser(channelid, currentuserid))
                     {
@@ -54,7 +62,7 @@ namespace MobileChat.Server.Hubs
                         DateCreated = DateTime.UtcNow,
                     };
 
-                    if (userid == currentuserid)
+                    if (ConnectorUserId == currentuserid)
                     {
                         channelUsers[i].IsAdmin = true;
                     }
@@ -68,10 +76,12 @@ namespace MobileChat.Server.Hubs
 
             return false;
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> ChannelContainUser(Guid channelid, Guid userid)
         {
             return (await ChannelUsersService.Read(x => x.ChannelId == channelid && x.UserId == userid)).FirstOrDefault() != null;
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User[]> GetChannelUsers(Guid channelid)
         {
             HashSet<User> channelUsers = new();
@@ -100,12 +110,16 @@ namespace MobileChat.Server.Hubs
 
             return users.ToArray();
         }
-        public async Task<Channel[]> GetUserChannels(Guid userid)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<Channel[]> GetUserChannels()
         {
             HashSet<Channel> userChannels = new();
             try
             {
-                List<ChannelUser> users = (await ChannelUsersService.Read(x => x.UserId == userid)).ToList();
+                string Token = Context.GetHttpContext().Request.Query["access_token"];
+                Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
+                List<ChannelUser> users = (await ChannelUsersService.Read(x => x.UserId == ConnectorUserId)).ToList();
                 foreach (ChannelUser user in users)
                 {
                     userChannels.Add((await ChannelService.Read(x => x.Id == user.ChannelId)).FirstOrDefault());
@@ -115,7 +129,7 @@ namespace MobileChat.Server.Hubs
 
             return userChannels.ToArray();
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
         {
             ChannelUser channelAdmin = (await ChannelUsersService.Read(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin)).FirstOrDefault();
@@ -129,10 +143,13 @@ namespace MobileChat.Server.Hubs
                 return true;
             }
         }
-
-        public async Task<bool> DeleteChannel(Guid channelId, Guid userId)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> DeleteChannel(Guid channelId)
         {
-            if (!await IsChannelAdmin(channelId, userId))
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
+            Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
+            if (!await IsChannelAdmin(channelId, ConnectorUserId))
             {
                 return false;
             }
@@ -149,10 +166,13 @@ namespace MobileChat.Server.Hubs
 
             return await ChannelService.Delete(x => x.Id == channelId);
         }
-
-        public async Task<bool> LeaveChannel(Guid userId, Guid channelId)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> LeaveChannel(Guid channelId)
         {
-            return await ChannelUsersService.Delete(x => x.UserId == userId && x.ChannelId == channelId);
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
+            Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
+            return await ChannelUsersService.Delete(x => x.UserId == ConnectorUserId && x.ChannelId == channelId);
         }
     }
 }

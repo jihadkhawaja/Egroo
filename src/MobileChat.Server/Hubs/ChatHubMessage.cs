@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
 
@@ -6,6 +8,7 @@ namespace MobileChat.Server.Hubs
 {
     public partial class ChatHub : IChatMessage
     {
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> SendMessage(Message message)
         {
             if (message == null)
@@ -44,6 +47,7 @@ namespace MobileChat.Server.Hubs
 
             return false;
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> UpdateMessage(Message message)
         {
             if (message == null)
@@ -75,11 +79,13 @@ namespace MobileChat.Server.Hubs
 
             return false;
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<Message[]> ReceiveMessageHistory(Guid channelId)
         {
             HashSet<Message> msgs = (await MessageService.Read(x => x.ChannelId == channelId)).ToHashSet();
             return msgs.ToArray();
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<Message[]> ReceiveMessageHistoryRange(Guid channelId, int index, int range)
         {
             HashSet<Message> msgs = (await ReceiveMessageHistory(channelId)).Skip(index).Take(range).ToHashSet();

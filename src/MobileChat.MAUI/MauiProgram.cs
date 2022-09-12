@@ -1,4 +1,5 @@
-﻿using MobileChat.Client.Services;
+﻿using MobileChat.Client;
+using MobileChat.Client.Services;
 using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Services;
 using MobileChat.Shared.Interfaces;
@@ -9,6 +10,18 @@ namespace MobileChat.MAUI
 {
     public static class MauiProgram
     {
+        // SignalR chat hub name (http://your-web-url/hubName)
+        private const string HubName = "chathub";
+#if DEBUG
+        // Development
+        // SignalR Web URL example (http://localhost:2736/ or server IP address with port) where the chat web app is hosted
+        public const string HubConnectionURL = "http://localhost:5175/" + HubName;
+#else
+        // Production
+        // SignalR Web URL example (https://www.domain.com/ or server IP address with port) where the chat web app is hosted
+        public const string HubConnectionURL = "your address here" + HubName;
+#endif
+        public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
         public static MauiApp CreateMauiApp()
         {
             MauiAppBuilder builder = MauiApp.CreateBuilder();
@@ -36,7 +49,14 @@ namespace MobileChat.MAUI
 
             MauiApp app = builder.Build();
 
-            //get local cached user credentials
+            ConfigureApplication(app);
+
+            return app;
+        }
+
+        private static void ConfigureApplication(MauiApp app)
+        {
+            //setup cache and try authenticate user
             using (IServiceScope scope = app.Services.CreateScope())
             {
                 ISaveFile SaveFileService = scope.ServiceProvider.GetRequiredService<ISaveFile>();
@@ -47,12 +67,37 @@ namespace MobileChat.MAUI
 
                 try
                 {
-                    SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("user.json", SessionStorage.AppDataPath, true);
+                    SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("credentials", SessionStorage.AppDataPath, true);
                 }
                 catch { }
-            }
 
-            return app;
+                Initialize(HubConnectionURL, SessionStorage.User?.Token);
+            }
+        }
+
+        public static void Initialize(string HubConnectionURL, string Token)
+        {
+            // Initialize client chat signalr service with your server chat hub url
+            Connection.Initialize(HubConnectionURL, Token);
+        }
+
+        public static async Task Connect()
+        {
+            //connect to the server through SignalR chathub
+            ConnectionCancellationTokenSource = new();
+            if (await Connection.SignalR.Connect(ConnectionCancellationTokenSource))
+            {
+                //client connected
+            }
+        }
+
+        public static async Task Disconnect()
+        {
+            //disconnect from the server through SignalR chathub
+            if (await Connection.SignalR.Disconnect())
+            {
+                //client disconnected
+            }
         }
     }
 }

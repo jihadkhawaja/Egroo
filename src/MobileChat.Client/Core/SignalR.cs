@@ -10,19 +10,22 @@ namespace MobileChat.Client.Core
         public event Func<string, Task> Reconnected;
         public event Func<Exception, Task> Closed;
 
-        public SignalR(string url)
+        public SignalR(string url, string token = null)
         {
-            HubConnection = new HubConnectionBuilder()
-                .WithAutomaticReconnect(new TimeSpan[5]
-                {
-                    new TimeSpan(0,0,0),
-                    new TimeSpan(0,0,5),
-                    new TimeSpan(0,0,10),
-                    new TimeSpan(0,0,30),
-                    new TimeSpan(0,0,60)
-                })
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                HubConnection = new HubConnectionBuilder()
+                .WithAutomaticReconnect()
                 .WithUrl(url)
                 .Build();
+            }
+            else
+            {
+                HubConnection = new HubConnectionBuilder()
+                .WithAutomaticReconnect()
+                .WithUrl(string.Format("{0}?access_token={1}", url, token))
+                .Build();
+            }
 
             SubscribeHubEvents();
         }
