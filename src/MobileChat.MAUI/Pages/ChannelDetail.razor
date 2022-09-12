@@ -38,12 +38,12 @@ else
                                     @if (SessionStorage.User.Id == user.Id)
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
-                                            OnClick="@(async () => await RemoveChannelUser(user.Id, GetChannelId()))" Disabled />
+                                            OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" Disabled />
                                     }
                                     else
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
-                                                OnClick="@(async () => await RemoveChannelUser(user.Id, GetChannelId()))" />
+                                                OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" />
                                     }
                                         
                                 </MudStack>
@@ -100,7 +100,7 @@ else
         return Guid.Empty;
     }
 
-    private async Task RemoveChannelUser(Guid userid, Guid channelid)
+    private async Task RemoveChannelUser(Guid channelid)
     {
         bool? result = await DialogService.ShowMessageBox(
             "Warning",
@@ -112,7 +112,7 @@ else
             return;
         }
 
-        if (await ChatChannelService.LeaveChannel(userid, channelid))
+        if (await ChatChannelService.LeaveChannel(channelid))
         {
             Snackbar.Add($"Removed user from channel", Severity.Success);
 

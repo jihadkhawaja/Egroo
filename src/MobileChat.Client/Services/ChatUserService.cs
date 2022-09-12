@@ -6,14 +6,14 @@ namespace MobileChat.Client.Services
 {
     public class ChatUserService : IChatUser
     {
-        public async Task<bool> AddFriend(Guid userId, string friendEmailorusername)
+        public async Task<bool> AddFriend(string friendEmailorusername)
         {
-            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("AddFriend", userId, friendEmailorusername);
+            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("AddFriend", friendEmailorusername);
         }
 
-        public async Task<bool> RemoveFriend(Guid userId, string friendEmailorusername)
+        public async Task<bool> RemoveFriend(string friendEmailorusername)
         {
-            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("RemoveFriend", userId, friendEmailorusername);
+            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("RemoveFriend", friendEmailorusername);
         }
 
         public Task<string> GetUserDisplayName(Guid userId)
@@ -41,14 +41,14 @@ namespace MobileChat.Client.Services
             return Connection.SignalR.HubConnection.InvokeAsync<UserFriend[]>("GetUserFriendRequests", userId);
         }
 
-        public Task<bool> AcceptFriend(Guid userId, Guid friendId)
+        public Task<bool> AcceptFriend(Guid friendId)
         {
-            return Connection.SignalR.HubConnection.InvokeAsync<bool>("AcceptFriend", userId, friendId);
+            return Connection.SignalR.HubConnection.InvokeAsync<bool>("AcceptFriend", friendId);
         }
 
-        public Task<bool> DenyFriend(Guid userId, Guid friendId)
+        public Task<bool> DenyFriend(Guid friendId)
         {
-            return Connection.SignalR.HubConnection.InvokeAsync<bool>("DenyFriend", userId, friendId);
+            return Connection.SignalR.HubConnection.InvokeAsync<bool>("DenyFriend", friendId);
         }
     }
 }

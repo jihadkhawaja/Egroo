@@ -29,8 +29,7 @@
             return;
         }
 
-        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Mobile Chat");
-        SaveFileService.CreateDirectory(path);
+        string path = Path.Combine(SessionStorage.AppDataPath);
         SaveFileService.DeleteDirectory(path);
 
         SessionStorage.User = null;

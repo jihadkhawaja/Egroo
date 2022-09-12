@@ -6,14 +6,14 @@ namespace MobileChat.Client.Services
 {
     public class ChatChannelService : IChatChannel
     {
-        public async Task<Channel> CreateChannel(Guid userId, params string[] usernames)
+        public async Task<Channel> CreateChannel(params string[] usernames)
         {
-            return await Connection.SignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", userId, usernames);
+            return await Connection.SignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", usernames);
         }
 
-        public async Task<bool> AddChannelUsers(Guid userId, Guid channelId, params string[] friendEmailorusername)
+        public async Task<bool> AddChannelUsers(Guid channelId, params string[] friendEmailorusername)
         {
-            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("AddChannelUsers", userId, channelId, friendEmailorusername);
+            return await Connection.SignalR.HubConnection.InvokeAsync<bool>("AddChannelUsers", channelId, friendEmailorusername);
         }
 
         public async Task<User[]> GetChannelUsers(Guid channelid)
@@ -21,9 +21,9 @@ namespace MobileChat.Client.Services
             return await Connection.SignalR.HubConnection.InvokeAsync<User[]>("GetChannelUsers", channelid);
         }
 
-        public Task<Channel[]> GetUserChannels(Guid userid)
+        public Task<Channel[]> GetUserChannels()
         {
-            return Connection.SignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels", userid);
+            return Connection.SignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels");
         }
 
         public Task<bool> ChannelContainUser(Guid channelId, Guid userId)
@@ -36,14 +36,14 @@ namespace MobileChat.Client.Services
             return Connection.SignalR.HubConnection.InvokeAsync<bool>("IsChannelAdmin", channelId, userId);
         }
 
-        public Task<bool> DeleteChannel(Guid channelId, Guid userId)
+        public Task<bool> DeleteChannel(Guid channelId)
         {
-            return Connection.SignalR.HubConnection.InvokeAsync<bool>("DeleteChannel", channelId, userId);
+            return Connection.SignalR.HubConnection.InvokeAsync<bool>("DeleteChannel", channelId);
         }
 
-        public Task<bool> LeaveChannel(Guid userId, Guid channelId)
+        public Task<bool> LeaveChannel(Guid channelId)
         {
-            return Connection.SignalR.HubConnection.InvokeAsync<bool>("LeaveChannel", userId, channelId);
+            return Connection.SignalR.HubConnection.InvokeAsync<bool>("LeaveChannel", channelId);
         }
     }
 }

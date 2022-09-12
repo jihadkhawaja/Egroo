@@ -173,7 +173,7 @@ else
             return;
         }
 
-        if (await ChatUserService.AddFriend(SessionStorage.User.Id, usernameToAdd))
+        if (await ChatUserService.AddFriend(usernameToAdd))
         {
             Snackbar.Add($"Friend request sent!", Severity.Success);
 
@@ -200,7 +200,7 @@ else
             return;
         }
 
-        if (await ChatUserService.RemoveFriend(SessionStorage.User.Id, friendusername))
+        if (await ChatUserService.RemoveFriend(friendusername))
         {
             Snackbar.Add($"Removed {friendusername} from friends", Severity.Success);
 
@@ -214,7 +214,7 @@ else
 
     private async Task AcceptFriendRequest(Guid friendid)
     {
-        if(await ChatUserService.AcceptFriend(SessionStorage.User.Id, friendid))
+        if(await ChatUserService.AcceptFriend(friendid))
         {
             await RefetchData();
         }
@@ -226,7 +226,7 @@ else
 
     private async Task DenyFriendRequest(Guid friendid)
     {
-        if (await ChatUserService.DenyFriend(SessionStorage.User.Id, friendid))
+        if (await ChatUserService.DenyFriend(friendid))
         {
             await RefetchData();
         }

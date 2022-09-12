@@ -46,6 +46,8 @@
 </MudContainer>
 
 @code {
+    [Inject] ISnackbar Snackbar { get; set; }
+
     [Parameter]
     public string Title { get; set; }
     [Parameter]
@@ -108,22 +110,24 @@
         {
             Id = Guid.NewGuid(),
             ChannelId = GetChannelId(),
-                DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
+            DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
             Content = InputContent,
             SenderId = SessionStorage.User.Id,
             DateCreated = DateTime.UtcNow,
             DateSent = DateTime.UtcNow
         };
 
-        await ChatMessageService.SendMessage(message);
+        if(await ChatMessageService.SendMessage(message))
+        {
+            InputContent = string.Empty;
+            await inputMudTextField.Clear();
 
-        InputContent = string.Empty;
-
-        await inputMudTextField.Clear();
-
-        await InvokeAsync(StateHasChanged);
-
-        ScrollToMessagesEnd();
+            await InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            Snackbar.Add("Failed to send message, Please check your connection and try again", MudBlazor.Severity.Error);
+        }
     }
 
     public async Task EnterPressed(KeyboardEventArgs e)

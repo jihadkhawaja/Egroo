@@ -104,9 +104,7 @@ else
             {
                 IsBusy = true;
 
-                KeyValuePair<Guid, bool> values = await ChatAuthService.SignIn(SessionStorage.User.Username, SessionStorage.User.Password);
-                IsSignedIn = values.Value;
-
+                IsSignedIn = !string.IsNullOrWhiteSpace(SessionStorage.User.Token);
                 if (IsSignedIn)
                 {
                     CurrentUserChannels = await GetChannels();
@@ -142,7 +140,7 @@ else
 
     private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
     {
-        Channel[] channels = await ChatChannelService.GetUserChannels(SessionStorage.User.Id);
+        Channel[] channels = await ChatChannelService.GetUserChannels();
         bool[] currentUserIsAdmin = new bool[channels.Length];
 
         KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];
@@ -180,7 +178,7 @@ else
 
     private async Task CreateChannel()
     {
-        await ChatChannelService.CreateChannel(SessionStorage.User.Id, SessionStorage.User.Username);
+        await ChatChannelService.CreateChannel(SessionStorage.User.Username);
 
         CurrentUserChannels = await GetChannels();
     }
@@ -197,7 +195,7 @@ else
             return;
         }
 
-        if (await ChatChannelService.DeleteChannel(channelId, SessionStorage.User.Id))
+        if (await ChatChannelService.DeleteChannel(channelId))
         {
             Snackbar.Add($"Channel deleted", Severity.Success);
 
@@ -217,7 +215,7 @@ else
             return;
         }
 
-        if (await ChatChannelService.AddChannelUsers(SessionStorage.User.Id, selectedChannelId, usernameToAdd))
+        if (await ChatChannelService.AddChannelUsers(selectedChannelId, usernameToAdd))
         {
             Snackbar.Add($"Added {usernameToAdd} to the channel", Severity.Success);
 
@@ -240,7 +238,7 @@ else
 
     private async Task LeaveChannel(Guid channelId)
     {
-        if (await ChatChannelService.LeaveChannel(SessionStorage.User.Id, channelId))
+        if (await ChatChannelService.LeaveChannel(channelId))
         {
             CurrentUserChannels = await GetChannels();
         }

@@ -7,6 +7,7 @@
 @using MobileChat.MAUI.Services
 @using MobileChat.Shared.Interfaces
 @using MobileChat.Shared.Models
+@using System.Text.Json
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
@@ -77,15 +78,19 @@
             return;
         }
 
-        KeyValuePair<Guid, bool> values = await ChatAuthService.SignIn(EmailOrUsername, Password);
+        dynamic dynamicObj = await ChatAuthService.SignIn(EmailOrUsername, Password);
+        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
 
         //check user
-        if (values.Value)
+        if (result is not null)
         {
+            Guid Id = Guid.Parse(result["id"].ToString());
+            string Token = result["token"].ToString();
+
             User user = new()
             {
-                Id = values.Key,
-                Password = Password
+                Id = Id,
+                Token = Token
             };
 
             if (PatternMatchHelper.IsEmail(EmailOrUsername))
@@ -98,9 +103,12 @@
             };
 
             SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-            SaveFileService.WriteToJsonFile<User>("user.json", SessionStorage.AppDataPath, user, false, true);
+            SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, user, false, true);
 
             SessionStorage.User = user;
+
+            MauiProgram.Initialize(MauiProgram.HubConnectionURL, SessionStorage.User.Token);
+            await MauiProgram.Connect();
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 

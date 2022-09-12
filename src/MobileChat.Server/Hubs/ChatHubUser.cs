@@ -1,4 +1,7 @@
-﻿using MobileChat.Server.Helpers;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using MobileChat.Server.Helpers;
 using MobileChat.Shared.Interfaces;
 using MobileChat.Shared.Models;
 
@@ -6,21 +9,22 @@ namespace MobileChat.Server.Hubs
 {
     public partial class ChatHub : IChatUser
     {
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<string> GetUserDisplayName(Guid userId)
         {
             string displayname = (await UserService.Read(x => x.Id == userId)).FirstOrDefault().DisplayName;
 
             return displayname;
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<string> GetUserUsername(Guid userId)
         {
             string username = (await UserService.Read(x => x.Id == userId)).FirstOrDefault().Username;
 
             return username;
         }
-
-        public async Task<bool> AddFriend(Guid userId, string friendEmailorusername)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> AddFriend(string friendEmailorusername)
         {
             if (string.IsNullOrEmpty(friendEmailorusername))
             {
@@ -29,10 +33,13 @@ namespace MobileChat.Server.Hubs
 
             try
             {
+                string Token = Context.GetHttpContext().Request.Query["access_token"];
+                Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
                 if (PatternMatchHelper.IsEmail(friendEmailorusername))
                 {
                     //get user id from email
-                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    User user = (await UserService.Read(x => x.Id == ConnectorUserId)).FirstOrDefault();
                     if (user == null)
                     {
                         return false;
@@ -57,7 +64,7 @@ namespace MobileChat.Server.Hubs
                 else
                 {
                     //get user id from username
-                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    User user = (await UserService.Read(x => x.Id == ConnectorUserId)).FirstOrDefault();
                     if (user == null)
                     {
                         return false;
@@ -87,7 +94,8 @@ namespace MobileChat.Server.Hubs
 
             return true;
         }
-        public async Task<bool> RemoveFriend(Guid userId, string friendEmailorusername)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> RemoveFriend(string friendEmailorusername)
         {
             if (string.IsNullOrEmpty(friendEmailorusername))
             {
@@ -96,10 +104,13 @@ namespace MobileChat.Server.Hubs
 
             try
             {
+                string Token = Context.GetHttpContext().Request.Query["access_token"];
+                Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
                 if (PatternMatchHelper.IsEmail(friendEmailorusername))
                 {
                     //get user id from email
-                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    User user = (await UserService.Read(x => x.Id == ConnectorUserId)).FirstOrDefault();
                     if (user == null)
                     {
                         return false;
@@ -124,7 +135,7 @@ namespace MobileChat.Server.Hubs
                 else
                 {
                     //get user id from username
-                    User user = (await UserService.Read(x => x.Id == userId)).FirstOrDefault();
+                    User user = (await UserService.Read(x => x.Id == ConnectorUserId)).FirstOrDefault();
                     if (user == null)
                     {
                         return false;
@@ -155,17 +166,17 @@ namespace MobileChat.Server.Hubs
 
             return true;
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]> GetUserFriends(Guid userId)
         {
             return (await UserFriendsService.Read(x => x.UserId == userId && x.IsAccepted || x.FriendUserId == userId && x.IsAccepted)).ToArray();
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]> GetUserFriendRequests(Guid userId)
         {
             return (await UserFriendsService.Read(x => x.FriendUserId == userId && !x.IsAccepted)).ToArray();
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
         {
             UserFriend result = (await UserFriendsService.Read(x => x.UserId == userId && x.FriendUserId == friendId && x.IsAccepted)).FirstOrDefault();
@@ -177,10 +188,13 @@ namespace MobileChat.Server.Hubs
 
             return result.IsAccepted;
         }
-
-        public async Task<bool> AcceptFriend(Guid userId, Guid friendId)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> AcceptFriend(Guid friendId)
         {
-            UserFriend friendRequest = (await UserFriendsService.Read(x => x.UserId == friendId && x.FriendUserId == userId && !x.IsAccepted)).FirstOrDefault();
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
+            Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
+            UserFriend friendRequest = (await UserFriendsService.Read(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && !x.IsAccepted)).FirstOrDefault();
 
             if (friendRequest is null)
             {
@@ -192,10 +206,13 @@ namespace MobileChat.Server.Hubs
             UserFriend[] friendRequests = new UserFriend[1] { friendRequest };
             return await UserFriendsService.Update(friendRequests);
         }
-
-        public async Task<bool> DenyFriend(Guid userId, Guid friendId)
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> DenyFriend(Guid friendId)
         {
-            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == userId && !x.IsAccepted);
+            string Token = Context.GetHttpContext().Request.Query["access_token"];
+            Guid ConnectorUserId = (await UserService.Read(x => x.Token == Token)).FirstOrDefault().Id;
+
+            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && !x.IsAccepted);
         }
     }
 }
