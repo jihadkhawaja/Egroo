@@ -4,7 +4,7 @@ namespace MobileChat.Client.Test
     public class ConnectionTest
     {
         private const string HubConnectionURL = "http://localhost:5175/" + "chathub";
-        private const string Token = "your-token-here-not-less-than-16-character";
+        private const string Token = "";
         [TestCleanup]
         public void TestClean()
         {
