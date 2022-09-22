@@ -1,12 +1,11 @@
 ﻿@page "/chat/{ChannelId}/{Title}"
 
 @using Microsoft.AspNetCore.SignalR.Client
-@using MobileChat.Client
 @using MobileChat.MAUI.Interfaces
 @using MobileChat.MAUI.Services
 @using MobileChat.MAUI.Shared.Components
-@using MobileChat.Shared.Interfaces
-@using MobileChat.Shared.Models
+@using jihadkhawaja.mobilechat.client.Interfaces
+@using jihadkhawaja.mobilechat.client.Models
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
@@ -164,7 +163,7 @@
 
     private void HubEvents()
     {
-        Connection.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {
