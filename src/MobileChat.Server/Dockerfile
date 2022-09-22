@@ -7,7 +7,6 @@ EXPOSE 80
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
 COPY ["MobileChat.Server/MobileChat.Server.csproj", "MobileChat.Server/"]
-COPY ["MobileChat.Shared/MobileChat.Shared.csproj", "MobileChat.Shared/"]
 RUN dotnet restore "MobileChat.Server/MobileChat.Server.csproj"
 COPY . .
 WORKDIR "/src/MobileChat.Server"
