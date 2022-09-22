@@ -1,4 +1,4 @@
-﻿using MobileChat.Shared.Models;
+﻿using jihadkhawaja.mobilechat.client.Models;
 
 namespace MobileChat.MAUI.Services
 {
