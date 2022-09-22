@@ -1,9 +1,9 @@
-﻿using MobileChat.Client;
-using MobileChat.Client.Services;
+﻿using jihadkhawaja.mobilechat.client.Interfaces;
+using jihadkhawaja.mobilechat.client.Models;
+using jihadkhawaja.mobilechat.client.Services;
 using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Services;
-using MobileChat.Shared.Interfaces;
-using MobileChat.Shared.Models;
+using jihadkhawaja.mobilechat.client;
 using MudBlazor.Services;
 
 namespace MobileChat.MAUI
@@ -78,14 +78,14 @@ namespace MobileChat.MAUI
         public static void Initialize(string HubConnectionURL, string Token)
         {
             // Initialize client chat signalr service with your server chat hub url
-            Connection.Initialize(HubConnectionURL, Token);
+            jihadkhawaja.mobilechat.client.MobileChat.Initialize(HubConnectionURL, Token);
         }
 
         public static async Task Connect()
         {
             //connect to the server through SignalR chathub
             ConnectionCancellationTokenSource = new();
-            if (await Connection.SignalR.Connect(ConnectionCancellationTokenSource))
+            if (await jihadkhawaja.mobilechat.client.MobileChat.SignalR.Connect(ConnectionCancellationTokenSource))
             {
                 //client connected
             }
@@ -94,7 +94,7 @@ namespace MobileChat.MAUI
         public static async Task Disconnect()
         {
             //disconnect from the server through SignalR chathub
-            if (await Connection.SignalR.Disconnect())
+            if (await jihadkhawaja.mobilechat.client.MobileChat.SignalR.Disconnect())
             {
                 //client disconnected
             }

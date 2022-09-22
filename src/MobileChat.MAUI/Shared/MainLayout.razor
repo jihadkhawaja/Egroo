@@ -1,5 +1,4 @@
-﻿@using MobileChat.Client
-@using MobileChat.MAUI.Services
+﻿@using MobileChat.MAUI.Services
 @inherits LayoutComponentBase
 @inject SessionStorage SessionStorage
 
@@ -72,7 +71,7 @@
 
     private bool GetIsConnected()
     {
-        if (Connection.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        if (jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
         {
             return true;
         }
