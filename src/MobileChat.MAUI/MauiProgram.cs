@@ -5,6 +5,7 @@ using MobileChat.MAUI.Interfaces;
 using MobileChat.MAUI.Services;
 using jihadkhawaja.mobilechat.client;
 using MudBlazor.Services;
+using jihadkhawaja.mobilechat.client.Services.Extension;
 
 namespace MobileChat.MAUI
 {
@@ -42,10 +43,7 @@ namespace MobileChat.MAUI
             builder.Services.AddSingleton<SessionStorage>();
             builder.Services.AddSingleton<ISaveFile, SaveFileService>();
             //chat services
-            builder.Services.AddScoped<IChatAuth, ChatAuthService>();
-            builder.Services.AddScoped<IChatUser, ChatUserService>();
-            builder.Services.AddScoped<IChatChannel, ChatChannelService>();
-            builder.Services.AddScoped<IChatMessage, ChatMessageService>();
+            builder.Services.AddMobileChatServices();
 
             MauiApp app = builder.Build();
 
@@ -71,11 +69,12 @@ namespace MobileChat.MAUI
                 }
                 catch { }
 
-                Initialize(HubConnectionURL, SessionStorage.User?.Token);
+                //Initialize(HubConnectionURL, SessionStorage.User?.Token);
+                Initialize(HubConnectionURL);
             }
         }
 
-        public static void Initialize(string HubConnectionURL, string Token)
+        public static void Initialize(string HubConnectionURL, string Token = "")
         {
             // Initialize client chat signalr service with your server chat hub url
             jihadkhawaja.mobilechat.client.MobileChat.Initialize(HubConnectionURL, Token);
