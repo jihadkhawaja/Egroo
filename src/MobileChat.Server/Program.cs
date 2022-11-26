@@ -10,6 +10,15 @@ Configurations = builder.Configuration;
 //logger
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", builder =>
+    builder
+    .AllowAnyOrigin()
+    .AllowAnyMethod()
+    .AllowAnyHeader());
+});
+
 //mobile chat service
 builder.Services.AddMobileChatServices(builder.Configuration);
 
@@ -39,8 +48,9 @@ app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-//hubs
-app.MapHub<ChatHub>("/chathub");
+//chat hub
+//true to use JWT auth
+app.UseMobileChatServices(false);
 
 app.Run();
 
