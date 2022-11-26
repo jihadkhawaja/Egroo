@@ -29,10 +29,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup .NET 6
+      - name: Setup .NET 7
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 7.0.x
           
       - name: Install MAUI Workload
         run: dotnet workload install maui --ignore-failed-sources
@@ -41,7 +41,7 @@ jobs:
         run: dotnet restore src/MobileChat.MAUI/MobileChat.MAUI.csproj
 
       - name: Build MAUI Android
-        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net6.0-android31.0 --no-restore
+        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net7.0-android --no-restore
 
       - name: Upload Android Artifact
         uses: actions/upload-artifact@v3
@@ -58,10 +58,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup .NET 6
+      - name: Setup .NET 7
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 7.0.x
 
       - name: Install MAUI Workload
         run: dotnet workload install maui --ignore-failed-sources
@@ -70,13 +70,13 @@ jobs:
         run: dotnet restore src/MobileChat.MAUI/MobileChat.MAUI.csproj
 
       - name: Build MAUI Windows
-        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net6.0-windows10.0.22621.0 --no-restore
+        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net7.0-windows10.0.22621.0 --no-restore
 
       - name: Upload Windows Artifact
         uses: actions/upload-artifact@v3
         with:
           name: MobileChat-windows-ci-build
-          path: src/MobileChat.MAUI/bin/Release/net6.0-windows10.0.22621.0/win10-x64/AppPackages/MobileChat.MAUI*/MobileChat.MAUI*.msix
+          path: src/MobileChat.MAUI/bin/Release/net7.0-windows10.0.22621.0/win10-x64/AppPackages/MobileChat.MAUI*/MobileChat.MAUI*.msix
 
 # MAUI iOS Build
   build-ios:
@@ -87,10 +87,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup .NET 6
+      - name: Setup .NET 7
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 7.0.x
 
       - name: Install MAUI Workload
         run: dotnet workload install maui --ignore-failed-sources
@@ -99,13 +99,13 @@ jobs:
         run: dotnet restore src/MobileChat.MAUI/MobileChat.MAUI.csproj
 
       - name: Build MAUI iOS
-        run: dotnet build src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net6.0-ios --no-restore /p:buildForSimulator=True /p:packageApp=True /p:ArchiveOnBuild=False
+        run: dotnet build src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net7.0-ios --no-restore /p:buildForSimulator=True /p:packageApp=True /p:ArchiveOnBuild=False
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v3
         with:
           name: MobileChat-ios-ci-build
-          path: src/MobileChat.MAUI/bin/Release/net6.0-ios/iossimulator-x64/**/*.app
+          path: src/MobileChat.MAUI/bin/Release/net7.0-ios/iossimulator-x64/**/*.app
 
 # MAUI MacCatalyst Build
   build-mac:
@@ -116,10 +116,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup .NET 6
+      - name: Setup .NET 7
         uses: actions/setup-dotnet@v2
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 7.0.x
 
       - name: Install MAUI Workload
         run: dotnet workload install maui --ignore-failed-sources
@@ -128,10 +128,10 @@ jobs:
         run: dotnet restore src/MobileChat.MAUI/MobileChat.MAUI.csproj
 
       - name: Build MAUI MacCatalyst
-        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net6.0-maccatalyst --no-restore -p:BuildIpa=True
+        run: dotnet publish src/MobileChat.MAUI/MobileChat.MAUI.csproj -c Release -f net7.0-maccatalyst --no-restore -p:BuildIpa=True
 
       - name: Upload MacCatalyst Artifact
         uses: actions/upload-artifact@v3
         with:
           name: MobileChat-macos-ci-build
-          path: src/MobileChat.MAUI/bin/Release/net6.0-maccatalyst/maccatalyst-x64/publish/*.pkg
+          path: src/MobileChat.MAUI/bin/Release/net7.0-maccatalyst/maccatalyst-x64/publish/*.pkg
