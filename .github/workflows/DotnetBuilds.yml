@@ -47,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: MobileChat-android-ci-build
-          path: src/MobileChat.MAUI/bin/Release/net6.0-android31.0/*Signed.a*
+          path: src/MobileChat.MAUI/bin/Release/net7.0-android31.0/*Signed.a*
 
 # MAUI Windows Build
   build-windows:
