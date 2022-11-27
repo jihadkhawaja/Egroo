@@ -97,15 +97,6 @@
                 Token = Token
             };
 
-            if (PatternMatchHelper.IsEmail(EmailOrUsername))
-            {
-                user.Email = EmailOrUsername;
-            }
-            else
-            {
-                user.Username = EmailOrUsername;
-            };
-
             SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
             SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, user, false, true);
 
