@@ -79,7 +79,11 @@
         }
 
         dynamic dynamicObj = await ChatAuthService.SignIn(EmailOrUsername, Password);
-        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+        Dictionary<string, object> result = null;
+        if (dynamicObj is not null)
+        {
+            result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+        }
 
         //check user
         if (result is not null)
