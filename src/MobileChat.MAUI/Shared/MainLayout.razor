@@ -22,7 +22,7 @@
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
             <MudSpacer />
-            <MudAvatar Color="Color.Primary">@SessionStorage.User.Username.ToUpper()[0]</MudAvatar>
+            <MudAvatar Color="Color.Primary">@SessionStorage.User.Username?.ToUpper()[0]</MudAvatar>
             <MudText Class="ml-4">@SessionStorage.User.Username</MudText>
         </MudAppBar>
         <MudDrawer @bind-Open="_drawerOpen" Elevation="1">
