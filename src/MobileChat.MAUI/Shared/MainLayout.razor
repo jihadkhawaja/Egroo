@@ -59,8 +59,11 @@
                 await Task.Delay(300);
             }
 
-            SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
-            SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
+            if (SessionStorage.User is not null && SessionStorage.User.Id != Guid.Empty)
+            {
+                SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
+                SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
+            }
 
             await InvokeAsync(StateHasChanged);
         }
