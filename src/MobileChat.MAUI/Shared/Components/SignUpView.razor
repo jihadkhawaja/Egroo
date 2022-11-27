@@ -110,9 +110,7 @@
             User user = new()
             {
                 Id = Id,
-                Token = Token,
-                Username = model.Username,
-                Email = model.Email
+                Token = Token
             };
 
             SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
