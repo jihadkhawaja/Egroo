@@ -1,6 +1,7 @@
 ﻿@using MobileChat.MAUI.Services
 @inherits LayoutComponentBase
 @inject SessionStorage SessionStorage
+@inject IChatUser ChatUserService
 
 <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="@_isDarkMode" />
 <MudDialogProvider />
@@ -57,6 +58,9 @@
                 IsConnected = GetIsConnected();
                 await Task.Delay(300);
             }
+
+            SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
+            SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
 
             await InvokeAsync(StateHasChanged);
         }
