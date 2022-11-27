@@ -141,6 +141,12 @@ else
     private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
     {
         Channel[] channels = await ChatChannelService.GetUserChannels();
+
+        if(channels is null)
+        {
+            return null;
+        }
+
         bool[] currentUserIsAdmin = new bool[channels.Length];
 
         KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];

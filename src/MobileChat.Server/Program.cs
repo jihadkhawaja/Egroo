@@ -20,16 +20,9 @@ builder.Services.AddCors(options =>
 });
 
 //mobile chat service
-builder.Services.AddMobileChatServices(builder.Configuration);
+builder.Services.AddMobileChatServices(builder.Configuration, ServiceCollectionEx.DatabaseEnum.Postgres, typeof(Program));
 
 WebApplication app = builder.Build();
-
-//auto-migrate database
-using (IServiceScope scope = app.Services.CreateScope())
-{
-    DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
-    db.Database.Migrate();
-}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
