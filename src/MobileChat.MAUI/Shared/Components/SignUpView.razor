@@ -95,7 +95,11 @@
         }
 
         dynamic dynamicObj = await ChatAuthService.SignUp(model.DisplayName, model.Username, model.Email, model.Password);
-        Dictionary<string, object> result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+        Dictionary<string, object> result = null;
+        if (dynamicObj is not null)
+        {
+            result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+        }
 
         //create user
         if (result is not null)
