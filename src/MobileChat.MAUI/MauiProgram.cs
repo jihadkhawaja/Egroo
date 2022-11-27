@@ -69,8 +69,7 @@ namespace MobileChat.MAUI
                 }
                 catch { }
 
-                //Initialize(HubConnectionURL, SessionStorage.User?.Token);
-                Initialize(HubConnectionURL);
+                Initialize(HubConnectionURL, SessionStorage.User?.Token);
             }
         }
 
