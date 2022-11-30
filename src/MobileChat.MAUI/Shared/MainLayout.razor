@@ -1,8 +1,14 @@
-﻿@using MobileChat.MAUI.Services
+﻿@using MobileChat.MAUI.Interfaces;
+@using MobileChat.MAUI.Services
+@using System.Text.Json;
 @using jihadkhawaja.mobilechat.client.Interfaces;
+@using jihadkhawaja.mobilechat.client.Models;
 @inherits LayoutComponentBase
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
+@inject NavigationManager NavigationManager
+@inject ISaveFile SaveFileService
+@inject IChatAuth ChatAuthService
 
 <MudThemeProvider @ref="@_mudThemeProvider" @bind-IsDarkMode="@_isDarkMode" />
 <MudDialogProvider />
@@ -54,7 +60,7 @@
             //_isDarkMode = await _mudThemeProvider.GetSystemPreference();
             _isDarkMode = true;
 
-            while(!IsConnected)
+            while (!IsConnected)
             {
                 IsConnected = GetIsConnected();
                 await Task.Delay(300);
@@ -62,6 +68,23 @@
 
             if (SessionStorage.User is not null && SessionStorage.User.Id != Guid.Empty)
             {
+                string token = await ChatAuthService.RefreshSession(SessionStorage.User.Token);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    SignOut();
+                    return;
+                }
+
+                if (SessionStorage.User.Token != token)
+                {
+                    SessionStorage.User.Token = token;
+                    MauiProgram.Initialize(MauiProgram.HubConnectionURL, SessionStorage.User.Token);
+                    await MauiProgram.Connect();
+
+                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
+                    SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                }
+
                 SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
                 SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
             }
@@ -87,5 +110,15 @@
         {
             return false;
         }
+    }
+
+    private void SignOut()
+    {
+        string path = Path.Combine(SessionStorage.AppDataPath);
+        SaveFileService.DeleteDirectory(path);
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
     }
 }
