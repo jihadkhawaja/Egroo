@@ -30,7 +30,7 @@
                 <MudStack>
                     @foreach (var message in Messages)
                     {
-                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToString("dddd, dd MMMM yyyy hh:mm tt")"
+                        <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, dd/MM/yyyy hh:mm tt")"
                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                     }
                 </MudStack>
