@@ -18,10 +18,6 @@
 {
     <MudProgressLinear Indeterminate />
 }
-else if (!IsSignedIn)
-{
-    <SignInView />
-}
 else
 {
     <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
@@ -109,13 +105,18 @@ else
                 {
                     CurrentUserChannels = await GetChannels();
                 }
+                else
+                {
+                    NavigationManager.NavigateTo("signin");
+                    return;
+                }
 
                 IsBusy = false;
             }
             else
             {
-                IsSignedIn = false;
-                IsBusy = false;
+                NavigationManager.NavigateTo("signin");
+                return;
             }
 
             await InvokeAsync(StateHasChanged);
@@ -244,6 +245,16 @@ else
 
     private async Task LeaveChannel(Guid channelId)
     {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to leave channel?",
+            yesText: "Leave", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
         if (await ChatChannelService.LeaveChannel(channelId))
         {
             CurrentUserChannels = await GetChannels();
