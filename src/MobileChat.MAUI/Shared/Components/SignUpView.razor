@@ -7,15 +7,16 @@
 @using System.Text.Json
 @using jihadkhawaja.mobilechat.client.Interfaces
 @using jihadkhawaja.mobilechat.client.Models
+@layout EmptyLayout
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 @inject IChatUser ChatUserService
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+<MudContainer MaxWidth="MaxWidth.Large">
     <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign Up</MudText>
-    <MudText>Already have an account? <span><MudButton Link="signin">Sign In</MudButton></span></MudText>
+    <MudText>Already have an account? <span><MudButton Link="signin">SignIn</MudButton></span></MudText>
 
     <MudGrid Class="mt-8" Justify="Justify.Center">
         <MudItem xs="12" sm="8" md="6">
@@ -57,7 +58,7 @@
                     </MudForm>
                 </MudCardContent>
                 <MudCardActions Class="d-flex justify-center">
-                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">Submit</MudButton>
+                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">SUBMIT</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>

@@ -9,7 +9,7 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
-    <MudButton Color="Color.Error" EndIcon="@Icons.Filled.Logout" OnClick="SignOut">Log Out</MudButton>
+    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Filled.Logout" OnClick="SignOut">LOGOUT</MudButton>
 </MudContainer>
 
 @code{
@@ -19,8 +19,8 @@
     {
         bool? result = await DialogService.ShowMessageBox(
             "Warning",
-            "Are you sure you want to log out?",
-            yesText: "Log Out", cancelText: "Cancel");
+            "Are you sure you want to logout?",
+            yesText: "Logout", cancelText: "Cancel");
 
         if (!result.HasValue || !result.Value)
         {

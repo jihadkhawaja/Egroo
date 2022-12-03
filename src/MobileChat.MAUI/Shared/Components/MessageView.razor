@@ -1,23 +1,21 @@
 ﻿@if(IsCurrentUser)
 {
     <MudPaper Class="pa-2" Elevation="0" Outlined>
-        <MudStack Row>
-            <MudText Color="Color.Primary">@DisplayName</MudText>
-            <MudSpacer />
-            <MudText>@Date</MudText>
+        <MudStack Spacing="0">
+            <MudText Class="text-single-line" Typo="Typo.subtitle1" Color="Color.Primary">@DisplayName</MudText>
+            <MudText Class="text-single-line" Typo="Typo.subtitle2" Color="Color.Dark">@Date</MudText>
         </MudStack>
-        <MudText>@Content</MudText>
+        <MudText Class="mt-2" Typo="Typo.body1">@Content</MudText>
     </MudPaper>
 }
 else
 {
     <MudPaper Class="pa-2" Elevation="0" Outlined>
-        <MudStack Row>
-            <MudText>@DisplayName</MudText>
-            <MudSpacer />
-            <MudText>@Date</MudText>
+        <MudStack Spacing="0">
+            <MudText Class="text-single-line" Typo="Typo.subtitle1">@DisplayName</MudText>
+            <MudText Class="text-single-line" Typo="Typo.subtitle2" Color="Color.Dark">@Date</MudText>
         </MudStack>
-        <MudText>@Content</MudText>
+        <MudText Class="mt-2" Typo="Typo.body1">@Content</MudText>
     </MudPaper>
 }
 
