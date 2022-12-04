@@ -32,12 +32,12 @@
                     <MudStack>
                         @foreach (var message in Messages)
                         {
-                            @if (message.DateCreated.Value.Date == DateTime.Today)
+                            @if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                             }
-                            else if (message.DateCreated.Value.Date == DateTime.Today.AddDays(-6))
+                            else if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
