@@ -1,0 +1,208 @@
+﻿@page "/chat/{ChannelId}/{Title}"
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using MobileChat.WASM.Services;
+@using MobileChat.WASM.Shared.Components
+@using jihadkhawaja.mobilechat.client.Interfaces
+@using jihadkhawaja.mobilechat.client.Models
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject IChatUser ChatUserService
+@inject IChatMessage ChatMessageService
+@inject IJSRuntime JSRuntime
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="mb-2">
+        <MudIconButton Icon="@Icons.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
+        <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+    </MudStack>
+
+    @if (!IsLoading)
+    {
+        <MudStack>
+            <MudPaper id="messages-container" Elevation="0" Class="pa-4" Style="height: calc(100vh - 260px); overflow:auto;">
+                @if (Messages.Count() == 0)
+                {
+                    <MudText>No Messages</MudText>
+                }
+                else
+                {
+                    <MudStack>
+                        @foreach (var message in Messages)
+                        {
+                            @if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
+                            {
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                            }
+                            else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
+                            {
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                            }
+                            else
+                            {
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                            }
+                        }
+                    </MudStack>
+                }
+            </MudPaper>
+            <MudStack Row>
+                <MudTextField @ref="inputMudTextField" DisableUnderLine @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" @onkeydown="@EnterPressed" />
+                <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
+                               OnClick="SendMessage" ButtonType="ButtonType.Submit" />
+            </MudStack>
+        </MudStack>
+    }
+    else
+    {
+        <div style="width:100%;height:100%;text-align:center;">
+            <MudProgressCircular Indeterminate Size="Size.Medium" />
+        </div>
+    }
+</MudContainer>
+
+@code {
+    [Inject] ISnackbar Snackbar { get; set; }
+
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string ChannelId { get; set; }
+
+    private List<Message> Messages { get; set; } = new();
+    private bool IsLoading { get; set; } = true;
+
+    MudTextField<string> inputMudTextField { get; set; }
+    private string InputContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            IsLoading = true;
+
+            Messages = (await GetMessages()).ToList();
+
+            HubEvents();
+
+            IsLoading = false;
+
+            await InvokeAsync(StateHasChanged);
+
+            ScrollToMessagesEnd();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private Guid GetChannelId()
+    {
+        Guid id;
+        if (Guid.TryParse(ChannelId, out id))
+        {
+            return id;
+        }
+
+        return Guid.Empty;
+    }
+
+    private async Task<Message[]> GetMessages()
+    {
+        var messages = await ChatMessageService.ReceiveMessageHistory(GetChannelId());
+
+        foreach (var msg in messages)
+        {
+            msg.DisplayName = await GetUserName(msg.SenderId);
+        }
+
+        return messages;
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrEmpty(InputContent) || string.IsNullOrWhiteSpace(InputContent))
+        {
+            return;
+        }
+
+        InputContent = InputContent.Trim();
+
+        Message message = new()
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = GetChannelId(),
+                DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
+                Content = InputContent,
+                SenderId = SessionStorage.User.Id,
+                DateCreated = DateTime.UtcNow,
+                DateSent = DateTime.UtcNow
+            };
+
+        if (await ChatMessageService.SendMessage(message))
+        {
+            InputContent = string.Empty;
+            await inputMudTextField.Clear();
+
+            await InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            Snackbar.Add("Failed to send message, Please check your connection and try again", MudBlazor.Severity.Error);
+        }
+    }
+
+    public async Task EnterPressed(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" || e.Code == "NumpadEnter")
+        {
+            await Task.Delay(150);
+
+            await SendMessage();
+        }
+    }
+
+    private async Task<string> GetUserName(Guid userid)
+    {
+        return await ChatUserService.GetUserDisplayName(userid);
+    }
+
+    private void ScrollToMessagesEnd()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToEnd", "messages-container");
+    }
+
+    private bool IsCurrentUserMessage(Guid senderid)
+    {
+        if (senderid == SessionStorage.User.Id)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    private void HubEvents()
+    {
+        jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        {
+            if (message.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            message.DisplayName = await GetUserName(message.SenderId);
+
+            Messages.Add(message);
+
+            await InvokeAsync(StateHasChanged);
+
+            ScrollToMessagesEnd();
+        });
+    }
+}

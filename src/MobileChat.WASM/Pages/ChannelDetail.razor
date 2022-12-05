@@ -1,0 +1,125 @@
+﻿@page "/channeldetail/{ChannelId}/{Title}"
+
+@using MobileChat.WASM.Services;
+@using MobileChat.WASM.Shared.Components
+@using jihadkhawaja.mobilechat.client.Interfaces
+@using jihadkhawaja.mobilechat.client.Models
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject IChatUser ChatUserService
+@inject IChatChannel ChatChannelService
+@inject ISnackbar Snackbar
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="mb-2">
+            <MudIconButton Icon="@Icons.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
+            <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+        </MudStack>
+
+        <MudPaper Elevation="0" Class="pa-4" Style="height: calc(100vh - 200px); overflow:auto;">
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                @foreach (var user in ChannelUsers)
+                {
+                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                        <MudGrid Justify="Justify.SpaceBetween">
+                            <MudItem>
+                                <ScopeView Title=@user.DisplayName Subtitle=@user.Username />
+                            </MudItem>
+                            <MudItem>
+                                <MudStack Row Style="height:100%;">
+                                    @if (SessionStorage.User.Id == user.Id)
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                            OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" Disabled />
+                                    }
+                                    else
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                                OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" />
+                                    }
+                                        
+                                </MudStack>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+            </MudStack>
+        </MudPaper>
+    </MudContainer>
+}
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string ChannelId { get; set; }
+
+    [Inject] IDialogService DialogService { get; set; }
+
+    private bool IsBusy { get; set; } = true;
+
+    private IEnumerable<User> ChannelUsers { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefetchData();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task RefetchData()
+    {
+        IsBusy = true;
+
+        ChannelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
+
+        IsBusy = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Guid GetChannelId()
+    {
+        Guid id;
+        if (Guid.TryParse(ChannelId, out id))
+        {
+            return id;
+        }
+
+        return Guid.Empty;
+    }
+
+    private async Task RemoveChannelUser(Guid channelid)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to remove user?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        if (await ChatChannelService.LeaveChannel(channelid))
+        {
+            Snackbar.Add($"Removed user from channel", Severity.Success);
+
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+}

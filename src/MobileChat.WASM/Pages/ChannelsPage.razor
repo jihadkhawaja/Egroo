@@ -1,0 +1,270 @@
+﻿@page "/"
+@page "/channels"
+
+@using MobileChat.WASM.Services;
+@using MobileChat.WASM.Shared.Components
+@using jihadkhawaja.mobilechat.client.Interfaces
+@using jihadkhawaja.mobilechat.client.Models
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject IChatAuth ChatAuthService
+@inject IChatUser ChatUserService
+@inject IChatChannel ChatChannelService
+@inject ISnackbar Snackbar
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+        <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Channels</MudText>
+            <MudButton OnClick="CreateChannel" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
+        </MudStack>
+        @if (CurrentUserChannels is null)
+        {
+            <MudText GutterBottom Typo="Typo.h6">No channels yet..</MudText>
+        }
+        else
+        {
+            @if (addFriendPopOverIsOpen)
+            {
+                <MudPaper Outlined="true" Class="pa-2 mb-4">
+                    <MudStack>
+                        <MudText GutterBottom Typo="Typo.body1">Add Friend To Channel</MudText>
+                        <MudTextField T="string" Placeholder="friend username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
+                        <MudButton OnClick="AddUserToChannel">Add</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+
+            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                @foreach (var channel in CurrentUserChannels)
+                {
+                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
+                        <MudGrid Justify="Justify.SpaceBetween">
+                            <MudItem>
+                                <ScopeView Title=@channel.Key.Title Subtitle="@channel.Key.DateCreated.Value.ToShortDateString()" />
+                            </MudItem>
+                            <MudItem>
+                                <MudStack Row Style="height:100%;">
+                                    @if (channel.Value)
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Add"
+                                                       OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Edit"
+                                                       OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.Title)))" />
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                    }
+                                    else
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.ExitToApp" Color="Color.Error"
+                                                       OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
+                                    }
+                                </MudStack>
+                            </MudItem>
+                        </MudGrid>
+                    </MudPaper>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+
+@code {
+    [Inject] IDialogService DialogService { get; set; }
+
+    private IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
+
+    private bool IsSignedIn { get; set; }
+
+    private bool IsBusy { get; set; } = true;
+
+    private bool addFriendPopOverIsOpen;
+
+    private string usernameToAdd { get; set; }
+
+    private Guid selectedChannelId { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (SessionStorage.User is not null)
+            {
+                IsBusy = true;
+
+                IsSignedIn = !string.IsNullOrWhiteSpace(SessionStorage.User.Token);
+                if (IsSignedIn)
+                {
+                    CurrentUserChannels = await GetChannels();
+                }
+                else
+                {
+                    NavigationManager.NavigateTo("signin");
+                    return;
+                }
+
+                IsBusy = false;
+            }
+            else
+            {
+                NavigationManager.NavigateTo("signin");
+                return;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public void ToggleAddFriendPopOverIsOpen(Guid channelid)
+    {
+        if (addFriendPopOverIsOpen)
+        {
+            addFriendPopOverIsOpen = false;
+            selectedChannelId = Guid.Empty;
+        }
+        else
+        {
+            addFriendPopOverIsOpen = true;
+            selectedChannelId = channelid;
+        }
+    }
+
+    private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
+    {
+        Channel[] channels = await ChatChannelService.GetUserChannels();
+
+        if (channels is null)
+        {
+            return null;
+        }
+
+        bool[] currentUserIsAdmin = new bool[channels.Length];
+
+        KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];
+
+        for (int i = 0; i < channels.Length; i++)
+        {
+            User[] friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
+
+            channels[i].Title = string.Empty;
+            foreach (User friend in friends)
+            {
+                if (friend.Id == SessionStorage.User.Id)
+                {
+                    channels[i].Title += $"{await ChatUserService.GetUserDisplayName(friend.Id)} (You)";
+                }
+                else
+                {
+                    channels[i].Title += await ChatUserService.GetUserDisplayName(friend.Id);
+                }
+
+                channels[i].Title += ", ";
+            }
+
+            channels[i].Title = channels[i].Title.TrimEnd(',', ' ');
+
+            bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User.Id);
+
+            results[i] = new KeyValuePair<Channel, bool>(channels[i], isChannelAdmin);
+        }
+
+        return results;
+    }
+
+    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{channel.Title}");
+
+    private async Task CreateChannel()
+    {
+        await ChatChannelService.CreateChannel(SessionStorage.User.Username);
+
+        CurrentUserChannels = await GetChannels();
+    }
+
+    private async Task DeleteChannel(Guid channelId)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to delete channel?",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        if (await ChatChannelService.DeleteChannel(channelId))
+        {
+            Snackbar.Add($"Channel deleted", Severity.Success);
+
+            CurrentUserChannels = await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+
+    private async Task AddUserToChannel()
+    {
+        if (selectedChannelId == Guid.Empty
+            || string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))
+        {
+            return;
+        }
+
+        if (await ChatChannelService.AddChannelUsers(selectedChannelId, usernameToAdd))
+        {
+            Snackbar.Add($"Added {usernameToAdd} to the channel", Severity.Success);
+
+            selectedChannelId = Guid.Empty;
+            usernameToAdd = string.Empty;
+            ToggleAddFriendPopOverIsOpen(Guid.Empty);
+
+            CurrentUserChannels = await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Add {usernameToAdd} as a friend first", Severity.Error);
+        }
+    }
+
+    private async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
+    {
+        return await ChatChannelService.IsChannelAdmin(channelId, userId);
+    }
+
+    private async Task LeaveChannel(Guid channelId)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to leave channel?",
+            yesText: "Leave", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        if (await ChatChannelService.LeaveChannel(channelId))
+        {
+            CurrentUserChannels = await GetChannels();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+
+    private void NavigateTo(string link)
+    {
+        NavigationManager.NavigateTo(link);
+    }
+}

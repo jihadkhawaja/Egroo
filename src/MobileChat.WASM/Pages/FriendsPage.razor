@@ -1,0 +1,237 @@
+﻿@page "/friends"
+
+@using MobileChat.WASM.Services;
+@using MobileChat.WASM.Shared.Components
+@using jihadkhawaja.mobilechat.client.Interfaces
+@using jihadkhawaja.mobilechat.client.Models
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject IChatUser ChatUserService
+@inject ISnackbar Snackbar
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+        <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h6">Friends</MudText>
+            <MudButton OnClick="ToggleAddFriendPopOverIsOpen" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">Add Friend</MudButton>
+        </MudStack>
+        @if (addFriendPopOverIsOpen)
+        {
+            <MudPaper Outlined="true" Class="pa-2 mb-4">
+                <MudStack>
+                    <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
+                    <MudTextField T="string" Placeholder="username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
+                    <MudButton OnClick="AddFriend">Send Request</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+            @foreach (var friendRequests in UserFriendRequests)
+            {
+                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                    <MudGrid Justify="Justify.SpaceBetween">
+                        <MudItem>
+                            <ScopeView Title=@friendRequests.DisplayName Subtitle=@friendRequests.Username />
+                        </MudItem>
+                        <MudItem>
+                            <MudStack Row Style="height:100%;">
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Check" Color="Color.Success" 
+                                OnClick="@(async () => await AcceptFriendRequest(friendRequests.Id))" />
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Close" Color="Color.Error" 
+                                OnClick="@(async () => await DenyFriendRequest(friendRequests.Id))" />
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudStack>
+
+        <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+            @foreach (var friend in UserFriends)
+            {
+                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                    <MudGrid Justify="Justify.SpaceBetween">
+                        <MudItem>
+                            <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                        </MudItem>
+                        <MudItem>
+                            <MudStack Row Style="height:100%;">
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(async () => await RemoveFriend(friend.Username))" />
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+        </MudStack>
+    </MudContainer>
+}
+
+@code {
+    [Inject] IDialogService DialogService { get; set; }
+
+    private IEnumerable<User> UserFriendRequests { get; set; }
+    private IEnumerable<User> UserFriends { get; set; }
+
+    private bool IsBusy { get; set; } = true;
+
+    private bool addFriendPopOverIsOpen;
+
+    private string usernameToAdd { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await RefetchData();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public void ToggleAddFriendPopOverIsOpen()
+    {
+        if (addFriendPopOverIsOpen)
+        {
+            addFriendPopOverIsOpen = false;
+        }
+        else
+        {
+            addFriendPopOverIsOpen = true;
+        }
+    }
+
+    private async Task RefetchData()
+    {
+        IsBusy = true;
+
+        UserFriendRequests = await GetFriendsRequest();
+        UserFriends = await GetFriends();
+
+        IsBusy = false;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<User[]> GetFriends()
+    {
+        UserFriend[] users = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
+        User[] friends = new User[users.Length];
+
+        for (int i = 0; i < users.Length; i++)
+        {
+            if (SessionStorage.User.Id == users[i].FriendUserId)
+            {
+                User user = new User();
+                user.Id = users[i].UserId;
+                user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].UserId);
+                user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
+                friends[i] = user;
+            }
+            else
+            {
+                User user = new User();
+                user.Id = users[i].FriendUserId;
+                user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].FriendUserId);
+                user.Username = await ChatUserService.GetUserUsername(users[i].FriendUserId);
+                friends[i] = user;
+            }
+        }
+
+        return friends;
+    }
+
+    private async Task<User[]> GetFriendsRequest()
+    {
+        UserFriend[] users = await ChatUserService.GetUserFriendRequests(SessionStorage.User.Id);
+        User[] friendRequests = new User[users.Length];
+
+        for (int i = 0; i < users.Length; i++)
+        {
+            User user = new User();
+            user.Id = users[i].UserId;
+            user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].UserId);
+            user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
+            friendRequests[i] = user;
+        }
+
+        return friendRequests;
+    }
+
+    private async Task AddFriend()
+    {
+        if (string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))
+        {
+            return;
+        }
+
+        if (await ChatUserService.AddFriend(usernameToAdd))
+        {
+            Snackbar.Add($"Friend request sent!", Severity.Success);
+
+            ToggleAddFriendPopOverIsOpen();
+            usernameToAdd = string.Empty;
+
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+
+    private async Task RemoveFriend(string friendusername)
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to remove friend?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        if (await ChatUserService.RemoveFriend(friendusername))
+        {
+            Snackbar.Add($"Removed {friendusername} from friends", Severity.Success);
+
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"User doesn't exist", Severity.Error);
+        }
+    }
+
+    private async Task AcceptFriendRequest(Guid friendid)
+    {
+        if(await ChatUserService.AcceptFriend(friendid))
+        {
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+
+    private async Task DenyFriendRequest(Guid friendid)
+    {
+        if (await ChatUserService.DenyFriend(friendid))
+        {
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+}
