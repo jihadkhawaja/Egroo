@@ -12,7 +12,7 @@ Self-host chatting solution with cross-platform client application.
 - iOS 14 or higher
 
 ## WASM Supported Platforms
-- Can be deployed to any website that supports WebAssembly
+- Can be deployed to any browser that supports WebAssembly
 
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki)
