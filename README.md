@@ -5,11 +5,14 @@ MAUI Client with ASP.NET SignalR Server.
 
 Self-host chatting solution with cross-platform client application.
 
-## Supported Platforms
+## MAUI Supported Platforms
 - Windows 7 or higher
 - macOS 11 or higher
 - Android 7.0 (API 24) or higher
 - iOS 14 or higher
+
+## WASM Supported Platforms
+- Can be deployed to any website that supports WebAssembly
 
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki)
