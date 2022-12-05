@@ -1,0 +1,16 @@
+{
+  "name": "MobileChat",
+  "short_name": "MobileChat",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#27272fff",
+  "theme_color": "#776be7ff",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icon-128.png",
+      "type": "image/png",
+      "sizes": "128x128"
+    }
+  ]
+}
