@@ -1,14 +1,12 @@
-﻿@using MobileChat.MAUI.Constants;
-@using MobileChat.MAUI.Interfaces
-@using MobileChat.MAUI.Services
-@using System.Text.Json
+﻿@using System.Text.Json;
+@using MobileChat.WASM.Services;
 @using jihadkhawaja.mobilechat.client.Interfaces
-@using jihadkhawaja.mobilechat.client.Models
+@using MobileChat.WASM.Constants
 @inherits LayoutComponentBase
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
 @inject NavigationManager NavigationManager
-@inject ISaveFile SaveFileService
+@inject LocalStorageService LocalStorageService
 @inject IChatAuth ChatAuthService
 
 <MudThemeProvider @bind-IsDarkMode="@IsDarkMode" Theme="Theme.DefaultTheme" />
@@ -41,7 +39,7 @@
             <NavMenu />
         </MudDrawer>
     }
-    <MudMainContent>
+    <MudMainContent Class="pt-2">
         @Body
     </MudMainContent>
 </MudLayout>
@@ -57,6 +55,8 @@
     {
         if (firstRender)
         {
+            await Program.Connect();
+
             while (!IsConnected)
             {
                 IsConnected = GetIsConnected();
@@ -68,18 +68,17 @@
                 string token = await ChatAuthService.RefreshSession(SessionStorage.User.Token);
                 if (string.IsNullOrWhiteSpace(token))
                 {
-                    SignOut();
+                    await SignOut();
                     return;
                 }
 
                 if (SessionStorage.User.Token != token)
                 {
                     SessionStorage.User.Token = token;
-                    MauiProgram.Initialize(MauiProgram.HubConnectionURL, SessionStorage.User.Token);
-                    await MauiProgram.Connect();
+                    Program.Initialize(Program.HubConnectionURL, SessionStorage.User.Token);
+                    await Program.Connect();
 
-                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                    SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                    await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
                 }
 
                 SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
@@ -109,10 +108,9 @@
         }
     }
 
-    private void SignOut()
+    private async Task SignOut()
     {
-        string path = Path.Combine(SessionStorage.AppDataPath);
-        SaveFileService.DeleteDirectory(path);
+        await LocalStorageService.RemoveLocalStorage("user");
 
         SessionStorage.User = null;
 

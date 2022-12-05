@@ -1,0 +1,34 @@
+﻿@page "/settings"
+@using MobileChat.WASM.Services;
+
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
+    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Filled.Logout" OnClick="SignOut">LOGOUT</MudButton>
+</MudContainer>
+
+@code{
+    [Inject] IDialogService DialogService { get; set; }
+
+    private async Task SignOut()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to logout?",
+            yesText: "Logout", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        await LocalStorageService.RemoveLocalStorage("user");
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
+    }
+}
