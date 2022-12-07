@@ -8,7 +8,6 @@
 @using jihadkhawaja.mobilechat.client.Models
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 @inject IChatUser ChatUserService
 @inject IChatChannel ChatChannelService
@@ -137,6 +136,8 @@ else
             addFriendPopOverIsOpen = true;
             selectedChannelId = channelid;
         }
+
+        StateHasChanged();
     }
 
     private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
@@ -188,6 +189,8 @@ else
         await ChatChannelService.CreateChannel(SessionStorage.User.Username);
 
         CurrentUserChannels = await GetChannels();
+
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task DeleteChannel(Guid channelId)
@@ -207,6 +210,8 @@ else
             Snackbar.Add($"Channel deleted", Severity.Success);
 
             CurrentUserChannels = await GetChannels();
+
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -231,6 +236,8 @@ else
             ToggleAddFriendPopOverIsOpen(Guid.Empty);
 
             CurrentUserChannels = await GetChannels();
+
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -258,6 +265,8 @@ else
         if (await ChatChannelService.LeaveChannel(channelId))
         {
             CurrentUserChannels = await GetChannels();
+
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
