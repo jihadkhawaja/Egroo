@@ -15,14 +15,15 @@
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="mb-2">
-        <MudIconButton Icon="@Icons.Filled.ArrowBack" Size="Size.Large" Link="/channels"/>
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels"/>
         <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
     </MudStack>
 
     @if (!IsLoading)
     {
         <MudStack>
-            <MudPaper id="messages-container" Elevation="0" Class="pa-4" Style="height: calc(100vh - 260px); overflow:auto;">
+            <MudPaper id="messages-container" Elevation="0" Class="pa-4" 
+                Style="height: calc(100vh - 280px); overflow-x:hidden;overflow-y:auto;">
                 @if (Messages.Count() == 0)
                 {
                     <MudText>No Messages</MudText>
@@ -34,17 +35,20 @@
                         {
                             @if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                             }
                             else
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
                             }
                         }
@@ -52,9 +56,17 @@
                 }
             </MudPaper>
             <MudStack Row>
-                <MudTextField @ref="inputMudTextField" DisableUnderLine @bind-Value="InputContent" Label="Your message here" Variant="Variant.Filled" @onkeydown="@EnterPressed" />
-                <MudIconButton Icon="@Icons.Filled.Send" Variant="Variant.Filled" DisableElevation Class="mt-1"
-                               OnClick="SendMessage" ButtonType="ButtonType.Submit" />
+                <MudTextField @ref="inputMudTextField" DisableUnderLine 
+                            Value="InputContent"
+                            ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                            InputMode="InputMode.text" InputType="InputType.Text"
+                            AutoFocus="true"
+                            Label="Your message here" Variant="Variant.Filled" @onkeydown="@EnterPressed"
+                            Lines="1" MaxLength="MaxMessageLength" 
+                            Counter="MaxMessageLength" />
+                <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled" 
+                            DisableElevation Class="mt-1 mb-6"
+                            OnClick="SendMessage" ButtonType="ButtonType.Submit" />
             </MudStack>
         </MudStack>
     }
@@ -79,6 +91,8 @@
 
     MudTextField<string> inputMudTextField { get; set; }
     private string InputContent { get; set; }
+    private int MessageLinesCount { get; set; }
+    private int MaxMessageLength { get; set; } = 300;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -185,6 +199,36 @@
         else
         {
             return false;
+        }
+    }
+
+    private void OnInputContent(string text)
+    {
+        InputContent = text;
+
+        //WIP
+        //SetTextAreaLines();
+    }
+
+    //set text area total lines based on content
+    private void SetTextAreaLines()
+    {
+        if (string.IsNullOrWhiteSpace(InputContent))
+        {
+            MessageLinesCount = 1;
+            return;
+        }
+
+        //increase MessageCount dynamically based on text length
+        int lines = InputContent.Length / 5;
+
+        if (lines > 0)
+        {
+            MessageLinesCount = lines;
+        }
+        else
+        {
+            MessageLinesCount = 1;
         }
     }
 
