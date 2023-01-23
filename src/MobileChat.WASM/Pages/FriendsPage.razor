@@ -42,9 +42,9 @@ else
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
-                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Check" Color="Color.Success" 
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Check" Color="Color.Success" 
                                 OnClick="@(async () => await AcceptFriendRequest(friendRequests.Id))" />
-                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Close" Color="Color.Error" 
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Close" Color="Color.Error" 
                                 OnClick="@(async () => await DenyFriendRequest(friendRequests.Id))" />
                             </MudStack>
                         </MudItem>
@@ -63,7 +63,7 @@ else
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
-                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                        OnClick="@(async () => await RemoveFriend(friend.Username))" />
                             </MudStack>
                         </MudItem>

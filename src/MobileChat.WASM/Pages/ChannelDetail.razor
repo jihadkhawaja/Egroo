@@ -19,7 +19,7 @@ else
 {
     <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
         <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="mb-2">
-            <MudIconButton Icon="@Icons.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
             <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
         </MudStack>
 
@@ -36,12 +36,12 @@ else
                                 <MudStack Row Style="height:100%;">
                                     @if (SessionStorage.User.Id == user.Id)
                                     {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                             OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" Disabled />
                                     }
                                     else
                                     {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Filled.Delete" Color="Color.Error"
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                                 OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" />
                                     }
                                         

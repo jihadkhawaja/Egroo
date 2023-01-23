@@ -13,3 +13,10 @@
     line-clamp: 1;
     -webkit-box-orient: vertical;
 }
+
+.loading-progress-text {
+}
+
+    .loading-progress-text:after {
+        content: var(--blazor-load-percentage-text, "Connecting");
+    }
