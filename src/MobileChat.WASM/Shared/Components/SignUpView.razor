@@ -2,8 +2,8 @@
 
 @using FluentValidation
 @using System.Text.RegularExpressions
-@using System.Text.Json
 @using MobileChat.WASM.Services;
+@using System.Text.Json
 @using jihadkhawaja.mobilechat.client.Interfaces
 @using jihadkhawaja.mobilechat.client.Models
 @layout EmptyLayout
@@ -29,30 +29,28 @@
                     <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
                         <MudTextField @bind-Value="model.DisplayName"
                                       For="@(() => model.DisplayName)"
-                                      Immediate="true"
+                                      Immediate="true" Required
                                       Label="Display Name" InputType="InputType.Text" />
 
                         <MudTextField @bind-Value="model.Username"
                                       For="@(() => model.Username)"
-                                      Immediate="true"
+                                      Immediate="true" Required
                                       Label="Username" ErrorText="Invalid username." />
 
                         <MudTextField @bind-Value="model.Email"
                                       For="@(() => model.Email)"
                                       Immediate="true"
-                                      Label="Email (Optional)" ErrorText="Invalid username." />
+                                      Label="Email (Optional)" />
 
                         <MudTextField @bind-Value="model.Password"
                                       For="@(() => model.Password)"
-                                      Immediate="true"
+                                      Immediate="true" Required
                                       T="string" Label="Password" HelperText="Choose a strong password" @ref="pwField1"
-                                      InputType="InputType.Password"
-                                      Validation="@(new Func<string, IEnumerable<string>>(PasswordStrength))" Required="true"
-                                      RequiredError="Password is required!" />
+                                      InputType="InputType.Password" />
 
                         <MudTextField T="string"
                                       Label="Password" HelperText="Repeat the password" InputType="InputType.Password"
-                                      Validation="@(new Func<string, string>(PasswordMatch))" />
+                                      Validation="@(new Func<string, string>(PasswordMatch))" Required />
 
                     </MudForm>
                 </MudCardContent>
@@ -96,7 +94,7 @@
 
         dynamic dynamicObj = await ChatAuthService.SignUp(model.DisplayName, model.Username, model.Email, model.Password);
         Dictionary<string, object> result = null;
-        if(dynamicObj is not null)
+        if (dynamicObj is not null)
         {
             result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
         }
@@ -108,10 +106,10 @@
             string Token = result["token"].ToString();
 
             User user = new()
-            {
-                Id = Id,
-                Token = Token
-            };
+                {
+                    Id = Id,
+                    Token = Token
+                };
 
             await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(user));
 
@@ -132,23 +130,6 @@
         IsBusy = false;
     }
 
-    private IEnumerable<string> PasswordStrength(string pw)
-    {
-        if (string.IsNullOrWhiteSpace(pw))
-        {
-            yield return "Password is required!";
-            yield break;
-        }
-        if (pw.Length < 8)
-            yield return "Password must be at least of length 8";
-        if (!Regex.IsMatch(pw, @"[A-Z]"))
-            yield return "Password must contain at least one capital letter";
-        if (!Regex.IsMatch(pw, @"[a-z]"))
-            yield return "Password must contain at least one lowercase letter";
-        if (!Regex.IsMatch(pw, @"[0-9]"))
-            yield return "Password must contain at least one digit";
-    }
-
     private string PasswordMatch(string arg)
     {
         if (pwField1.Value != arg)
@@ -165,12 +146,31 @@
 
             RuleFor(x => x.DisplayName)
                 .NotEmpty()
-                .Length(3, 100);
+                .Length(3, 16)
+                .WithMessage("Display name must be between 3 and 16 characters");
 
             RuleFor(x => x.Username)
-                .Cascade(CascadeMode.Stop)
+            .Cascade(CascadeMode.Stop)
                 .NotEmpty()
-                .Length(3, 100);
+                .Matches(@"^[a-zA-Z0-9_]{3,16}$")
+                .WithMessage("Username must be between 3 and 16 characters, and can only contain letters, numbers, and underscores.");
+
+            //not required
+            //RuleFor(x => x.Email)
+            //.Cascade(CascadeMode.Stop)
+            //    .NotEmpty()
+            //    .EmailAddress()
+            //    .WithMessage("Invalid email address.");
+
+            // at least one lowercase letter
+            // at least one uppercase letter
+            // at least one digit
+            // at least 8 characters and at most 15 characters
+            RuleFor(x => x.Password)
+            .Cascade(CascadeMode.Stop)
+                .NotEmpty()
+                .Matches(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,15}$")
+                .WithMessage("Password must be between 8 and 15 characters, contain at least one uppercase letter, one lowercase letter, and one number.");
         }
 
         public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
