@@ -29,7 +29,7 @@ Find everything you need to get started at the [Wiki](https://github.com/jihadkh
 ![mobilechat_android](docs/mobilechat_android.png)
 
 ### Features and Progress
-Check what's coming in future releases [here](https://github.com/jihadkhawaja/MobileChat/projects/1)
+Check what's coming in future releases [here](https://github.com/users/jihadkhawaja/projects/3)
 
 ### Contribution
 Feel free to fork and **contribute** or **open an issue**. All contributions are welcome!
