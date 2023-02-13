@@ -54,7 +54,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="FluentValidation" Version="11.4.0" />
+	  <PackageReference Include="FluentValidation" Version="11.5.0" />
 	  <PackageReference Include="jihadkhawaja.mobilechat.client" Version="0.1.16" />
 	  <PackageReference Include="MudBlazor" Version="6.1.7" />
 	</ItemGroup>
