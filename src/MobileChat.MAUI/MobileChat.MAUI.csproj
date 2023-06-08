@@ -59,4 +59,8 @@
 	  <PackageReference Include="MudBlazor" Version="6.2.3" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\MobileChat.Client.Package\src\jihadkhawaja.mobilechat.client\jihadkhawaja.mobilechat.client.csproj" />
+	</ItemGroup>
+
 </Project>
