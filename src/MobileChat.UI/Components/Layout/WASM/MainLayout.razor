@@ -1,0 +1,120 @@
+﻿@using System.Text.Json;
+@using MobileChat.UI.Core;
+@using MobileChat.UI.Constants
+
+@inherits LayoutComponentBase
+
+@inject SessionStorage SessionStorage
+@inject IChatUser ChatUserService
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject IChatAuth ChatAuthService
+
+<MudThemeProvider @bind-IsDarkMode="@IsDarkMode" Theme="Theme.DefaultTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    @if (!IsConnected)
+    {
+        <div style="width:100vw;height:100vh;background-color:#27272fff">
+            <MudProgressLinear Indeterminate Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting to server</MudText>
+        </div>
+
+        return;
+    }
+
+    @if (SessionStorage.User is not null)
+    {
+        <MudAppBar Elevation="0">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
+            <MudSpacer />
+            <MudAvatar Color="Color.Primary">@SessionStorage.User.Username?.ToUpper()[0]</MudAvatar>
+            <MudText Class="ml-4">@SessionStorage.User.Username</MudText>
+        </MudAppBar>
+        <MudDrawer @bind-Open="IsDrawerOpen" Elevation="1">
+            <MudDrawerHeader>
+                <MudText Typo="Typo.h6">Mobile Chat</MudText>
+            </MudDrawerHeader>
+            <NavMenu />
+        </MudDrawer>
+    }
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool IsDrawerOpen = true;
+
+    private bool IsDarkMode { get; set; } = true;
+
+    private bool IsConnected { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await HubInitializer.Connect();
+
+            while (!IsConnected)
+            {
+                IsConnected = GetIsConnected();
+                await Task.Delay(300);
+            }
+
+            if (SessionStorage.User is not null && SessionStorage.User.Id != Guid.Empty)
+            {
+                string token = await ChatAuthService.RefreshSession(SessionStorage.User.Token);
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    await SignOut();
+                    return;
+                }
+
+                if (SessionStorage.User.Token != token)
+                {
+                    SessionStorage.User.Token = token;
+                    HubInitializer.Initialize(HubInitializer.HubConnectionURL, SessionStorage.User.Token);
+                    await HubInitializer.Connect();
+
+                    await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
+                }
+
+                SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
+                SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private void DrawerToggle()
+    {
+        IsDrawerOpen = !IsDrawerOpen;
+    }
+
+    private bool GetIsConnected()
+    {
+        if (jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    private async Task SignOut()
+    {
+        await LocalStorageService.RemoveLocalStorage("user");
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
+    }
+}
