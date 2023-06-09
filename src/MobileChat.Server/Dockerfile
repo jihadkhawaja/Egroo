@@ -12,7 +12,7 @@ WORKDIR "/src/MobileChat.Server"
 
 # Add the submodel from GitHub
 WORKDIR /src
-RUN git clone https://github.com/jihadkhawaja/mobilechat.server /src/MobileChat.Server.Package
+RUN git clone https://github.com/jihadkhawaja/mobilechat.server /MobileChat.Server.Package
 
 # Continue with the remaining steps
 COPY ["MobileChat.Server.Package/src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "MobileChat.Server.Package/src/jihadkhawaja.mobilechat.server/"]
