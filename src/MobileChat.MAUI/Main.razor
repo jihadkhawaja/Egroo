@@ -1,4 +1,6 @@
-﻿<Router AppAssembly="@typeof(Main).Assembly">
+﻿@using MobileChat.UI.Components.Layout.MAUI;
+
+<Router AppAssembly="@typeof(Main).Assembly">
 	<Found Context="routeData">
 		<RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
