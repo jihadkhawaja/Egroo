@@ -10,11 +10,10 @@ RUN dotnet restore "MobileChat.Server/MobileChat.Server.csproj"
 COPY . .
 WORKDIR "/src/MobileChat.Server"
 
-# Initialize and update the submodules
+# Add the submodel from GitHub
 WORKDIR /src
-RUN git submodule update --init
+RUN git clone https://github.com/jihadkhawaja/mobilechat.server /src/MobileChat.Server.Package
 
-# Continue with the remaining steps
 RUN dotnet build "MobileChat.Server.csproj" -c Release -o /app/build
 
 FROM build AS publish
