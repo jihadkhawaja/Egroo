@@ -5,13 +5,14 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /src
-RUN git clone https://github.com/jihadkhawaja/mobilechat.server MobileChatServer
+RUN mkdir -p /src/MobileChatServer  # Create the target folder
+RUN git clone https://github.com/jihadkhawaja/mobilechat.server /src/MobileChatServer  # Clone the repository to the target folder
 RUN ls -R
 COPY ["MobileChat.Server/MobileChat.Server.csproj", "MobileChat.Server/"]
 COPY ["MobileChatServer/src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "MobileChatServer/src/jihadkhawaja.mobilechat.server/"]
 RUN dotnet restore "MobileChat.Server/MobileChat.Server.csproj"
 COPY . .
-WORKDIR "/src/MobileChat.Server"
+WORKDIR "/src/MobileChatServer"
 RUN dotnet build "MobileChat.Server.csproj" -c Release -o /app/build
 
 FROM build AS publish
