@@ -19,7 +19,7 @@ builder.Services.AddMobileChatServices(
     builder.Configuration, 
     typeof(Program), 
     ServiceCollectionEx.DatabaseEnum.Postgres,
-    false, false
+    true, false
     );
 
 WebApplication app = builder.Build();

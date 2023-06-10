@@ -18,14 +18,33 @@ else
             <MudPaper Outlined="true" Class="pa-2 mb-4">
                 <MudStack>
                     <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
-                    <MudTextField T="string" Placeholder="username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
-                    <MudButton OnClick="AddFriend">Send Request</MudButton>
+                    <MudTextField T="string" Placeholder="Search friends"
+                    Value="@SearchQuery" TextChanged="OnSearchFriends" 
+                    Immediate Class="mb-2"></MudTextField>
+
+                    @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                    {
+                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                            <MudGrid Justify="Justify.SpaceBetween">
+                                <MudItem>
+                                    <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                                </MudItem>
+                                <MudItem>
+                                    <MudStack Row Style="height:100%;">
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" 
+                                        Icon="@Icons.Material.Filled.Add" Color="Color.Success"
+                                        OnClick="@(async () => await AddFriend(friend.Username))" />
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
                 </MudStack>
             </MudPaper>
         }
 
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-            @foreach (var friendRequests in UserFriendRequests)
+            @foreach (var friendRequests in UserFriendRequests ?? Enumerable.Empty<User>())
             {
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
@@ -46,7 +65,7 @@ else
         </MudStack>
 
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-            @foreach (var friend in UserFriends)
+            @foreach (var friend in UserFriends ?? Enumerable.Empty<User>())
             {
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
@@ -71,12 +90,13 @@ else
 
     private IEnumerable<User> UserFriendRequests { get; set; }
     private IEnumerable<User> UserFriends { get; set; }
+    private IEnumerable<User> SearchedUserFriends { get; set; }
+
+    private string SearchQuery { get; set; }
 
     private bool IsBusy { get; set; } = true;
 
     private bool addFriendPopOverIsOpen;
-
-    private string usernameToAdd { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -157,7 +177,7 @@ else
         return friendRequests;
     }
 
-    private async Task AddFriend()
+    private async Task AddFriend(string usernameToAdd)
     {
         if (string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))
         {
@@ -170,6 +190,9 @@ else
 
             ToggleAddFriendPopOverIsOpen();
             usernameToAdd = string.Empty;
+
+            SearchQuery = string.Empty;
+            SearchedUserFriends = Enumerable.Empty<User>();
 
             await RefetchData();
         }
@@ -225,5 +248,21 @@ else
         {
             Snackbar.Add($"Something went wrong!", Severity.Error);
         }
+    }
+
+    private async Task OnSearchFriends(string value)
+    {
+        SearchQuery = value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            SearchedUserFriends = Enumerable.Empty<User>();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        SearchedUserFriends = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
+
+        await InvokeAsync(StateHasChanged);
     }
 }
