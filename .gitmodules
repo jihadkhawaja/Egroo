@@ -1,0 +1,6 @@
+[submodule "src/MobileChat.Server.Package"]
+	path = src/MobileChat.Server.Package
+	url = https://github.com/jihadkhawaja/mobilechat.server
+[submodule "src/MobileChat.Client.Package"]
+	path = src/MobileChat.Client.Package
+	url = https://github.com/jihadkhawaja/mobilechat.client

@@ -1,4 +1,6 @@
-﻿namespace MobileChat.MAUI
+﻿using MobileChat.UI.Core;
+
+namespace MobileChat.MAUI
 {
     public partial class App : Application
     {
@@ -11,7 +13,7 @@
 
         protected override async void OnStart()
         {
-            await MauiProgram.Connect();
+            await HubInitializer.Connect();
         }
     }
 }
