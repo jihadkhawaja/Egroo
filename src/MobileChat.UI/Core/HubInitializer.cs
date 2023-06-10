@@ -39,5 +39,10 @@
                 //client disconnected
             }
         }
+
+        public static bool IsConnected()
+        {
+            return jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected;
+        }
     }
 }

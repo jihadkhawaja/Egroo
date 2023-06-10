@@ -58,7 +58,7 @@
         {
             while (!IsConnected)
             {
-                IsConnected = GetIsConnected();
+                IsConnected = HubInitializer.IsConnected();
                 await Task.Delay(300);
             }
 
@@ -94,18 +94,6 @@
     private void DrawerToggle()
     {
         IsDrawerOpen = !IsDrawerOpen;
-    }
-
-    private bool GetIsConnected()
-    {
-        if (jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
     }
 
     private void SignOut()
