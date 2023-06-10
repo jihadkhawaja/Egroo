@@ -2,17 +2,6 @@
 {
     public static class HubInitializer
     {
-        // SignalR chat hub name (http://your-web-url/hubName)
-        private const string HubName = "chathub";
-#if DEBUG
-        // Development
-        // SignalR Web URL example (http://localhost:2736/ or server IP address with port) where the chat web app is hosted
-        public const string HubConnectionURL = "http://localhost:5175/" + HubName;
-#else
-        // Production
-        // SignalR Web URL example (https://www.domain.com/ or server IP address with port) where the chat web app is hosted
-        public const string HubConnectionURL = "https://www.your-domain.com/" + HubName;
-#endif
         public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
 
         public static void Initialize(string HubConnectionURL, string Token = "")
