@@ -44,6 +44,7 @@ using (IServiceScope scope = app.Services.CreateScope())
     catch { }
 
     HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User?.Token);
+    await HubInitializer.Connect();
 }
 
 await app.RunAsync();
