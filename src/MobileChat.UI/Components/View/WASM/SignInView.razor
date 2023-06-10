@@ -1,6 +1,7 @@
 ﻿@using FluentValidation
 @using System.Text.Json
 @using MobileChat.UI.Components.Layout.WASM;
+@using MobileChat.UI.Constants;
 @using MobileChat.UI.Core;
 
 @layout EmptyLayout
@@ -98,7 +99,7 @@
 
             SessionStorage.User = user;
 
-            HubInitializer.Initialize(HubInitializer.HubConnectionURL, SessionStorage.User.Token);
+            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
             await HubInitializer.Connect();
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
