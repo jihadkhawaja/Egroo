@@ -74,7 +74,7 @@
                 if (SessionStorage.User.Token != token)
                 {
                     SessionStorage.User.Token = token;
-                    HubInitializer.Initialize(HubInitializer.HubConnectionURL, SessionStorage.User.Token);
+                    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
                     await HubInitializer.Connect();
 
                     await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
