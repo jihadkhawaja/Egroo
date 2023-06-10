@@ -54,9 +54,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="FluentValidation" Version="11.5.2" />
-	  <PackageReference Include="jihadkhawaja.mobilechat.client" Version="0.1.16" />
-	  <PackageReference Include="MudBlazor" Version="6.2.3" />
+	  <ProjectReference Include="..\MobileChat.UI\MobileChat.UI.csproj" />
 	</ItemGroup>
 
 </Project>
