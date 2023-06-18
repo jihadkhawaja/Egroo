@@ -3,6 +3,12 @@
 # About
 MAUI Client with ASP.NET SignalR Server.
 
+[![Server Nuget version](https://img.shields.io/nuget/v/jihadkhawaja.mobilechat.server?color=776be7&label=server%20nuget%20version&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.mobilechat.server/)
+[![Server Nuget downloads](https://img.shields.io/nuget/dt/jihadkhawaja.mobilechat.server?color=776be7&label=server%20nuget%20downloads&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.mobilechat.server/)
+
+[![Client Nuget version](https://img.shields.io/nuget/v/jihadkhawaja.mobilechat.client?color=776be7&label=client%20nuget%20version&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.mobilechat.client/)
+[![Client Nuget downloads](https://img.shields.io/nuget/dt/jihadkhawaja.mobilechat.client?color=776be7&label=client%20nuget%20downloads&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.mobilechat.client/)
+
 Self-host chatting solution with cross-platform client application.
 
 ## MAUI Supported Platforms
