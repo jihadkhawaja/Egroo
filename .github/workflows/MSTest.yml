@@ -59,6 +59,7 @@ jobs:
             docker kill mobilechat-server
             docker system prune -f
             docker run --name mobilechat-server -p 43222:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-server:latest
+            
   nginx-setup:
     name: Nginx Setup
     needs: docker-build
