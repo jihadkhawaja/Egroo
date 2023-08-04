@@ -4,10 +4,10 @@ EXPOSE 80
 EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
-WORKDIR /src
-COPY ["MobileChat.Server/MobileChat.Server.csproj", "MobileChat.Server/"]
+WORKDIR /
+COPY ["src/MobileChat.Server/MobileChat.Server.csproj", "MobileChat.Server/"]
 RUN git clone https://github.com/jihadkhawaja/mobilechat.server MobileChat.Server.Package
-RUN dotnet restore "MobileChat.Server/MobileChat.Server.csproj"
+RUN dotnet restore "src/MobileChat.Server/MobileChat.Server.csproj"
 COPY . .
 WORKDIR "/src/MobileChat.Server"
 RUN dotnet build "MobileChat.Server.csproj" -c Release -o /app/build
