@@ -28,6 +28,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/MobileChat.Server/MobileChat.Server.csproj
   docker-build:
     name: Docker Build
+    needs: dotnet-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
