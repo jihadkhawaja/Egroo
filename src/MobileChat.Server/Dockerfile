@@ -17,7 +17,5 @@ RUN dotnet publish "MobileChat.Server.csproj" -c Release -o /app/publish /p:UseA
 
 FROM base AS final
 WORKDIR /app
-RUN echo '{
-}' > appsettings.json
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "MobileChat.Server.dll"]
