@@ -2,6 +2,6 @@
 {
     public static class TestConfig
     {
-        public static string HubConnectionUrl = "http://localhost:5175/chathub";
+        public static string HubConnectionUrl = "https://dev-api-chat.jihadkhawaja.com/chathub";
     }
 }
