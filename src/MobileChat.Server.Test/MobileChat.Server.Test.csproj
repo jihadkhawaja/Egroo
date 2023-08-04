@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MobileChat.Client.Package\src\jihadkhawaja.mobilechat.client\jihadkhawaja.mobilechat.client.csproj" />
+    <ProjectReference Include="..\MobileChat.Server\MobileChat.Server.csproj" />
   </ItemGroup>
 
 </Project>
