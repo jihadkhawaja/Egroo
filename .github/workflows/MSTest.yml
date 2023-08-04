@@ -9,9 +9,120 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  dotnet-build:
+    name: Dotnet Build
     runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-build --verbosity normal
+  docker-build:
+    name: Docker Build
+    needs: dotnet-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create appsettings
+        run: |
+          echo '{
+            "Logging": {
+              "LogLevel": {
+                "Default": "Information",
+                "Microsoft.AspNetCore": "Warning"
+              }
+            },
+            "AllowedHosts": "*",
+            "ConnectionStrings": {
+              "DefaultConnection": "Server=${{ secrets.REMOTE_HOST }};Port=5432;User Id=Postgres;Password=${{ secrets.REMOTE_PASSWORD }};Database=jihadkhawaja_dev_mobilechatdb;"
+            },
+            "Secrets": {
+              "Jwt": "5sT#uN8yRm2AqHwJvE6zPcX"
+            }
+          }' > appsettings.json
+          ls src/MobileChat.Server/
+      - name: build docker image
+        run: docker build -t jihadkhawajakhawaja/mobilechat-server:latest -f src/MobileChat.Server/Dockerfile .
+      - name: save docker image
+        run: |
+             docker save -o mobilechat-server.tar jihadkhawajakhawaja/mobilechat-server
+             ls -sh
+      - name: copy tar via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: 22
+          source: "mobilechat-server.tar"
+          target: "/opt"
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+            docker load -i /opt/mobilechat-server.tar
+            rm /opt/mobilechat-server.tar
+            docker kill mobilechat-server
+            docker system prune -f
+            docker run --name mobilechat-server -p 43222:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-server:latest
+  nginx-setup:
+    name: Nginx Setup
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+                  desired_config='
+                  server {
+                      listen        80;
+                      server_name   dev-api-chat.jihadkhawaja.com;
+                      location / {
+                          proxy_pass         http://localhost:43222;
+                          proxy_http_version 1.1;
+                          proxy_set_header   Upgrade $http_upgrade;
+                          proxy_set_header   Connection "upgrade";
+                          proxy_set_header   Host $host;
+                          proxy_cache_bypass $http_upgrade;
+                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+                          proxy_set_header   X-Forwarded-Proto $scheme;
+                      }
+                  }'
 
+                  if [ -f /etc/nginx/sites-available/web-blazorappserver.com ]; then
+                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/web-blazorappserver.com >/dev/null; then
+                          echo "File exists and contains the desired configuration. Skipping..."
+                      else
+                          echo "File exists but doesn't contain the desired configuration. Updating..."
+                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/web-blazorappserver.com >/dev/null
+
+                          sudo ln -sf /etc/nginx/sites-available/web-blazorappserver.com /etc/nginx/sites-enabled/
+                          sudo systemctl restart nginx
+                      fi
+                  else
+                      echo "File does not exist. Creating..."
+                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/web-blazorappserver.com >/dev/null
+
+                      sudo ln -sf /etc/nginx/sites-available/web-blazorappserver.com /etc/nginx/sites-enabled/
+                      sudo systemctl restart nginx
+                  fi
+  uni-test:
+    runs-on: ubuntu-latest
+    needs: nginx-setup
     steps:
     - uses: actions/checkout@v2
 
