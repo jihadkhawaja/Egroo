@@ -112,7 +112,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Clone Refrences
-      run: git clone https://github.com/jihadkhawaja/mobilechat.client MobileChat.Client.Package
+      run: git clone https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
 
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2
