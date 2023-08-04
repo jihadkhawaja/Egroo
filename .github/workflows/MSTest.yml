@@ -1,0 +1,37 @@
+name: MSTest
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: '7.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+
+    - name: Build
+      run: dotnet build --configuration Release src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+
+    - name: Test
+      run: dotnet test --logger trx --results-directory TestResults --configuration Release src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+      continue-on-error: true
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v2
+      with:
+        name: Test Results
+        path: TestResults/*.trx
