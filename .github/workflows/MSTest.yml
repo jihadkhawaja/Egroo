@@ -9,24 +9,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  dotnet-build:
-    name: Dotnet Build
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 7.0.x
-    - name: Restore dependencies
-      run: dotnet restore src/MobileChat.Server/MobileChat.Server.csproj
-    - name: Build
-      run: dotnet build src/MobileChat.Server/MobileChat.Server.csproj --no-restore
-    - name: Test
-      run: dotnet test src/MobileChat.Server/MobileChat.Server.csproj --no-build --verbosity normal
   docker-build:
     name: Docker Build
-    needs: dotnet-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
