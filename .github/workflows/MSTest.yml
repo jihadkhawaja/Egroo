@@ -150,3 +150,17 @@ jobs:
       with:
         name: Test Results
         path: TestResults/*.trx
+  docker-stop:
+    name: Docker Stop
+    needs: uni-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+            docker kill mobilechat-server
+            docker system prune -f
