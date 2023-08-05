@@ -34,29 +34,26 @@ jobs:
       - uses: actions/checkout@v2
       - name: Create appsettings
         run: |
-             echo '{
-              "Logging": {
-                "LogLevel": {
-                  "Default": "Information",
-                  "Microsoft.AspNetCore": "Warning"
+              echo '{
+                "Logging": {
+                  "LogLevel": {
+                    "Default": "Information",
+                    "Microsoft.AspNetCore": "Warning"
+                  }
+                },
+                "AllowedHosts": "*",
+                "ConnectionStrings": {
+                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=Postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=jihadkhawaja_dev_mobilechatdb;"
+                },
+                "Secrets": {
+                  "Jwt": "5sT#uN8yRm2AqHwJvE6zPcX"
                 }
-              },
-              "AllowedHosts": "*",
-              "ConnectionStrings": {
-                "DefaultConnection": "Server=$secrets.REMOTE_HOST;Port=5432;User Id=Postgres;Password=$secrets.REMOTE_PASSWORD;Database=jihadkhawaja_dev_mobilechatdb;"
-              },
-              "Secrets": {
-                "Jwt": "5sT#uN8yRm2AqHwJvE6zPcX"
-              }
               }' > src/MobileChat.Server/appsettings.json
-              ls src/MobileChat.Server/
-              cat src/MobileChat.Server/appsettings.json
       - name: build docker image
         run: docker build -t jihadkhawajakhawaja/mobilechat-server:latest -f src/MobileChat.Server/Dockerfile .
       - name: save docker image
         run: |
              docker save -o mobilechat-server.tar jihadkhawajakhawaja/mobilechat-server
-             ls -sh
       - name: copy tar via ssh
         uses: appleboy/scp-action@master
         with:
