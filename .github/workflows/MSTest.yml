@@ -46,7 +46,7 @@ jobs:
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=jihadkhawaja_dev_mobilechatdb;"
                 },
                 "Secrets": {
-                  "Jwt": "5sT#uN8yRm2AqHwJvE6zPcX"
+                  "Jwt": "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY5MTU3MDk4NCwiaWF0IjoxNjkxNTcwOTg0fQ.5Wnm0ZApqZwSeYtWyzunYNFAXJ_ACONdGn3zpIuj8vE"
                 }
               }' > src/MobileChat.Server/appsettings.json
       - name: build docker image
