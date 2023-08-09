@@ -32,34 +32,8 @@ namespace MobileChat.Server.Test
         }
 
         [TestMethod]
-        public async Task SignInTest()
+        public async Task SignUpThenSignInTest()
         {
-            dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
-            Dictionary<string, object>? result = null;
-            if (dynamicObj is not null)
-            {
-                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-            }
-
-            Assert.IsNotNull(result, "Failed to sign in or user doesn't exist.");
-        }
-
-        [TestMethod]
-        public async Task SignUpTest()
-        {
-            dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
-            Dictionary<string, object>? result = null;
-            if (dynamicObj is not null)
-            {
-                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-            }
-
-            if(result is not null)
-            {
-                Assert.IsNotNull(result, "Failed to sign in when user exist.");
-                return;
-            }
-
             dynamic? dynamicObj2 = await ChatAuthService.SignUp("Test", "test", "test@domain.com", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result2 = null;
             if (dynamicObj2 is not null)
@@ -68,6 +42,19 @@ namespace MobileChat.Server.Test
             }
 
             Assert.IsNotNull(result2, "Failed to sign up or user already exist.");
+
+            dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
+            Dictionary<string, object>? result = null;
+            if (dynamicObj is not null)
+            {
+                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+            }
+
+            if (result is not null)
+            {
+                Assert.IsNotNull(result, "Failed to sign in when user exist.");
+                return;
+            }
         }
 
         [TestCleanup]
