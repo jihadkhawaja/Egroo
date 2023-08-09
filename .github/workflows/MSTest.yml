@@ -164,3 +164,16 @@ jobs:
           script: |
             docker kill mobilechat-server
             docker system prune -f
+  database-drop:
+    name: Database drop
+    needs: docker-stop
+    runs-on: ubuntu-latest
+    steps:
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+            docker exec postgres psql -U postgres -d jihadkhawaja_dev_mobilechatdb -c "DROP DATABASE jihadkhawaja_dev_mobilechatdb;"
