@@ -176,4 +176,4 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
-            docker exec postgres psql -U postgres -d jihadkhawaja_dev_mobilechatdb -c "DROP DATABASE jihadkhawaja_dev_mobilechatdb;"
+            docker exec postgres psql -U postgres -c "drop database jihadkhawaja_dev_mobilechatdb WITH ( FORCE );"
