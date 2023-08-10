@@ -16,5 +16,5 @@ jobs:
 
       # docker-compose check
       - name: docker-compose check
-        working-directory: ../src/MobileChat.Server
+        working-directory: ./src/MobileChat.Server
         run: docker-compose up -d
