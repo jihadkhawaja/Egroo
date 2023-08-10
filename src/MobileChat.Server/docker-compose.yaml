@@ -15,7 +15,7 @@ services:
   web:
     container_name: 'chat-server'
     build:
-      context: ../../src
+      context: ../../../
       dockerfile: MobileChat.Server/Dockerfile
     ports:
       - "5175:80"
