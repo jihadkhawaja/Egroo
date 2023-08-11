@@ -123,6 +123,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Clone Refrences
+      run: git clone https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
