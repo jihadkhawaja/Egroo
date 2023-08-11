@@ -135,7 +135,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/MobileChat.WASM/MobileChat.WASM.csproj
   docker-build-wasm:
     name: Docker Build wasm
-    needs: dotnet-build-api
+    needs: dotnet-build-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
