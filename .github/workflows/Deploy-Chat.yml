@@ -1,0 +1,221 @@
+name: chat-deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  dotnet-build-api:
+    name: Dotnet Build api
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Clone Refrences
+      run: git clone https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+    - name: Restore dependencies
+      run: dotnet restore src/MobileChat.Server/MobileChat.Server.csproj
+    - name: Build
+      run: dotnet build --no-restore src/MobileChat.Server/MobileChat.Server.csproj
+    - name: Test
+      run: dotnet test --no-build --verbosity normal src/MobileChat.Server/MobileChat.Server.csproj
+  docker-build-api:
+    name: Docker Build api
+    needs: dotnet-build-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create appsettings
+        run: |
+              echo '{
+                "Logging": {
+                  "LogLevel": {
+                    "Default": "Information",
+                    "Microsoft.AspNetCore": "Warning"
+                  }
+                },
+                "AllowedHosts": "*",
+                "ConnectionStrings": {
+                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=mobilechatdb_prod;"
+                },
+                "Secrets": {
+                  "Jwt": "${{ secrets.JWT_PROD }}"
+                }
+              }' > src/MobileChat.Server/appsettings.json
+      - name: build docker image
+        run: docker build -t jihadkhawajakhawaja/mobilechat-server-prod:latest -f src/MobileChat.Server/Dockerfile .
+      - name: save docker image
+        run: |
+             docker save -o mobilechat-server-prod.tar jihadkhawajakhawaja/mobilechat-server-prod
+      - name: copy tar via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: 22
+          source: "mobilechat-server-prod.tar"
+          target: "/opt"
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+            docker load -i /opt/mobilechat-server-prod.tar
+            rm /opt/mobilechat-server-prod.tar
+            docker kill mobilechat-server-prod
+            docker system prune -f
+            docker run --name mobilechat-server-prod -p 49117:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-server-prod:latest 
+  nginx-setup-api:
+    name: Nginx Setup api
+    needs: docker-build-api
+    runs-on: ubuntu-latest
+    steps:
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+                  desired_config='
+                  server {
+                      listen        80;
+                      server_name   api-chat.egroo.org;
+                      location / {
+                          proxy_pass         http://localhost:49117;
+                          proxy_http_version 1.1;
+                          proxy_set_header   Upgrade $http_upgrade;
+                          proxy_set_header   Connection "upgrade";
+                          proxy_set_header   Host $host;
+                          proxy_cache_bypass $http_upgrade;
+                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+                          proxy_set_header   X-Forwarded-Proto $scheme;
+                      }
+                  }'
+
+                  if [ -f /etc/nginx/sites-available/api-chat.egroo.org ]; then
+                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/api-chat.egroo.org >/dev/null; then
+                          echo "File exists and contains the desired configuration. Skipping..."
+                      else
+                          echo "File exists but doesn't contain the desired configuration. Updating..."
+                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+
+                          sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                          sudo systemctl restart nginx
+                      fi
+                  else
+                      echo "File does not exist. Creating..."
+                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+
+                      sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                      sudo systemctl restart nginx
+                  fi
+  dotnet-build-wasm:
+    name: Dotnet Build wasm
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+    - name: Restore dependencies
+      run: dotnet restore src/MobileChat.WASM/MobileChat.WASM.csproj
+    - name: Build
+      run: dotnet build --no-restore src/MobileChat.WASM/MobileChat.WASM.csproj
+    - name: Test
+      run: dotnet test --no-build --verbosity normal src/MobileChat.WASM/MobileChat.WASM.csproj
+  docker-build-wasm:
+    name: Docker Build wasm
+    needs: dotnet-build-api
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create appsettings
+        run: |
+              echo 'events { }
+              http {
+                  include mime.types;
+
+                  server {
+                      listen 80;
+
+                      location / {
+                          root /usr/share/nginx/html;
+                          try_files $uri $uri/ /index.html =404;
+                      }
+                  }
+              }' > src/MobileChat.WASM/nginx.conf
+      - name: build docker image
+        run: docker build -t jihadkhawajakhawaja/mobilechat-wasm-prod:latest -f src/MobileChat.WASM/Dockerfile .
+      - name: save docker image
+        run: |
+             docker save -o mobilechat-wasm-prod.tar jihadkhawajakhawaja/mobilechat-wasm-prod
+      - name: copy tar via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: 22
+          source: "mobilechat-wasm-prod.tar"
+          target: "/opt"
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+            docker load -i /opt/mobilechat-wasm-prod.tar
+            rm /opt/mobilechat-wasm-prod.tar
+            docker kill mobilechat-wasm-prod
+            docker system prune -f
+            docker run --name mobilechat-wasm-prod -p 49168:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-wasm-prod:latest  
+  nginx-setup-wasm:
+    name: Nginx Setup wasm
+    needs: docker-build-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - name: executing remote ssh commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          script: |
+                  desired_config='
+                        server {
+                        listen        80;
+                        server_name   egroo.org www.egroo.org;
+                        location / {
+                            proxy_pass         http://localhost:49168;
+                            add_header Access-Control-Allow-Origin *;
+                        }
+                    }'
+
+                  if [ -f /etc/nginx/sites-available/www.egroo.org ]; then
+                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/www.egroo.org >/dev/null; then
+                          echo "File exists and contains the desired configuration. Skipping..."
+                      else
+                          echo "File exists but doesn't contain the desired configuration. Updating..."
+                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+
+                          sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                          sudo systemctl restart nginx
+                      fi
+                  else
+                      echo "File does not exist. Creating..."
+                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+
+                      sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                      sudo systemctl restart nginx
+                  fi
