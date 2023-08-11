@@ -9,7 +9,7 @@ WORKDIR /
 
 COPY ["src/MobileChat.WASM/MobileChat.WASM.csproj", "MobileChat.WASM/"]
 COPY ["src/MobileChat.UI/MobileChat.UI.csproj", "MobileChat.UI/"]
-RUN git clone https://github.com/jihadkhawaja/mobilechat.client ./MobileChat.Client.Package
+RUN git clone https://github.com/jihadkhawaja/mobilechat.client ../MobileChat.Client.Package
 RUN ls
 COPY . .
 WORKDIR "/src/MobileChat.WASM"
