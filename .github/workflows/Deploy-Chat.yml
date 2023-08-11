@@ -2,7 +2,7 @@ name: chat-deploy
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main" , "dev"]
 
   workflow_dispatch:
 
