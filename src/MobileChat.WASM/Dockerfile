@@ -9,7 +9,7 @@ WORKDIR /
 
 COPY ["src/MobileChat.WASM/MobileChat.WASM.csproj", "MobileChat.WASM/"]
 COPY ["src/MobileChat.UI/MobileChat.UI.csproj", "MobileChat.UI/"]
-RUN dotnet restore "MobileChat.WASM/MobileChat.WASM.csproj"
+RUN git clone https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
 COPY . .
 WORKDIR "/src/MobileChat.WASM"
 RUN dotnet build "MobileChat.WASM.csproj" -c Release -o /app/build
