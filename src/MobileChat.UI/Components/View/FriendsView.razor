@@ -19,10 +19,10 @@ else
                 <MudStack>
                     <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
                     <MudTextField T="string" Placeholder="Search friends"
-                    Value="@SearchQuery" TextChanged="OnSearchFriends" 
+                    Value="@SearchQuery" TextChanged="OnSearchUsers" 
                     Immediate Class="mb-2"></MudTextField>
 
-                    @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                    @foreach (var friend in SearchedUsers ?? Enumerable.Empty<User>())
                     {
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                             <MudGrid Justify="Justify.SpaceBetween">
@@ -70,10 +70,22 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                             <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
+                                @if(friend.IsOnline)
+                                {
+                                    <MudTooltip Text="Online">
+                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Square" Color="Color.Success" />
+                                    </MudTooltip>
+                                }
+                                else
+                                {
+                                    <MudTooltip Text="Offline">
+                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Square" Color="Color.Dark" />
+                                    </MudTooltip>
+                                }                               
                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                        OnClick="@(async () => await RemoveFriend(friend.Username))" />
                             </MudStack>
@@ -86,13 +98,13 @@ else
 }
 
 @code {
-    [Inject] IDialogService DialogService { get; set; }
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
-    private IEnumerable<User> UserFriendRequests { get; set; }
-    private IEnumerable<User> UserFriends { get; set; }
-    private IEnumerable<User> SearchedUserFriends { get; set; }
+    private IEnumerable<User> UserFriendRequests { get; set; } = null!;
+    private IEnumerable<User> UserFriends { get; set; } = null!;
+    private IEnumerable<User> SearchedUsers { get; set; } = null!;
 
-    private string SearchQuery { get; set; }
+    private string? SearchQuery { get; set; }
 
     private bool IsBusy { get; set; } = true;
 
@@ -125,14 +137,14 @@ else
         IsBusy = true;
 
         UserFriendRequests = await GetFriendsRequest();
-        UserFriends = await GetFriends();
+        UserFriends = await GetUsers();
 
         IsBusy = false;
 
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task<User[]> GetFriends()
+    private async Task<User[]> GetUsers()
     {
         UserFriend[] users = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
         User[] friends = new User[users.Length];
@@ -145,6 +157,7 @@ else
                 user.Id = users[i].UserId;
                 user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].UserId);
                 user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
+                user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
             }
             else
@@ -153,6 +166,7 @@ else
                 user.Id = users[i].FriendUserId;
                 user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].FriendUserId);
                 user.Username = await ChatUserService.GetUserUsername(users[i].FriendUserId);
+                user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
             }
         }
@@ -192,7 +206,7 @@ else
             usernameToAdd = string.Empty;
 
             SearchQuery = string.Empty;
-            SearchedUserFriends = Enumerable.Empty<User>();
+            SearchedUsers = Enumerable.Empty<User>();
 
             await RefetchData();
         }
@@ -250,18 +264,18 @@ else
         }
     }
 
-    private async Task OnSearchFriends(string value)
+    private async Task OnSearchUsers(string value)
     {
         SearchQuery = value;
 
         if (string.IsNullOrWhiteSpace(value))
         {
-            SearchedUserFriends = Enumerable.Empty<User>();
+            SearchedUsers = Enumerable.Empty<User>();
             await InvokeAsync(StateHasChanged);
             return;
         }
 
-        SearchedUserFriends = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
+        SearchedUsers = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
 
         await InvokeAsync(StateHasChanged);
     }

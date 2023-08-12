@@ -1,10 +1,7 @@
 name: Docker
 
 on:
-  push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
   workflow_dispatch:
 
@@ -16,6 +13,6 @@ jobs:
       - uses: actions/checkout@v3
 
       # docker-compose check
-      - name: docker-compose check
+      - name: docker-compose checking
         working-directory: ./src/MobileChat.Server
         run: docker-compose up -d

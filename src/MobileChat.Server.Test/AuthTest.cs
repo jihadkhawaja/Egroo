@@ -15,13 +15,13 @@ namespace MobileChat.Server.Test
             ChatAuthService = new ChatAuthService();
 
             var cancellationTokenSource = new CancellationTokenSource();
-            jihadkhawaja.mobilechat.client.MobileChat.Initialize(TestConfig.HubConnectionUrl);
-            await jihadkhawaja.mobilechat.client.MobileChat.SignalR.Connect(cancellationTokenSource);
+            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
+            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
         }
         [TestMethod]
         public async Task ConnectTest()
         {
-            if (jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+            if (jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
             {
                 Assert.IsTrue(true);
             }

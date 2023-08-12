@@ -23,7 +23,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.mobilechat.ser
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libs (NuGet Package)", "Libs (NuGet Package)", "{C1954230-0F2C-45CA-9A23-B3D8176971A6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MobileChat.UI", "MobileChat.UI\MobileChat.UI.csproj", "{A9E09E1B-8350-4D1F-9760-4BBFF50B01AC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MobileChat.UI", "MobileChat.UI\MobileChat.UI.csproj", "{A9E09E1B-8350-4D1F-9760-4BBFF50B01AC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{806FB1EE-C13B-468E-BFE6-75B10033A553}"
 EndProject

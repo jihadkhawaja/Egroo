@@ -26,9 +26,28 @@ else
             {
                 <MudPaper Outlined="true" Class="pa-2 mb-4">
                     <MudStack>
-                        <MudText GutterBottom Typo="Typo.body1">Add Friend To Channel</MudText>
-                        <MudTextField T="string" Placeholder="friend username" @bind-Text="@usernameToAdd" Class="mb-2"></MudTextField>
-                        <MudButton OnClick="AddUserToChannel">Add</MudButton>
+                        <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
+                         <MudTextField T="string" Placeholder="Search friends"
+                                       Value="@SearchQuery" TextChanged="OnSearchFriends"
+                                       Immediate Class="mb-2"></MudTextField>
+
+                            @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                            {
+                                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                                     <MudGrid Justify="Justify.SpaceBetween">
+                                         <MudItem>
+                                             <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                                         </MudItem>
+                                         <MudItem>
+                                             <MudStack Row Style="height:100%;">
+                                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
+                                                                Icon="@Icons.Material.Filled.Add" Color="Color.Success"
+                                                            OnClick="@(async () => await AddUserToChannel(friend.Username))" />
+                                             </MudStack>
+                                         </MudItem>
+                                     </MudGrid>
+                                 </MudPaper>
+                            }
                     </MudStack>
                 </MudPaper>
             }
@@ -71,6 +90,7 @@ else
     [Inject] IDialogService DialogService { get; set; }
 
     private IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
+    private IEnumerable<User> SearchedUserFriends { get; set; } = null!;
 
     private bool IsSignedIn { get; set; }
 
@@ -78,7 +98,7 @@ else
 
     private bool addFriendPopOverIsOpen;
 
-    private string usernameToAdd { get; set; }
+    private string? SearchQuery { get; set; }
 
     private Guid selectedChannelId { get; set; }
 
@@ -113,6 +133,22 @@ else
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task OnSearchFriends(string value)
+    {
+        SearchQuery = value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            SearchedUserFriends = Enumerable.Empty<User>();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        SearchedUserFriends = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
+
+        await InvokeAsync(StateHasChanged);
     }
 
     public void ToggleAddFriendPopOverIsOpen(Guid channelid)
@@ -210,7 +246,7 @@ else
         }
     }
 
-    private async Task AddUserToChannel()
+    private async Task AddUserToChannel(string usernameToAdd)
     {
         if (selectedChannelId == Guid.Empty
             || string.IsNullOrEmpty(usernameToAdd) || string.IsNullOrWhiteSpace(usernameToAdd))

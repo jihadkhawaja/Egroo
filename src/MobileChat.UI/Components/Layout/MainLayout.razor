@@ -1,6 +1,7 @@
 ﻿@using System.Text.Json;
 @using MobileChat.UI.Core;
 @using MobileChat.UI.Constants
+@using MobileChat.UI.Models;
 
 @inherits LayoutComponentBase
 
@@ -8,6 +9,7 @@
 @inject IChatUser ChatUserService
 @inject NavigationManager NavigationManager
 @inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 
 <MudThemeProvider @bind-IsDarkMode="@IsDarkMode" Theme="Theme.DefaultTheme" />
@@ -40,7 +42,7 @@
             <NavMenu />
         </MudDrawer>
     }
-    <MudMainContent Class="pt-2">
+    <MudMainContent>
         @Body
     </MudMainContent>
 </MudLayout>
@@ -77,7 +79,18 @@
                     HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
                     await HubInitializer.Connect();
 
-                    await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
+                    switch (SessionStorage.CurrentFrameworkPlatform)
+                    {
+                        case FrameworkPlatform.MAUI:
+                            SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
+                            SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                            break;
+                        case FrameworkPlatform.WASM:
+                            await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
+                            break;
+                        default:
+                            throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                    }
                 }
 
                 SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
@@ -97,7 +110,18 @@
 
     private async Task SignOut()
     {
-        await LocalStorageService.RemoveLocalStorage("user");
+        switch (SessionStorage.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(SessionStorage.AppDataPath);
+                SaveFileService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+                await LocalStorageService.RemoveLocalStorage("user");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
 
         SessionStorage.User = null;
 

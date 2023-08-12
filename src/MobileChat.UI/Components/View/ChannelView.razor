@@ -1,4 +1,5 @@
 ﻿@using Microsoft.AspNetCore.SignalR.Client
+@using jihadkhawaja.mobilechat.client;
 
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
@@ -29,19 +30,22 @@
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
                             }
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)" />
+                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
                             }
                         }
                     </MudStack>
@@ -119,11 +123,15 @@
 
     private async Task<Message[]> GetMessages()
     {
-        var messages = await ChatMessageService.ReceiveMessageHistory(GetChannelId());
+        var messages = await ChatMessageService.ReceiveMessageHistoryRange(GetChannelId(), 50);
 
         foreach (var msg in messages)
         {
             msg.DisplayName = await GetUserName(msg.SenderId);
+            if (!msg.Seen && msg.SenderId != SessionStorage.User.Id)
+            {
+                await ChatMessageService.SetMessageAsSeen(msg.Id);
+            }
         }
 
         return messages;
@@ -194,36 +202,11 @@
     private void OnInputContent(string text)
     {
         InputContent = text;
-
-        //WIP
-        //SetTextAreaLines();
-    }
-
-    //set text area total lines based on content
-    private void SetTextAreaLines()
-    {
-        if (string.IsNullOrWhiteSpace(InputContent))
-        {
-            MessageLinesCount = 1;
-            return;
-        }
-
-        //increase MessageCount dynamically based on text length
-        int lines = InputContent.Length / 5;
-
-        if (lines > 0)
-        {
-            MessageLinesCount = lines;
-        }
-        else
-        {
-            MessageLinesCount = 1;
-        }
     }
 
     private void HubEvents()
     {
-        jihadkhawaja.mobilechat.client.MobileChat.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        MobileChatClient.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {
@@ -236,7 +219,25 @@
 
             await InvokeAsync(StateHasChanged);
 
+            if (!message.Seen && message.SenderId != SessionStorage.User.Id)
+            {
+                await ChatMessageService.SetMessageAsSeen(message.Id);
+            }
+
             ScrollToMessagesEnd();
+        });
+
+        MobileChatClient.SignalR.HubConnection.On<Message>("UpdateMessage", async message =>
+        {
+            if (message.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            int index = Messages.IndexOf(message);
+            Messages[index] = message;
+
+            await InvokeAsync(StateHasChanged);
         });
     }
 }

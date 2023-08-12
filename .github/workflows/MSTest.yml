@@ -1,10 +1,7 @@
 name: MSTest
 
 on:
-  push:
-    branches: [ "dev", "main" ]
   pull_request:
-    branches: [ "main" ]
 
   workflow_dispatch:
 
@@ -15,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -46,7 +43,7 @@ jobs:
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=jihadkhawaja_dev_mobilechatdb;"
                 },
                 "Secrets": {
-                  "Jwt": "eyJhbGciOiJIUzI1NiJ9.eyJSb2xlIjoiQWRtaW4iLCJJc3N1ZXIiOiJJc3N1ZXIiLCJVc2VybmFtZSI6IkphdmFJblVzZSIsImV4cCI6MTY5MTU3MDk4NCwiaWF0IjoxNjkxNTcwOTg0fQ.5Wnm0ZApqZwSeYtWyzunYNFAXJ_ACONdGn3zpIuj8vE"
+                  "Jwt": "${{ secrets.JWT_UAT }}"
                 }
               }' > src/MobileChat.Server/appsettings.json
       - name: build docker image
@@ -104,21 +101,21 @@ jobs:
                       }
                   }'
 
-                  if [ -f /etc/nginx/sites-available/web-blazorappserver.com ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/web-blazorappserver.com >/dev/null; then
+                  if [ -f /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com ]; then
+                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null; then
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/web-blazorappserver.com >/dev/null
+                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/web-blazorappserver.com /etc/nginx/sites-enabled/
+                          sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
                           sudo systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/web-blazorappserver.com >/dev/null
+                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/web-blazorappserver.com /etc/nginx/sites-enabled/
+                      sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
                       sudo systemctl restart nginx
                   fi
   uni-test:
@@ -128,7 +125,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Clone Refrences
-      run: git clone https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
 
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2

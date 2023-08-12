@@ -1,6 +1,8 @@
-﻿@inject SessionStorage SessionStorage
+﻿@using MobileChat.UI.Models;
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
@@ -22,7 +24,18 @@
             return;
         }
 
-        await LocalStorageService.RemoveLocalStorage("user");
+        switch (SessionStorage.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(SessionStorage.AppDataPath);
+                SaveFileService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+                await LocalStorageService.RemoveLocalStorage("user");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
 
         SessionStorage.User = null;
 
