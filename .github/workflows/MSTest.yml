@@ -2,7 +2,6 @@ name: MSTest
 
 on:
   push:
-    branches: [ "dev" ]
   pull_request:
 
   workflow_dispatch:
