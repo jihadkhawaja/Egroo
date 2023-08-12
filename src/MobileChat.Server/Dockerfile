@@ -6,7 +6,7 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /
 COPY ["src/MobileChat.Server/MobileChat.Server.csproj", "MobileChat.Server/"]
-RUN git clone --recurse-submodules --branch dev https://github.com/jihadkhawaja/MobileChat
+RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
 COPY . .
 WORKDIR "/src/MobileChat.Server"
 RUN dotnet build "MobileChat.Server.csproj" -c Release -o /app/build
