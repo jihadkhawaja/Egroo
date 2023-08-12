@@ -12,7 +12,7 @@
 #else
         // Production
         // SignalR Web URL example (https://www.domain.com/ or server IP address with port) where the chat web app is hosted
-        public const string ConnectionURL = "https://www.your-domain.com/";
+        public const string ConnectionURL = "https://api.egroo.org/";
 #endif
 
         public const string HubConnectionURL = ConnectionURL + HubName;
