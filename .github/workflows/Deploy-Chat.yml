@@ -88,7 +88,7 @@ jobs:
                   desired_config='
                   server {
                       listen        80;
-                      server_name   api-chat.egroo.org;
+                      server_name   api.egroo.org;
                       location / {
                           proxy_pass         http://localhost:49117;
                           proxy_http_version 1.1;
