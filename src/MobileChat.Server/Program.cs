@@ -18,8 +18,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddMobileChatServices(
     builder.Configuration, 
     typeof(Program), 
-    ServiceCollectionEx.DatabaseEnum.Postgres,
-    true, false
+    MobileChatServer.DatabaseEnum.Postgres
     );
 
 WebApplication app = builder.Build();

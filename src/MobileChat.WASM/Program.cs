@@ -1,9 +1,11 @@
+using jihadkhawaja.mobilechat.client;
 using jihadkhawaja.mobilechat.client.Models;
-using jihadkhawaja.mobilechat.client.Services.Extension;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MobileChat.UI.Constants;
 using MobileChat.UI.Core;
+using MobileChat.UI.Interfaces;
+using MobileChat.UI.Models;
 using MobileChat.UI.Services;
 using MobileChat.WASM;
 using MudBlazor.Services;
@@ -24,8 +26,9 @@ builder.Services.AddScoped(sp => new HttpClient
 builder.Services.AddMudServices();
 
 //general services
-builder.Services.AddSingleton<LocalStorageService>();
 builder.Services.AddSingleton<SessionStorage>();
+builder.Services.AddSingleton<LocalStorageService>();
+builder.Services.AddSingleton<ISaveFile, SaveFileService>();
 //chat services
 builder.Services.AddMobileChatServices();
 
@@ -39,6 +42,7 @@ using (IServiceScope scope = app.Services.CreateScope())
 
     try
     {
+        SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.WASM;
         SessionStorage.User = JsonSerializer.Deserialize<User>(await LocalStorageService.GetFromLocalStorage("user"));
     }
     catch { }

@@ -1,11 +1,22 @@
 ﻿@if (IsCurrentUser)
 {
-    <MudPaper Class="pa-2" Elevation="0" Outlined>
+    <MudPaper Class="pa-2" Elevation="0" Outlined Style="position:relative;">
         <MudStack Spacing="0">
             <MudText Class="text-single-line" Typo="Typo.subtitle1" Color="Color.Primary">@DisplayName</MudText>
             <MudText Class="text-single-line" Typo="Typo.subtitle2" Color="Color.Default">@Date</MudText>
         </MudStack>
-        <MudText Class="mt-2" Typo="Typo.body1" Style="white-space: initial;overflow-wrap: break-word;">@Content</MudText>
+        <MudText Class="mt-2 pr-12" Typo="Typo.body1" Style="white-space: initial;overflow-wrap: break-word;">@Content</MudText>
+        <MudStack Row Style="position:absolute;bottom:0;right:0;" Class="pa-2" Spacing="0">
+            @if(IsSent && IsSeen)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
+                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
+            }
+            else if (IsSent)
+            {
+                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
+            }
+        </MudStack>
     </MudPaper>
 }
 else
@@ -28,4 +39,8 @@ else
     public string Date { get; set; }
     [Parameter]
     public bool IsCurrentUser { get; set; }
+    [Parameter]
+    public bool IsSent { get; set; }
+    [Parameter]
+    public bool IsSeen { get; set; }
 }

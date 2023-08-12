@@ -42,16 +42,16 @@ namespace MobileChat.Server.Test
                 };
 
                 var cancellationTokenSource = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChat.Initialize(TestConfig.HubConnectionUrl, User.Token);
-                await jihadkhawaja.mobilechat.client.MobileChat.SignalR.Connect(cancellationTokenSource);
+                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, User.Token);
+                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
 
                 Channel = await ChatChannelService.CreateChannel("test");
             }
             else
             {
                 var cancellationTokenSource = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChat.Initialize(TestConfig.HubConnectionUrl);
-                await jihadkhawaja.mobilechat.client.MobileChat.SignalR.Connect(cancellationTokenSource);
+                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
+                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
             }
         }
         [TestMethod]

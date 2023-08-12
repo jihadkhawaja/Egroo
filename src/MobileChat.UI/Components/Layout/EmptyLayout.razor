@@ -1,12 +1,14 @@
-﻿@using System.Text.Json
-@using MobileChat.UI.Constants;
+﻿@using System.Text.Json;
 @using MobileChat.UI.Core;
+@using MobileChat.UI.Constants
+@using MobileChat.UI.Models;
 
 @inherits LayoutComponentBase
 
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
 @inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
 @inject ISaveFile SaveFileService
 @inject IChatAuth ChatAuthService
 
@@ -67,7 +69,7 @@
                 string token = await ChatAuthService.RefreshSession(SessionStorage.User.Token);
                 if (string.IsNullOrWhiteSpace(token))
                 {
-                    SignOut();
+                    await SignOut();
                     return;
                 }
 
@@ -77,8 +79,18 @@
                     HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
                     await HubInitializer.Connect();
 
-                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                    SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                    switch (SessionStorage.CurrentFrameworkPlatform)
+                    {
+                        case FrameworkPlatform.MAUI:
+                            SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
+                            SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                            break;
+                        case FrameworkPlatform.WASM:
+                            await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
+                            break;
+                        default:
+                            throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                    }
                 }
 
                 SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
@@ -96,10 +108,20 @@
         IsDrawerOpen = !IsDrawerOpen;
     }
 
-    private void SignOut()
+    private async Task SignOut()
     {
-        string path = Path.Combine(SessionStorage.AppDataPath);
-        SaveFileService.DeleteDirectory(path);
+        switch (SessionStorage.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(SessionStorage.AppDataPath);
+                SaveFileService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+                await LocalStorageService.RemoveLocalStorage("user");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
 
         SessionStorage.User = null;
 

@@ -1,8 +1,9 @@
-﻿using jihadkhawaja.mobilechat.client.Models;
-using jihadkhawaja.mobilechat.client.Services.Extension;
+﻿using jihadkhawaja.mobilechat.client;
+using jihadkhawaja.mobilechat.client.Models;
 using MobileChat.UI.Constants;
 using MobileChat.UI.Core;
 using MobileChat.UI.Interfaces;
+using MobileChat.UI.Models;
 using MobileChat.UI.Services;
 using MudBlazor.Services;
 
@@ -29,6 +30,7 @@ namespace MobileChat.MAUI
 
             //general services
             builder.Services.AddSingleton<SessionStorage>();
+            builder.Services.AddSingleton<LocalStorageService>();
             builder.Services.AddSingleton<ISaveFile, SaveFileService>();
             //chat services
             builder.Services.AddMobileChatServices();
@@ -53,6 +55,7 @@ namespace MobileChat.MAUI
 
                 try
                 {
+                    SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.MAUI;
                     SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("credentials", SessionStorage.AppDataPath, true);
                 }
                 catch { }
