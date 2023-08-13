@@ -12,7 +12,7 @@ using jihadkhawaja.mobilechat.server.Database;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    [Migration("20221127085400_init")]
+    [Migration("20230813133752_init")]
     partial class init
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace Egroo.Server.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "7.0.0")
+                .HasAnnotation("ProductVersion", "7.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);

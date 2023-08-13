@@ -12,10 +12,10 @@
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 
 		<!-- Display name -->
-		<ApplicationTitle>MobileChat.MAUI</ApplicationTitle>
+		<ApplicationTitle>Egroo.MAUI</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.companyname.mobilechat.maui</ApplicationId>
+		<ApplicationId>com.egroo.egroo</ApplicationId>
 		<ApplicationIdGuid>7F3CC355-EF8E-4541-BC87-0DAB41736401</ApplicationIdGuid>
 
 		<!-- Versions -->
