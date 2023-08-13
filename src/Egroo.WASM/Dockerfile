@@ -9,7 +9,7 @@ WORKDIR /
 
 COPY ["src/Egroo.WASM/Egroo.WASM.csproj", "Egroo.WASM/"]
 COPY ["src/Egroo.UI/Egroo.UI.csproj", "Egroo.UI/"]
-RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/Egroo.Client.Package
+RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
 RUN ls
 COPY . .
 WORKDIR "/src/Egroo.WASM"

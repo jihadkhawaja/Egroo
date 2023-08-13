@@ -6,7 +6,7 @@ EXPOSE 443
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 WORKDIR /
 COPY ["src/Egroo.Server/Egroo.Server.csproj", "Egroo.Server/"]
-RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/Egroo.Server.Package
+RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
 COPY . .
 WORKDIR "/src/Egroo.Server"
 RUN dotnet build "Egroo.Server.csproj" -c Release -o /app/build
