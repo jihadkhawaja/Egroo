@@ -13,7 +13,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/Egroo.Server.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -48,10 +48,10 @@ jobs:
                 }
               }' > src/Egroo.Server/appsettings.json
       - name: build docker image
-        run: docker build -t jihadkhawajakhawaja/mobilechat-server-prod:latest -f src/Egroo.Server/Dockerfile .
+        run: docker build -t jihadkhawaja/mobilechat-server-prod:latest -f src/Egroo.Server/Dockerfile .
       - name: save docker image
         run: |
-             docker save -o mobilechat-server-prod.tar jihadkhawajakhawaja/mobilechat-server-prod
+             docker save -o mobilechat-server-prod.tar jihadkhawaja/mobilechat-server-prod
       - name: copy tar via ssh
         uses: appleboy/scp-action@master
         with:
@@ -72,7 +72,7 @@ jobs:
             rm /opt/mobilechat-server-prod.tar
             docker kill mobilechat-server-prod
             docker system prune -f
-            docker run --name mobilechat-server-prod -p 49117:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-server-prod:latest 
+            docker run --name mobilechat-server-prod -p 49117:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server-prod:latest 
   nginx-setup-api:
     name: Nginx Setup api
     needs: docker-build-api
@@ -124,7 +124,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/Egroo.Client.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -157,10 +157,10 @@ jobs:
                   }
               }' > src/Egroo.WASM/nginx.conf
       - name: build docker image
-        run: docker build -t jihadkhawajakhawaja/mobilechat-wasm-prod:latest -f src/Egroo.WASM/Dockerfile .
+        run: docker build -t jihadkhawaja/mobilechat-wasm-prod:latest -f src/Egroo.WASM/Dockerfile .
       - name: save docker image
         run: |
-             docker save -o mobilechat-wasm-prod.tar jihadkhawajakhawaja/mobilechat-wasm-prod
+             docker save -o mobilechat-wasm-prod.tar jihadkhawaja/mobilechat-wasm-prod
       - name: copy tar via ssh
         uses: appleboy/scp-action@master
         with:
@@ -181,7 +181,7 @@ jobs:
             rm /opt/mobilechat-wasm-prod.tar
             docker kill mobilechat-wasm-prod
             docker system prune -f
-            docker run --name mobilechat-wasm-prod -p 49168:80 --restart always -v public:/app/wwwroot/public -d jihadkhawajakhawaja/mobilechat-wasm-prod:latest  
+            docker run --name mobilechat-wasm-prod -p 49168:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-wasm-prod:latest  
   nginx-setup-wasm:
     name: Nginx Setup wasm
     needs: docker-build-wasm
