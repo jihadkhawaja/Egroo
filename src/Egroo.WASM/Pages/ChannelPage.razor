@@ -1,0 +1,12 @@
+﻿@page "/chat/{ChannelId}/{Title}"
+
+@using Egroo.UI.Components.View
+
+<ChannelView Title="@Title" ChannelId="@ChannelId" />
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string ChannelId { get; set; }
+}

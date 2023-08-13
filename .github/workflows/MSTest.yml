@@ -12,17 +12,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/Egroo.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 7.0.x
     - name: Restore dependencies
-      run: dotnet restore src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet restore src/Egroo.Server/Egroo.Server.csproj
     - name: Build
-      run: dotnet build --no-restore src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet build --no-restore src/Egroo.Server/Egroo.Server.csproj
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet test --no-build --verbosity normal src/Egroo.Server/Egroo.Server.csproj
   docker-build:
     name: Docker Build
     needs: dotnet-build
@@ -45,9 +45,9 @@ jobs:
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"
                 }
-              }' > src/MobileChat.Server/appsettings.json
+              }' > src/Egroo.Server/appsettings.json
       - name: build docker image
-        run: docker build -t jihadkhawajakhawaja/mobilechat-server:latest -f src/MobileChat.Server/Dockerfile .
+        run: docker build -t jihadkhawajakhawaja/mobilechat-server:latest -f src/Egroo.Server/Dockerfile .
       - name: save docker image
         run: |
              docker save -o mobilechat-server.tar jihadkhawajakhawaja/mobilechat-server
@@ -125,7 +125,7 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/Egroo.Client.Package
 
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2
@@ -133,13 +133,13 @@ jobs:
         dotnet-version: '7.0.x'
 
     - name: Restore dependencies
-      run: dotnet restore src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+      run: dotnet restore src/Egroo.Server.Test/Egroo.Server.Test.csproj
 
     - name: Build
-      run: dotnet build --configuration Release src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+      run: dotnet build --configuration Release src/Egroo.Server.Test/Egroo.Server.Test.csproj
 
     - name: Test
-      run: dotnet test --logger trx --results-directory TestResults --configuration Release src/MobileChat.Server.Test/MobileChat.Server.Test.csproj
+      run: dotnet test --logger trx --results-directory TestResults --configuration Release src/Egroo.Server.Test/Egroo.Server.Test.csproj
       continue-on-error: true
 
     - name: Upload Test Results

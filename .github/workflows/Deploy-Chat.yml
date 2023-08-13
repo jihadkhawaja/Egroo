@@ -13,17 +13,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/Egroo.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 7.0.x
     - name: Restore dependencies
-      run: dotnet restore src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet restore src/Egroo.Server/Egroo.Server.csproj
     - name: Build
-      run: dotnet build --no-restore src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet build --no-restore src/Egroo.Server/Egroo.Server.csproj
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/MobileChat.Server/MobileChat.Server.csproj
+      run: dotnet test --no-build --verbosity normal src/Egroo.Server/Egroo.Server.csproj
   docker-build-api:
     name: Docker Build api
     needs: dotnet-build-api
@@ -41,14 +41,14 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=mobilechatdb_prod;"
+                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_PROD }}"
                 }
-              }' > src/MobileChat.Server/appsettings.json
+              }' > src/Egroo.Server/appsettings.json
       - name: build docker image
-        run: docker build -t jihadkhawajakhawaja/mobilechat-server-prod:latest -f src/MobileChat.Server/Dockerfile .
+        run: docker build -t jihadkhawajakhawaja/mobilechat-server-prod:latest -f src/Egroo.Server/Dockerfile .
       - name: save docker image
         run: |
              docker save -o mobilechat-server-prod.tar jihadkhawajakhawaja/mobilechat-server-prod
@@ -124,17 +124,17 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
+      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/Egroo.Client.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
         dotnet-version: 7.0.x
     - name: Restore dependencies
-      run: dotnet restore src/MobileChat.WASM/MobileChat.WASM.csproj
+      run: dotnet restore src/Egroo.WASM/Egroo.WASM.csproj
     - name: Build
-      run: dotnet build --no-restore src/MobileChat.WASM/MobileChat.WASM.csproj
+      run: dotnet build --no-restore src/Egroo.WASM/Egroo.WASM.csproj
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/MobileChat.WASM/MobileChat.WASM.csproj
+      run: dotnet test --no-build --verbosity normal src/Egroo.WASM/Egroo.WASM.csproj
   docker-build-wasm:
     name: Docker Build wasm
     needs: dotnet-build-wasm
@@ -155,9 +155,9 @@ jobs:
                           try_files $uri $uri/ /index.html =404;
                       }
                   }
-              }' > src/MobileChat.WASM/nginx.conf
+              }' > src/Egroo.WASM/nginx.conf
       - name: build docker image
-        run: docker build -t jihadkhawajakhawaja/mobilechat-wasm-prod:latest -f src/MobileChat.WASM/Dockerfile .
+        run: docker build -t jihadkhawajakhawaja/mobilechat-wasm-prod:latest -f src/Egroo.WASM/Dockerfile .
       - name: save docker image
         run: |
              docker save -o mobilechat-wasm-prod.tar jihadkhawajakhawaja/mobilechat-wasm-prod

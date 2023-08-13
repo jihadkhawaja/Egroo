@@ -1,0 +1,44 @@
+﻿@using Egroo.UI.Models;
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
+    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="SignOut">LOGOUT</MudButton>
+</MudContainer>
+
+@code{
+    [Inject] IDialogService DialogService { get; set; }
+
+    private async Task SignOut()
+    {
+        bool? result = await DialogService.ShowMessageBox(
+            "Warning",
+            "Are you sure you want to logout?",
+            yesText: "Logout", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        switch (SessionStorage.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(SessionStorage.AppDataPath);
+                SaveFileService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+                await LocalStorageService.RemoveLocalStorage("user");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
+    }
+}

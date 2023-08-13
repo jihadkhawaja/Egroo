@@ -1,0 +1,129 @@
+﻿@using FluentValidation
+@using System.Text.Json
+@using Egroo.UI.Components.Layout;
+@using Egroo.UI.Constants;
+@using Egroo.UI.Core;
+@using Egroo.UI.Models;
+
+@layout EmptyLayout
+
+@inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject IChatAuth ChatAuthService
+
+<MudContainer MaxWidth="MaxWidth.Large">
+    <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign In</MudText>
+    <MudText>Don't have an account? <span><MudButton Link="signup">SIGNUP</MudButton></span></MudText>
+
+    <MudGrid Class="mt-8" Justify="Justify.Center">
+        <MudItem xs="12" sm="8" md="6">
+            <MudCard Elevation="25" Class="rounded-lg pb-4">
+                <MudCardHeader>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h5" Align="Align.Start">Login Account</MudText>
+                    </CardHeaderContent>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudForm @ref="@form" ValidationDelay="0">
+                        <MudTextField @bind-Value="@EmailOrUsername"
+                                    Immediate="true"
+                                    Required="true"
+                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                    Label="Email or Username" />
+
+                        <MudTextField @bind-Value="@Password"
+                                    Immediate="true"
+                                    Required="true"
+                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                    Label="Password" InputType="InputType.Password" />
+                    </MudForm>
+                </MudCardContent>
+                <MudCardActions Class="d-flex justify-center">
+                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">SUBMIT</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [Inject] ISnackbar Snackbar { get; set; }
+    MudForm form;
+
+    string EmailOrUsername { get; set; }
+    string Password { get; set; }
+    bool IsBusy = false;
+
+    private IEnumerable<string> NotEmpty(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            yield return "Field is required!";
+            yield break;
+        }
+    }
+
+    private async Task Submit()
+    {
+        IsBusy = true;
+
+        await form.Validate();
+
+        if (!form.IsValid)
+        {
+            Snackbar.Add("Please be sure to fill all fields.", MudBlazor.Severity.Error);
+            IsBusy = false;
+            return;
+        }
+
+        dynamic dynamicObj = await ChatAuthService.SignIn(EmailOrUsername, Password);
+        Dictionary<string, object> result = null;
+        if (dynamicObj is not null)
+        {
+            result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+        }
+
+        //check user
+        if (result is not null)
+        {
+            Guid Id = Guid.Parse(result["id"].ToString());
+            string Token = result["token"].ToString();
+
+            User user = new()
+            {
+                Id = Id,
+                Token = Token
+            };
+
+            switch (SessionStorage.CurrentFrameworkPlatform)
+            {
+                case FrameworkPlatform.MAUI:
+                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
+                    SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, user, false, true);
+                    break;
+                case FrameworkPlatform.WASM:
+                    await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(user));
+                    break;
+                default:
+                    throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+            }
+
+            SessionStorage.User = user;
+
+            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
+            await HubInitializer.Connect();
+
+            Snackbar.Add("User Created.", MudBlazor.Severity.Success);
+
+            NavigationManager.NavigateTo("/", true);
+        }
+        else
+        {
+            Snackbar.Add("Failed to sign in, Please try again", MudBlazor.Severity.Error);
+        }
+
+        IsBusy = false;
+    }
+}
