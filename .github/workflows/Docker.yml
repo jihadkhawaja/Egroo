@@ -14,5 +14,5 @@ jobs:
 
       # docker-compose check
       - name: docker-compose checking
-        working-directory: ./src/MobileChat.Server
+        working-directory: ./src/Egroo.Server
         run: docker-compose up -d
