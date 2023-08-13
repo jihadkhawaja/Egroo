@@ -40,7 +40,7 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-dev-test;"
+                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"
@@ -173,4 +173,4 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
-            docker exec postgres psql -U postgres -c "drop database egroo-dev-test WITH ( FORCE );"
+            docker exec postgres psql -U postgres -c "drop database \"egroo-dev-test\" WITH ( FORCE );"
