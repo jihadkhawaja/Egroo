@@ -33,6 +33,17 @@
 
 	<PropertyGroup>
 	  <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.22621.0</TargetFrameworks>
+	  <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+	  <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+	  <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
+	  <GenerateTestArtifacts>True</GenerateTestArtifacts>
+	  <GenerateTemporaryStoreCertificate>True</GenerateTemporaryStoreCertificate>
+	  <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+	  <DefaultLanguage>en</DefaultLanguage>
+	  <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+	  <PackageCertificateThumbprint>D5BBD2D0EC1908A8B8C48178E49EBC9EAAECC673</PackageCertificateThumbprint>
+	  <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+	  <AppInstallerUri>C:\Users\jihad\Downloads\Package Release</AppInstallerUri>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -57,12 +68,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <ProjectReference Include="..\Egroo.UI\Egroo.UI.csproj" />
+	  <Folder Include="Resources\Images\" />
+	  <Folder Include="Resources\Raw\" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Resources\Images\" />
-	  <Folder Include="Resources\Raw\" />
+	  <ProjectReference Include="..\Egroo.UI\Egroo.UI.csproj" />
 	</ItemGroup>
 
 </Project>
