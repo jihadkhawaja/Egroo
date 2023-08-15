@@ -33,7 +33,7 @@
 
 	<PropertyGroup>
 	  <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.22621.0</TargetFrameworks>
-	  <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+	  <GenerateAppInstallerFile>True</GenerateAppInstallerFile>
 	  <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
 	  <AppxSymbolPackageEnabled>True</AppxSymbolPackageEnabled>
 	  <GenerateTestArtifacts>True</GenerateTestArtifacts>
@@ -41,9 +41,9 @@
 	  <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
 	  <DefaultLanguage>en</DefaultLanguage>
 	  <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
-	  <PackageCertificateThumbprint>D5BBD2D0EC1908A8B8C48178E49EBC9EAAECC673</PackageCertificateThumbprint>
+	  <PackageCertificateThumbprint>EC955B2B0AAAFCFF5CE4A37525B2A34073C4BD0F</PackageCertificateThumbprint>
 	  <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-	  <AppInstallerUri>C:\Users\jihad\Downloads\Package Release</AppInstallerUri>
+	  <AppInstallerUri>C:\Users\jihad\Downloads\Package Installer Release</AppInstallerUri>
 	</PropertyGroup>
 
 	<ItemGroup>

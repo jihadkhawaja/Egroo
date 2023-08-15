@@ -6,7 +6,7 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   IgnorableNamespaces="uap rescap mp">
 
-  <Identity Name="30693JihadKhawaja.64090AA1012CB" Publisher="CN=jihad" Version="1.4.1.0" />
+  <Identity Name="30693JihadKhawaja.64090AA1012CB" Publisher="CN=3D7F2853-4DED-47D3-AD7B-2CF20B3FD6C7" Version="1.4.1.0" />
 
   <Properties>
     <DisplayName>Egroo</DisplayName>
@@ -40,7 +40,5 @@
     <Capabilities>
 		<Capability Name="internetClient"/>
 	</Capabilities>
-
-    <mp:PhoneIdentity PhonePublisherId="3D7F2853-4DED-47D3-AD7B-2CF20B3FD6C7" PhoneProductId="61f7b31c-ed53-4cce-90fc-5643114b3c8f"/>
 
 </Package>
