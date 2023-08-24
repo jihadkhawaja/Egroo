@@ -51,7 +51,7 @@ namespace Egroo.MAUI
                 SessionStorage SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
 
                 //https://docs.microsoft.com/en-us/dotnet/maui/platform-integration/storage/file-system-helpers
-                SessionStorage.AppDataPath = Path.Combine(FileSystem.Current.AppDataDirectory, "Mobile Chat");
+                SessionStorage.AppDataPath = Path.Combine(FileSystem.Current.AppDataDirectory, "Ergoo");
 
                 try
                 {
