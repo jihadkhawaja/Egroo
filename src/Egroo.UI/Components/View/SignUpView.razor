@@ -110,17 +110,16 @@
             User user = new()
             {
                 Id = Id,
-                Token = Token
             };
 
             switch (SessionStorage.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
                     SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                    SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, user, false, true);
+                    SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
-                    await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(user));
+                    await LocalStorageService.SetLocalStorage("token", Token);
                     break;
                 default:
                     throw new Exception("CurrentFrameworkPlatform parameter not specified.");
@@ -128,7 +127,7 @@
 
             SessionStorage.User = user;
 
-            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
+            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
             await HubInitializer.Connect();
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
@@ -137,7 +136,7 @@
         }
         else
         {
-            Snackbar.Add("Failed to sign in, Please try again", MudBlazor.Severity.Error);
+            Snackbar.Add("Failed to sign up, Please try again", MudBlazor.Severity.Error);
         }
 
         IsBusy = false;

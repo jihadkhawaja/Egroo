@@ -121,5 +121,55 @@ namespace Egroo.UI.Services
                 reader?.Close();
             }
         }
+
+        public void WriteToJsonFile(string fileName, string path, string objectToWrite, bool append = false, bool encrypt = false, int key = 757)
+        {
+            TextWriter writer = null;
+            try
+            {
+                string contentsToWriteToFile = objectToWrite;
+                writer = new StreamWriter(Path.Combine(path, fileName), append);
+
+                if (encrypt)
+                {
+                    writer.Write(EncryptDecrypt(contentsToWriteToFile, key));
+                }
+                else
+                {
+                    writer.Write(contentsToWriteToFile);
+                }
+            }
+            catch { }
+            finally
+            {
+                writer?.Close();
+            }
+        }
+        public string ReadFromJsonFile(string fileName, string path, bool isEncrypted = false, int key = 757)
+        {
+            TextReader reader = null;
+            try
+            {
+                reader = new StreamReader(Path.Combine(path, fileName));
+                string fileContents = reader.ReadToEnd();
+
+                if (isEncrypted)
+                {
+                    return EncryptDecrypt(fileContents, key);
+                }
+                else
+                {
+                    return fileContents;
+                }
+            }
+            catch
+            {
+                return default;
+            }
+            finally
+            {
+                reader?.Close();
+            }
+        }
     }
 }

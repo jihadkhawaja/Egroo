@@ -5,6 +5,8 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 //logger
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
+//change to your liking
+#if DEBUG
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("CorsPolicy", builder =>
@@ -13,11 +15,21 @@ builder.Services.AddCors(options =>
     .AllowAnyMethod()
     .AllowAnyHeader());
 });
+#else
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CorsPolicy", builder =>
+    builder
+    .WithOrigins("https://egroo.org", "https://www.egroo.org")
+    .AllowAnyMethod()
+    .AllowAnyHeader());
+});
+#endif
 
 //mobile chat service
 builder.Services.AddMobileChatServices(
-    builder.Configuration, 
-    typeof(Program), 
+    builder.Configuration,
+    typeof(Program),
     MobileChatServer.DatabaseEnum.Postgres
     );
 

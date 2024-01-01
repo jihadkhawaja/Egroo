@@ -22,34 +22,38 @@ namespace Egroo.Server.Test
             ChatChannelService = new ChatChannelService();
             ChatMessageService = new ChatMessageService();
 
+            var cancellationTokenSource = new CancellationTokenSource();
+            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
+            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+
             dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result = null;
             if (dynamicObj is not null)
             {
                 result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+
+                Guid Id = Guid.Parse(result["id"].ToString());
+                string Token = result["token"].ToString();
+                User = new()
+                {
+                    Id = Id,
+                };
             }
 
             //check user
             if (result is not null)
             {
-                Guid Id = Guid.Parse(result["id"].ToString());
                 string Token = result["token"].ToString();
 
-                User = new()
-                {
-                    Id = Id,
-                    Token = Token
-                };
-
-                var cancellationTokenSource = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, User.Token);
+                var cancellationTokenSource1 = new CancellationTokenSource();
+                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, Token);
                 await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
 
                 Channel = await ChatChannelService.CreateChannel("test");
             }
             else
             {
-                var cancellationTokenSource = new CancellationTokenSource();
+                var cancellationTokenSource2 = new CancellationTokenSource();
                 jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
                 await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
             }

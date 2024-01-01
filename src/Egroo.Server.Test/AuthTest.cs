@@ -18,7 +18,7 @@ namespace Egroo.Server.Test
             jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
             await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
         }
-        [TestMethod]
+        [TestMethod, Priority(0)]
         public async Task ConnectTest()
         {
             if (jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
@@ -31,7 +31,7 @@ namespace Egroo.Server.Test
             }
         }
 
-        [TestMethod]
+        [TestMethod, Priority(1)]
         public async Task SignUpThenSignInTest()
         {
             dynamic? dynamicObj2 = await ChatAuthService.SignUp("Test", "test", "test@domain.com", "HvrnS4Q4zJ$xaW!3");
@@ -40,8 +40,6 @@ namespace Egroo.Server.Test
             {
                 result2 = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj2);
             }
-
-            Assert.IsNotNull(result2, "Failed to sign up or user already exist.");
 
             dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result = null;
@@ -55,6 +53,8 @@ namespace Egroo.Server.Test
                 Assert.IsNotNull(result, "Failed to sign in when user exist.");
                 return;
             }
+
+            Assert.IsNotNull(result2, "Failed to sign up or user already exist.");
         }
 
         [TestCleanup]

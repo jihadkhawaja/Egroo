@@ -19,6 +19,10 @@ namespace Egroo.Server.Test
             ChatAuthService = new ChatAuthService();
             ChatChannelService = new ChatChannelService();
 
+            var cancellationTokenSource = new CancellationTokenSource();
+            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
+            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+
             dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result = null;
             if (dynamicObj is not null)
@@ -28,23 +32,16 @@ namespace Egroo.Server.Test
 
             //check user
             if (result is not null)
-            {
-                Guid Id = Guid.Parse(result["id"].ToString());
+            {;
                 string Token = result["token"].ToString();
 
-                User user = new()
-                {
-                    Id = Id,
-                    Token = Token
-                };
-
-                var cancellationTokenSource = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, user.Token);
+                var cancellationTokenSource1 = new CancellationTokenSource();
+                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, Token);
                 await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
             }
             else
             {
-                var cancellationTokenSource = new CancellationTokenSource();
+                var cancellationTokenSource2 = new CancellationTokenSource();
                 jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
                 await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
             }

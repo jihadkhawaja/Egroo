@@ -64,37 +64,44 @@
                 await Task.Delay(300);
             }
 
-            if (SessionStorage.User is not null && SessionStorage.User.Id != Guid.Empty)
+            if (!string.IsNullOrWhiteSpace(SessionStorage.Token))
             {
-                string token = await ChatAuthService.RefreshSession(SessionStorage.User.Token);
-                if (string.IsNullOrWhiteSpace(token))
+                dynamic dynamicObj = await ChatAuthService.RefreshSession(SessionStorage.Token);
+                Dictionary<string, object> result = null;
+                if (dynamicObj is not null)
+                {
+                    result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+                }
+                if (string.IsNullOrWhiteSpace(result["token"].ToString()))
                 {
                     await SignOut();
                     return;
                 }
 
-                if (SessionStorage.User.Token != token)
+                if (SessionStorage.Token != result["token"].ToString())
                 {
-                    SessionStorage.User.Token = token;
-                    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User.Token);
+                    SessionStorage.Token = result["token"].ToString();
+                    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
                     await HubInitializer.Connect();
 
                     switch (SessionStorage.CurrentFrameworkPlatform)
                     {
                         case FrameworkPlatform.MAUI:
                             SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                            SaveFileService.WriteToJsonFile<User>("credentials", SessionStorage.AppDataPath, SessionStorage.User, false, true);
+                            SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, result["token"].ToString(), false, true);
                             break;
                         case FrameworkPlatform.WASM:
-                            await LocalStorageService.SetLocalStorage("user", JsonSerializer.Serialize(SessionStorage.User));
+                            await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
                             break;
                         default:
                             throw new Exception("CurrentFrameworkPlatform parameter not specified.");
                     }
                 }
 
-                SessionStorage.User.DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id);
-                SessionStorage.User.Username = await ChatUserService.GetUserUsername(SessionStorage.User.Id);
+                SessionStorage.User = new();
+                SessionStorage.User.Id = Guid.Parse(result["id"].ToString());
+                SessionStorage.User.DisplayName = await ChatUserService.GetCurrentUserDisplayName();
+                SessionStorage.User.Username = await ChatUserService.GetCurrentUserUsername();
             }
 
             await InvokeAsync(StateHasChanged);

@@ -4,10 +4,10 @@
     {
         public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
 
-        public static void Initialize(string HubConnectionURL, string Token = "")
+        public static void Initialize(string HubConnectionURL, string? Token = "")
         {
             // Initialize client chat signalr service with your server chat hub url
-            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(HubConnectionURL, Token);
+            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(HubConnectionURL, Token ?? "");
         }
 
         public static async Task Connect()
