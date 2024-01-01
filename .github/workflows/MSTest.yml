@@ -52,7 +52,7 @@ jobs:
         run: |
              docker save -o mobilechat-server.tar jihadkhawaja/mobilechat-server
       - name: copy tar via ssh
-        uses: appleboy/scp-action@master
+        uses: appleboy/scp-action@v0.1.3
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
