@@ -32,17 +32,10 @@ namespace Egroo.Server.Test
             //check user
             if (result is not null)
             {
-                Guid Id = Guid.Parse(result["id"].ToString());
                 string Token = result["token"].ToString();
 
-                User = new()
-                {
-                    Id = Id,
-                    Token = Token
-                };
-
                 var cancellationTokenSource = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, User.Token);
+                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, Token);
                 await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
 
                 Channel = await ChatChannelService.CreateChannel("test");

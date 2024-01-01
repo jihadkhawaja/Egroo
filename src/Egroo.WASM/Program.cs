@@ -1,15 +1,13 @@
-using jihadkhawaja.mobilechat.client;
-using jihadkhawaja.mobilechat.client.Models;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Egroo.UI.Constants;
 using Egroo.UI.Core;
 using Egroo.UI.Interfaces;
 using Egroo.UI.Models;
 using Egroo.UI.Services;
 using Egroo.WASM;
+using jihadkhawaja.mobilechat.client;
+using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using MudBlazor.Services;
-using System.Text.Json;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -20,7 +18,6 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddScoped(sp => new HttpClient
 {
     BaseAddress = new Uri(Source.ConnectionURL),
-    Timeout = TimeSpan.FromMinutes(10)
 });
 
 builder.Services.AddMudServices();
@@ -43,11 +40,11 @@ using (IServiceScope scope = app.Services.CreateScope())
     try
     {
         SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.WASM;
-        SessionStorage.User = JsonSerializer.Deserialize<User>(await LocalStorageService.GetFromLocalStorage("user"));
+        SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
     }
     catch { }
 
-    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User?.Token);
+    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
     await HubInitializer.Connect();
 }
 

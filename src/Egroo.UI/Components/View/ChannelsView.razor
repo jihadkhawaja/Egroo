@@ -58,7 +58,7 @@ else
                     <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem>
-                                <ScopeView Title=@channel.Key.Title Subtitle="@channel.Key.DateCreated.Value.ToShortDateString()" />
+                                <ScopeView Title=@channel.Key.Title Subtitle="@channel.Key.DateCreated.Value.Date.ToShortDateString()" />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
@@ -110,7 +110,7 @@ else
             {
                 IsBusy = true;
 
-                IsSignedIn = !string.IsNullOrWhiteSpace(SessionStorage.User.Token);
+                IsSignedIn = !string.IsNullOrWhiteSpace(SessionStorage.Token);
                 if (IsSignedIn)
                 {
                     CurrentUserChannels = await GetChannels();

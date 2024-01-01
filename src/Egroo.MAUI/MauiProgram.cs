@@ -4,7 +4,6 @@ using Egroo.UI.Interfaces;
 using Egroo.UI.Models;
 using Egroo.UI.Services;
 using jihadkhawaja.mobilechat.client;
-using jihadkhawaja.mobilechat.client.Models;
 using MudBlazor.Services;
 
 namespace Egroo.MAUI
@@ -56,11 +55,11 @@ namespace Egroo.MAUI
                 try
                 {
                     SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.MAUI;
-                    SessionStorage.User = SaveFileService.ReadFromJsonFile<User>("credentials", SessionStorage.AppDataPath, true);
+                    SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", SessionStorage.AppDataPath, true);
                 }
                 catch { }
 
-                HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.User?.Token);
+                HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
             }
         }
     }

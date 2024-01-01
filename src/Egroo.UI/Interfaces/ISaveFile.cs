@@ -13,5 +13,7 @@
 
         void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false, bool encrypt = false, int key = 757) where T : new();
         T ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new();
+        void WriteToJsonFile(string fileName, string path, string objectToWrite, bool append = false, bool encrypt = false, int key = 757);
+        string ReadFromJsonFile(string fileName, string path, bool isEncrypted = false, int key = 757);
     }
 }
