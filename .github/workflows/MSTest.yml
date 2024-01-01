@@ -140,7 +140,7 @@ jobs:
 
     - name: Test
       run: dotnet test --logger trx --results-directory TestResults --configuration Release src/Egroo.Server.Test/Egroo.Server.Test.csproj
-      continue-on-error: true
+      continue-on-error: false
 
     - name: Upload Test Results
       uses: actions/upload-artifact@v2
