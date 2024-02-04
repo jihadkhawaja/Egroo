@@ -17,9 +17,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Server", "Server", "{1F1A60
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{2AC5D9DD-0E94-4476-9A1B-90A984003303}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.mobilechat.client", "MobileChat.Client.Package\src\jihadkhawaja.mobilechat.client\jihadkhawaja.mobilechat.client.csproj", "{0A904E7A-4FC2-4807-A0CA-9A28B869EC24}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.mobilechat.client", "jihadkhawaja.mobilechat.client\jihadkhawaja.mobilechat.client.csproj", "{0A904E7A-4FC2-4807-A0CA-9A28B869EC24}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.mobilechat.server", "MobileChat.Server.Package\src\jihadkhawaja.mobilechat.server\jihadkhawaja.mobilechat.server.csproj", "{98E5E51F-46FC-48C2-9844-8A7E55858BB4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.mobilechat.server", "jihadkhawaja.mobilechat.server\jihadkhawaja.mobilechat.server.csproj", "{98E5E51F-46FC-48C2-9844-8A7E55858BB4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libs (NuGet Package)", "Libs (NuGet Package)", "{C1954230-0F2C-45CA-9A23-B3D8176971A6}"
 EndProject

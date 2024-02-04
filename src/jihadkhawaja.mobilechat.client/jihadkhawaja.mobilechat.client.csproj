@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<TargetFrameworks>net7.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+  	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<Authors>jihadkhawaja</Authors>
+	<Description>Chat client solution for ASP.NET server</Description>
+	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
+	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>
+	<PackageIcon>favico.png</PackageIcon>
+	<PackageTags>asp.net, blazor, signalr, chat, client</PackageTags>
+	<PackageReleaseNotes>https://github.com/jihadkhawaja/Egroo/releases</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.10" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<None Include="..\..\favico.png" Pack="true" PackagePath="" />
+	<None Include="..\..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

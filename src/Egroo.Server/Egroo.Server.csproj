@@ -40,6 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MobileChat.Server.Package\src\jihadkhawaja.mobilechat.server\jihadkhawaja.mobilechat.server.csproj" />
+    <ProjectReference Include="..\jihadkhawaja.mobilechat.server\jihadkhawaja.mobilechat.server.csproj" />
   </ItemGroup>
 </Project>
