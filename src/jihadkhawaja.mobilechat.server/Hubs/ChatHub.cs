@@ -20,7 +20,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         private IEntity<ChannelUser> ChannelUsersService { get; set; }
         [Inject]
         private IEntity<Message> MessageService { get; set; }
-        private User ConnectedUser { get; set; }
         public ChatHub(IEntity<User> UserService, IEntity<UserFriend> UserFriendsService,
             IEntity<Channel> ChannelService, IEntity<ChannelUser> ChannelUsersService,
             IEntity<Message> MessageService)
@@ -31,7 +30,47 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             this.ChannelUsersService = ChannelUsersService;
             this.MessageService = MessageService;
         }
+
         public override async Task OnConnectedAsync()
+        {
+            var ConnectedUser = await GetConnectedUser();
+
+            if (ConnectedUser != null)
+            {
+                // Hang up any calls the user is in
+                await HangUp();
+
+                // Gets the user from "Context" which is available in the whole hub
+                // Remove the user
+                _Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
+
+                // Send down the new user list to all clients
+                await SendUserListUpdate();
+
+                ConnectedUser.ConnectionId = Context.ConnectionId;
+                ConnectedUser.IsOnline = true;
+
+                User[] connectedUsers = [ConnectedUser];
+                await UserService.Update(connectedUsers);
+            }
+
+            await base.OnConnectedAsync();
+        }
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            User? connectedUser = await UserService.ReadFirst(x => x.ConnectionId == Context.ConnectionId);
+            if (connectedUser != null)
+            {
+                connectedUser.ConnectionId = null;
+                connectedUser.IsOnline = false;
+
+                User[] connectedUsers = [connectedUser];
+                await UserService.Update(connectedUsers);
+            }
+
+            await base.OnDisconnectedAsync(exception);
+        }
+        public async Task<User?> GetConnectedUser()
         {
             HttpContext? hc = Context.GetHttpContext();
 
@@ -49,43 +88,11 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 
                     Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-                    ConnectedUser = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
-                    if (ConnectedUser != null)
-                    {
-                        // Hang up any calls the user is in
-                        //await HangUp();
-
-                        // Gets the user from "Context" which is available in the whole hub
-                        // Remove the user
-                        //_Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
-
-                        // Send down the new user list to all clients
-                        //await SendUserListUpdate();
-
-                        ConnectedUser.ConnectionId = Context.ConnectionId;
-                        ConnectedUser.IsOnline = true;
-
-                        User[] connectedUsers = [ConnectedUser];
-                        await UserService.Update(connectedUsers);
-                    }
+                    return await UserService.ReadFirst(x => x.Id == ConnectorUserId);
                 }
             }
 
-            await base.OnConnectedAsync();
-        }
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            User? connectedUser = await UserService.ReadFirst(x => x.ConnectionId == Context.ConnectionId);
-            if (connectedUser != null)
-            {
-                connectedUser.ConnectionId = null;
-                connectedUser.IsOnline = false;
-
-                User[] connectedUsers = new User[1] { connectedUser };
-                await UserService.Update(connectedUsers);
-            }
-
-            await base.OnDisconnectedAsync(exception);
+            return null;
         }
     }
 }

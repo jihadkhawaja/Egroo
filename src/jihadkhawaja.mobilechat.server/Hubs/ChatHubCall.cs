@@ -13,9 +13,9 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 {
     public partial class ChatHub
     {
-        private readonly List<User> _Users;
-        private readonly List<UserCall> _UserCalls;
-        private readonly List<CallOffer> _CallOffers;
+        private readonly List<User> _Users = new();
+        private readonly List<UserCall> _UserCalls = new();
+        private readonly List<CallOffer> _CallOffers = new();
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task Join(string username)
         {

@@ -2,8 +2,6 @@
 using jihadkhawaja.mobilechat.server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.SignalR;
 
 namespace jihadkhawaja.mobilechat.server.Hubs
 {
@@ -35,11 +33,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         {
             try
             {
-                HttpContext? hc = Context.GetHttpContext();
-                if (hc == null)
-                {
-                    return false;
-                }
+                var ConnectedUser = await GetConnectedUser();
 
                 if (ConnectedUser == null)
                 {
@@ -131,17 +125,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             HashSet<Channel> userChannels = new();
             try
             {
-                HttpContext? hc = Context.GetHttpContext();
-
-                if (hc == null)
-                {
-                    return null;
-                }
-
-                if (ConnectedUser == null)
-                {
-                    return null;
-                }
+                var ConnectedUser = await GetConnectedUser();
 
                 List<ChannelUser> channelUsers = (await ChannelUsersService.Read(x => x.UserId == ConnectedUser.Id)).ToList();
                 foreach (ChannelUser cu in channelUsers)
@@ -177,16 +161,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> DeleteChannel(Guid channelId)
         {
-            HttpContext? hc = Context.GetHttpContext();
-            if (hc == null)
-            {
-                return false;
-            }
-
-            if (ConnectedUser == null)
-            {
-                return false;
-            }
+            var ConnectedUser = await GetConnectedUser();
 
             if (!await IsChannelAdmin(channelId, ConnectedUser.Id))
             {
@@ -208,11 +183,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> LeaveChannel(Guid channelId)
         {
-            HttpContext? hc = Context.GetHttpContext();
-            if (hc == null)
-            {
-                return false;
-            }
+            var ConnectedUser = await GetConnectedUser();
 
             if (ConnectedUser == null)
             {
