@@ -2,6 +2,7 @@
 using jihadkhawaja.mobilechat.server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 
 namespace jihadkhawaja.mobilechat.server.Hubs
 {
@@ -31,7 +32,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             message.DateSent = DateTime.UtcNow;
             message.Sent = true;
 
-            Message[] messages = new Message[1] { message };
+            Message[] messages = [message];
             if (await MessageService.Create(messages))
             {
                 User[]? users = await GetChannelUsers(message.ChannelId);

@@ -8,7 +8,7 @@ using System.Security.Claims;
 
 namespace jihadkhawaja.mobilechat.server.Hubs
 {
-    public partial class ChatHub : Hub<IChatHub>
+    public partial class ChatHub : Hub
     {
         [Inject]
         private IEntity<User> UserService { get; set; }

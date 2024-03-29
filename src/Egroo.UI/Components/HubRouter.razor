@@ -115,6 +115,7 @@
                 Id = Guid.Parse(result["id"].ToString()),
                 DisplayName = await ChatUserService.GetCurrentUserDisplayName(),
                 Username = await ChatUserService.GetCurrentUserUsername(),
+                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };
         }
 

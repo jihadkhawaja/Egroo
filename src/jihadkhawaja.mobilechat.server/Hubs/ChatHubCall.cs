@@ -5,13 +5,15 @@
  * 
  */
 
+using jihadkhawaja.mobilechat.server.Interfaces;
 using jihadkhawaja.mobilechat.server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 
 namespace jihadkhawaja.mobilechat.server.Hubs
 {
-    public partial class ChatHub
+    public partial class ChatHub : IChatCall
     {
         private readonly List<User> _Users = new();
         private readonly List<UserCall> _UserCalls = new();
@@ -39,19 +41,19 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             if (targetUser == null)
             {
                 // If not, let the caller know
-                await Clients.Caller.CallDeclined(targetConnectionId, "The user you called has left.");
+                await CallDeclined(targetConnectionId, "The user you called has left.");
                 return;
             }
 
             // And that they aren't already in a call
             if (GetUserCall(targetUser.ConnectionId) != null)
             {
-                await Clients.Caller.CallDeclined(targetConnectionId, string.Format("{0} is already in a call.", targetUser.Username));
+                await CallDeclined(targetConnectionId, string.Format("{0} is already in a call.", targetUser.Username));
                 return;
             }
 
             // They are here, so tell them someone wants to talk
-            await Clients.Client(targetConnectionId.ConnectionId).IncomingCall(callingUser);
+            await IncomingCall(callingUser);
 
             // Create an offer
             _CallOffers.Add(new CallOffer
@@ -76,14 +78,14 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             // Make sure the original caller has not left the page yet
             if (targetUser == null)
             {
-                await Clients.Caller.CallEnded(targetConnectionId, "The other user in your call has left.");
+                await CallEnded(targetConnectionId, "The other user in your call has left.");
                 return;
             }
 
             // Send a decline message if the callee said no
             if (acceptCall == false)
             {
-                await Clients.Client(targetConnectionId.ConnectionId).CallDeclined(callingUser, string.Format("{0} did not accept your call.", callingUser.Username));
+                await CallDeclined(callingUser, string.Format("{0} did not accept your call.", callingUser.Username));
                 return;
             }
 
@@ -92,7 +94,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
                                                   && c.Caller.ConnectionId == targetUser.ConnectionId);
             if (offerCount < 1)
             {
-                await Clients.Caller.CallEnded(targetConnectionId, string.Format("{0} has already hung up.", targetUser.Username));
+                await CallEnded(targetConnectionId, string.Format("{0} has already hung up.", targetUser.Username));
                 return;
             }
 
@@ -100,7 +102,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             if (GetUserCall(targetUser.ConnectionId) != null)
             {
                 // And that they aren't already in a call
-                await Clients.Caller.CallDeclined(targetConnectionId, string.Format("{0} chose to accept someone elses call instead of yours :(", targetUser.Username));
+                await CallDeclined(targetConnectionId, string.Format("{0} chose to accept someone elses call instead of yours :(", targetUser.Username));
                 return;
             }
 
@@ -114,7 +116,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             });
 
             // Tell the original caller that the call was accepted
-            await Clients.Client(targetConnectionId.ConnectionId).CallAccepted(callingUser);
+            await CallAccepted(callingUser);
 
             // Update the user list, since thes two are now in a call
             await SendUserListUpdate();
@@ -136,7 +138,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             {
                 foreach (var user in currentCall.Users.Where(u => u.ConnectionId != callingUser.ConnectionId))
                 {
-                    await Clients.Client(user.ConnectionId).CallEnded(callingUser, string.Format("{0} has hung up.", callingUser.Username));
+                    await CallEnded(callingUser, string.Format("{0} has hung up.", callingUser.Username));
                 }
 
                 // Remove the call from the list if there is only one (or none) person left.  This should
@@ -174,7 +176,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             if (userCall != null && userCall.Users.Exists(u => u.ConnectionId == targetUser.ConnectionId))
             {
                 // These folks are in a call together, let's let em talk WebRTC
-                await Clients.Client(targetConnectionId).ReceiveSignal(callingUser, signal);
+                await ReceiveSignal(callingUser, signal);
             }
         }
 
@@ -183,7 +185,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         private async Task SendUserListUpdate()
         {
             _Users.ForEach(u => u.InCall = (GetUserCall(u.ConnectionId) != null));
-            await Clients.All.UpdateUserList(_Users);
+            await UpdateUserList(_Users);
         }
 
         private UserCall GetUserCall(string connectionId)
@@ -191,6 +193,36 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             var matchingCall =
                 _UserCalls.SingleOrDefault(uc => uc.Users.SingleOrDefault(u => u.ConnectionId == connectionId) != null);
             return matchingCall;
+        }
+
+        public async Task UpdateUserList(List<User> userList)
+        {
+            await Clients.All.SendAsync("UpdateUserList", userList);
+        }
+
+        public async Task CallAccepted(User acceptingUser)
+        {
+            await Clients.All.SendAsync("CallAccepted", acceptingUser);
+        }
+
+        public async Task CallDeclined(User decliningUser, string reason)
+        {
+            await Clients.All.SendAsync("CallDeclined", reason);
+        }
+
+        public async Task IncomingCall(User callingUser)
+        {
+            await Clients.All.SendAsync("IncomingCall", callingUser);
+        }
+
+        public async Task ReceiveSignal(User signalingUser, string signal)
+        {
+            await Clients.All.SendAsync("ReceiveSignal", signal);
+        }
+
+        public Task CallEnded(User signalingUser, string signal)
+        {
+            throw new NotImplementedException();
         }
 
         #endregion

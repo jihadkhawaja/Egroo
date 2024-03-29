@@ -76,7 +76,7 @@
 </MudContainer>
 
 @code {
-    [Inject] ISnackbar Snackbar { get; set; }
+    [Inject] ISnackbar Snackbar { get; set; } = null!;
 
     [Parameter]
     public string Title { get; set; }
@@ -91,18 +91,17 @@
     private int MessageLinesCount { get; set; }
     private int MaxMessageLength { get; set; } = 300;
 
+    protected override async Task OnInitializedAsync()
+    {
+        HubEvents();
+        Messages = (await GetMessages()).ToList();
+        IsLoading = false;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            IsLoading = true;
-
-            Messages = (await GetMessages()).ToList();
-
-            HubEvents();
-
-            IsLoading = false;
-
             await InvokeAsync(StateHasChanged);
 
             ScrollToMessagesEnd();
@@ -207,7 +206,7 @@
 
     private void HubEvents()
     {
-        MobileChatSignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        MobileChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {
@@ -228,7 +227,7 @@
             ScrollToMessagesEnd();
         });
 
-        MobileChatSignalR.HubConnection.On<Message>("UpdateMessage", async message =>
+        MobileChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {
