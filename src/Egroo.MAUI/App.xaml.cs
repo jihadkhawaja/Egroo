@@ -1,6 +1,4 @@
-﻿using Egroo.UI.Core;
-
-namespace Egroo.MAUI
+﻿namespace Egroo.MAUI
 {
     public partial class App : Application
     {
@@ -9,11 +7,6 @@ namespace Egroo.MAUI
             InitializeComponent();
 
             MainPage = new MainPage();
-        }
-
-        protected override async void OnStart()
-        {
-            await HubInitializer.Connect();
         }
     }
 }

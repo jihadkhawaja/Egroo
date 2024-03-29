@@ -1,4 +1,5 @@
-﻿using jihadkhawaja.mobilechat.client.Interfaces;
+﻿using jihadkhawaja.mobilechat.client.Core;
+using jihadkhawaja.mobilechat.client.Interfaces;
 using jihadkhawaja.mobilechat.client.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -8,42 +9,42 @@ namespace jihadkhawaja.mobilechat.client.Services
     {
         public async Task<bool> SendMessage(Message message)
         {
-            if (MobileChatClient.SignalR is null)
+            if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatClient.SignalR.HubConnection.InvokeAsync<bool>("SendMessage", message);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("SendMessage", message);
         }
 
         public async Task<Message[]?> ReceiveMessageHistory(Guid channelid)
         {
-            if (MobileChatClient.SignalR is null)
+            if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatClient.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistory", channelid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistory", channelid);
         }
 
         public async Task<Message[]?> ReceiveMessageHistoryRange(Guid channelid, int range)
         {
-            if (MobileChatClient.SignalR is null)
+            if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatClient.SignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistoryRange", channelid, range);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<Message[]>("ReceiveMessageHistoryRange", channelid, range);
         }
 
         public async Task<bool> SetMessageAsSeen(Guid messageid)
         {
-            if (MobileChatClient.SignalR is null)
+            if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatClient.SignalR.HubConnection.InvokeAsync<bool>("SetMessageAsSeen", messageid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("SetMessageAsSeen", messageid);
         }
     }
 }

@@ -1,3 +1,4 @@
+using jihadkhawaja.mobilechat.client.Core;
 using jihadkhawaja.mobilechat.client.Interfaces;
 using jihadkhawaja.mobilechat.client.Services;
 using System.Text.Json;
@@ -14,14 +15,13 @@ namespace Egroo.Server.Test
         {
             ChatAuthService = new ChatAuthService();
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
-            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+            await MobileChatSignalR.HubConnection.StartAsync();
         }
         [TestMethod, Priority(0)]
         public async Task ConnectTest()
         {
-            if (jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
+            if (MobileChatSignalR.HubConnection.State == Microsoft.AspNetCore.SignalR.Client.HubConnectionState.Connected)
             {
                 Assert.IsTrue(true);
             }

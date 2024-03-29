@@ -53,19 +53,19 @@ namespace jihadkhawaja.mobilechat.server.Hubs
                     if (ConnectedUser != null)
                     {
                         // Hang up any calls the user is in
-                        await HangUp();
+                        //await HangUp();
 
                         // Gets the user from "Context" which is available in the whole hub
                         // Remove the user
-                        _Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
+                        //_Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
 
                         // Send down the new user list to all clients
-                        await SendUserListUpdate();
+                        //await SendUserListUpdate();
 
                         ConnectedUser.ConnectionId = Context.ConnectionId;
                         ConnectedUser.IsOnline = true;
 
-                        User[] connectedUsers = new User[1] { ConnectedUser };
+                        User[] connectedUsers = [ConnectedUser];
                         await UserService.Update(connectedUsers);
                     }
                 }

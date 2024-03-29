@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.SignalR.Client
 @using jihadkhawaja.mobilechat.client;
+@using jihadkhawaja.mobilechat.client.Core
 
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
@@ -206,7 +207,7 @@
 
     private void HubEvents()
     {
-        MobileChatClient.SignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+        MobileChatSignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {
@@ -227,7 +228,7 @@
             ScrollToMessagesEnd();
         });
 
-        MobileChatClient.SignalR.HubConnection.On<Message>("UpdateMessage", async message =>
+        MobileChatSignalR.HubConnection.On<Message>("UpdateMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
             {

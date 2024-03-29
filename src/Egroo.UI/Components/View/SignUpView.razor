@@ -1,10 +1,11 @@
 ﻿@using FluentValidation
 @using System.Text.RegularExpressions
 @using Egroo.UI.Constants;
-@using Egroo.UI.Core;
 @using System.Text.Json
 @using Egroo.UI.Components.Layout;
 @using Egroo.UI.Models;
+@using jihadkhawaja.mobilechat.client
+@using jihadkhawaja.mobilechat.client.Core
 
 @layout EmptyLayout
 
@@ -127,8 +128,8 @@
 
             SessionStorage.User = user;
 
-            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-            await HubInitializer.Connect();
+            MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+            await MobileChatSignalR.HubConnection.StartAsync();
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 

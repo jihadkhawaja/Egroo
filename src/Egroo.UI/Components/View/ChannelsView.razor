@@ -6,7 +6,7 @@
 
 @if (IsBusy)
 {
-    <MudProgressLinear Indeterminate />
+    <MudProgressCircular Indeterminate />
 }
 else
 {
@@ -87,12 +87,10 @@ else
 }
 
 @code {
-    [Inject] IDialogService DialogService { get; set; }
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
-    private IEnumerable<KeyValuePair<Channel, bool>> CurrentUserChannels { get; set; }
+    private IEnumerable<KeyValuePair<Channel, bool>>? CurrentUserChannels { get; set; }
     private IEnumerable<User> SearchedUserFriends { get; set; } = null!;
-
-    private bool IsSignedIn { get; set; }
 
     private bool IsBusy { get; set; } = true;
 
@@ -102,37 +100,13 @@ else
 
     private Guid selectedChannelId { get; set; }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnInitializedAsync()
     {
-        if (firstRender)
-        {
-            if (SessionStorage.User is not null)
-            {
-                IsBusy = true;
+        IsBusy = true;
 
-                IsSignedIn = !string.IsNullOrWhiteSpace(SessionStorage.Token);
-                if (IsSignedIn)
-                {
-                    CurrentUserChannels = await GetChannels();
-                }
-                else
-                {
-                    NavigationManager.NavigateTo("signin");
-                    return;
-                }
+        CurrentUserChannels = await GetChannels();
 
-                IsBusy = false;
-            }
-            else
-            {
-                NavigationManager.NavigateTo("signin");
-                return;
-            }
-
-            await InvokeAsync(StateHasChanged);
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
+        IsBusy = false;
     }
 
     private async Task OnSearchFriends(string value)

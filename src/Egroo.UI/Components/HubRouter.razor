@@ -1,0 +1,85 @@
+﻿@using Egroo.UI.Components.Layout
+@using Egroo.UI.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using jihadkhawaja.mobilechat.client.Interfaces;
+@using jihadkhawaja.mobilechat.client.Core;
+@using Egroo.UI.Constants
+@using System.Text.Json;
+
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
+@inject IChatUser ChatUserService
+
+@if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected && SessionStorage.User is null)
+{
+    <div style="width:100vw;height:100vh;background-color:#27272fff">
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
+        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting to server</MudText>
+    </div>
+
+    return;
+}
+
+@ChildContent
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.WASM;
+
+            await LoadCache();
+            await CreateSession();
+        }
+    }
+
+    private async Task LoadCache()
+    {
+        SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
+
+        if (string.IsNullOrEmpty(SessionStorage.Token))
+        {
+            NavigationManager.NavigateTo("signin");
+        }
+    }
+
+    private async Task CreateSession()
+    {
+        if (MobileChatSignalR.HubConnection is not null)
+        {
+            return;
+        }
+
+        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
+
+        if (MobileChatSignalR.HubConnection is null)
+        {
+            return;
+        }
+
+        await MobileChatSignalR.HubConnection.StartAsync();
+
+        if (!string.IsNullOrEmpty(SessionStorage!.Token))
+        {
+            SessionStorage!.User = new()
+            {
+                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
+                DisplayName = await ChatUserService.GetCurrentUserDisplayName(),
+                Username = await ChatUserService.GetCurrentUserUsername(),
+            };
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+        #if DEBUG
+        Console.WriteLine(SessionStorage!.CurrentFrameworkPlatform);
+        Console.WriteLine(JsonSerializer.Serialize(SessionStorage!.User));
+        #endif
+    }
+}
