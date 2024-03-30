@@ -81,11 +81,11 @@ jobs:
       with:
         dotnet-version: 8.0.x
     - name: Restore dependencies
-      run: dotnet restore src/Egroo/Egroo.csproj
+      run: dotnet restore src/Egroo/Egroo/Egroo.csproj
     - name: Build
-      run: dotnet build --no-restore src/Egroo/Egroo.csproj
+      run: dotnet build --no-restore src/Egroo/Egroo/Egroo.csproj
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/Egroo/Egroo.csproj
+      run: dotnet test --no-build --verbosity normal src/Egroo/Egroo/Egroo.csproj
   docker-build-wasm:
     name: Docker Build wasm
     needs: dotnet-build-wasm
