@@ -45,7 +45,7 @@ namespace Egroo.Server.Test
             }
         }
         [TestMethod]
-        public async Task CreateChannelTest()
+        public async Task CreateChannelTest2()
         {
             Channel = await ChatChannelService.CreateChannel("test");
 
@@ -53,7 +53,7 @@ namespace Egroo.Server.Test
         }
 
         [TestMethod]
-        public async Task DeleteChannel()
+        public async Task DeleteChannelTest1()
         {
             Assert.IsTrue(await ChatChannelService.DeleteChannel(Channel.Id));
         }
