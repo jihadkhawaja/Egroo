@@ -82,6 +82,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
                   desired_config='
                   server {
@@ -174,6 +175,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
                   desired_config='
                   server {
