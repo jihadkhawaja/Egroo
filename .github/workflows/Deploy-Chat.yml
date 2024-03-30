@@ -105,14 +105,14 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org <<< "$desired_config" >/dev/null
 
                           echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
                           echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org <<< "$desired_config" >/dev/null
 
                       echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
                       echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
@@ -198,14 +198,14 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org <<< "$desired_config" >/dev/null
 
                           echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
                           echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org <<< "$desired_config" >/dev/null
 
                       echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
                       echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
