@@ -62,9 +62,9 @@ jobs:
       with:
         name: nugetPackage
     - name: Prep packages
-      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
+      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
     - name: Push package to GitHub packages
-      run: dotnet nuget push nugetPackage/*.nupkg --api-key ${{ secrets.GITHUB_TOKEN }}  --source "github"
+      run: dotnet nuget push nugetPackage/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
       
     - name: Publish nuget package
       run: dotnet nuget push nugetPackage/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
@@ -83,4 +83,4 @@ jobs:
           tag: ${{ needs.build.outputs.VERSION }}
           name: Release ${{ needs.build.outputs.VERSION }}
           artifacts: "nugetPackage/*.nupkg"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.Egroo_GITHUB_PACKAGE }}
