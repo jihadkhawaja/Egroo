@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.MAUI", "Egroo.MAUI\Egroo.MAUI.csproj", "{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.Server", "Egroo.Server\Egroo.Server.csproj", "{1EDC6F16-E37D-4344-9CD6-D15B786B8F02}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.Server.Test", "Egroo.Server.Test\Egroo.Server.Test.csproj", "{D5985995-53A3-4769-B63D-3F4440C8EF1A}"
@@ -29,18 +27,14 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo", "Egroo\Egroo\Egroo.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.Client", "Egroo\Egroo.Client\Egroo.Client.csproj", "{97ED607B-6318-4A22-9D4E-11BE2CB81296}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.MAUI", "Egroo.MAUI\Egroo.MAUI.csproj", "{ECF7229C-8219-4B67-9584-ADEB2B6B5318}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Release|Any CPU.Build.0 = Release|Any CPU
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65}.Release|Any CPU.Deploy.0 = Release|Any CPU
 		{1EDC6F16-E37D-4344-9CD6-D15B786B8F02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1EDC6F16-E37D-4344-9CD6-D15B786B8F02}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1EDC6F16-E37D-4344-9CD6-D15B786B8F02}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -69,12 +63,17 @@ Global
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{10BDDC37-43D4-4333-99E2-67E6EDDD5C65} = {34C21B87-402C-45B9-9895-36AC32E41686}
 		{1EDC6F16-E37D-4344-9CD6-D15B786B8F02} = {1F1A6022-30CB-4DBA-8210-5CFFFEB4BB71}
 		{D5985995-53A3-4769-B63D-3F4440C8EF1A} = {2AC5D9DD-0E94-4476-9A1B-90A984003303}
 		{0A904E7A-4FC2-4807-A0CA-9A28B869EC24} = {C1954230-0F2C-45CA-9A23-B3D8176971A6}
@@ -82,6 +81,7 @@ Global
 		{A9E09E1B-8350-4D1F-9760-4BBFF50B01AC} = {806FB1EE-C13B-468E-BFE6-75B10033A553}
 		{DF4883E6-2CF6-4201-9EFE-27117C3A33F6} = {34C21B87-402C-45B9-9895-36AC32E41686}
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296} = {34C21B87-402C-45B9-9895-36AC32E41686}
+		{ECF7229C-8219-4B67-9584-ADEB2B6B5318} = {34C21B87-402C-45B9-9895-36AC32E41686}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {61F7FB11-1E47-470C-91E2-47F8143E1572}

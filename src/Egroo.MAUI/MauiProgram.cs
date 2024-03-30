@@ -1,11 +1,11 @@
 ﻿using Egroo.UI;
 using Egroo.UI.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Egroo.MAUI
 {
     public static class MauiProgram
     {
-        public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
         public static MauiApp CreateMauiApp()
         {
             MauiAppBuilder builder = MauiApp.CreateBuilder();
@@ -17,9 +17,15 @@ namespace Egroo.MAUI
                 });
 
             builder.Services.AddMauiBlazorWebView();
+
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Logging.AddDebug();
 #endif
+
+            //https://docs.microsoft.com/en-us/dotnet/maui/platform-integration/storage/file-system-helpers
+            ClientModel.AppDataPath = Path.Combine(FileSystem.Current.AppDataDirectory, "Ergoo");
+
             ClientModel.MyMudThemeProvider = builder =>
             {
                 builder.OpenComponent(0, typeof(MyMudThemeProvider));

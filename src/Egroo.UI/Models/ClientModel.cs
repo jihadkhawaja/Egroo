@@ -12,5 +12,7 @@ namespace Egroo.UI.Models
     {
         public static RenderFragment? MyMudThemeProvider { get; set; }
         public static RenderFragment? MyMudProvider { get; set; }
+        public static FrameworkPlatform CurrentFrameworkPlatform { get; set; }
+        public static string? AppDataPath { get; set; }
     }
 }

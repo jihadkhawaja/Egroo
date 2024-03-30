@@ -113,11 +113,11 @@
                 Id = Id,
             };
 
-            switch (SessionStorage.CurrentFrameworkPlatform)
+            switch (ClientModel.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
-                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                    SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, Token, false, true);
+                    SaveFileService.CreateDirectory(ClientModel.AppDataPath);
+                    SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
                     await LocalStorageService.SetLocalStorage("token", Token);

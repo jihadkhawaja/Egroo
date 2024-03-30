@@ -13,9 +13,8 @@ namespace Egroo.UI
             this IServiceCollection services,
             FrameworkPlatform frameworkPlatform)
         {
-            services.AddMudServices();
+            ClientModel.CurrentFrameworkPlatform = frameworkPlatform;
 
-            //general services
             if (frameworkPlatform == FrameworkPlatform.SERVER)
             {
                 services.AddScoped<SessionStorage>();
@@ -29,6 +28,7 @@ namespace Egroo.UI
                 services.AddSingleton<ISaveFile, SaveFileService>();
             }
 
+            services.AddMudServices();
             services.AddMobileChatServices();
 
             return services;

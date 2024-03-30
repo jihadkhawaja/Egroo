@@ -17,7 +17,7 @@
 {
     <div style="width:100vw;height:100vh;background-color:#27272fff">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
-        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting to server</MudText>
+        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting..</MudText>
     </div>
 
     return;
@@ -33,8 +33,6 @@
     {
         if (firstRender)
         {
-            SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.WASM;
-
             await LoadCache();
             await CreateSession();
         }
@@ -42,7 +40,17 @@
 
     private async Task LoadCache()
     {
-        SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
+        switch (ClientModel.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", ClientModel.AppDataPath, true);
+                break;
+            case FrameworkPlatform.WASM:
+                SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
 
         if (string.IsNullOrEmpty(SessionStorage.Token))
         {
@@ -96,11 +104,11 @@
 
                 await MobileChatSignalR.HubConnection.StartAsync();
 
-                switch (SessionStorage.CurrentFrameworkPlatform)
+                switch (ClientModel.CurrentFrameworkPlatform)
                 {
                     case FrameworkPlatform.MAUI:
-                        SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                        SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, result["token"].ToString(), false, true);
+                        SaveFileService.CreateDirectory(ClientModel.AppDataPath);
+                        SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
                         break;
                     case FrameworkPlatform.WASM:
                         await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
@@ -122,17 +130,17 @@
         await InvokeAsync(StateHasChanged);
 
         #if DEBUG
-        Console.WriteLine(SessionStorage!.CurrentFrameworkPlatform);
+        Console.WriteLine(ClientModel.CurrentFrameworkPlatform);
         Console.WriteLine(JsonSerializer.Serialize(SessionStorage!.User));
         #endif
     }
 
     private async Task SignOut()
     {
-        switch (SessionStorage.CurrentFrameworkPlatform)
+        switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
-                string path = Path.Combine(SessionStorage.AppDataPath);
+                string path = Path.Combine(ClientModel.AppDataPath);
                 SaveFileService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:
