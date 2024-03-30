@@ -8,11 +8,11 @@ EXPOSE 8081
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["Egroo/Egroo/Egroo.csproj", "Egroo/Egroo/"]
-COPY ["Egroo/Egroo.Client/Egroo.Client.csproj", "Egroo/Egroo.Client/"]
-COPY ["Egroo.UI/Egroo.UI.csproj", "Egroo.UI/"]
-COPY ["jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj", "jihadkhawaja.mobilechat.client/"]
+WORKDIR /
+COPY ["src/Egroo/Egroo/Egroo.csproj", "Egroo/Egroo/"]
+COPY ["src/Egroo/Egroo.Client/Egroo.Client.csproj", "Egroo/Egroo.Client/"]
+COPY ["src/Egroo.UI/Egroo.UI.csproj", "Egroo.UI/"]
+COPY ["src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj", "jihadkhawaja.mobilechat.client/"]
 RUN dotnet restore "./Egroo/Egroo/Egroo.csproj"
 COPY . .
 WORKDIR "/src/Egroo/Egroo"

@@ -5,7 +5,7 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /
 COPY ["src/Egroo.Server/Egroo.Server.csproj", "Egroo.Server/"]
-RUN git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
+COPY ["src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "jihadkhawaja.mobilechat.server/"]
 COPY . .
 WORKDIR "/src/Egroo.Server"
 RUN dotnet build "Egroo.Server.csproj" -c Release -o /app/build

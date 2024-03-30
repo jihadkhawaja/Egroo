@@ -11,12 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore src/Egroo.Server/Egroo.Server.csproj
     - name: Build
@@ -71,8 +69,8 @@ jobs:
             rm /opt/mobilechat-server.tar
             docker kill mobilechat-server
             docker system prune -f
-            docker run --name mobilechat-server -p 43222:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
-            
+            docker run --name mobilechat-server -p 43222:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
+
   nginx-setup:
     name: Nginx Setup
     needs: docker-build
@@ -123,14 +121,10 @@ jobs:
     needs: nginx-setup
     steps:
     - uses: actions/checkout@v2
-
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
-
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2
       with:
-        dotnet-version: '7.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Restore dependencies
       run: dotnet restore src/Egroo.Server.Test/Egroo.Server.Test.csproj
