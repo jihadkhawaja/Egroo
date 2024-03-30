@@ -105,17 +105,17 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                          echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                      echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                   fi
   dotnet-build-wasm:
     name: Dotnet Build wasm
@@ -198,15 +198,15 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                          echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                      echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                   fi

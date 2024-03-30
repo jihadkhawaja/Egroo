@@ -82,7 +82,6 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
                   desired_config='
                   server {
@@ -105,17 +104,17 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
+                          echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
+                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
+                      echo "$desired_config" | echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
+                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
                   fi
   uni-test:
     runs-on: ubuntu-latest
