@@ -13,12 +13,12 @@
 @inject IChatUser ChatUserService
 @inject IChatAuth ChatAuthService
 
-@if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected && SessionStorage?.User is null)
+@if (IsBusy || MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected)
 {
     <div style="width:100vw;height:100vh;background-color:#27272fff">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
         <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
-            Connecting, Please Wait...
+            Please Wait...
         </MudText>
     </div>
 
@@ -31,12 +31,18 @@
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
+    private bool IsBusy { get; set; } = true;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await LoadCache();
-            await CreateSession();
+            await EstablishSession();
+
+            IsBusy = false;
+
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -54,14 +60,9 @@
             default:
                 throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
         }
-
-        if (string.IsNullOrEmpty(SessionStorage.Token))
-        {
-            NavigationManager.NavigateTo("/");
-        }
     }
 
-    private async Task CreateSession()
+    private async Task EstablishSession()
     {
         if (MobileChatSignalR.HubConnection is not null)
         {
@@ -70,12 +71,7 @@
 
         MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
 
-        if (MobileChatSignalR.HubConnection is null)
-        {
-            return;
-        }
-
-        await MobileChatSignalR.HubConnection.StartAsync();
+        await MobileChatSignalR.HubConnection!.StartAsync();
 
         if (!string.IsNullOrEmpty(SessionStorage!.Token))
         {
@@ -129,11 +125,13 @@
                 Username = await ChatUserService.GetCurrentUserUsername(),
                 ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };
+
+            NavigationManager.NavigateTo("/channels");
         }
-
-        NavigationManager.NavigateTo("/channels");
-
-        await InvokeAsync(StateHasChanged);
+        else
+        {
+            NavigationManager.NavigateTo("/");
+        }
 
         #if DEBUG
         Console.WriteLine(ClientModel.CurrentFrameworkPlatform);
