@@ -71,54 +71,9 @@ jobs:
             docker system prune -f
             docker run --name mobilechat-server -p 43222:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
 
-  nginx-setup:
-    name: Nginx Setup
-    needs: docker-build
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.KEY }}
-          script: |
-                  desired_config='
-                  server {
-                      listen        80;
-                      server_name   dev-api-chat.jihadkhawaja.com;
-                      location / {
-                          proxy_pass         http://localhost:43222;
-                          proxy_http_version 1.1;
-                          proxy_set_header   Upgrade $http_upgrade;
-                          proxy_set_header   Connection "upgrade";
-                          proxy_set_header   Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header   X-Forwarded-Proto $scheme;
-                      }
-                  }'
-
-                  if [ -f /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com <<< "$desired_config" >/dev/null
-
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com <<< "$desired_config" >/dev/null
-
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                  fi
   uni-test:
     runs-on: ubuntu-latest
-    needs: nginx-setup
+    needs: docker-build
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core

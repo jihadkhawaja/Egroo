@@ -71,52 +71,6 @@ jobs:
             docker kill mobilechat-server-prod
             docker system prune -f
             docker run --name mobilechat-server-prod -p 49117:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server-prod:latest
-  nginx-setup-api:
-    name: Nginx Setup api
-    needs: docker-build-api
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.KEY }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-                  desired_config='
-                  server {
-                      listen        80;
-                      server_name   api.egroo.org;
-                      location / {
-                          proxy_pass         http://localhost:49117;
-                          proxy_http_version 1.1;
-                          proxy_set_header   Upgrade $http_upgrade;
-                          proxy_set_header   Connection "upgrade";
-                          proxy_set_header   Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header   X-Forwarded-Proto $scheme;
-                      }
-                  }'
-
-                  if [ -f /etc/nginx/sites-available/api-chat.egroo.org ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/api-chat.egroo.org >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org <<< "$desired_config" >/dev/null
-
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/api-chat.egroo.org <<< "$desired_config" >/dev/null
-
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                  fi
   dotnet-build-wasm:
     name: Dotnet Build wasm
     runs-on: ubuntu-latest
@@ -164,49 +118,3 @@ jobs:
             docker kill mobilechat-wasm-prod
             docker system prune -f
             docker run --name mobilechat-wasm-prod -p 49168:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-wasm-prod:latest
-  nginx-setup-wasm:
-    name: Nginx Setup wasm
-    needs: docker-build-wasm
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          key: ${{ secrets.KEY }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-                  desired_config='
-                  server {
-                      listen        80;
-                      server_name   egroo.org www.egroo.org;
-                      location / {
-                          proxy_pass         http://localhost:49168;
-                          proxy_http_version 1.1;
-                          proxy_set_header   Upgrade $http_upgrade;
-                          proxy_set_header   Connection "upgrade";
-                          proxy_set_header   Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header   X-Forwarded-Proto $scheme;
-                      }
-                  }'
-
-                  if [ -f /etc/nginx/sites-available/www.egroo.org ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/www.egroo.org >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org <<< "$desired_config" >/dev/null
-
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                          echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S tee /etc/nginx/sites-available/www.egroo.org <<< "$desired_config" >/dev/null
-
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                      echo "${{ secrets.REMOTE_PASSWORD }}" | sudo -S systemctl restart nginx
-                  fi
