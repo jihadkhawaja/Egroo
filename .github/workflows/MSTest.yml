@@ -57,7 +57,7 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server.tar"
-          target: "/opt"
+          target: "/home/ubuntu/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
@@ -65,8 +65,8 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker load -i /opt/mobilechat-server.tar
-            rm /opt/mobilechat-server.tar
+            docker load -i /home/ubuntu/images/mobilechat-server.tar
+            rm /home/ubuntu/images/mobilechat-server.tar
             docker kill mobilechat-server
             docker system prune -f
             docker run --name mobilechat-server -p 43222:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
