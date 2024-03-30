@@ -1,4 +1,4 @@
-name: Nuget Push
+name: Nuget Server Push
 
 on:
   workflow_dispatch:
@@ -45,6 +45,8 @@ jobs:
       uses: actions/setup-dotnet@v2
       with:
          dotnet-version: |
+          6.0.x
+          7.0.x
           8.0.x
     - name: Build and Pack NuGet package
       run: dotnet pack src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj -p:Version=${VERSION} -c Release
