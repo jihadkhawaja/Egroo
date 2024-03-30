@@ -15,8 +15,9 @@
 @inject IChatUser ChatUserService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-16 pt-16">
+    <MudIconButton Icon="@Icons.Material.Filled.Home" Href="/" Size="Size.Large" Class="mb-4" />
     <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign Up</MudText>
-    <MudText>Already have an account? <span><MudButton Link="signin">SIGNIN</MudButton></span></MudText>
+    <MudText>Already have an account? <span><MudButton Href="signin">SIGNIN</MudButton></span></MudText>
 
     <MudGrid Class="mt-8" Justify="Justify.Center">
         <MudItem xs="12" sm="8" md="6">
@@ -130,9 +131,7 @@
             MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
             await MobileChatSignalR.HubConnection.StartAsync();
 
-            Snackbar.Add("User Created.", MudBlazor.Severity.Success);
-
-            NavigationManager.NavigateTo("/", true);
+            NavigationManager.NavigateTo("/channels", true);
         }
         else
         {
