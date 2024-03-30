@@ -54,7 +54,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server.tar"
           target: "/opt"
@@ -63,7 +63,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker load -i /opt/mobilechat-server.tar
             rm /opt/mobilechat-server.tar
@@ -81,7 +81,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
                   desired_config='
                   server {
@@ -151,7 +151,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker kill mobilechat-server
             docker system prune -f
@@ -165,6 +165,6 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker exec postgres psql -U postgres -c "drop database \"egroo-dev-test\" WITH ( FORCE );"

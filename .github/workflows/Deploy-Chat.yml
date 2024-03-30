@@ -55,7 +55,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server-prod.tar"
           target: "/opt"
@@ -64,7 +64,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker load -i /opt/mobilechat-server-prod.tar
             rm /opt/mobilechat-server-prod.tar
@@ -81,7 +81,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
                   desired_config='
                   server {
@@ -147,7 +147,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-wasm-prod.tar"
           target: "/opt"
@@ -156,7 +156,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker load -i /opt/mobilechat-wasm-prod.tar
             rm /opt/mobilechat-wasm-prod.tar
@@ -173,7 +173,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
                   desired_config='
                   server {
