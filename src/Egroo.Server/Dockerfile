@@ -1,18 +1,23 @@
+#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER app
 WORKDIR /app
 EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /
 COPY ["src/Egroo.Server/Egroo.Server.csproj", "Egroo.Server/"]
 COPY ["src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "jihadkhawaja.mobilechat.server/"]
-COPY ["src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj", "jihadkhawaja.mobilechat.client/"]
+RUN dotnet restore "./Egroo.Server/Egroo.Server.csproj"
 COPY . .
 WORKDIR "/src/Egroo.Server"
-RUN dotnet build "Egroo.Server.csproj" -c Release -o /app/build
+RUN dotnet build "./Egroo.Server.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Egroo.Server.csproj" -c Release -o /app/publish /p:UseAppHost=false
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "./Egroo.Server.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
