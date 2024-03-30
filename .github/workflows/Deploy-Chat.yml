@@ -82,6 +82,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
                   desired_config='
                   server {
@@ -104,17 +105,17 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                          echo "$desired_config" | tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
+                         ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                         systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
+                      echo "$desired_config" | tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
+                     ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
+                     systemctl restart nginx
                   fi
   dotnet-build-wasm:
     name: Dotnet Build wasm
@@ -174,6 +175,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
           script: |
                   desired_config='
                   server {
@@ -196,15 +198,15 @@ jobs:
                           echo "File exists and contains the desired configuration. Skipping..."
                       else
                           echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                          echo "$desired_config" | tee /etc/nginx/sites-available/www.egroo.org >/dev/null
 
-                          sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
+                         ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                         systemctl restart nginx
                       fi
                   else
                       echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
+                      echo "$desired_config" | tee /etc/nginx/sites-available/www.egroo.org >/dev/null
 
-                      sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
+                     ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
+                     systemctl restart nginx
                   fi
