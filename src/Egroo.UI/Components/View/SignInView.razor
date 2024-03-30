@@ -6,15 +6,13 @@
 @using jihadkhawaja.mobilechat.client
 @using jihadkhawaja.mobilechat.client.Core
 
-@layout EmptyLayout
-
 @inject LocalStorageService LocalStorageService
 @inject ISaveFile SaveFileService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject IChatAuth ChatAuthService
 
-<MudContainer MaxWidth="MaxWidth.Large">
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-16 pt-16">
     <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign In</MudText>
     <MudText>Don't have an account? <span><MudButton Link="signup">SIGNUP</MudButton></span></MudText>
 
@@ -104,10 +102,11 @@
                     SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
+                case FrameworkPlatform.SERVER:
                     await LocalStorageService.SetLocalStorage("token", Token);
                     break;
                 default:
-                    throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                    throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
             }
 
             SessionStorage.User = user;

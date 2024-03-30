@@ -13,11 +13,13 @@
 @inject IChatUser ChatUserService
 @inject IChatAuth ChatAuthService
 
-@if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected && SessionStorage.User is null)
+@if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected && SessionStorage?.User is null)
 {
     <div style="width:100vw;height:100vh;background-color:#27272fff">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
-        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting..</MudText>
+        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
+            Connecting, Please Wait...
+        </MudText>
     </div>
 
     return;
@@ -46,15 +48,16 @@
                 SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", ClientModel.AppDataPath, true);
                 break;
             case FrameworkPlatform.WASM:
+            case FrameworkPlatform.SERVER:
                 SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
                 break;
             default:
-                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
         }
 
         if (string.IsNullOrEmpty(SessionStorage.Token))
         {
-            NavigationManager.NavigateTo("signin");
+            NavigationManager.NavigateTo("/");
         }
     }
 
@@ -111,10 +114,11 @@
                         SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
                         break;
                     case FrameworkPlatform.WASM:
+                    case FrameworkPlatform.SERVER:
                         await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
                         break;
                     default:
-                        throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                        throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
                 }
             }
 
@@ -126,6 +130,8 @@
                 ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };
         }
+
+        NavigationManager.NavigateTo("/channels");
 
         await InvokeAsync(StateHasChanged);
 
@@ -144,10 +150,11 @@
                 SaveFileService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:
+            case FrameworkPlatform.SERVER:
                 await LocalStorageService.RemoveLocalStorage("token");
                 break;
             default:
-                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
         }
 
         SessionStorage.User = null;
