@@ -1,0 +1,85 @@
+name: Nuget Client Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag to publish v[0-9]+.[0-9]+.[0-9]+*'
+        required: true
+        default: ''
+        type: string
+  push:
+    tags:
+    - "v[0-9]+.[0-9]+.[0-9]+"
+jobs:
+  build:
+    runs-on: ubuntu-latest    
+    env:
+        VERSION: 1.0.0
+    outputs:
+        VERSION: ${{ steps.output-version.outputs.VERSION }}
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 
+        
+    - name: Set tag from input
+      if: ${{ github.event.inputs.version != '' }}
+      env:
+        TAG: ${{ github.event.inputs.version }}
+      run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
+    - name: Set version variable from tag
+      if: ${{ github.ref_type == 'tag' }}
+      env:
+        TAG: ${{ github.ref_name }}
+      run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+
+    - name: VERSION to job output
+      id: output-version
+      run: |
+        echo "VERSION=${{ env.VERSION }}" >> $GITHUB_OUTPUT
+        
+    #Build/pack the project
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+         dotnet-version: |
+          6.0.x
+          7.0.x
+          8.0.x
+    - name: Build and Pack NuGet package
+      run: dotnet pack src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj -p:Version=${VERSION} -c Release
+    - name: Upload NuGet package to GitHub
+      uses: actions/upload-artifact@v2
+      with:
+        name: nugetPackage
+        path: src/jihadkhawaja.mobilechat.client/bin/Release/
+        
+    #Push NuGet package to GitHub packages
+    - name: Download nuget package artifact
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: nugetPackage
+    - name: Prep packages
+      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.GITHUB_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
+    - name: Push package to GitHub packages
+      run: dotnet nuget push nugetPackage/*.nupkg --api-key ${{ secrets.GITHUB_TOKEN }}  --source "github"
+      
+    - name: Publish nuget package
+      run: dotnet nuget push nugetPackage/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+  Release: 
+    runs-on: ubuntu-latest 
+    needs: build
+    steps:
+      - name: Download nuget package artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: nugetPackage
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ needs.build.outputs.VERSION }}
+          name: Release ${{ needs.build.outputs.VERSION }}
+          artifacts: "nugetPackage/*.nupkg"
+          token: ${{ secrets.GITHUB_TOKEN }}
