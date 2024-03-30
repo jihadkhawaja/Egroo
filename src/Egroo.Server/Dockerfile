@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /
 COPY ["src/Egroo.Server/Egroo.Server.csproj", "Egroo.Server/"]
 COPY ["src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "jihadkhawaja.mobilechat.server/"]
+COPY ["src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj", "jihadkhawaja.mobilechat.client/"]
 COPY . .
 WORKDIR "/src/Egroo.Server"
 RUN dotnet build "Egroo.Server.csproj" -c Release -o /app/build
