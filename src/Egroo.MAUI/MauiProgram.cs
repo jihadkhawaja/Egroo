@@ -1,16 +1,11 @@
-﻿using Egroo.UI.Constants;
-using Egroo.UI.Core;
-using Egroo.UI.Interfaces;
+﻿using Egroo.UI;
 using Egroo.UI.Models;
-using Egroo.UI.Services;
-using jihadkhawaja.mobilechat.client;
-using MudBlazor.Services;
+using Microsoft.Extensions.Logging;
 
 namespace Egroo.MAUI
 {
     public static class MauiProgram
     {
-        public static CancellationTokenSource ConnectionCancellationTokenSource { get; private set; }
         public static MauiApp CreateMauiApp()
         {
             MauiAppBuilder builder = MauiApp.CreateBuilder();
@@ -22,45 +17,32 @@ namespace Egroo.MAUI
                 });
 
             builder.Services.AddMauiBlazorWebView();
+
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Logging.AddDebug();
 #endif
-            builder.Services.AddMudServices();
 
-            //general services
-            builder.Services.AddSingleton<SessionStorage>();
-            builder.Services.AddSingleton<LocalStorageService>();
-            builder.Services.AddSingleton<ISaveFile, SaveFileService>();
-            //chat services
-            builder.Services.AddMobileChatServices();
+            //https://docs.microsoft.com/en-us/dotnet/maui/platform-integration/storage/file-system-helpers
+            ClientModel.AppDataPath = Path.Combine(FileSystem.Current.AppDataDirectory, "Ergoo");
+
+            ClientModel.MyMudThemeProvider = builder =>
+            {
+                builder.OpenComponent(0, typeof(MyMudThemeProvider));
+                builder.CloseComponent();
+            };
+
+            ClientModel.MyMudProvider = builder =>
+            {
+                builder.OpenComponent(0, typeof(MyMudProviders));
+                builder.CloseComponent();
+            };
+
+            builder.Services.AddEgrooServices(FrameworkPlatform.MAUI);
 
             MauiApp app = builder.Build();
 
-            ConfigureApplication(app);
-
             return app;
-        }
-
-        private static void ConfigureApplication(MauiApp app)
-        {
-            //setup cache and try authenticate user
-            using (IServiceScope scope = app.Services.CreateScope())
-            {
-                ISaveFile SaveFileService = scope.ServiceProvider.GetRequiredService<ISaveFile>();
-                SessionStorage SessionStorage = scope.ServiceProvider.GetRequiredService<SessionStorage>();
-
-                //https://docs.microsoft.com/en-us/dotnet/maui/platform-integration/storage/file-system-helpers
-                SessionStorage.AppDataPath = Path.Combine(FileSystem.Current.AppDataDirectory, "Ergoo");
-
-                try
-                {
-                    SessionStorage.CurrentFrameworkPlatform = FrameworkPlatform.MAUI;
-                    SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", SessionStorage.AppDataPath, true);
-                }
-                catch { }
-
-                HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-            }
         }
     }
 }

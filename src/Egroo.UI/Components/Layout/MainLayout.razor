@@ -1,39 +1,23 @@
 ﻿@using System.Text.Json;
-@using Egroo.UI.Core;
 @using Egroo.UI.Constants
 @using Egroo.UI.Models;
+@using jihadkhawaja.mobilechat.client
+@using jihadkhawaja.mobilechat.client.Core
 
 @inherits LayoutComponentBase
 
 @inject SessionStorage SessionStorage
-@inject IChatUser ChatUserService
-@inject NavigationManager NavigationManager
-@inject LocalStorageService LocalStorageService
-@inject ISaveFile SaveFileService
-@inject IChatAuth ChatAuthService
 
-<MudThemeProvider @bind-IsDarkMode="@IsDarkMode" Theme="Theme.DefaultTheme" />
-<MudDialogProvider />
-<MudSnackbarProvider />
+<MudItem ChildContent="@ClientModel.MyMudProvider" />
+<MudItem ChildContent="@ClientModel.MyMudThemeProvider" />
 
-<MudLayout>
-    @if (!IsConnected)
-    {
-        <div style="width:100vw;height:100vh;background-color:#27272fff">
-            <MudProgressLinear Indeterminate Color="Color.Primary" />
-            <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting to server</MudText>
-        </div>
-
-        return;
-    }
-
-    @if (SessionStorage.User is not null)
-    {
+<HubRouter>
+    <MudLayout>
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
             <MudSpacer />
-            <MudAvatar Color="Color.Primary">@SessionStorage.User.Username?.ToUpper()[0]</MudAvatar>
-            <MudText Class="ml-4">@SessionStorage.User.Username</MudText>
+            <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+            <MudText Class="ml-4">@SessionStorage?.User?.Username</MudText>
         </MudAppBar>
         <MudDrawer @bind-Open="IsDrawerOpen" Elevation="1">
             <MudDrawerHeader>
@@ -41,97 +25,18 @@
             </MudDrawerHeader>
             <NavMenu />
         </MudDrawer>
-    }
-    <MudMainContent>
-        @Body
-    </MudMainContent>
-</MudLayout>
+
+        <MudMainContent>
+            @Body
+        </MudMainContent>
+    </MudLayout>
+</HubRouter>
 
 @code {
     bool IsDrawerOpen = true;
 
-    private bool IsDarkMode { get; set; } = true;
-
-    private bool IsConnected { get; set; }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            while (!IsConnected)
-            {
-                IsConnected = HubInitializer.IsConnected();
-                await Task.Delay(300);
-            }
-
-            if (!string.IsNullOrWhiteSpace(SessionStorage.Token))
-            {
-                dynamic dynamicObj = await ChatAuthService.RefreshSession(SessionStorage.Token);
-                Dictionary<string, object> result = null;
-                if (dynamicObj is not null)
-                {
-                    result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-                }
-                if (string.IsNullOrWhiteSpace(result["token"].ToString()))
-                {
-                    await SignOut();
-                    return;
-                }
-
-                if (SessionStorage.Token != result["token"].ToString())
-                {
-                    SessionStorage.Token = result["token"].ToString();
-                    HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-                    await HubInitializer.Connect();
-
-                    switch (SessionStorage.CurrentFrameworkPlatform)
-                    {
-                        case FrameworkPlatform.MAUI:
-                            SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                            SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, result["token"].ToString(), false, true);
-                            break;
-                        case FrameworkPlatform.WASM:
-                            await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
-                            break;
-                        default:
-                            throw new Exception("CurrentFrameworkPlatform parameter not specified.");
-                    }
-                }
-
-                SessionStorage.User = new();
-                SessionStorage.User.Id = Guid.Parse(result["id"].ToString());
-                SessionStorage.User.DisplayName = await ChatUserService.GetCurrentUserDisplayName();
-                SessionStorage.User.Username = await ChatUserService.GetCurrentUserUsername();
-            }
-
-            await InvokeAsync(StateHasChanged);
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
     private void DrawerToggle()
     {
         IsDrawerOpen = !IsDrawerOpen;
-    }
-
-    private async Task SignOut()
-    {
-        switch (SessionStorage.CurrentFrameworkPlatform)
-        {
-            case FrameworkPlatform.MAUI:
-                string path = Path.Combine(SessionStorage.AppDataPath);
-                SaveFileService.DeleteDirectory(path);
-                break;
-            case FrameworkPlatform.WASM:
-                await LocalStorageService.RemoveLocalStorage("user");
-                break;
-            default:
-                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
-        }
-
-        SessionStorage.User = null;
-
-        NavigationManager.NavigateTo("/", true);
     }
 }

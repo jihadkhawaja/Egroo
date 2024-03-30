@@ -1,4 +1,5 @@
-﻿using jihadkhawaja.mobilechat.client.Interfaces;
+﻿using jihadkhawaja.mobilechat.client.Core;
+using jihadkhawaja.mobilechat.client.Interfaces;
 using jihadkhawaja.mobilechat.client.Models;
 using jihadkhawaja.mobilechat.client.Services;
 using System.Text.Json;
@@ -19,9 +20,8 @@ namespace Egroo.Server.Test
             ChatAuthService = new ChatAuthService();
             ChatChannelService = new ChatChannelService();
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
-            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+            await MobileChatSignalR.HubConnection.StartAsync();
 
             dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result = null;
@@ -32,22 +32,20 @@ namespace Egroo.Server.Test
 
             //check user
             if (result is not null)
-            {;
+            {
                 string Token = result["token"].ToString();
 
-                var cancellationTokenSource1 = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, Token);
-                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, Token);
+                await MobileChatSignalR.HubConnection.StartAsync();
             }
             else
             {
-                var cancellationTokenSource2 = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
-                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+                await MobileChatSignalR.HubConnection.StartAsync();
             }
         }
         [TestMethod]
-        public async Task CreateChannelTest()
+        public async Task CreateChannelTest2()
         {
             Channel = await ChatChannelService.CreateChannel("test");
 
@@ -55,7 +53,7 @@ namespace Egroo.Server.Test
         }
 
         [TestMethod]
-        public async Task DeleteChannel()
+        public async Task DeleteChannelTest1()
         {
             Assert.IsTrue(await ChatChannelService.DeleteChannel(Channel.Id));
         }

@@ -2,8 +2,9 @@
 @using System.Text.Json
 @using Egroo.UI.Components.Layout;
 @using Egroo.UI.Constants;
-@using Egroo.UI.Core;
 @using Egroo.UI.Models;
+@using jihadkhawaja.mobilechat.client
+@using jihadkhawaja.mobilechat.client.Core
 
 @layout EmptyLayout
 
@@ -96,11 +97,11 @@
                 Id = Id,
             };
 
-            switch (SessionStorage.CurrentFrameworkPlatform)
+            switch (ClientModel.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
-                    SaveFileService.CreateDirectory(SessionStorage.AppDataPath);
-                    SaveFileService.WriteToJsonFile("token", SessionStorage.AppDataPath, Token, false, true);
+                    SaveFileService.CreateDirectory(ClientModel.AppDataPath);
+                    SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
                     await LocalStorageService.SetLocalStorage("token", Token);
@@ -111,8 +112,8 @@
 
             SessionStorage.User = user;
 
-            HubInitializer.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-            await HubInitializer.Connect();
+            MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+            await MobileChatSignalR.HubConnection.StartAsync();
 
             Snackbar.Add("User Created.", MudBlazor.Severity.Success);
 

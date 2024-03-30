@@ -1,0 +1,157 @@
+﻿@using Egroo.UI.Components.Layout
+@using Egroo.UI.Models
+@using Microsoft.AspNetCore.SignalR.Client
+@using jihadkhawaja.mobilechat.client.Interfaces;
+@using jihadkhawaja.mobilechat.client.Core;
+@using Egroo.UI.Constants
+@using System.Text.Json;
+
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject LocalStorageService LocalStorageService
+@inject ISaveFile SaveFileService
+@inject IChatUser ChatUserService
+@inject IChatAuth ChatAuthService
+
+@if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected && SessionStorage.User is null)
+{
+    <div style="width:100vw;height:100vh;background-color:#27272fff">
+        <MudProgressLinear Indeterminate Color="Color.Primary" />
+        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">Connecting..</MudText>
+    </div>
+
+    return;
+}
+
+@ChildContent
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadCache();
+            await CreateSession();
+        }
+    }
+
+    private async Task LoadCache()
+    {
+        switch (ClientModel.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", ClientModel.AppDataPath, true);
+                break;
+            case FrameworkPlatform.WASM:
+                SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
+
+        if (string.IsNullOrEmpty(SessionStorage.Token))
+        {
+            NavigationManager.NavigateTo("signin");
+        }
+    }
+
+    private async Task CreateSession()
+    {
+        if (MobileChatSignalR.HubConnection is not null)
+        {
+            return;
+        }
+
+        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
+
+        if (MobileChatSignalR.HubConnection is null)
+        {
+            return;
+        }
+
+        await MobileChatSignalR.HubConnection.StartAsync();
+
+        if (!string.IsNullOrEmpty(SessionStorage!.Token))
+        {
+            dynamic dynamicObj = await ChatAuthService.RefreshSession(SessionStorage.Token);
+            Dictionary<string, object> result = null;
+            if (dynamicObj is not null)
+            {
+                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
+            }
+            if (string.IsNullOrWhiteSpace(result["token"].ToString()))
+            {
+                await SignOut();
+                return;
+            }
+
+            if (SessionStorage.Token != result["token"].ToString())
+            {
+                SessionStorage.Token = result["token"].ToString();
+
+                await MobileChatSignalR.HubConnection.StopAsync();
+                await MobileChatSignalR.HubConnection.DisposeAsync();
+
+                MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
+
+                if (MobileChatSignalR.HubConnection is null)
+                {
+                    return;
+                }
+
+                await MobileChatSignalR.HubConnection.StartAsync();
+
+                switch (ClientModel.CurrentFrameworkPlatform)
+                {
+                    case FrameworkPlatform.MAUI:
+                        SaveFileService.CreateDirectory(ClientModel.AppDataPath);
+                        SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
+                        break;
+                    case FrameworkPlatform.WASM:
+                        await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
+                        break;
+                    default:
+                        throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+                }
+            }
+
+            SessionStorage!.User = new()
+            {
+                Id = Guid.Parse(result["id"].ToString()),
+                DisplayName = await ChatUserService.GetCurrentUserDisplayName(),
+                Username = await ChatUserService.GetCurrentUserUsername(),
+                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
+            };
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+        #if DEBUG
+        Console.WriteLine(ClientModel.CurrentFrameworkPlatform);
+        Console.WriteLine(JsonSerializer.Serialize(SessionStorage!.User));
+        #endif
+    }
+
+    private async Task SignOut()
+    {
+        switch (ClientModel.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(ClientModel.AppDataPath);
+                SaveFileService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+                await LocalStorageService.RemoveLocalStorage("token");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter not specified.");
+        }
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
+    }
+}

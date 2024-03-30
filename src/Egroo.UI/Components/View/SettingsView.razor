@@ -24,10 +24,10 @@
             return;
         }
 
-        switch (SessionStorage.CurrentFrameworkPlatform)
+        switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
-                string path = Path.Combine(SessionStorage.AppDataPath);
+                string path = Path.Combine(ClientModel.AppDataPath);
                 SaveFileService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:

@@ -1,4 +1,5 @@
-﻿using jihadkhawaja.mobilechat.client.Interfaces;
+﻿using jihadkhawaja.mobilechat.client.Core;
+using jihadkhawaja.mobilechat.client.Interfaces;
 using jihadkhawaja.mobilechat.client.Models;
 using jihadkhawaja.mobilechat.client.Services;
 using System.Text.Json;
@@ -22,9 +23,8 @@ namespace Egroo.Server.Test
             ChatChannelService = new ChatChannelService();
             ChatMessageService = new ChatMessageService();
 
-            var cancellationTokenSource = new CancellationTokenSource();
-            jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
-            await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+            await MobileChatSignalR.HubConnection.StartAsync();
 
             dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result = null;
@@ -45,17 +45,15 @@ namespace Egroo.Server.Test
             {
                 string Token = result["token"].ToString();
 
-                var cancellationTokenSource1 = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl, Token);
-                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, Token);
+                await MobileChatSignalR.HubConnection.StartAsync();
 
                 Channel = await ChatChannelService.CreateChannel("test");
             }
             else
             {
-                var cancellationTokenSource2 = new CancellationTokenSource();
-                jihadkhawaja.mobilechat.client.MobileChatClient.Initialize(TestConfig.HubConnectionUrl);
-                await jihadkhawaja.mobilechat.client.MobileChatClient.SignalR.Connect(cancellationTokenSource);
+                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+                await MobileChatSignalR.HubConnection.StartAsync();
             }
         }
         [TestMethod]

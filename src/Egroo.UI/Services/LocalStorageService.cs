@@ -11,18 +11,41 @@ namespace Egroo.UI.Services
             _js = js;
         }
 
-        public async Task<string> GetFromLocalStorage(string key)
+        public async Task<string?> GetFromLocalStorage(string key)
         {
-            return await _js.InvokeAsync<string>("localStorage.getItem", key);
+            try
+            {
+                return await _js.InvokeAsync<string>("localStorage.getItem", key);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while getting item from local storage: {ex.Message}");
+                return null;
+            }
         }
 
         public async Task SetLocalStorage(string key, string value)
         {
-            await _js.InvokeVoidAsync("localStorage.setItem", key, value);
+            try
+            {
+                await _js.InvokeVoidAsync("localStorage.setItem", key, value);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while setting item in local storage: {ex.Message}");
+            }
         }
+
         public async Task RemoveLocalStorage(string key)
         {
-            await _js.InvokeVoidAsync("localStorage.removeItem", key);
+            try
+            {
+                await _js.InvokeVoidAsync("localStorage.removeItem", key);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while removing item from local storage: {ex.Message}");
+            }
         }
     }
 }

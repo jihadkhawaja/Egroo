@@ -11,12 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore src/Egroo.Server/Egroo.Server.csproj
     - name: Build
@@ -56,81 +54,32 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server.tar"
-          target: "/opt"
+          target: "/home/ubuntu/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
-            docker load -i /opt/mobilechat-server.tar
-            rm /opt/mobilechat-server.tar
+            docker load -i /home/ubuntu/images/mobilechat-server.tar
+            rm /home/ubuntu/images/mobilechat-server.tar
             docker kill mobilechat-server
             docker system prune -f
-            docker run --name mobilechat-server -p 43222:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
-            
-  nginx-setup:
-    name: Nginx Setup
-    needs: docker-build
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-                  desired_config='
-                  server {
-                      listen        80;
-                      server_name   dev-api-chat.jihadkhawaja.com;
-                      location / {
-                          proxy_pass         http://localhost:43222;
-                          proxy_http_version 1.1;
-                          proxy_set_header   Upgrade $http_upgrade;
-                          proxy_set_header   Connection "upgrade";
-                          proxy_set_header   Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header   X-Forwarded-Proto $scheme;
-                      }
-                  }'
+            docker run --name mobilechat-server -p 43222:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
 
-                  if [ -f /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
-
-                          sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com >/dev/null
-
-                      sudo ln -sf /etc/nginx/sites-available/dev-api-chat.jihadkhawaja.com /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
-                  fi
   uni-test:
     runs-on: ubuntu-latest
-    needs: nginx-setup
+    needs: docker-build
     steps:
     - uses: actions/checkout@v2
-
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
-
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2
       with:
-        dotnet-version: '7.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Restore dependencies
       run: dotnet restore src/Egroo.Server.Test/Egroo.Server.Test.csproj
@@ -157,7 +106,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker kill mobilechat-server
             docker system prune -f
@@ -171,6 +120,6 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
             docker exec postgres psql -U postgres -c "drop database \"egroo-dev-test\" WITH ( FORCE );"

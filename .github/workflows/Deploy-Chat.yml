@@ -12,12 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.server src/MobileChat.Server.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: 8.0.x
     - name: Restore dependencies
       run: dotnet restore src/Egroo.Server/Egroo.Server.csproj
     - name: Build
@@ -57,107 +55,45 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server-prod.tar"
-          target: "/opt"
+          target: "/home/ubuntu/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
-            docker load -i /opt/mobilechat-server-prod.tar
-            rm /opt/mobilechat-server-prod.tar
+            docker load -i /home/ubuntu/images/mobilechat-server-prod.tar
+            rm /home/ubuntu/images/mobilechat-server-prod.tar
             docker kill mobilechat-server-prod
             docker system prune -f
-            docker run --name mobilechat-server-prod -p 49117:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server-prod:latest 
-  nginx-setup-api:
-    name: Nginx Setup api
-    needs: docker-build-api
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-                  desired_config='
-                  server {
-                      listen        80;
-                      server_name   api.egroo.org;
-                      location / {
-                          proxy_pass         http://localhost:49117;
-                          proxy_http_version 1.1;
-                          proxy_set_header   Upgrade $http_upgrade;
-                          proxy_set_header   Connection "upgrade";
-                          proxy_set_header   Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header   X-Forwarded-Proto $scheme;
-                      }
-                  }'
-
-                  if [ -f /etc/nginx/sites-available/api-chat.egroo.org ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/api-chat.egroo.org >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
-
-                          sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/api-chat.egroo.org >/dev/null
-
-                      sudo ln -sf /etc/nginx/sites-available/api-chat.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
-                  fi
+            docker run --name mobilechat-server-prod -p 49117:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server-prod:latest
   dotnet-build-wasm:
     name: Dotnet Build wasm
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Clone Refrences
-      run: git clone --branch dev https://github.com/jihadkhawaja/mobilechat.client src/MobileChat.Client.Package
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: 7.0.x
+        dotnet-version: 8.0.x
     - name: Restore dependencies
-      run: dotnet restore src/Egroo.WASM/Egroo.WASM.csproj
+      run: dotnet restore src/Egroo/Egroo.csproj
     - name: Build
-      run: dotnet build --no-restore src/Egroo.WASM/Egroo.WASM.csproj
+      run: dotnet build --no-restore src/Egroo/Egroo.csproj
     - name: Test
-      run: dotnet test --no-build --verbosity normal src/Egroo.WASM/Egroo.WASM.csproj
+      run: dotnet test --no-build --verbosity normal src/Egroo/Egroo.csproj
   docker-build-wasm:
     name: Docker Build wasm
     needs: dotnet-build-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Create appsettings
-        run: |
-              echo 'events { }
-              http {
-                  include mime.types;
-
-                  server {
-                      listen 80;
-
-                      location / {
-                          root /usr/share/nginx/html;
-                          try_files $uri $uri/ /index.html =404;
-                      }
-                  }
-              }' > src/Egroo.WASM/nginx.conf
       - name: build docker image
-        run: docker build -t jihadkhawaja/mobilechat-wasm-prod:latest -f src/Egroo.WASM/Dockerfile .
+        run: docker build -t jihadkhawaja/mobilechat-wasm-prod:latest -f src/Egroo/Egroo/Dockerfile .
       - name: save docker image
         run: |
              docker save -o mobilechat-wasm-prod.tar jihadkhawaja/mobilechat-wasm-prod
@@ -166,58 +102,19 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-wasm-prod.tar"
-          target: "/opt"
+          target: "/home/ubuntu/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
+          key: ${{ secrets.KEY }}
           script: |
-            docker load -i /opt/mobilechat-wasm-prod.tar
-            rm /opt/mobilechat-wasm-prod.tar
+            docker load -i /home/ubuntu/images/mobilechat-wasm-prod.tar
+            rm /home/ubuntu/images/mobilechat-wasm-prod.tar
             docker kill mobilechat-wasm-prod
             docker system prune -f
-            docker run --name mobilechat-wasm-prod -p 49168:80 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-wasm-prod:latest  
-  nginx-setup-wasm:
-    name: Nginx Setup wasm
-    needs: docker-build-wasm
-    runs-on: ubuntu-latest
-    steps:
-      - name: executing remote ssh commands
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          script: |
-                  desired_config='
-                        server {
-                        listen        80;
-                        server_name   egroo.org www.egroo.org;
-                        location / {
-                            proxy_pass         http://localhost:49168;
-                            add_header Access-Control-Allow-Origin *;
-                        }
-                    }'
-
-                  if [ -f /etc/nginx/sites-available/www.egroo.org ]; then
-                      if diff -q <(echo "$desired_config") /etc/nginx/sites-available/www.egroo.org >/dev/null; then
-                          echo "File exists and contains the desired configuration. Skipping..."
-                      else
-                          echo "File exists but doesn't contain the desired configuration. Updating..."
-                          echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
-
-                          sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                          sudo systemctl restart nginx
-                      fi
-                  else
-                      echo "File does not exist. Creating..."
-                      echo "$desired_config" | sudo tee /etc/nginx/sites-available/www.egroo.org >/dev/null
-
-                      sudo ln -sf /etc/nginx/sites-available/www.egroo.org /etc/nginx/sites-enabled/
-                      sudo systemctl restart nginx
-                  fi
+            docker run --name mobilechat-wasm-prod -p 49168:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-wasm-prod:latest
