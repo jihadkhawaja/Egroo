@@ -1,4 +1,4 @@
-name: Nuget Client Push
+name: Nuget Client and Server Push
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ on:
     - "v[0-9]+.[0-9]+.[0-9]+"
 jobs:
   build:
-    runs-on: ubuntu-latest    
+    runs-on: ubuntu-latest
     env:
         VERSION: 1.0.0
     outputs:
@@ -21,8 +21,8 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        fetch-depth: 0 
-        
+        fetch-depth: 0
+
     - name: Set tag from input
       if: ${{ github.event.inputs.version != '' }}
       env:
@@ -39,7 +39,7 @@ jobs:
       id: output-version
       run: |
         echo "VERSION=${{ env.VERSION }}" >> $GITHUB_OUTPUT
-        
+
     #Build/pack the project
     - name: Setup .NET
       uses: actions/setup-dotnet@v2
@@ -53,33 +53,67 @@ jobs:
     - name: Upload NuGet package to GitHub
       uses: actions/upload-artifact@v2
       with:
-        name: nugetPackage
+        name: nugetPackageClient
         path: src/jihadkhawaja.mobilechat.client/bin/Release/
-        
+
     #Push NuGet package to GitHub packages
     - name: Download nuget package artifact
       uses: actions/download-artifact@v1.0.0
       with:
-        name: nugetPackage
+        name: nugetPackageClient
     - name: Prep packages
       run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
     - name: Push package to GitHub packages
-      run: dotnet nuget push nugetPackage/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
-      
+      run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
+
     - name: Publish nuget package
-      run: dotnet nuget push nugetPackage/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
-  Release: 
-    runs-on: ubuntu-latest 
+      run: dotnet nuget push nugetPackageClient/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+
+    #Build/pack the project
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+         dotnet-version: |
+          6.0.x
+          7.0.x
+          8.0.x
+    - name: Build and Pack NuGet package
+      run: dotnet pack src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj -p:Version=${VERSION} -c Release
+    - name: Upload NuGet package to GitHub
+      uses: actions/upload-artifact@v2
+      with:
+        name: nugetPackageServer
+        path: src/jihadkhawaja.mobilechat.server/bin/Release/
+
+    #Push NuGet package to GitHub packages
+    - name: Download nuget package artifact
+      uses: actions/download-artifact@v1.0.0
+      with:
+        name: nugetPackageServer
+    - name: Prep packages
+      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
+    - name: Push package to GitHub packages
+      run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
+
+    - name: Publish nuget package
+      run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+
+  Release:
+    runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Download nuget package artifact
+      - name: Download nuget package client artifact
         uses: actions/download-artifact@v1.0.0
         with:
-          name: nugetPackage
+          name: nugetPackageClient
+      - name: Download nuget package server artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: nugetPackageServer
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ needs.build.outputs.VERSION }}
           name: Release ${{ needs.build.outputs.VERSION }}
-          artifacts: "nugetPackage/*.nupkg"
+          artifacts: "nugetPackageClient/*.nupkg,nugetPackageServer/*.nupkg"
           token: ${{ secrets.Egroo_GITHUB_PACKAGE }}
