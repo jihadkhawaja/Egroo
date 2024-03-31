@@ -15,10 +15,10 @@
 
 @if (IsBusy || MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected)
 {
-    <div style="width:100vw;height:100vh;background-color:#27272fff">
+    <div style="width:100vw;height:100vh;background-color:var(--mud-palette-background)">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
         <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
-            Please Wait...
+            Establishing Connection
         </MudText>
     </div>
 
