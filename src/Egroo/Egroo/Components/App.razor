@@ -14,6 +14,37 @@
     <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
 
+    <title>@PageTitle</title>
+    <!-- HTML Meta Tags -->
+    <meta name="description"
+          content="@MetaContent">
+    <meta name="keywords" content="@MetaKeywords">
+
+    <link rel="canonical" href="@baseUrl">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+
+    <!-- Google / Search Engine Tags -->
+    <meta itemprop="name" content="@MetaTitle">
+    <meta itemprop="description"
+          content="@MetaContent">
+    <meta itemprop="image" content="@MetaThumbnailUrl">
+
+    <!-- Facebook Meta Tags -->
+    <meta property="og:url" content="@baseUrl">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="@MetaTitle">
+    <meta property="og:description"
+          content="@MetaContent">
+    <meta property="og:image" content="@MetaThumbnailUrl">
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="@MetaTitle">
+    <meta name="twitter:description"
+          content="@MetaContent">
+    <meta name="twitter:image" content="@MetaThumbnailUrl">
+
     <HeadOutlet @rendermode="InteractiveAuto" />
 </head>
 
@@ -27,3 +58,12 @@
 </body>
 
 </html>
+
+@code {
+    string PageTitle = "Egroo - Cross-platform chat";
+    string MetaTitle = "Cross-platform chat";
+    string MetaContent = "Self-host chatting solution with cross-platform client application.";
+    string MetaThumbnailUrl = "https://raw.githubusercontent.com/jihadkhawaja/Egroo/main/docs/icon.png";
+    string MetaKeywords = "Jihad Khawaja, Jihad Khawaja Egroo, Blazor .net 8 Auto, c#, jihad khawaja chat signalr, chat signalr, Egroo";
+    string baseUrl = "https://www.egroo.org/";
+}
