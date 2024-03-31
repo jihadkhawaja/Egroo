@@ -48,45 +48,59 @@ jobs:
           6.0.x
           7.0.x
           8.0.x
-    - name: Prep packages
+    - name: Nuget add source
       run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
-    - name: Build and Pack NuGet package
+
+      #Push NuGet package
+    - name: Pack package
       run: dotnet pack src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj -p:Version=${VERSION} -c Release
-    - name: Upload NuGet package to GitHub
+
+    - name: Upload NuGet Client package to artifact
       uses: actions/upload-artifact@v2
       with:
         name: nugetPackageClient
         path: src/jihadkhawaja.mobilechat.client/bin/Release/
 
-    #Push NuGet package to GitHub packages
-    - name: Download nuget package artifact
-      uses: actions/download-artifact@v1.0.0
-      with:
-        name: nugetPackageClient
-    - name: Push package to GitHub packages
-      run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
-
-    - name: Publish nuget package
-      run: dotnet nuget push nugetPackageClient/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
-
-    - name: Build and Pack NuGet package
+      #Push NuGet package
+    - name: Pack package
       run: dotnet pack src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj -p:Version=${VERSION} -c Release
+
     - name: Upload NuGet package to GitHub
       uses: actions/upload-artifact@v2
       with:
         name: nugetPackageServer
         path: src/jihadkhawaja.mobilechat.server/bin/Release/
 
-    #Push NuGet package to GitHub packages
+  PublishClient:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download nuget client package artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: nugetPackageClient
+
+      - name: Push client package to GitHub packages
+        run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
+
+      - name: Publish nuget client package
+        run: dotnet nuget push nugetPackageClient/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+
+  PublishServer:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
     - name: Download nuget package artifact
       uses: actions/download-artifact@v1.0.0
       with:
         name: nugetPackageServer
+
     - name: Push package to GitHub packages
       run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
 
     - name: Publish nuget package
       run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+
 
   Release:
     runs-on: ubuntu-latest
