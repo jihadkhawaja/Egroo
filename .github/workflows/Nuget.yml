@@ -79,7 +79,10 @@ jobs:
         uses: actions/download-artifact@v1.0.0
         with:
           name: nugetPackageClient
-
+          
+      - name: Nuget add source
+        run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
+      
       - name: Push client package to GitHub packages
         run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
 
@@ -94,6 +97,9 @@ jobs:
       uses: actions/download-artifact@v1.0.0
       with:
         name: nugetPackageServer
+
+    - name: Nuget add source
+      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"    
 
     - name: Push package to GitHub packages
       run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
