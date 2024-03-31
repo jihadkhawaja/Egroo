@@ -24,8 +24,8 @@ Self-host chatting solution with cross-platform client application.
 | Platforms | .NET | Support |
 | :---: | :---: | :---: |
 | Xamarin | [.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Ended 01/2020 |
-| Blazor WASM | [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Ended 01/2022 |
-| Blazor WASM, Blazor Hybrid MAUI | [.NET 7](https://dotnet.microsoft.com/download/dotnet/7.0) | :heavy_check_mark: |
+| Blazor WASM, Blazor Hybrid MAUI | [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Ended 01/2022 |
+| Blazor WASM, Blazor Hybrid MAUI | [.NET 7](https://dotnet.microsoft.com/download/dotnet/7.0) | Ended 04/2024 |
 | Blazor Auto, Blazor Hybrid MAUI | [.NET 8](https://dotnet.microsoft.com/download/dotnet/8.0) | :heavy_check_mark: |
 
 # Documentation
