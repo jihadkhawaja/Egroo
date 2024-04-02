@@ -9,13 +9,11 @@ namespace jihadkhawaja.mobilechat.client.Models
         public Guid SenderId { get; set; }
         [Required]
         public Guid ChannelId { get; set; }
+        public DateTimeOffset? DateSent { get; set; }
+        public DateTimeOffset? DateSeen { get; set; }
         [NotMapped]
         public string? DisplayName { get; set; }
-        public bool Sent { get; set; }
-        public DateTime? DateSent { get; set; }
-        public bool Seen { get; set; }
-        public DateTime? DateSeen { get; set; }
-        [Required]
+        [NotMapped]
         public string? Content { get; set; }
     }
 }

@@ -11,7 +11,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 {
     public partial class ChatHub : IChatAuth
     {
-        public async Task<dynamic?> SignUp(string displayname, string username, string email, string password)
+        public async Task<dynamic?> SignUp(string displayname, string username, string password)
         {
             if (!PatternMatchHelper.IsValidUsername(username)
                 || !PatternMatchHelper.IsValidPassword(password))
@@ -20,18 +20,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             }
 
             username = username.ToLower();
-
-            if (!string.IsNullOrWhiteSpace(email))
-            {
-                if (PatternMatchHelper.IsValidEmail(email))
-                {
-                    email = email.ToLower();
-                }
-                else
-                {
-                    email = string.Empty;
-                }
-            }
 
             if (await UserService.ReadFirst(x => x.Username == username) != null)
             {
@@ -43,7 +31,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             User user = new()
             {
                 Username = username,
-                Email = email,
                 Password = encryptedPassword,
                 DisplayName = displayname,
                 ConnectionId = Context.ConnectionId,
@@ -75,93 +62,48 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 
             return null;
         }
-        public async Task<dynamic?> SignIn(string emailorusername, string password)
+        public async Task<dynamic?> SignIn(string username, string password)
         {
-            emailorusername = emailorusername.ToLower();
+            username = username.ToLower();
 
-            if (PatternMatchHelper.IsValidEmail(emailorusername))
+            User? user = await UserService.ReadFirst(x => x.Username == username);
+            if (user == null)
             {
-                User? user = await UserService.ReadFirst(x => x.Email == emailorusername);
-
-                if (user == null)
-                {
-                    return null;
-                }
-                else if (string.IsNullOrWhiteSpace(user.Password))
-                {
-                    return null;
-                }
-                else if (!CryptographyHelper.ComparePassword(password, user.Password))
-                {
-                    return null;
-                }
-                else if (MobileChatServer.Configuration == null)
-                {
-                    return null;
-                }
-
-                User registeredUser = user;
-
-                registeredUser.ConnectionId = Context.ConnectionId;
-                registeredUser.IsOnline = true;
-                registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
-                registeredUser.DateUpdated = DateTimeOffset.UtcNow;
-
-                var generatedToken = await TokenGenerator.GenerateJwtToken(registeredUser, MobileChatServer.Configuration.GetSection("Secrets")["Jwt"]);
-                string token = generatedToken.Access_Token;
-
-                User[] users = new User[1] { registeredUser };
-                await UserService.Update(users);
-
-                var result = new
-                {
-                    registeredUser.Id,
-                    token,
-                };
-
-                return result;
+                return null;
             }
-            else
+            else if (string.IsNullOrWhiteSpace(user.Password))
             {
-                User? user = await UserService.ReadFirst(x => x.Username == emailorusername);
-                if (user == null)
-                {
-                    return null;
-                }
-                else if (string.IsNullOrWhiteSpace(user.Password))
-                {
-                    return null;
-                }
-                else if (!CryptographyHelper.ComparePassword(password, user.Password))
-                {
-                    return null;
-                }
-                else if (MobileChatServer.Configuration == null)
-                {
-                    return null;
-                }
-
-                User registeredUser = user;
-
-                registeredUser.ConnectionId = Context.ConnectionId;
-                registeredUser.IsOnline = true;
-                registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
-                registeredUser.DateUpdated = DateTimeOffset.UtcNow;
-
-                var generatedToken = await TokenGenerator.GenerateJwtToken(registeredUser, MobileChatServer.Configuration.GetSection("Secrets")["Jwt"]);
-                string token = generatedToken.Access_Token;
-
-                User[] users = new User[1] { registeredUser };
-                await UserService.Update(users);
-
-                var result = new
-                {
-                    registeredUser.Id,
-                    token,
-                };
-
-                return result;
+                return null;
             }
+            else if (!CryptographyHelper.ComparePassword(password, user.Password))
+            {
+                return null;
+            }
+            else if (MobileChatServer.Configuration == null)
+            {
+                return null;
+            }
+
+            User registeredUser = user;
+
+            registeredUser.ConnectionId = Context.ConnectionId;
+            registeredUser.IsOnline = true;
+            registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
+            registeredUser.DateUpdated = DateTimeOffset.UtcNow;
+
+            var generatedToken = await TokenGenerator.GenerateJwtToken(registeredUser, MobileChatServer.Configuration.GetSection("Secrets")["Jwt"]);
+            string token = generatedToken.Access_Token;
+
+            User[] users = new User[1] { registeredUser };
+            await UserService.Update(users);
+
+            var result = new
+            {
+                registeredUser.Id,
+                token,
+            };
+
+            return result;
         }
         public async Task<dynamic?> RefreshSession(string oldtoken)
         {
@@ -199,64 +141,33 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             return result;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> ChangePassword(string emailorusername, string oldpassword, string newpassword)
+        public async Task<bool> ChangePassword(string username, string oldpassword, string newpassword)
         {
-            if (PatternMatchHelper.IsValidEmail(emailorusername))
+            User? registeredUser = await UserService.ReadFirst(x => x.Username == username);
+
+            if (registeredUser is null)
             {
-                User? registeredUser = await UserService.ReadFirst(x => x.Email == emailorusername);
-
-                if (registeredUser is null)
-                {
-                    return false;
-                }
-
-                if (string.IsNullOrWhiteSpace(registeredUser.Password))
-                {
-                    return false;
-                }
-                else if (!CryptographyHelper.ComparePassword(oldpassword, registeredUser.Password))
-                {
-                    return false;
-                }
-
-                string encryptedPassword = CryptographyHelper.SecurePassword(newpassword);
-                registeredUser.Password = encryptedPassword;
-
-                registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
-                registeredUser.DateUpdated = DateTimeOffset.UtcNow;
-                User[] users = new User[1] { registeredUser };
-                await UserService.Update(users);
-
-                return true;
+                return false;
             }
-            else
+
+            if (string.IsNullOrWhiteSpace(registeredUser.Password))
             {
-                User? registeredUser = await UserService.ReadFirst(x => x.Username == emailorusername);
-
-                if (registeredUser is null)
-                {
-                    return false;
-                }
-
-                if (string.IsNullOrWhiteSpace(registeredUser.Password))
-                {
-                    return false;
-                }
-                else if (!CryptographyHelper.ComparePassword(oldpassword, registeredUser.Password))
-                {
-                    return false;
-                }
-
-                string encryptedPassword = CryptographyHelper.SecurePassword(newpassword);
-                registeredUser.Password = encryptedPassword;
-
-                registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
-                registeredUser.DateUpdated = DateTimeOffset.UtcNow;
-                User[] users = new User[1] { registeredUser };
-                await UserService.Update(users);
-
-                return true;
+                return false;
             }
+            else if (!CryptographyHelper.ComparePassword(oldpassword, registeredUser.Password))
+            {
+                return false;
+            }
+
+            string encryptedPassword = CryptographyHelper.SecurePassword(newpassword);
+            registeredUser.Password = encryptedPassword;
+
+            registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
+            registeredUser.DateUpdated = DateTimeOffset.UtcNow;
+            User[] users = new User[1] { registeredUser };
+            await UserService.Update(users);
+
+            return true;
         }
     }
 }

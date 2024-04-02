@@ -24,9 +24,9 @@ Self-host chatting solution with cross-platform client application.
 | Platforms | .NET | Support |
 | :---: | :---: | :---: |
 | Xamarin | [.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Ended 01/2020 |
-| Blazor WASM, Blazor Hybrid MAUI | [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Ended 01/2022 |
-| Blazor WASM, Blazor Hybrid MAUI | [.NET 7](https://dotnet.microsoft.com/download/dotnet/7.0) | Ended 04/2024 |
-| Blazor Auto, Blazor Hybrid MAUI | [.NET 8](https://dotnet.microsoft.com/download/dotnet/8.0) | :heavy_check_mark: |
+| Blazor WASM, MAUI Hybrid | [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Ended 01/2022 |
+| Blazor WASM, MAUI Hybrid | [.NET 7](https://dotnet.microsoft.com/download/dotnet/7.0) | Ended 04/2024 |
+| Blazor Auto, MAUI Hybrid | [.NET 8](https://dotnet.microsoft.com/download/dotnet/8.0) | :heavy_check_mark: |
 
 # Documentation
 Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki)
@@ -50,13 +50,3 @@ Feel free to fork and **contribute** or **open an issue**. All contributions are
 
 ### Community
 Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
-
-#### Sponsors
-
-<div>
-    <a href="https://www.jetbrains.com/" align="right"><img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.svg" alt="JetBrains" class="logo-footer" width="72" align="left">
-    <a>
-    <br/>
-        
-Special thanks to [JetBrains](https://jb.gg/OpenSourceSupport) for supporting us with open-source licenses for their IDEs. </a>
-</div>

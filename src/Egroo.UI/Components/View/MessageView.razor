@@ -7,12 +7,12 @@
         </MudStack>
         <MudText Class="mt-2 pr-12" Typo="Typo.body1" Style="white-space: initial;overflow-wrap: break-word;">@Content</MudText>
         <MudStack Row Style="position:absolute;bottom:0;right:0;" Class="pa-2" Spacing="0">
-            @if(IsSent && IsSeen)
+            @if (SentOnDate is not null && SeenOnDate is not null)
             {
                 <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
                 <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
             }
-            else if (IsSent)
+            else if (SentOnDate is not null)
             {
                 <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
             }
@@ -40,7 +40,7 @@ else
     [Parameter]
     public bool IsCurrentUser { get; set; }
     [Parameter]
-    public bool IsSent { get; set; }
+    public DateTimeOffset? SentOnDate { get; set; }
     [Parameter]
-    public bool IsSeen { get; set; }
+    public DateTimeOffset? SeenOnDate { get; set; }
 }

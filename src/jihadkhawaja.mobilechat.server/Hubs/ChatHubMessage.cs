@@ -30,7 +30,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             message.Id = Guid.NewGuid();
             message.DateCreated = DateTime.UtcNow;
             message.DateSent = DateTime.UtcNow;
-            message.Sent = true;
 
             Message[] messages = [message];
             if (await MessageService.Create(messages))
@@ -69,7 +68,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 
             Message dbMessage = await MessageService.ReadFirst(x => x.Id == messageid);
             dbMessage.DateSeen = DateTime.UtcNow;
-            dbMessage.Seen = true;
 
             Message[] messages = new Message[1] { dbMessage };
             //save msg to db

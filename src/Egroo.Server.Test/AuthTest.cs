@@ -34,7 +34,7 @@ namespace Egroo.Server.Test
         [TestMethod, Priority(1)]
         public async Task SignUpThenSignInTest()
         {
-            dynamic? dynamicObj2 = await ChatAuthService.SignUp("Test", "test", "test@domain.com", "HvrnS4Q4zJ$xaW!3");
+            dynamic? dynamicObj2 = await ChatAuthService.SignUp("Test", "test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result2 = null;
             if (dynamicObj2 is not null)
             {

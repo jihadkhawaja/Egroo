@@ -32,21 +32,21 @@
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                         }
                     </MudStack>
@@ -128,7 +128,7 @@
         foreach (var msg in messages)
         {
             msg.DisplayName = await GetUserName(msg.SenderId);
-            if (!msg.Seen && msg.SenderId != SessionStorage.User.Id)
+            if (msg.DateSeen is null && msg.SenderId != SessionStorage.User.Id)
             {
                 await ChatMessageService.SetMessageAsSeen(msg.Id);
             }
@@ -219,7 +219,7 @@
 
             await InvokeAsync(StateHasChanged);
 
-            if (!message.Seen && message.SenderId != SessionStorage.User.Id)
+            if (message.DateSeen is null && message.SenderId != SessionStorage.User.Id)
             {
                 await ChatMessageService.SetMessageAsSeen(message.Id);
             }

@@ -55,25 +55,6 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             return displayname;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<string?> GetUserDisplayNameByEmail(string email)
-        {
-            email = email.ToLower();
-            User? user = await UserService.ReadFirst(x => x.Email == email);
-
-            if (user == null)
-            {
-                return null;
-            }
-            else if (string.IsNullOrWhiteSpace(user.DisplayName))
-            {
-                return null;
-            }
-
-            string displayname = user.DisplayName;
-
-            return displayname;
-        }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<string?> GetUserUsername(Guid userId)
         {
             User? user = await UserService.ReadFirst(x => x.Id == userId);
@@ -117,9 +98,9 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             return username;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> AddFriend(string friendEmailorusername)
+        public async Task<bool> AddFriend(string friendusername)
         {
-            if (string.IsNullOrEmpty(friendEmailorusername))
+            if (string.IsNullOrEmpty(friendusername))
             {
                 return false;
             }
@@ -149,46 +130,24 @@ namespace jihadkhawaja.mobilechat.server.Hubs
                     return false;
                 }
 
-                friendEmailorusername = friendEmailorusername.ToLower();
+                friendusername = friendusername.ToLower();
 
-                if (PatternMatchHelper.IsValidEmail(friendEmailorusername))
+                //get friend id from username
+                User? friendUser = await UserService.ReadFirst(x => x.Username == friendusername);
+                if (friendUser == null || currentUser.Id == friendUser.Id)
                 {
-                    //get friend id from email
-                    User? friendUser = await UserService.ReadFirst(x => x.Email == friendEmailorusername);
-                    if (friendUser == null || currentUser.Id == friendUser.Id)
-                    {
-                        return false;
-                    }
-
-                    if (await UserFriendsService.ReadFirst(x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
-                    || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
-                    {
-                        return false;
-                    }
-
-                    UserFriend entry = new() { UserId = currentUser.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-                    UserFriend[] entries = new UserFriend[1] { entry };
-                    await UserFriendsService.Create(entries);
+                    return false;
                 }
-                else
+
+                if (await UserFriendsService.ReadFirst(x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
+                || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
                 {
-                    //get friend id from username
-                    User? friendUser = await UserService.ReadFirst(x => x.Username == friendEmailorusername);
-                    if (friendUser == null || currentUser.Id == friendUser.Id)
-                    {
-                        return false;
-                    }
-
-                    if (await UserFriendsService.ReadFirst(x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
-                    || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
-                    {
-                        return false;
-                    }
-
-                    UserFriend entry = new() { Id = Guid.NewGuid(), UserId = currentUser.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-                    UserFriend[] entries = new UserFriend[1] { entry };
-                    await UserFriendsService.Create(entries);
+                    return false;
                 }
+
+                UserFriend entry = new() { Id = Guid.NewGuid(), UserId = currentUser.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                UserFriend[] entries = new UserFriend[1] { entry };
+                await UserFriendsService.Create(entries);
             }
             catch
             {
@@ -198,9 +157,9 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             return true;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> RemoveFriend(string friendEmailorusername)
+        public async Task<bool> RemoveFriend(string friendusername)
         {
-            if (string.IsNullOrEmpty(friendEmailorusername))
+            if (string.IsNullOrEmpty(friendusername))
             {
                 return false;
             }
@@ -221,59 +180,31 @@ namespace jihadkhawaja.mobilechat.server.Hubs
                 }
 
                 Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
-                friendEmailorusername = friendEmailorusername.ToLower();
+                friendusername = friendusername.ToLower();
 
-                if (PatternMatchHelper.IsValidEmail(friendEmailorusername))
+                //get user id from username
+                User? user = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
+                if (user == null)
                 {
-                    //get user id from email
-                    User? user = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
-                    if (user == null)
-                    {
-                        return false;
-                    }
-                    //get friend id from email
-                    User? friendUser = await UserService.ReadFirst(x => x.Email == friendEmailorusername);
-                    if (friendUser == null)
-                    {
-                        return false;
-                    }
-
-                    if (await UserFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
-                    x.FriendUserId == user.Id && x.UserId == friendUser.Id) != null)
-                    {
-                        return false;
-                    }
-
-                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-
-                    await UserFriendsService.Delete(x => x.Id == entry.Id);
+                    return false;
                 }
-                else
+                //get friend id from username
+                User? friendUser = await UserService.ReadFirst(x => x.Username == friendusername);
+                if (friendUser == null)
                 {
-                    //get user id from username
-                    User? user = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
-                    if (user == null)
-                    {
-                        return false;
-                    }
-                    //get friend id from username
-                    User? friendUser = await UserService.ReadFirst(x => x.Username == friendEmailorusername);
-                    if (friendUser == null)
-                    {
-                        return false;
-                    }
-
-                    if (await UserFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
-                    x.FriendUserId == user.Id && x.UserId == friendUser.Id) == null)
-                    {
-                        return false;
-                    }
-
-                    UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-
-                    await UserFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
-                    || x.FriendUserId == user.Id && x.UserId == friendUser.Id);
+                    return false;
                 }
+
+                if (await UserFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
+                x.FriendUserId == user.Id && x.UserId == friendUser.Id) == null)
+                {
+                    return false;
+                }
+
+                UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+
+                await UserFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
+                || x.FriendUserId == user.Id && x.UserId == friendUser.Id);
             }
             catch
             {
@@ -285,24 +216,28 @@ namespace jihadkhawaja.mobilechat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriends(Guid userId)
         {
-            return (await UserFriendsService.Read(x => (x.UserId == userId && x.IsAccepted) || (x.FriendUserId == userId && x.IsAccepted))).ToArray();
+            return (await UserFriendsService.Read(x => (x.UserId == userId 
+            && x.DateAcceptedOn is not null) 
+            || (x.FriendUserId == userId && x.DateAcceptedOn is not null))).ToArray();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriendRequests(Guid userId)
         {
-            return (await UserFriendsService.Read(x => x.FriendUserId == userId && !x.IsAccepted)).ToArray();
+            return (await UserFriendsService.Read(x => x.FriendUserId == userId 
+            && x.DateAcceptedOn is null)).ToArray();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
         {
-            UserFriend? result = await UserFriendsService.ReadFirst(x => x.UserId == userId && x.FriendUserId == friendId && x.IsAccepted);
+            UserFriend? result = await UserFriendsService.ReadFirst(x => x.UserId == userId 
+            && x.FriendUserId == friendId && x.DateAcceptedOn is not null);
 
             if (result is null)
             {
                 return false;
             }
 
-            return result.IsAccepted;
+            return true;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> AcceptFriend(Guid friendId)
@@ -314,7 +249,8 @@ namespace jihadkhawaja.mobilechat.server.Hubs
             }
 
             var identity = hc.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+            var userIdClaim = identity.Claims
+                .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
             if (userIdClaim == null)
             {
                 return false;
@@ -322,16 +258,17 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            UserFriend? friendRequest = await UserFriendsService.ReadFirst(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && !x.IsAccepted);
+            UserFriend? friendRequest = await UserFriendsService.ReadFirst(x => x.UserId == friendId 
+            && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
 
             if (friendRequest is null)
             {
                 return false;
             }
 
-            friendRequest.IsAccepted = true;
+            friendRequest.DateAcceptedOn = DateTimeOffset.UtcNow;
 
-            UserFriend[] friendRequests = new UserFriend[1] { friendRequest };
+            UserFriend[] friendRequests = [friendRequest];
             return await UserFriendsService.Update(friendRequests);
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -352,7 +289,7 @@ namespace jihadkhawaja.mobilechat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && !x.IsAccepted);
+            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)

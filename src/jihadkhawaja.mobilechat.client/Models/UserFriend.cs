@@ -8,6 +8,6 @@ namespace jihadkhawaja.mobilechat.client.Models
         public Guid UserId { get; set; }
         [Required]
         public Guid FriendUserId { get; set; }
-        public bool IsAccepted { get; set; }
+        public DateTimeOffset? DateAcceptedOn { get; set; }
     }
 }
