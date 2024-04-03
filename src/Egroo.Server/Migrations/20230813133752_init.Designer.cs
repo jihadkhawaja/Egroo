@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using jihadkhawaja.mobilechat.server.Database;
+using jihadkhawaja.chat.server.Database;
 
 #nullable disable
 
@@ -25,7 +25,7 @@ namespace Egroo.Server.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.Channel", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.server.Models.Channel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -39,7 +39,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("Channels");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.ChannelUser", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.server.Models.ChannelUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -62,7 +62,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("ChannelUsers");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.Message", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.server.Models.Message", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -98,7 +98,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("Messages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.User", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.server.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -154,7 +154,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.UserFriend", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.server.Models.UserFriend", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()

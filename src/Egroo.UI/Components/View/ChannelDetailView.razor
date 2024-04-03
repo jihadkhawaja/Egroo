@@ -21,7 +21,7 @@ else
                     <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem>
-                                <ScopeView Title=@user.DisplayName Subtitle=@user.Username />
+                                <ScopeView Title=@user.Username Subtitle=@user.LastLoginDate?.Date.ToShortDateString() />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">

@@ -1,7 +1,7 @@
 ﻿using Egroo.UI.Interfaces;
 using Egroo.UI.Models;
 using Egroo.UI.Services;
-using jihadkhawaja.mobilechat.client;
+using jihadkhawaja.chat.client;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -29,7 +29,7 @@ namespace Egroo.UI
             }
 
             services.AddMudServices();
-            services.AddMobileChatServices();
+            services.AddChatServices();
 
             return services;
         }

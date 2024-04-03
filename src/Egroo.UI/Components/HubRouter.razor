@@ -1,8 +1,8 @@
 ﻿@using Egroo.UI.Components.Layout
 @using Egroo.UI.Models
 @using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.mobilechat.client.Interfaces;
-@using jihadkhawaja.mobilechat.client.Core;
+@using jihadkhawaja.chat.shared.Interfaces;
+@using jihadkhawaja.chat.client.Core;
 @using Egroo.UI.Constants
 @using System.Text.Json;
 
@@ -121,7 +121,6 @@
             SessionStorage!.User = new()
             {
                 Id = Guid.Parse(result["id"].ToString()),
-                DisplayName = await ChatUserService.GetCurrentUserDisplayName(),
                 Username = await ChatUserService.GetCurrentUserUsername(),
                 ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };

@@ -1,7 +1,7 @@
-﻿using jihadkhawaja.mobilechat.client.Core;
-using jihadkhawaja.mobilechat.client.Interfaces;
-using jihadkhawaja.mobilechat.client.Models;
-using jihadkhawaja.mobilechat.client.Services;
+﻿using jihadkhawaja.chat.client.Core;
+using jihadkhawaja.chat.shared.Interfaces;
+using jihadkhawaja.chat.shared.Models;
+using jihadkhawaja.chat.client.Services;
 using System.Text.Json;
 
 namespace Egroo.Server.Test

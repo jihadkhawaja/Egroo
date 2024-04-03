@@ -1,4 +1,4 @@
-﻿using jihadkhawaja.mobilechat.client.Models;
+﻿using jihadkhawaja.chat.shared.Models;
 
 namespace Egroo.UI.Services
 {

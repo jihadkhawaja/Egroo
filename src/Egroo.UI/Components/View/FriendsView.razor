@@ -27,7 +27,7 @@ else
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                             <MudGrid Justify="Justify.SpaceBetween">
                                 <MudItem>
-                                    <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                                    <ScopeView Title=@friend.Username Subtitle=@friend.LastLoginDate?.Date.ToShortDateString() />
                                 </MudItem>
                                 <MudItem>
                                     <MudStack Row Style="height:100%;">
@@ -49,7 +49,7 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friendRequests.DisplayName Subtitle=@friendRequests.Username />
+                            <ScopeView Title=@friendRequests.Username Subtitle=@friendRequests.LastLoginDate?.Date.ToShortDateString() />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -70,7 +70,7 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                             <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                            <ScopeView Title=@friend.Username Subtitle=@friend.LastLoginDate?.Date.ToShortDateString() />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -155,7 +155,6 @@ else
             {
                 User user = new User();
                 user.Id = users[i].UserId;
-                user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].UserId);
                 user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
                 user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
@@ -164,7 +163,6 @@ else
             {
                 User user = new User();
                 user.Id = users[i].FriendUserId;
-                user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].FriendUserId);
                 user.Username = await ChatUserService.GetUserUsername(users[i].FriendUserId);
                 user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
@@ -183,7 +181,6 @@ else
         {
             User user = new User();
             user.Id = users[i].UserId;
-            user.DisplayName = await ChatUserService.GetUserDisplayName(users[i].UserId);
             user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
             friendRequests[i] = user;
         }

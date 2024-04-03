@@ -12,7 +12,7 @@ WORKDIR /
 COPY ["src/Egroo/Egroo/Egroo.csproj", "Egroo/Egroo/"]
 COPY ["src/Egroo/Egroo.Client/Egroo.Client.csproj", "Egroo/Egroo.Client/"]
 COPY ["src/Egroo.UI/Egroo.UI.csproj", "Egroo.UI/"]
-COPY ["src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj", "jihadkhawaja.mobilechat.client/"]
+COPY ["src/jihadkhawaja.chat.client/jihadkhawaja.chat.client.csproj", "jihadkhawaja.chat.client/"]
 RUN dotnet restore "./Egroo/Egroo/Egroo.csproj"
 COPY . .
 WORKDIR "/src/Egroo/Egroo"

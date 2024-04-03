@@ -4,8 +4,8 @@
 @using System.Text.Json
 @using Egroo.UI.Components.Layout;
 @using Egroo.UI.Models;
-@using jihadkhawaja.mobilechat.client
-@using jihadkhawaja.mobilechat.client.Core
+@using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.Core
 
 @inject LocalStorageService LocalStorageService
 @inject ISaveFile SaveFileService
@@ -29,11 +29,6 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
-                        <MudTextField @bind-Value="model.DisplayName"
-                                      For="@(() => model.DisplayName)"
-                                      Immediate="true" Required
-                                      Label="Display Name" InputType="InputType.Text" />
-
                         <MudTextField @bind-Value="model.Username"
                                       For="@(() => model.Username)"
                                       Immediate="true" Required
@@ -89,7 +84,7 @@
             return;
         }
 
-        dynamic dynamicObj = await ChatAuthService.SignUp(model.DisplayName, model.Username, model.Password);
+        dynamic dynamicObj = await ChatAuthService.SignUp(model.Username, model.Password);
         Dictionary<string, object> result = null;
         if (dynamicObj is not null)
         {
@@ -149,11 +144,6 @@
         public UserFluentValidator(IChatUser ChatUserService)
         {
             this.ChatUserService = ChatUserService;
-
-            RuleFor(x => x.DisplayName)
-                .NotEmpty()
-                .Length(3, 16)
-                .WithMessage("Display name must be between 3 and 16 characters");
 
             RuleFor(x => x.Username)
             .Cascade(CascadeMode.Stop)

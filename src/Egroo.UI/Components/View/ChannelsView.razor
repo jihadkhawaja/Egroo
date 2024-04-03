@@ -36,7 +36,7 @@ else
                                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                                      <MudGrid Justify="Justify.SpaceBetween">
                                          <MudItem>
-                                             <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                                             <ScopeView Title=@friend.Username Subtitle=@friend.LastLoginDate?.Date.ToShortDateString() />
                                          </MudItem>
                                          <MudItem>
                                              <MudStack Row Style="height:100%;">
@@ -163,11 +163,11 @@ else
             {
                 if (friend.Id == SessionStorage.User.Id)
                 {
-                    channels[i].Title += $"{await ChatUserService.GetUserDisplayName(friend.Id)} (You)";
+                    channels[i].Title += $"{await ChatUserService.GetUserUsername(friend.Id)} (You)";
                 }
                 else
                 {
-                    channels[i].Title += await ChatUserService.GetUserDisplayName(friend.Id);
+                    channels[i].Title += await ChatUserService.GetUserUsername(friend.Id);
                 }
 
                 channels[i].Title += ", ";

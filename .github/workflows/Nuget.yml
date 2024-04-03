@@ -4,72 +4,72 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Tag to publish v[0-9]+.[0-9]+.[0-9]+*'
+        description: "Tag to publish v[0-9]+.[0-9]+.[0-9]+*"
         required: true
-        default: ''
+        default: ""
         type: string
   push:
     tags:
-    - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+"
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-        VERSION: 1.0.0
+      VERSION: 1.0.0
     outputs:
-        VERSION: ${{ steps.output-version.outputs.VERSION }}
+      VERSION: ${{ steps.output-version.outputs.VERSION }}
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    - name: Set tag from input
-      if: ${{ github.event.inputs.version != '' }}
-      env:
-        TAG: ${{ github.event.inputs.version }}
-      run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+      - name: Set tag from input
+        if: ${{ github.event.inputs.version != '' }}
+        env:
+          TAG: ${{ github.event.inputs.version }}
+        run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
 
-    - name: Set version variable from tag
-      if: ${{ github.ref_type == 'tag' }}
-      env:
-        TAG: ${{ github.ref_name }}
-      run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
+      - name: Set version variable from tag
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          TAG: ${{ github.ref_name }}
+        run: echo "VERSION=${TAG#v}" >> $GITHUB_ENV
 
-    - name: VERSION to job output
-      id: output-version
-      run: |
-        echo "VERSION=${{ env.VERSION }}" >> $GITHUB_OUTPUT
+      - name: VERSION to job output
+        id: output-version
+        run: |
+          echo "VERSION=${{ env.VERSION }}" >> $GITHUB_OUTPUT
 
-    #Build/pack the project
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v2
-      with:
-         dotnet-version: |
-          6.0.x
-          7.0.x
-          8.0.x
-    - name: Nuget add source
-      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
+      #Build/pack the project
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: |
+            6.0.x
+            7.0.x
+            8.0.x
+      - name: Nuget add source
+        run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
-      #Push NuGet package
-    - name: Pack package
-      run: dotnet pack src/jihadkhawaja.mobilechat.client/jihadkhawaja.mobilechat.client.csproj -p:Version=${VERSION} -c Release
+        #Push NuGet package
+      - name: Pack package
+        run: dotnet pack src/jihadkhawaja.chat.client/jihadkhawaja.chat.client.csproj -p:Version=${VERSION} -c Release
 
-    - name: Upload NuGet Client package to artifact
-      uses: actions/upload-artifact@v2
-      with:
-        name: nugetPackageClient
-        path: src/jihadkhawaja.mobilechat.client/bin/Release/
+      - name: Upload NuGet Client package to artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: nugetPackageClient
+          path: src/jihadkhawaja.chat.client/bin/Release/
 
-      #Push NuGet package
-    - name: Pack package
-      run: dotnet pack src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj -p:Version=${VERSION} -c Release
+        #Push NuGet package
+      - name: Pack package
+        run: dotnet pack src/jihadkhawaja.chat.server/jihadkhawaja.chat.server.csproj -p:Version=${VERSION} -c Release
 
-    - name: Upload NuGet package to GitHub
-      uses: actions/upload-artifact@v2
-      with:
-        name: nugetPackageServer
-        path: src/jihadkhawaja.mobilechat.server/bin/Release/
+      - name: Upload NuGet package to GitHub
+        uses: actions/upload-artifact@v2
+        with:
+          name: nugetPackageServer
+          path: src/jihadkhawaja.chat.server/bin/Release/
 
   PublishClient:
     runs-on: ubuntu-latest
@@ -79,10 +79,10 @@ jobs:
         uses: actions/download-artifact@v1.0.0
         with:
           name: nugetPackageClient
-          
+
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
-      
+
       - name: Push client package to GitHub packages
         run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
 
@@ -93,20 +93,19 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-    - name: Download nuget package artifact
-      uses: actions/download-artifact@v1.0.0
-      with:
-        name: nugetPackageServer
+      - name: Download nuget package artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: nugetPackageServer
 
-    - name: Nuget add source
-      run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"    
+      - name: Nuget add source
+        run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
-    - name: Push package to GitHub packages
-      run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
+      - name: Push package to GitHub packages
+        run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
 
-    - name: Publish nuget package
-      run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
-
+      - name: Publish nuget package
+        run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
 
   Release:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 ﻿@using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.mobilechat.client;
-@using jihadkhawaja.mobilechat.client.Core
+@using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.Core
 
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
@@ -149,7 +149,7 @@
         Message message = new()
         {
             ChannelId = GetChannelId(),
-            DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
+            DisplayName = await ChatUserService.GetUserUsername(SessionStorage.User.Id),
             Content = InputContent,
             SenderId = SessionStorage.User.Id,
         };
@@ -179,7 +179,7 @@
 
     private async Task<string> GetUserName(Guid userid)
     {
-        return await ChatUserService.GetUserDisplayName(userid);
+        return await ChatUserService.GetUserUsername(userid);
     }
 
     private void ScrollToMessagesEnd()
