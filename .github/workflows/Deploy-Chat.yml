@@ -24,6 +24,9 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/Egroo.Server/Egroo.Server.csproj
   docker-build-api:
     name: Docker Build api
+    environment:
+      name: 'Release API'
+      url: "https://api.egroo.org"
     needs: dotnet-build-api
     runs-on: ubuntu-latest
     steps:
@@ -88,6 +91,9 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/Egroo/Egroo/Egroo.csproj
   docker-build-wasm:
     name: Docker Build wasm
+    environment:
+      name: 'Release WEB'
+      url: "https://www.egroo.org"
     needs: dotnet-build-wasm
     runs-on: ubuntu-latest
     steps:
