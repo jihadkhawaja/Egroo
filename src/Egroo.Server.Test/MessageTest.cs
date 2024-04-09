@@ -69,14 +69,6 @@ namespace Egroo.Server.Test
             Assert.IsTrue(await ChatMessageService.SendMessage(message), "Failed to send message.");
         }
 
-        [TestMethod]
-        public async Task ReadMessagesTest()
-        {
-            Message[] messages = await ChatMessageService.ReceiveMessageHistory(Channel.Id);
-
-            Assert.IsNotNull(messages, "Failed to read messages.");
-        }
-
         [TestCleanup]
         public async Task Cleanup()
         {

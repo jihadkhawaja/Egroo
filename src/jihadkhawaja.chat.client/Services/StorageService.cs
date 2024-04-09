@@ -1,11 +1,85 @@
-﻿using Egroo.UI.Interfaces;
+﻿using Microsoft.JSInterop;
 using System.Text;
 using System.Text.Json;
 
-namespace Egroo.UI.Services
+namespace jihadkhawaja.chat.client.Services
 {
-    public class SaveFileService : ISaveFile
+    public class StorageService
     {
+        private readonly IJSRuntime JSRuntime;
+
+        public StorageService(IJSRuntime jsruntime)
+        {
+            JSRuntime = jsruntime;
+        }
+
+        #region Helpers
+        public string RemoveSpecialCharacters(string str)
+        {
+            StringBuilder sb = new();
+            foreach (char c in str)
+            {
+                if (c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c == '.' || c == '_')
+                {
+                    sb.Append(c);
+                }
+            }
+            return sb.ToString();
+        }
+
+        public string EncryptDecrypt(string textToEncrypt, int key)
+        {
+            StringBuilder inSb = new(textToEncrypt);
+            StringBuilder outSb = new(textToEncrypt.Length);
+            char c;
+            for (int i = 0; i < textToEncrypt.Length; i++)
+            {
+                c = inSb[i];
+                c = (char)(c ^ key);
+                outSb.Append(c);
+            }
+            return outSb.ToString();
+        }
+        #endregion
+        #region Local Storage
+        public async Task<string?> GetFromLocalStorage(string key)
+        {
+            try
+            {
+                return await JSRuntime.InvokeAsync<string>("localStorage.getItem", key);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while getting item from local storage: {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task SetLocalStorage(string key, string value)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", key, value);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while setting item in local storage: {ex.Message}");
+            }
+        }
+
+        public async Task RemoveFromLocalStorage(string key)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("localStorage.removeItem", key);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred while removing item from local storage: {ex.Message}");
+            }
+        }
+        #endregion
+        #region File Storage
         public void DeleteFile(string fileName, string path)
         {
             if (File.Exists(Path.Combine(path, fileName)))
@@ -43,33 +117,6 @@ namespace Egroo.UI.Services
                     Directory.CreateDirectory(s);
                 }
             }
-        }
-
-        public string RemoveSpecialCharacters(string str)
-        {
-            StringBuilder sb = new();
-            foreach (char c in str)
-            {
-                if (c >= '0' && c <= '9' || c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c == '.' || c == '_')
-                {
-                    sb.Append(c);
-                }
-            }
-            return sb.ToString();
-        }
-
-        public string EncryptDecrypt(string textToEncrypt, int key)
-        {
-            StringBuilder inSb = new(textToEncrypt);
-            StringBuilder outSb = new(textToEncrypt.Length);
-            char c;
-            for (int i = 0; i < textToEncrypt.Length; i++)
-            {
-                c = inSb[i];
-                c = (char)(c ^ key);
-                outSb.Append(c);
-            }
-            return outSb.ToString();
         }
 
         public void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false, bool encrypt = false, int key = 757) where T : new()
@@ -171,5 +218,6 @@ namespace Egroo.UI.Services
                 reader?.Close();
             }
         }
+        #endregion
     }
 }

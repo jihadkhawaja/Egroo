@@ -69,7 +69,7 @@ namespace jihadkhawaja.chat.server.Hubs
             Message dbMessage = await MessageService.ReadFirst(x => x.Id == messageid);
             dbMessage.DateSeen = DateTime.UtcNow;
 
-            Message[] messages = new Message[1] { dbMessage };
+            Message[] messages = [dbMessage];
             //save msg to db
             if (await MessageService.Update(messages))
             {
@@ -92,23 +92,6 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             return false;
-        }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<Message[]?> ReceiveMessageHistory(Guid channelId)
-        {
-            Message[] msgs = (await MessageService.Read(x => x.ChannelId == channelId)).ToArray();
-            return msgs;
-        }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<Message[]?> ReceiveMessageHistoryRange(Guid channelId, int range)
-        {
-            Message[]? messages = await ReceiveMessageHistory(channelId);
-            if (messages is null)
-            {
-                return null;
-            }
-            Message[] msgs = messages.TakeLast(range).ToArray();
-            return msgs;
         }
     }
 }

@@ -6,7 +6,5 @@ namespace jihadkhawaja.chat.shared.Interfaces
     {
         Task<bool> SendMessage(Message message);
         Task<bool> SetMessageAsSeen(Guid messageid);
-        Task<Message[]?> ReceiveMessageHistory(Guid channelId);
-        Task<Message[]?> ReceiveMessageHistoryRange(Guid channelId, int range);
     }
 }

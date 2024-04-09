@@ -1,4 +1,6 @@
-﻿using jihadkhawaja.chat.client.Services;
+﻿using BlazorDexie.Extensions;
+using jihadkhawaja.chat.client.CacheDB;
+using jihadkhawaja.chat.client.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,6 +15,9 @@ namespace jihadkhawaja.chat.client
             services.AddScoped<IChatUser, ChatUserService>();
             services.AddScoped<IChatChannel, ChatChannelService>();
             services.AddScoped<IChatMessage, ChatMessageService>();
+
+            services.AddDexieWrapper();
+            services.AddScoped<EgrooDB>();
 
             return services;
         }

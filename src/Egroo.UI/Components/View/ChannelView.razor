@@ -1,8 +1,12 @@
-﻿@using Microsoft.AspNetCore.SignalR.Client
+﻿@using BlazorDexie.JsModule
+@using Microsoft.AspNetCore.SignalR.Client
 @using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Core
+@using jihadkhawaja.chat.client.Services
 
 @inject SessionStorage SessionStorage
+@inject StorageService StorageService
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
 @inject IJSRuntime JSRuntime
@@ -79,22 +83,40 @@
     [Inject] ISnackbar Snackbar { get; set; } = null!;
 
     [Parameter]
-    public string Title { get; set; }
+    public string? Title { get; set; }
     [Parameter]
-    public string ChannelId { get; set; }
+    public string? ChannelId { get; set; }
 
     private List<Message> Messages { get; set; } = new();
     private bool IsLoading { get; set; } = true;
 
-    MudTextField<string> inputMudTextField { get; set; }
-    private string InputContent { get; set; }
+    MudTextField<string> inputMudTextField { get; set; } = null!;
+    private string? InputContent { get; set; }
     private int MessageLinesCount { get; set; }
     private int MaxMessageLength { get; set; } = 300;
+
+    private EgrooDB? CacheDB { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
         HubEvents();
-        Messages = (await GetMessages()).ToList();
+
+        var moduleFactory = new EsModuleFactory(JSRuntime);
+        CacheDB = new EgrooDB(moduleFactory);
+
+        // await CacheDB.Messages.BulkPut(new Message[]
+        // {
+        //     new Message()
+        //     {
+        //         ChannelId = GetChannelId(),
+        //         DisplayName = await ChatUserService.GetUserUsername(SessionStorage.User.Id),
+        //         Content = "Test",
+        //         SenderId = SessionStorage.User.Id,
+        //     },
+        // });
+
+        Messages = await CacheDB.Messages.Where(nameof(Message.ChannelId)).IsEqual(GetChannelId()).Limit(50).SortByToList(nameof(Message.DateCreated));
+
         IsLoading = false;
     }
 
@@ -119,22 +141,6 @@
         }
 
         return Guid.Empty;
-    }
-
-    private async Task<Message[]> GetMessages()
-    {
-        var messages = await ChatMessageService.ReceiveMessageHistoryRange(GetChannelId(), 50);
-
-        foreach (var msg in messages)
-        {
-            msg.DisplayName = await GetUserName(msg.SenderId);
-            if (msg.DateSeen is null && msg.SenderId != SessionStorage.User.Id)
-            {
-                await ChatMessageService.SetMessageAsSeen(msg.Id);
-            }
-        }
-
-        return messages;
     }
 
     private async Task SendMessage()
@@ -224,6 +230,8 @@
                 await ChatMessageService.SetMessageAsSeen(message.Id);
             }
 
+            await CacheDB.Messages.Add(message);
+
             ScrollToMessagesEnd();
         });
 
@@ -236,6 +244,8 @@
 
             int index = Messages.IndexOf(message);
             Messages[index] = message;
+
+            await CacheDB.Messages.Add(message);
 
             await InvokeAsync(StateHasChanged);
         });

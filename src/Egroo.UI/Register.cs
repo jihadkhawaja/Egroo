@@ -1,7 +1,7 @@
-﻿using Egroo.UI.Interfaces;
-using Egroo.UI.Models;
+﻿using Egroo.UI.Models;
 using Egroo.UI.Services;
 using jihadkhawaja.chat.client;
+using jihadkhawaja.chat.client.Services;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -18,14 +18,12 @@ namespace Egroo.UI
             if (frameworkPlatform == FrameworkPlatform.SERVER)
             {
                 services.AddScoped<SessionStorage>();
-                services.AddScoped<LocalStorageService>();
-                services.AddScoped<ISaveFile, SaveFileService>();
+                services.AddScoped<StorageService>();
             }
             else
             {
                 services.AddSingleton<SessionStorage>();
-                services.AddSingleton<LocalStorageService>();
-                services.AddSingleton<ISaveFile, SaveFileService>();
+                services.AddSingleton<StorageService>();
             }
 
             services.AddMudServices();
