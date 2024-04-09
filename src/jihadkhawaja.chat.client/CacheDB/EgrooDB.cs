@@ -21,7 +21,7 @@ namespace jihadkhawaja.chat.client.CacheDB
             );
 
         public EgrooDB(IModuleFactory moduleFactory)
-            : base("MessageDatabase", 1, new DbVersion[] { }, moduleFactory)
+            : base("EgrooDatabase", 1, new DbVersion[] { }, moduleFactory)
         {
         }
     }

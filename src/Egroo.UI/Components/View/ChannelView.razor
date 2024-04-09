@@ -87,7 +87,7 @@
     [Parameter]
     public string? ChannelId { get; set; }
 
-    private List<Message> Messages { get; set; } = new();
+    private List<Message> Messages { get; set; }
     private bool IsLoading { get; set; } = true;
 
     MudTextField<string> inputMudTextField { get; set; } = null!;
@@ -104,18 +104,11 @@
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
 
-        // await CacheDB.Messages.BulkPut(new Message[]
-        // {
-        //     new Message()
-        //     {
-        //         ChannelId = GetChannelId(),
-        //         DisplayName = await ChatUserService.GetUserUsername(SessionStorage.User.Id),
-        //         Content = "Test",
-        //         SenderId = SessionStorage.User.Id,
-        //     },
-        // });
-
-        Messages = await CacheDB.Messages.Where(nameof(Message.ChannelId)).IsEqual(GetChannelId()).Limit(50).SortByToList(nameof(Message.DateCreated));
+        Messages = (await CacheDB.Messages
+        .Where(nameof(Message.ChannelId))
+        .IsEqual(GetChannelId())
+        .Limit(50)
+        .SortByToList(nameof(Message.DateCreated))) ?? new();
 
         IsLoading = false;
     }
@@ -245,7 +238,7 @@
             int index = Messages.IndexOf(message);
             Messages[index] = message;
 
-            await CacheDB.Messages.Add(message);
+            await CacheDB.Messages.Put(message);
 
             await InvokeAsync(StateHasChanged);
         });
