@@ -23,12 +23,12 @@
   </ItemGroup>
 
   <ItemGroup>
-	<None Include="..\..\favico.png" Pack="true" PackagePath="" />
-	<None Include="..\..\README.md" Pack="true" PackagePath="" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj" />
   </ItemGroup>
+
+	<ItemGroup>
+		<None Include="..\..\favico.png" Pack="true" PackagePath="" />
+		<None Include="..\..\README.md" Pack="true" PackagePath="" />
+	</ItemGroup>
 
 </Project>
