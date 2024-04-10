@@ -1,9 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+	<TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+  	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<Authors>jihadkhawaja</Authors>
+	<Description>Chat client solution for ASP.NET server</Description>
+	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
+	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>
+	<PackageIcon>favico.png</PackageIcon>
+	<PackageTags>asp.net, blazor, signalr, chat, client</PackageTags>
+	<PackageReleaseNotes>https://github.com/jihadkhawaja/Egroo/releases</PackageReleaseNotes>
   </PropertyGroup>
 
 </Project>

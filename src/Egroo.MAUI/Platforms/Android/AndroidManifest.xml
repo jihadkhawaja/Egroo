@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.jihadkhawaja.egroo" android:versionCode="2">
-	<application android:allowBackup="true" android:icon="@mipmap/icon" android:supportsRtl="true" android:usesCleartextTraffic="true" android:label="Egroo"></application>
+	<application android:allowBackup="true" android:supportsRtl="true" android:usesCleartextTraffic="true" android:label="Egroo"></application>
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />
 	<uses-sdk android:minSdkVersion="29" android:targetSdkVersion="33" />
