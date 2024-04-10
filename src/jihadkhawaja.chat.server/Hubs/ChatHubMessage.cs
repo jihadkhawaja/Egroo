@@ -79,7 +79,7 @@ namespace jihadkhawaja.chat.server.Hubs
             return false;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> SetMessageAsSeen(Guid messageid)
+        public async Task<bool> UpdateMessage(Guid messageid)
         {
             if (messageid == Guid.Empty)
             {
@@ -129,12 +129,29 @@ namespace jihadkhawaja.chat.server.Hubs
                         .ReadFirst(x => x.Id == userpendingmessage.MessageId);
                     message.Content = userpendingmessage.Content;
 
-                    if (await SendClientMessage(ConnectedUser, message))
-                    {
-                        await UserPendingMessageService
-                            .Delete(x => x.Id == userpendingmessage.Id);
-                    }
+                    await SendClientMessage(ConnectedUser, message);
                 }
+            }
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task UpdatePendingMessage(Guid messageid)
+        {
+            var ConnectedUser = await GetConnectedUser();
+
+            UserPendingMessage UserPendingMessage =
+                await UserPendingMessageService
+                .ReadFirst(x => x.UserId == ConnectedUser.Id
+                    && x.MessageId == messageid
+                    && x.DateUserReceivedOn is null
+                    && x.DateDeleted is null);
+
+            if (UserPendingMessage is not null)
+            {
+                UserPendingMessage.Content = "REDACTED";
+                UserPendingMessage.DateDeleted = DateTimeOffset.UtcNow;
+                UserPendingMessage.DateUserReceivedOn = DateTimeOffset.UtcNow;
+                await UserPendingMessageService
+                .Update(UserPendingMessage);
             }
         }
     }

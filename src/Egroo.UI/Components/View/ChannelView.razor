@@ -229,10 +229,12 @@
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User.Id)
             {
-                await ChatMessageService.SetMessageAsSeen(message.Id);
+                await ChatMessageService.UpdateMessage(message.Id);
             }
 
             await CacheDB.Messages.Add(message);
+
+            await ChatMessageService.UpdatePendingMessage(message.Id);
 
             ScrollToMessagesEnd();
         });
