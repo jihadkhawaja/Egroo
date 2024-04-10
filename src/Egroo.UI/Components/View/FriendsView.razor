@@ -159,7 +159,7 @@ else
             }
             else
             {
-                User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
+                User? user = await ChatUserService.GetUserPublicInfo(users[i].FriendUserId);
                 user.Id = users[i].FriendUserId;
                 friends[i] = user;
             }

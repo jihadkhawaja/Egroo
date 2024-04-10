@@ -129,12 +129,15 @@ namespace jihadkhawaja.chat.server.Hubs
                 user, Register.Configuration.GetSection("Secrets")["Jwt"]);
             string newtoken = generatedToken.Access_Token;
 
+            user.ConnectionId = Context.ConnectionId;
+            user.IsOnline = true;
+            user.LastLoginDate = DateTimeOffset.UtcNow;
             user.DateUpdated = DateTimeOffset.UtcNow;
             await UserService.Update(user);
 
             var result = new
             {
-                Id = user.Id,
+                user.Id,
                 Token = newtoken,
             };
 
