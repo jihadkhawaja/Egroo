@@ -27,11 +27,11 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudForm @ref="@form" ValidationDelay="0">
-                        <MudTextField @bind-Value="@EmailOrUsername"
+                        <MudTextField @bind-Value="@Username"
                                     Immediate="true"
                                     Required="true"
                                     Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                    Label="Email or Username" />
+                                    Label="Username" />
 
                         <MudTextField @bind-Value="@Password"
                                     Immediate="true"
@@ -52,7 +52,7 @@
     [Inject] ISnackbar Snackbar { get; set; }
     MudForm form;
 
-    string EmailOrUsername { get; set; }
+    string Username { get; set; }
     string Password { get; set; }
     bool IsBusy = false;
 
@@ -78,7 +78,7 @@
             return;
         }
 
-        dynamic dynamicObj = await ChatAuthService.SignIn(EmailOrUsername, Password);
+        dynamic dynamicObj = await ChatAuthService.SignIn(Username, Password);
         Dictionary<string, object> result = null;
         if (dynamicObj is not null)
         {

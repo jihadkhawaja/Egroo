@@ -4,9 +4,8 @@ namespace jihadkhawaja.chat.shared.Interfaces
 {
     public interface IChatUser
     {
-        Task<string?> GetUserUsername(Guid userId);
+        Task<User?> GetUserPublicInfo(Guid userId);
         Task<string?> GetCurrentUserUsername();
-        Task<bool> IsUserOnline(Guid userId);
         Task<bool> AddFriend(string friendusername);
         Task<bool> RemoveFriend(string friendusername);
         Task<UserFriend[]?> GetUserFriends(Guid userId);

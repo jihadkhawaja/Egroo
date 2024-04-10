@@ -11,7 +11,7 @@ namespace jihadkhawaja.chat.server.Hubs
     public partial class ChatHub : IChatUser
     {
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<string?> GetUserUsername(Guid userId)
+        public async Task<User?> GetUserPublicInfo(Guid userId)
         {
             User? user = await UserService.ReadFirst(x => x.Id == userId);
 
@@ -24,9 +24,16 @@ namespace jihadkhawaja.chat.server.Hubs
                 return null;
             }
 
-            string username = user.Username;
+            User userPublicResult = new()
+            {
+                AvatarBase64 = user.AvatarBase64,
+                Username = user.Username,
+                IsOnline = user.IsOnline,
+                LastLoginDate = user.LastLoginDate,
+                DateCreated = user.DateCreated,
+            };
 
-            return username;
+            return userPublicResult;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<string?> GetCurrentUserUsername()
@@ -289,24 +296,11 @@ namespace jihadkhawaja.chat.server.Hubs
             return users.Select(x =>
             new User
             {
-                Username = x.Username
+                Username = x.Username,
+                LastLoginDate = x.LastLoginDate,
+                IsOnline = x.IsOnline,
+                DateCreated = x.DateCreated,
             });
-        }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> IsUserOnline(Guid userId)
-        {
-            User? user = await UserService.ReadFirst(x => x.Id == userId);
-
-            if (user == null)
-            {
-                return false;
-            }
-            else if (string.IsNullOrWhiteSpace(user.Username))
-            {
-                return false;
-            }
-
-            return user.IsOnline;
         }
     }
 }

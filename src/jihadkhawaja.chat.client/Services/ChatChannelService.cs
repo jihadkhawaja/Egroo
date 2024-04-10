@@ -14,7 +14,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<Channel>("CreateChannel", usernames);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<Channel>(nameof(CreateChannel), usernames);
         }
 
         public async Task<bool> AddChannelUsers(Guid channelId, params string[] friendEmailorusername)
@@ -24,7 +24,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("AddChannelUsers", channelId, friendEmailorusername);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(AddChannelUsers), channelId, friendEmailorusername);
         }
 
         public async Task<User[]?> GetChannelUsers(Guid channelid)
@@ -34,7 +34,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<User[]>("GetChannelUsers", channelid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<User[]>(nameof(GetChannelUsers), channelid);
         }
 
         public async Task<Channel[]?> GetUserChannels()
@@ -44,7 +44,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<Channel[]>("GetUserChannels");
+            return await MobileChatSignalR.HubConnection.InvokeAsync<Channel[]>(nameof(GetUserChannels));
         }
 
         public async Task<bool> ChannelContainUser(Guid channelId, Guid userId)
@@ -54,7 +54,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("ChannelContainUser", channelId, userId);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(ChannelContainUser), channelId, userId);
         }
 
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
@@ -64,7 +64,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("IsChannelAdmin", channelId, userId);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(IsChannelAdmin), channelId, userId);
         }
 
         public async Task<bool> DeleteChannel(Guid channelId)
@@ -74,7 +74,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("DeleteChannel", channelId);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(DeleteChannel), channelId);
         }
 
         public async Task<bool> LeaveChannel(Guid channelId)
@@ -84,7 +84,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("LeaveChannel", channelId);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(LeaveChannel), channelId);
         }
     }
 }

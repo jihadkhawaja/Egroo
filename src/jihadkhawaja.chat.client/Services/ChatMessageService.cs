@@ -14,7 +14,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("SendMessage", message);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(SendMessage), message);
         }
 
         public async Task<bool> SetMessageAsSeen(Guid messageid)
@@ -24,7 +24,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("SetMessageAsSeen", messageid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(SetMessageAsSeen), messageid);
         }
     }
 }

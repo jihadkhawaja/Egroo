@@ -154,7 +154,7 @@
         Message message = new()
         {
             ChannelId = GetChannelId(),
-            DisplayName = await ChatUserService.GetUserUsername(SessionStorage.User.Id),
+            DisplayName = SessionStorage?.User?.Username,
             Content = InputContent,
             SenderId = SessionStorage.User.Id,
         };
@@ -180,11 +180,6 @@
 
             await SendMessage();
         }
-    }
-
-    private async Task<string> GetUserName(Guid userid)
-    {
-        return await ChatUserService.GetUserUsername(userid);
     }
 
     private void ScrollToMessagesEnd()
@@ -218,7 +213,8 @@
                 return;
             }
 
-            message.DisplayName = await GetUserName(message.SenderId);
+            User? senderUser = await ChatUserService.GetUserPublicInfo(message.SenderId);
+            message.DisplayName = senderUser?.Username;
 
             Messages.Add(message);
 

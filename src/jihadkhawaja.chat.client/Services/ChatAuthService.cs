@@ -13,7 +13,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<object?>("SignUp", username, password);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<object?>(nameof(SignUp), username, password);
         }
 
         public async Task<dynamic?> SignIn(string username, string password)
@@ -23,7 +23,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<object>("SignIn", username, password);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<object>(nameof(SignIn), username, password);
         }
 
         public async Task<dynamic?> RefreshSession(string token)
@@ -33,7 +33,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<dynamic?>("RefreshSession", token);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<dynamic?>(nameof(RefreshSession), token);
         }
 
         public async Task<bool> ChangePassword(string username, string oldpassword, string newpassword)
@@ -43,7 +43,7 @@ namespace jihadkhawaja.chat.client.Services
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>("ChangePassword", username, oldpassword, newpassword);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(ChangePassword), username, oldpassword, newpassword);
         }
     }
 }

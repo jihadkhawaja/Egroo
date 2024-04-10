@@ -27,7 +27,7 @@ else
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                             <MudGrid Justify="Justify.SpaceBetween">
                                 <MudItem>
-                                    <ScopeView Title=@friend.Username Subtitle=@friend.LastLoginDate?.Date.ToShortDateString() />
+                                    <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
                                 </MudItem>
                                 <MudItem>
                                     <MudStack Row Style="height:100%;">
@@ -49,7 +49,7 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friendRequests.Username Subtitle=@friendRequests.LastLoginDate?.Date.ToShortDateString() />
+                            <ScopeView Title=@friendRequests.Username Subtitle=@string.Format("Last Seen Online: {0}", friendRequests.LastLoginDate?.Date.ToShortDateString()) />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -70,20 +70,20 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friend.Username Subtitle=@friend.LastLoginDate?.Date.ToShortDateString() />
+                            <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
                                 @if(friend.IsOnline)
                                 {
                                     <MudTooltip Text="Online">
-                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Square" Color="Color.Success" />
+                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Circle" Color="Color.Success" />
                                     </MudTooltip>
                                 }
                                 else
                                 {
                                     <MudTooltip Text="Offline">
-                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Square" Color="Color.Dark" />
+                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Circle" Color="Color.Dark" />
                                     </MudTooltip>
                                 }                               
                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
@@ -153,18 +153,14 @@ else
         {
             if (SessionStorage.User.Id == users[i].FriendUserId)
             {
-                User user = new User();
+                User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
                 user.Id = users[i].UserId;
-                user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
-                user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
             }
             else
             {
-                User user = new User();
+                User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
                 user.Id = users[i].FriendUserId;
-                user.Username = await ChatUserService.GetUserUsername(users[i].FriendUserId);
-                user.IsOnline = await ChatUserService.IsUserOnline(users[i].UserId);
                 friends[i] = user;
             }
         }
@@ -179,9 +175,8 @@ else
 
         for (int i = 0; i < users.Length; i++)
         {
-            User user = new User();
+            User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
             user.Id = users[i].UserId;
-            user.Username = await ChatUserService.GetUserUsername(users[i].UserId);
             friendRequests[i] = user;
         }
 
