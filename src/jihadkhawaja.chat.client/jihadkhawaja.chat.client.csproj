@@ -1,12 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFrameworks>net8.0</TargetFrameworks>
+	<TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>annotations</Nullable>
+    <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<Authors>jihadkhawaja</Authors>
-	<Description>Chat client solution for ASP.NET server</Description>
+	<Description>Chat data models shared solution for ASP.NET server and Client packages</Description>
 	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
