@@ -153,5 +153,5 @@ jobs:
         with:
           tag: ${{ needs.build.outputs.VERSION }}
           name: Release ${{ needs.build.outputs.VERSION }}
-          artifacts: "nugetPackageShared/*,nugetPackageClient/*.nupkg,nugetPackageServer/*.nupkg"
+          artifacts: "nugetPackageShared/*.nupkg,nugetPackageClient/*.nupkg,nugetPackageServer/*.nupkg"
           token: ${{ secrets.Egroo_GITHUB_PACKAGE }}
