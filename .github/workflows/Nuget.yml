@@ -138,8 +138,12 @@ jobs:
 
   Release:
     runs-on: ubuntu-latest
-    needs: [PublishShared,PublishClient,PublishServer]
+    needs: build
     steps:
+      - name: Download nuget package shared artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: nugetPackageShared
       - name: Download nuget package client artifact
         uses: actions/download-artifact@v1.0.0
         with:
