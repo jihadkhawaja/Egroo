@@ -21,8 +21,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = DateTime.UtcNow,
             };
 
-            Channel[] channels = new Channel[1] { channel };
-            await ChannelService.Create(channels);
+            await ChannelService.Create(channel);
 
             await AddChannelUsers(channel.Id, usernames);
 
@@ -126,7 +125,8 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 var ConnectedUser = await GetConnectedUser();
 
-                List<ChannelUser> channelUsers = (await ChannelUsersService.Read(x => x.UserId == ConnectedUser.Id)).ToList();
+                List<ChannelUser> channelUsers = (await ChannelUsersService
+                    .Read(x => x.UserId == ConnectedUser.Id)).ToList();
                 foreach (ChannelUser cu in channelUsers)
                 {
                     Channel? channel = await ChannelService.ReadFirst(x => x.Id == cu.ChannelId);

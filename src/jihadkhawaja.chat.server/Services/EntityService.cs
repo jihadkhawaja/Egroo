@@ -11,6 +11,47 @@ namespace jihadkhawaja.chat.server.Services
         {
             this.context = context;
         }
+
+        public async Task<bool> Create(T entity)
+        {
+            try
+            {
+                context.Set<T>().Add(entity);
+                await context.SaveChangesAsync();
+
+                context.ChangeTracker.Clear();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(string.Format("Error: {0}.\n{1}", ex.Message, ex.InnerException));
+            }
+
+            return false;
+        }
+
+        public async Task<bool> CreateOrUpdate(T entity)
+        {
+            try
+            {
+                context.Set<T>().Add(entity);
+                await context.SaveChangesAsync();
+
+                context.ChangeTracker.Clear();
+                context.Set<T>().Update(entity);
+                await context.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(string.Format("Error: {0}.\n{1}", ex.Message, ex.InnerException));
+            }
+
+            return false;
+        }
+
         public async Task<bool> Create(IEnumerable<T> entities)
         {
             try
@@ -152,6 +193,24 @@ namespace jihadkhawaja.chat.server.Services
             }
 
             return Task.FromResult(result);
+        }
+
+        public async Task<bool> Update(T newentity)
+        {
+            try
+            {
+                context.ChangeTracker.Clear();
+                context.Set<T>().Update(newentity);
+                await context.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(string.Format("Error: {0}.\n{1}", ex.Message, ex.InnerException));
+            }
+
+            return false;
         }
 
         public async Task<bool> Update(IEnumerable<T> newentities)

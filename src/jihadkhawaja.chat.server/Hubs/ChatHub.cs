@@ -20,15 +20,18 @@ namespace jihadkhawaja.chat.server.Hubs
         private IEntity<ChannelUser> ChannelUsersService { get; set; }
         [Inject]
         private IEntity<Message> MessageService { get; set; }
+        [Inject]
+        private IEntity<UserPendingMessage> UserPendingMessageService { get; set; }
         public ChatHub(IEntity<User> UserService, IEntity<UserFriend> UserFriendsService,
             IEntity<Channel> ChannelService, IEntity<ChannelUser> ChannelUsersService,
-            IEntity<Message> MessageService)
+            IEntity<Message> MessageService, IEntity<UserPendingMessage> UserPendingMessageService)
         {
             this.UserService = UserService;
             this.UserFriendsService = UserFriendsService;
             this.ChannelService = ChannelService;
             this.ChannelUsersService = ChannelUsersService;
             this.MessageService = MessageService;
+            this.UserPendingMessageService = UserPendingMessageService;
         }
 
         public override async Task OnConnectedAsync()
@@ -50,22 +53,40 @@ namespace jihadkhawaja.chat.server.Hubs
                 ConnectedUser.ConnectionId = Context.ConnectionId;
                 ConnectedUser.IsOnline = true;
 
-                User[] connectedUsers = [ConnectedUser];
-                await UserService.Update(connectedUsers);
+                await UserService.Update(ConnectedUser);
+
+                //Send pending messages
+                IEnumerable<UserPendingMessage> UserPendingMessages =
+                    await UserPendingMessageService
+                    .Read(x => x.UserId == ConnectedUser.Id);
+
+                if (UserPendingMessages is not null)
+                foreach (var userpendingmessage in UserPendingMessages)
+                {
+                    Message message = await MessageService
+                        .ReadFirst(x => x.Id == userpendingmessage.MessageId);
+                    message.Content = userpendingmessage.Content;
+
+                    if (await SendClientMessage(ConnectedUser, message))
+                    {
+                        await UserPendingMessageService
+                            .Delete(x => x.Id == userpendingmessage.Id);
+                    }
+                }
             }
 
             await base.OnConnectedAsync();
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            User? connectedUser = await UserService.ReadFirst(x => x.ConnectionId == Context.ConnectionId);
+            User? connectedUser = await UserService
+                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
             if (connectedUser != null)
             {
                 connectedUser.ConnectionId = null;
                 connectedUser.IsOnline = false;
 
-                User[] connectedUsers = [connectedUser];
-                await UserService.Update(connectedUsers);
+                await UserService.Update(connectedUser);
             }
 
             await base.OnDisconnectedAsync(exception);
@@ -84,7 +105,8 @@ namespace jihadkhawaja.chat.server.Hubs
                     //get user id from token
                     JwtSecurityTokenHandler tokenHandler = new();
                     JwtSecurityToken jwtToken = tokenHandler.ReadJwtToken(Token);
-                    var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+                    var userIdClaim = jwtToken.Claims
+                        .FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
 
                     Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 

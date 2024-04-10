@@ -95,15 +95,21 @@ namespace jihadkhawaja.chat.server.Hubs
                     return false;
                 }
 
-                if (await UserFriendsService.ReadFirst(x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
+                if (await UserFriendsService.ReadFirst(
+                    x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
                 || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
                 {
                     return false;
                 }
 
-                UserFriend entry = new() { Id = Guid.NewGuid(), UserId = currentUser.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
-                UserFriend[] entries = new UserFriend[1] { entry };
-                await UserFriendsService.Create(entries);
+                UserFriend entry = new()
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = currentUser.Id,
+                    FriendUserId = friendUser.Id,
+                    DateCreated = DateTime.UtcNow
+                };
+                await UserFriendsService.Create(entry);
             }
             catch
             {
@@ -157,7 +163,12 @@ namespace jihadkhawaja.chat.server.Hubs
                     return false;
                 }
 
-                UserFriend entry = new() { UserId = user.Id, FriendUserId = friendUser.Id, DateCreated = DateTime.UtcNow };
+                UserFriend entry = new()
+                {
+                    UserId = user.Id,
+                    FriendUserId = friendUser.Id,
+                    DateCreated = DateTime.UtcNow
+                };
 
                 await UserFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
                 || x.FriendUserId == user.Id && x.UserId == friendUser.Id);

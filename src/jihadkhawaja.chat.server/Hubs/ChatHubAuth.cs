@@ -45,11 +45,11 @@ namespace jihadkhawaja.chat.server.Hubs
                 return null;
             }
 
-            var generatedToken = await TokenGenerator.GenerateJwtToken(user, Register.Configuration.GetSection("Secrets")["Jwt"]);
+            var generatedToken = await TokenGenerator.GenerateJwtToken(
+                user, Register.Configuration.GetSection("Secrets")["Jwt"]);
             string token = generatedToken.Access_Token;
 
-            User[] users = [user];
-            if (await UserService.Create(users))
+            if (await UserService.Create(user))
             {
                 var result = new
                 {
@@ -91,11 +91,11 @@ namespace jihadkhawaja.chat.server.Hubs
             registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
 
-            var generatedToken = await TokenGenerator.GenerateJwtToken(registeredUser, Register.Configuration.GetSection("Secrets")["Jwt"]);
+            var generatedToken = await TokenGenerator.GenerateJwtToken(
+                registeredUser, Register.Configuration.GetSection("Secrets")["Jwt"]);
             string token = generatedToken.Access_Token;
 
-            User[] users = new User[1] { registeredUser };
-            await UserService.Update(users);
+            await UserService.Update(registeredUser);
 
             var result = new
             {
@@ -125,12 +125,12 @@ namespace jihadkhawaja.chat.server.Hubs
                 return null;
             }
 
-            var generatedToken = await TokenGenerator.GenerateJwtToken(user, Register.Configuration.GetSection("Secrets")["Jwt"]);
+            var generatedToken = await TokenGenerator.GenerateJwtToken(
+                user, Register.Configuration.GetSection("Secrets")["Jwt"]);
             string newtoken = generatedToken.Access_Token;
 
             user.DateUpdated = DateTimeOffset.UtcNow;
-            User[] users = [user];
-            await UserService.Update(users);
+            await UserService.Update(user);
 
             var result = new
             {
@@ -164,8 +164,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
-            User[] users = [registeredUser];
-            await UserService.Update(users);
+            await UserService.Update(registeredUser);
 
             return true;
         }

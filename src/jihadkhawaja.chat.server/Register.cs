@@ -45,7 +45,8 @@ public static class Register
 
     private static void ConfigureJwtAuthentication(IServiceCollection services)
     {
-        string jwtKey = Configuration.GetSection("Secrets")["Jwt"] ?? throw new NullReferenceException(nameof(jwtKey));
+        string jwtKey = Configuration.GetSection("Secrets")["Jwt"] 
+            ?? throw new NullReferenceException(nameof(jwtKey));
 
         services.AddAuthentication(options =>
         {
@@ -55,7 +56,8 @@ public static class Register
         .AddJwtBearer(options =>
         {
             options.TokenValidationParameters.ValidateIssuerSigningKey = true;
-            options.TokenValidationParameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            options.TokenValidationParameters.IssuerSigningKey = 
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             options.TokenValidationParameters.ValidateIssuer = false;
             options.TokenValidationParameters.ValidateAudience = false;
             options.TokenValidationParameters.ValidateLifetime = true;
@@ -98,6 +100,7 @@ public static class Register
         services.AddScoped<IEntity<Channel>, EntityService<Channel>>();
         services.AddScoped<IEntity<ChannelUser>, EntityService<ChannelUser>>();
         services.AddScoped<IEntity<Message>, EntityService<Message>>();
+        services.AddScoped<IEntity<UserPendingMessage>, EntityService<UserPendingMessage>>();
     }
 
     public static void UseMobileChatServices(this WebApplication app)

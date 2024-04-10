@@ -95,20 +95,26 @@
     private int MessageLinesCount { get; set; }
     private int MaxMessageLength { get; set; } = 300;
 
-    private EgrooDB? CacheDB { get; set; }
+    private EgrooDB CacheDB { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
         HubEvents();
 
+        //init Cached DB
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
 
-        Messages = (await CacheDB.Messages
+        //fetch cached messages
+        var messages = (await CacheDB.Messages
         .Where(nameof(Message.ChannelId))
         .IsEqual(GetChannelId())
-        .Limit(50)
-        .SortByToList(nameof(Message.DateCreated))) ?? new();
+        .Limit(50).ToList()) ?? new();
+
+        //assign fetched messages
+        Messages = messages
+        .OrderBy(x => x.DateCreated)
+        .ToList();
 
         IsLoading = false;
     }
