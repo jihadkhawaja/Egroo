@@ -106,29 +106,30 @@
         CacheDB = new EgrooDB(moduleFactory);
 
         Messages = new();
-        //get pending messages
-        await ChatMessageService.SendPendingMessages();
-
-        //fetch cached messages
-        var messages = (await CacheDB.Messages
-        .Where(nameof(Message.ChannelId))
-        .IsEqual(GetChannelId())
-        .Limit(50).ToList()) ?? new();
-
-        //add cached messages
-        Messages.AddRange(messages);
-
-        //reorder
-        Messages = Messages.OrderBy(x => x.DateCreated)
-        .ToList();
-
-        IsLoading = false;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            //get pending messages
+            await ChatMessageService.SendPendingMessages();
+
+            //fetch cached messages
+            var messages = (await CacheDB.Messages
+            .Where(nameof(Message.ChannelId))
+            .IsEqual(GetChannelId())
+            .Limit(50).ToList()) ?? new();
+
+            //add cached messages
+            Messages.AddRange(messages);
+
+            //reorder
+            Messages = Messages.OrderBy(x => x.DateCreated)
+            .ToList();
+
+            IsLoading = false;
+
             await InvokeAsync(StateHasChanged);
 
             ScrollToMessagesEnd();
