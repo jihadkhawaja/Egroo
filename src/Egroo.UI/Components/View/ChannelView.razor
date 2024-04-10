@@ -105,15 +105,21 @@
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
 
+        Messages = new();
+        //get pending messages
+        await ChatMessageService.SendPendingMessages();
+
         //fetch cached messages
         var messages = (await CacheDB.Messages
         .Where(nameof(Message.ChannelId))
         .IsEqual(GetChannelId())
         .Limit(50).ToList()) ?? new();
 
-        //assign fetched messages
-        Messages = messages
-        .OrderBy(x => x.DateCreated)
+        //add cached messages
+        Messages.AddRange(messages);
+
+        //reorder
+        Messages = Messages.OrderBy(x => x.DateCreated)
         .ToList();
 
         IsLoading = false;

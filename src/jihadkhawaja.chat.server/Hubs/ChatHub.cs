@@ -34,63 +34,6 @@ namespace jihadkhawaja.chat.server.Hubs
             this.UserPendingMessageService = UserPendingMessageService;
         }
 
-        public override async Task OnConnectedAsync()
-        {
-            var ConnectedUser = await GetConnectedUser();
-
-            if (ConnectedUser != null)
-            {
-                // Hang up any calls the user is in
-                await HangUp();
-
-                // Gets the user from "Context" which is available in the whole hub
-                // Remove the user
-                _Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
-
-                // Send down the new user list to all clients
-                await SendUserListUpdate();
-
-                ConnectedUser.ConnectionId = Context.ConnectionId;
-                ConnectedUser.IsOnline = true;
-
-                await UserService.Update(ConnectedUser);
-
-                //Send pending messages
-                IEnumerable<UserPendingMessage> UserPendingMessages =
-                    await UserPendingMessageService
-                    .Read(x => x.UserId == ConnectedUser.Id);
-
-                if (UserPendingMessages is not null)
-                foreach (var userpendingmessage in UserPendingMessages)
-                {
-                    Message message = await MessageService
-                        .ReadFirst(x => x.Id == userpendingmessage.MessageId);
-                    message.Content = userpendingmessage.Content;
-
-                    if (await SendClientMessage(ConnectedUser, message))
-                    {
-                        await UserPendingMessageService
-                            .Delete(x => x.Id == userpendingmessage.Id);
-                    }
-                }
-            }
-
-            await base.OnConnectedAsync();
-        }
-        public override async Task OnDisconnectedAsync(Exception? exception)
-        {
-            User? connectedUser = await UserService
-                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
-            if (connectedUser != null)
-            {
-                connectedUser.ConnectionId = null;
-                connectedUser.IsOnline = false;
-
-                await UserService.Update(connectedUser);
-            }
-
-            await base.OnDisconnectedAsync(exception);
-        }
         public async Task<User?> GetConnectedUser()
         {
             HttpContext? hc = Context.GetHttpContext();
@@ -115,6 +58,44 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             return null;
+        }
+        public override async Task OnConnectedAsync()
+        {
+            var ConnectedUser = await GetConnectedUser();
+
+            if (ConnectedUser != null)
+            {
+                // Hang up any calls the user is in
+                await HangUp();
+
+                // Gets the user from "Context" which is available in the whole hub
+                // Remove the user
+                _Users.RemoveAll(u => u.ConnectionId == Context.ConnectionId);
+
+                // Send down the new user list to all clients
+                await SendUserListUpdate();
+
+                ConnectedUser.ConnectionId = Context.ConnectionId;
+                ConnectedUser.IsOnline = true;
+
+                await UserService.Update(ConnectedUser);
+            }
+
+            await base.OnConnectedAsync();
+        }
+        public override async Task OnDisconnectedAsync(Exception? exception)
+        {
+            User? connectedUser = await UserService
+                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
+            if (connectedUser != null)
+            {
+                connectedUser.ConnectionId = null;
+                connectedUser.IsOnline = false;
+
+                await UserService.Update(connectedUser);
+            }
+
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

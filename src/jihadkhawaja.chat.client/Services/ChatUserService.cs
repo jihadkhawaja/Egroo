@@ -27,6 +27,16 @@ namespace jihadkhawaja.chat.client.Services
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(RemoveFriend), friendEmailorusername);
         }
 
+        public async Task CloseUserSession()
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(CloseUserSession));
+        }
+
         public async Task<User?> GetUserPublicInfo(Guid userId)
         {
             if (MobileChatSignalR.HubConnection is null)

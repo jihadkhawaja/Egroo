@@ -50,25 +50,29 @@ namespace jihadkhawaja.chat.server.Hubs
         }
         private async Task<bool> SendClientMessage(User user, Message message)
         {
+            UserPendingMessage userPendingMessage = new()
+            {
+                UserId = user.Id,
+                MessageId = message.Id,
+                Content = message.Content
+            };
+
+            if (string.IsNullOrEmpty(user.ConnectionId))
+            {
+                await UserPendingMessageService.Create(userPendingMessage);
+                return false;
+            }
+
             try
             {
-                if (string.IsNullOrEmpty(user.ConnectionId))
-                {
-                    return false;
-                }
-
                 await Clients.Client(user.ConnectionId).SendAsync("ReceiveMessage", message);
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
-                UserPendingMessage userPendingMessage = new()
-                {
-                    UserId = user.Id,
-                    MessageId = message.Id,
-                    Content = message.Content
-                };
+                Console.WriteLine($"Failed to send message for the following error: {ex}");
+
                 await UserPendingMessageService.Create(userPendingMessage);
             }
 
@@ -107,6 +111,31 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             return false;
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task SendPendingMessages()
+        {
+            var ConnectedUser = await GetConnectedUser();
+
+            IEnumerable<UserPendingMessage> UserPendingMessages =
+                await UserPendingMessageService
+                .Read(x => x.UserId == ConnectedUser.Id);
+
+            if (UserPendingMessages is not null)
+            {
+                foreach (var userpendingmessage in UserPendingMessages)
+                {
+                    Message message = await MessageService
+                        .ReadFirst(x => x.Id == userpendingmessage.MessageId);
+                    message.Content = userpendingmessage.Content;
+
+                    if (await SendClientMessage(ConnectedUser, message))
+                    {
+                        await UserPendingMessageService
+                            .Delete(x => x.Id == userpendingmessage.Id);
+                    }
+                }
+            }
         }
     }
 }

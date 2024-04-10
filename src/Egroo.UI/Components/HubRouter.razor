@@ -138,6 +138,13 @@
         #endif
     }
 
+    [JSInvokable]
+    public static async Task OnClosedWindow()
+    {
+        ChatUserService chatUserService = new();
+        await chatUserService.CloseUserSession();
+    }
+
     private async Task SignOut()
     {
         switch (ClientModel.CurrentFrameworkPlatform)

@@ -2,3 +2,11 @@ function scrollToEnd(id) {
     let scroll_to_bottom = document.getElementById(id);
     scroll_to_bottom.scrollTop = scroll_to_bottom.scrollHeight;
 }
+
+window.onbeforeunload = function () {
+    DotNet.invokeMethodAsync('Egroo.UI', 'OnClosedWindow')
+        .then(data => {
+            console.log("Window unloaded!");
+            console.log(data);
+        });
+}

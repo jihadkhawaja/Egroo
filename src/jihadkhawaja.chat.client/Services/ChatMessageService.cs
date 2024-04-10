@@ -26,5 +26,15 @@ namespace jihadkhawaja.chat.client.Services
 
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(SetMessageAsSeen), messageid);
         }
+
+        public async Task SendPendingMessages()
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(SendPendingMessages));
+        }
     }
 }

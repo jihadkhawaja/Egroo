@@ -4,6 +4,7 @@ namespace jihadkhawaja.chat.shared.Interfaces
 {
     public interface IChatUser
     {
+        Task CloseUserSession();
         Task<User?> GetUserPublicInfo(Guid userId);
         Task<string?> GetCurrentUserUsername();
         Task<bool> AddFriend(string friendusername);

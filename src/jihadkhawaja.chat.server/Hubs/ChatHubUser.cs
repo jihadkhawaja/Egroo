@@ -11,6 +11,19 @@ namespace jihadkhawaja.chat.server.Hubs
     public partial class ChatHub : IChatUser
     {
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task CloseUserSession()
+        {
+            User? connectedUser = await UserService
+                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
+            if (connectedUser != null)
+            {
+                connectedUser.ConnectionId = null;
+                connectedUser.IsOnline = false;
+
+                await UserService.Update(connectedUser);
+            }
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User?> GetUserPublicInfo(Guid userId)
         {
             User? user = await UserService.ReadFirst(x => x.Id == userId);
