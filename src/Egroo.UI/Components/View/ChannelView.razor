@@ -1,8 +1,12 @@
-﻿@using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.mobilechat.client;
-@using jihadkhawaja.mobilechat.client.Core
+﻿@using BlazorDexie.JsModule
+@using Microsoft.AspNetCore.SignalR.Client
+@using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.CacheDB
+@using jihadkhawaja.chat.client.Core
+@using jihadkhawaja.chat.client.Services
 
 @inject SessionStorage SessionStorage
+@inject StorageService StorageService
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
 @inject IJSRuntime JSRuntime
@@ -32,21 +36,21 @@
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             IsSent="@message.Sent" IsSeen="@message.Seen" />
+                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                         }
                     </MudStack>
@@ -79,29 +83,53 @@
     [Inject] ISnackbar Snackbar { get; set; } = null!;
 
     [Parameter]
-    public string Title { get; set; }
+    public string? Title { get; set; }
     [Parameter]
-    public string ChannelId { get; set; }
+    public string? ChannelId { get; set; }
 
-    private List<Message> Messages { get; set; } = new();
+    private List<Message> Messages { get; set; }
     private bool IsLoading { get; set; } = true;
 
-    MudTextField<string> inputMudTextField { get; set; }
-    private string InputContent { get; set; }
+    MudTextField<string> inputMudTextField { get; set; } = null!;
+    private string? InputContent { get; set; }
     private int MessageLinesCount { get; set; }
     private int MaxMessageLength { get; set; } = 300;
+
+    private EgrooDB CacheDB { get; set; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
         HubEvents();
-        Messages = (await GetMessages()).ToList();
-        IsLoading = false;
+
+        //init Cached DB
+        var moduleFactory = new EsModuleFactory(JSRuntime);
+        CacheDB = new EgrooDB(moduleFactory);
+
+        Messages = new();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            //get pending messages
+            await ChatMessageService.SendPendingMessages();
+
+            //fetch cached messages
+            var messages = (await CacheDB.Messages
+            .Where(nameof(Message.ChannelId))
+            .IsEqual(GetChannelId())
+            .Limit(50).ToList()) ?? new();
+
+            //add cached messages
+            Messages.AddRange(messages);
+
+            //reorder
+            Messages = Messages.OrderBy(x => x.DateCreated)
+            .ToList();
+
+            IsLoading = false;
+
             await InvokeAsync(StateHasChanged);
 
             ScrollToMessagesEnd();
@@ -121,22 +149,6 @@
         return Guid.Empty;
     }
 
-    private async Task<Message[]> GetMessages()
-    {
-        var messages = await ChatMessageService.ReceiveMessageHistoryRange(GetChannelId(), 50);
-
-        foreach (var msg in messages)
-        {
-            msg.DisplayName = await GetUserName(msg.SenderId);
-            if (!msg.Seen && msg.SenderId != SessionStorage.User.Id)
-            {
-                await ChatMessageService.SetMessageAsSeen(msg.Id);
-            }
-        }
-
-        return messages;
-    }
-
     private async Task SendMessage()
     {
         if (string.IsNullOrEmpty(InputContent) || string.IsNullOrWhiteSpace(InputContent))
@@ -149,7 +161,7 @@
         Message message = new()
         {
             ChannelId = GetChannelId(),
-            DisplayName = await ChatUserService.GetUserDisplayName(SessionStorage.User.Id),
+            DisplayName = SessionStorage?.User?.Username,
             Content = InputContent,
             SenderId = SessionStorage.User.Id,
         };
@@ -175,11 +187,6 @@
 
             await SendMessage();
         }
-    }
-
-    private async Task<string> GetUserName(Guid userid)
-    {
-        return await ChatUserService.GetUserDisplayName(userid);
     }
 
     private void ScrollToMessagesEnd()
@@ -213,16 +220,19 @@
                 return;
             }
 
-            message.DisplayName = await GetUserName(message.SenderId);
+            User? senderUser = await ChatUserService.GetUserPublicInfo(message.SenderId);
+            message.DisplayName = senderUser?.Username;
 
             Messages.Add(message);
 
             await InvokeAsync(StateHasChanged);
 
-            if (!message.Seen && message.SenderId != SessionStorage.User.Id)
+            if (message.DateSeen is null && message.SenderId != SessionStorage.User.Id)
             {
                 await ChatMessageService.SetMessageAsSeen(message.Id);
             }
+
+            await CacheDB.Messages.Add(message);
 
             ScrollToMessagesEnd();
         });
@@ -236,6 +246,8 @@
 
             int index = Messages.IndexOf(message);
             Messages[index] = message;
+
+            await CacheDB.Messages.Put(message);
 
             await InvokeAsync(StateHasChanged);
         });

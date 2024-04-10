@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<TargetFrameworks>net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<Authors>jihadkhawaja</Authors>
+	<Description>Chat backend solution for ASP.NET server</Description>
+	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
+	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>
+	<PackageIcon>favico.png</PackageIcon>
+	<PackageTags>asp.net, blazor, signalr, chat, server</PackageTags>
+	<PackageReleaseNotes>https://github.com/jihadkhawaja/Egroo/releases</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <ItemGroup>
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.3" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.3" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
+	  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
+	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.0" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.3">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+	  </PackageReference>
+  </ItemGroup>
+	
+  <ItemGroup>
+	<FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+	<None Include="..\..\favico.png" Pack="true" PackagePath="" />
+	<None Include="..\..\README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj" />
+  </ItemGroup>
+
+</Project>

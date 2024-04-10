@@ -36,7 +36,7 @@ else
                                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                                      <MudGrid Justify="Justify.SpaceBetween">
                                          <MudItem>
-                                             <ScopeView Title=@friend.DisplayName Subtitle=@friend.Username />
+                                        <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
                                          </MudItem>
                                          <MudItem>
                                              <MudStack Row Style="height:100%;">
@@ -58,7 +58,7 @@ else
                     <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem>
-                                <ScopeView Title=@channel.Key.Title Subtitle="@channel.Key.DateCreated.Value.Date.ToShortDateString()" />
+                                <ScopeView Title=@channel.Key.Title Subtitle=@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString()) />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
@@ -161,19 +161,20 @@ else
             channels[i].Title = string.Empty;
             foreach (User friend in friends)
             {
+                User? user = await ChatUserService.GetUserPublicInfo(friend.Id);
                 if (friend.Id == SessionStorage.User.Id)
                 {
-                    channels[i].Title += $"{await ChatUserService.GetUserDisplayName(friend.Id)} (You)";
+                    channels[i].Title += $"{user?.Username} (You)";
                 }
                 else
                 {
-                    channels[i].Title += await ChatUserService.GetUserDisplayName(friend.Id);
+                    channels[i].Title += user?.Username;
                 }
 
                 channels[i].Title += ", ";
             }
 
-            channels[i].Title = channels[i].Title.TrimEnd(',', ' ');
+            channels[i].Title = channels[i].Title?.TrimEnd(',', ' ');
 
             bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User.Id);
 

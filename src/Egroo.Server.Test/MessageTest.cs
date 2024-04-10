@@ -1,7 +1,7 @@
-﻿using jihadkhawaja.mobilechat.client.Core;
-using jihadkhawaja.mobilechat.client.Interfaces;
-using jihadkhawaja.mobilechat.client.Models;
-using jihadkhawaja.mobilechat.client.Services;
+﻿using jihadkhawaja.chat.client.Core;
+using jihadkhawaja.chat.client.Services;
+using jihadkhawaja.chat.shared.Interfaces;
+using jihadkhawaja.chat.shared.Models;
 using System.Text.Json;
 
 namespace Egroo.Server.Test
@@ -63,19 +63,10 @@ namespace Egroo.Server.Test
             {
                 ChannelId = Channel.Id,
                 Content = "This is a test.",
-                DisplayName = User.DisplayName,
                 SenderId = User.Id,
             };
 
             Assert.IsTrue(await ChatMessageService.SendMessage(message), "Failed to send message.");
-        }
-
-        [TestMethod]
-        public async Task ReadMessagesTest()
-        {
-            Message[] messages = await ChatMessageService.ReceiveMessageHistory(Channel.Id);
-
-            Assert.IsNotNull(messages, "Failed to read messages.");
         }
 
         [TestCleanup]

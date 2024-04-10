@@ -4,11 +4,11 @@
 @using System.Text.Json
 @using Egroo.UI.Components.Layout;
 @using Egroo.UI.Models;
-@using jihadkhawaja.mobilechat.client
-@using jihadkhawaja.mobilechat.client.Core
+@using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.Core
+@using jihadkhawaja.chat.client.Services
 
-@inject LocalStorageService LocalStorageService
-@inject ISaveFile SaveFileService
+@inject StorageService StorageService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject IChatAuth ChatAuthService
@@ -29,20 +29,10 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
-                        <MudTextField @bind-Value="model.DisplayName"
-                                      For="@(() => model.DisplayName)"
-                                      Immediate="true" Required
-                                      Label="Display Name" InputType="InputType.Text" />
-
                         <MudTextField @bind-Value="model.Username"
                                       For="@(() => model.Username)"
                                       Immediate="true" Required
                                       Label="Username" ErrorText="Invalid username." />
-
-                        <MudTextField @bind-Value="model.Email"
-                                      For="@(() => model.Email)"
-                                      Immediate="true"
-                                      Label="Email (Optional)" />
 
                         <MudTextField @bind-Value="model.Password"
                                       For="@(() => model.Password)"
@@ -94,7 +84,7 @@
             return;
         }
 
-        dynamic dynamicObj = await ChatAuthService.SignUp(model.DisplayName, model.Username, model.Email, model.Password);
+        dynamic dynamicObj = await ChatAuthService.SignUp(model.Username, model.Password);
         Dictionary<string, object> result = null;
         if (dynamicObj is not null)
         {
@@ -115,12 +105,12 @@
             switch (ClientModel.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
-                    SaveFileService.CreateDirectory(ClientModel.AppDataPath);
-                    SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
+                    StorageService.CreateDirectory(ClientModel.AppDataPath);
+                    StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
                 case FrameworkPlatform.SERVER:
-                    await LocalStorageService.SetLocalStorage("token", Token);
+                    await StorageService.SetLocalStorage("token", Token);
                     break;
                 default:
                     throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
@@ -155,29 +145,12 @@
         {
             this.ChatUserService = ChatUserService;
 
-            RuleFor(x => x.DisplayName)
-                .NotEmpty()
-                .Length(3, 16)
-                .WithMessage("Display name must be between 3 and 16 characters");
-
             RuleFor(x => x.Username)
             .Cascade(CascadeMode.Stop)
                 .NotEmpty()
                 .Matches(@"^[a-zA-Z0-9_]{3,16}$")
                 .WithMessage("Username must be between 3 and 16 characters, and can only contain letters, numbers, and underscores.");
 
-            //not required
-            //RuleFor(x => x.Email)
-            //.Cascade(CascadeMode.Stop)
-            //    .NotEmpty()
-            //    .EmailAddress()
-            //    .WithMessage("Invalid email address.");
-
-            // at least one lowercase letter
-            // at least one uppercase letter
-            // at least one digit
-            // at least one symbol
-            // at least 8 characters and a high length limit
             RuleFor(x => x.Password)
                 .Cascade(CascadeMode.Stop)
                 .NotEmpty()

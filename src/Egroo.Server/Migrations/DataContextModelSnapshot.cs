@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using jihadkhawaja.mobilechat.server.Database;
+using jihadkhawaja.chat.server.Database;
 
 #nullable disable
 
@@ -17,12 +17,12 @@ namespace Egroo.Server.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.2")
+                .HasAnnotation("ProductVersion", "8.0.3")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.Channel", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Channel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -43,7 +43,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("Channels");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.ChannelUser", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -73,7 +73,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("ChannelUsers");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.Message", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Message", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -82,10 +82,6 @@ namespace Egroo.Server.Migrations
                     b.Property<Guid>("ChannelId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
                         .HasColumnType("timestamp with time zone");
@@ -93,37 +89,28 @@ namespace Egroo.Server.Migrations
                     b.Property<DateTimeOffset?>("DateDeleted")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DateSeen")
+                    b.Property<DateTimeOffset?>("DateSeen")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTime?>("DateSent")
+                    b.Property<DateTimeOffset?>("DateSent")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<bool>("Seen")
-                        .HasColumnType("boolean");
-
                     b.Property<Guid>("SenderId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("Sent")
-                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
                     b.ToTable("Messages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.User", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("About")
-                        .HasColumnType("text");
 
                     b.Property<string>("AvatarBase64")
                         .HasColumnType("text");
@@ -141,15 +128,6 @@ namespace Egroo.Server.Migrations
                     b.Property<DateTimeOffset?>("DateUpdated")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DisplayName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<string>("FirstName")
-                        .HasColumnType("text");
-
                     b.Property<bool>("InCall")
                         .HasColumnType("boolean");
 
@@ -158,9 +136,6 @@ namespace Egroo.Server.Migrations
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastName")
-                        .HasColumnType("text");
 
                     b.Property<string>("Password")
                         .IsRequired()
@@ -179,11 +154,14 @@ namespace Egroo.Server.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.mobilechat.server.Models.UserFriend", b =>
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFriend", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DateAcceptedOn")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
@@ -198,15 +176,46 @@ namespace Egroo.Server.Migrations
                     b.Property<Guid>("FriendUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<bool>("IsAccepted")
-                        .HasColumnType("boolean");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.ToTable("UsersFriends");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserPendingMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("DateCreated")
+                        .IsRequired()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("DateUserReceivedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UsersPendingMessages");
                 });
 #pragma warning restore 612, 618
         }

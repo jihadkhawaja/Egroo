@@ -1,6 +1,6 @@
-using jihadkhawaja.mobilechat.client.Core;
-using jihadkhawaja.mobilechat.client.Interfaces;
-using jihadkhawaja.mobilechat.client.Services;
+using jihadkhawaja.chat.client.Core;
+using jihadkhawaja.chat.shared.Interfaces;
+using jihadkhawaja.chat.client.Services;
 using System.Text.Json;
 
 namespace Egroo.Server.Test
@@ -34,7 +34,7 @@ namespace Egroo.Server.Test
         [TestMethod, Priority(1)]
         public async Task SignUpThenSignInTest()
         {
-            dynamic? dynamicObj2 = await ChatAuthService.SignUp("Test", "test", "test@domain.com", "HvrnS4Q4zJ$xaW!3");
+            dynamic? dynamicObj2 = await ChatAuthService.SignUp("test", "HvrnS4Q4zJ$xaW!3");
             Dictionary<string, object>? result2 = null;
             if (dynamicObj2 is not null)
             {

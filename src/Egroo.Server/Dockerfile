@@ -9,7 +9,8 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /
 COPY ["src/Egroo.Server/Egroo.Server.csproj", "Egroo.Server/"]
-COPY ["src/jihadkhawaja.mobilechat.server/jihadkhawaja.mobilechat.server.csproj", "jihadkhawaja.mobilechat.server/"]
+COPY ["src/jihadkhawaja.chat.server/jihadkhawaja.chat.server.csproj", "jihadkhawaja.chat.server/"]
+COPY ["src/jihadkhawaja.chat.shared/jihadkhawaja.chat.shared.csproj", "jihadkhawaja.chat.shared/"]
 RUN dotnet restore "./Egroo.Server/Egroo.Server.csproj"
 COPY . .
 WORKDIR "/src/Egroo.Server"

@@ -1,8 +1,8 @@
 ﻿@using Egroo.UI.Models;
+@using jihadkhawaja.chat.client.Services;
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject LocalStorageService LocalStorageService
-@inject ISaveFile SaveFileService
+@inject StorageService StorageService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
@@ -28,11 +28,11 @@
         {
             case FrameworkPlatform.MAUI:
                 string path = Path.Combine(ClientModel.AppDataPath);
-                SaveFileService.DeleteDirectory(path);
+                StorageService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:
             case FrameworkPlatform.SERVER:
-                await LocalStorageService.RemoveLocalStorage("token");
+                await StorageService.RemoveFromLocalStorage("token");
                 break;
             default:
                 throw new Exception("CurrentFrameworkPlatform parameter is undefined.");

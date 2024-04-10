@@ -3,11 +3,11 @@
 @using Egroo.UI.Components.Layout;
 @using Egroo.UI.Constants;
 @using Egroo.UI.Models;
-@using jihadkhawaja.mobilechat.client
-@using jihadkhawaja.mobilechat.client.Core
+@using jihadkhawaja.chat.client
+@using jihadkhawaja.chat.client.Core
+@using jihadkhawaja.chat.client.Services
 
-@inject LocalStorageService LocalStorageService
-@inject ISaveFile SaveFileService
+@inject StorageService StorageService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject IChatAuth ChatAuthService
@@ -27,11 +27,11 @@
                 </MudCardHeader>
                 <MudCardContent>
                     <MudForm @ref="@form" ValidationDelay="0">
-                        <MudTextField @bind-Value="@EmailOrUsername"
+                        <MudTextField @bind-Value="@Username"
                                     Immediate="true"
                                     Required="true"
                                     Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                    Label="Email or Username" />
+                                    Label="Username" />
 
                         <MudTextField @bind-Value="@Password"
                                     Immediate="true"
@@ -52,7 +52,7 @@
     [Inject] ISnackbar Snackbar { get; set; }
     MudForm form;
 
-    string EmailOrUsername { get; set; }
+    string Username { get; set; }
     string Password { get; set; }
     bool IsBusy = false;
 
@@ -78,7 +78,7 @@
             return;
         }
 
-        dynamic dynamicObj = await ChatAuthService.SignIn(EmailOrUsername, Password);
+        dynamic dynamicObj = await ChatAuthService.SignIn(Username, Password);
         Dictionary<string, object> result = null;
         if (dynamicObj is not null)
         {
@@ -99,12 +99,12 @@
             switch (ClientModel.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
-                    SaveFileService.CreateDirectory(ClientModel.AppDataPath);
-                    SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
+                    StorageService.CreateDirectory(ClientModel.AppDataPath);
+                    StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
                 case FrameworkPlatform.SERVER:
-                    await LocalStorageService.SetLocalStorage("token", Token);
+                    await StorageService.SetLocalStorage("token", Token);
                     break;
                 default:
                     throw new Exception("CurrentFrameworkPlatform parameter is undefined.");

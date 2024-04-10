@@ -1,15 +1,15 @@
 ﻿@using Egroo.UI.Components.Layout
 @using Egroo.UI.Models
 @using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.mobilechat.client.Interfaces;
-@using jihadkhawaja.mobilechat.client.Core;
+@using jihadkhawaja.chat.shared.Interfaces;
+@using jihadkhawaja.chat.client.Core;
 @using Egroo.UI.Constants
 @using System.Text.Json;
+@using jihadkhawaja.chat.client.Services;
 
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject LocalStorageService LocalStorageService
-@inject ISaveFile SaveFileService
+@inject StorageService StorageService
 @inject IChatUser ChatUserService
 @inject IChatAuth ChatAuthService
 
@@ -51,11 +51,11 @@
         switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
-                SessionStorage.Token = SaveFileService.ReadFromJsonFile("token", ClientModel.AppDataPath, true);
+                SessionStorage.Token = StorageService.ReadFromJsonFile("token", ClientModel.AppDataPath, true);
                 break;
             case FrameworkPlatform.WASM:
             case FrameworkPlatform.SERVER:
-                SessionStorage.Token = await LocalStorageService.GetFromLocalStorage("token");
+                SessionStorage.Token = await StorageService.GetFromLocalStorage("token");
                 break;
             default:
                 throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
@@ -106,12 +106,12 @@
                 switch (ClientModel.CurrentFrameworkPlatform)
                 {
                     case FrameworkPlatform.MAUI:
-                        SaveFileService.CreateDirectory(ClientModel.AppDataPath);
-                        SaveFileService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
+                        StorageService.CreateDirectory(ClientModel.AppDataPath);
+                        StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
                         break;
                     case FrameworkPlatform.WASM:
                     case FrameworkPlatform.SERVER:
-                        await LocalStorageService.SetLocalStorage("token", result["token"].ToString());
+                        await StorageService.SetLocalStorage("token", result["token"].ToString());
                         break;
                     default:
                         throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
@@ -121,7 +121,6 @@
             SessionStorage!.User = new()
             {
                 Id = Guid.Parse(result["id"].ToString()),
-                DisplayName = await ChatUserService.GetCurrentUserDisplayName(),
                 Username = await ChatUserService.GetCurrentUserUsername(),
                 ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };
@@ -139,17 +138,24 @@
         #endif
     }
 
+    [JSInvokable]
+    public static async Task OnClosedWindow()
+    {
+        ChatUserService chatUserService = new();
+        await chatUserService.CloseUserSession();
+    }
+
     private async Task SignOut()
     {
         switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
                 string path = Path.Combine(ClientModel.AppDataPath);
-                SaveFileService.DeleteDirectory(path);
+                StorageService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:
             case FrameworkPlatform.SERVER:
-                await LocalStorageService.RemoveLocalStorage("token");
+                await StorageService.RemoveFromLocalStorage("token");
                 break;
             default:
                 throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
