@@ -33,14 +33,3 @@
         </MudButton>
     </MudStack>
 </MudContainer>
-
-@code {
-    protected override void OnInitialized()
-    {
-        if (!string.IsNullOrEmpty(SessionStorage.Token) 
-        && SessionStorage.User is not null)
-        {
-            NavigationManager.NavigateTo("/channels");
-        }
-    }
-}

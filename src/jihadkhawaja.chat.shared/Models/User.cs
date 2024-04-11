@@ -1,10 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 
 namespace jihadkhawaja.chat.shared.Models
 {
+    [Index(nameof(Username), IsUnique = true)]
     public class User : EntityBase
     {
         public string? ConnectionId { get; set; }
+        [Base64String]
         public string? AvatarBase64 { get; set; }
         [Required]
         public string? Username { get; set; }

@@ -31,16 +31,14 @@ namespace jihadkhawaja.chat.server.Services
             return false;
         }
 
-        public async Task<bool> CreateOrUpdate(T entity)
+        public async Task<bool> Create(IEnumerable<T> entities)
         {
             try
             {
-                context.Set<T>().Add(entity);
+                context.Set<T>().AddRange(entities);
                 await context.SaveChangesAsync();
 
                 context.ChangeTracker.Clear();
-                context.Set<T>().Update(entity);
-                await context.SaveChangesAsync();
 
                 return true;
             }
@@ -52,14 +50,22 @@ namespace jihadkhawaja.chat.server.Services
             return false;
         }
 
-        public async Task<bool> Create(IEnumerable<T> entities)
+        public async Task<bool> CreateOrUpdate(T entity)
         {
             try
             {
-                context.Set<T>().AddRange(entities);
-                await context.SaveChangesAsync();
-
-                context.ChangeTracker.Clear();
+                var e = await context.Set<T>().FirstOrDefaultAsync(x => x == entity);
+                if (e == null)
+                {
+                    context.Set<T>().AddRange(entity);
+                    await context.SaveChangesAsync();
+                }
+                else
+                {
+                    context.ChangeTracker.Clear();
+                    context.Set<T>().UpdateRange(entity);
+                    await context.SaveChangesAsync();
+                }
 
                 return true;
             }

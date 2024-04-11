@@ -40,7 +40,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 }
                 foreach (User user in users)
                 {
-                    await SendClientMessage(user, message);
+                    await SendClientMessage(user, message, false);
                 }
 
                 return true;
@@ -48,8 +48,13 @@ namespace jihadkhawaja.chat.server.Hubs
 
             return false;
         }
-        private async Task<bool> SendClientMessage(User user, Message message)
+        private async Task<bool> SendClientMessage(User user, Message message, bool IgnorePendingMessages)
         {
+            if (string.IsNullOrWhiteSpace(message.Content))
+            {
+                return false;
+            }
+
             UserPendingMessage userPendingMessage = new()
             {
                 UserId = user.Id,
@@ -57,9 +62,14 @@ namespace jihadkhawaja.chat.server.Hubs
                 Content = message.Content
             };
 
+            //In case client was offline or had connection cut
+            if(!IgnorePendingMessages)
+            {
+                await UserPendingMessageService.CreateOrUpdate(userPendingMessage);
+            } 
+
             if (string.IsNullOrEmpty(user.ConnectionId))
             {
-                await UserPendingMessageService.Create(userPendingMessage);
                 return false;
             }
 
@@ -72,8 +82,6 @@ namespace jihadkhawaja.chat.server.Hubs
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to send message for the following error: {ex}");
-
-                await UserPendingMessageService.Create(userPendingMessage);
             }
 
             return false;
@@ -87,7 +95,8 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             Message dbMessage = await MessageService.ReadFirst(x => x.Id == messageid);
-            dbMessage.DateSeen = DateTime.UtcNow;
+            dbMessage.DateSeen = DateTimeOffset.UtcNow;
+            dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 
             //save msg to db
             if (await MessageService.Update(dbMessage))
@@ -129,7 +138,7 @@ namespace jihadkhawaja.chat.server.Hubs
                         .ReadFirst(x => x.Id == userpendingmessage.MessageId);
                     message.Content = userpendingmessage.Content;
 
-                    await SendClientMessage(ConnectedUser, message);
+                    await SendClientMessage(ConnectedUser, message, true);
                 }
             }
         }
@@ -147,9 +156,9 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (UserPendingMessage is not null)
             {
-                UserPendingMessage.Content = "REDACTED";
                 UserPendingMessage.DateDeleted = DateTimeOffset.UtcNow;
                 UserPendingMessage.DateUserReceivedOn = DateTimeOffset.UtcNow;
+                UserPendingMessage.Content = null;
                 await UserPendingMessageService
                 .Update(UserPendingMessage);
             }
