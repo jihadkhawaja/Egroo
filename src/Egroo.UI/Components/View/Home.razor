@@ -1,18 +1,14 @@
-﻿@page "/"
-
-@layout EmptyLayout
-
-@inject NavigationManager NavigationManager
+﻿@inject NavigationManager NavigationManager
 @inject SessionStorage SessionStorage
 
 <MudAppBar Elevation="2">
     <MudText Typo="Typo.h6">Egroo</MudText>
     <MudSpacer />
-    <MudIconButton Icon="@Icons.Custom.Brands.GitHub" 
-    Href="https://github.com/jihadkhawaja/Egroo" 
-    Target="_blank" Rel="noopener noreferrer" />
+    <MudIconButton Icon="@Icons.Custom.Brands.GitHub"
+                   Href="https://github.com/jihadkhawaja/Egroo"
+                   Target="_blank" Rel="noopener noreferrer" />
     <MudIconButton Variant="Variant.Text"
-                   Icon="@Icons.Material.Filled.Login" 
+                   Icon="@Icons.Material.Filled.Login"
                    Href="/signin" />
 </MudAppBar>
 
@@ -34,11 +30,11 @@
     </MudStack>
 </MudContainer>
 
-@code {
+@code{
     protected override void OnInitialized()
     {
-        if (!string.IsNullOrEmpty(SessionStorage.Token) 
-        && SessionStorage.User is not null)
+        if (!string.IsNullOrEmpty(SessionStorage.Token)
+            && SessionStorage.User is not null)
         {
             NavigationManager.NavigateTo("/channels");
         }

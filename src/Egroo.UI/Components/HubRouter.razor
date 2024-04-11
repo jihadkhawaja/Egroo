@@ -8,40 +8,60 @@
 @using jihadkhawaja.chat.client.Services;
 
 @inject SessionStorage SessionStorage
-@inject NavigationManager NavigationManager
 @inject StorageService StorageService
+@inject NavigationManager NavigationManager
 @inject IChatUser ChatUserService
 @inject IChatAuth ChatAuthService
 
-@if (IsBusy || MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected)
+@if (IsBusy)
 {
     <div style="width:100vw;height:100vh;background-color:var(--mud-palette-background)">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
         <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
-            Establishing Connection
+            @GetAppState()
         </MudText>
     </div>
-
-    return;
+}
+else
+{
+    @ChildContent
 }
 
-@ChildContent
 
 @code {
+    [Inject]
+    private ISnackbar Snackbar { get; set; } = null!;
+
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
     private bool IsBusy { get; set; } = true;
 
+    protected override void OnInitialized()
+    {
+        PrintStateLog();
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            if (MobileChatSignalR.HubConnection is not null)
+            {
+                IsBusy = false;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            await SetAppState(AppState.LOADING_CACHE);
             await LoadCache();
+
+            await SetAppState(AppState.ESTABLISHING_CONNECTION);
             await EstablishSession();
 
-            IsBusy = false;
+            await SetAppState(AppState.CONNECTED);
 
+            IsBusy = false;
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -62,13 +82,8 @@
         }
     }
 
-    private async Task EstablishSession()
+    private async Task<bool?> EstablishSession()
     {
-        if (MobileChatSignalR.HubConnection is not null)
-        {
-            return;
-        }
-
         MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
 
         await MobileChatSignalR.HubConnection!.StartAsync();
@@ -84,7 +99,7 @@
             if (string.IsNullOrWhiteSpace(result["token"].ToString()))
             {
                 await SignOut();
-                return;
+                return false;
             }
 
             if (SessionStorage.Token != result["token"].ToString())
@@ -98,8 +113,11 @@
 
                 if (MobileChatSignalR.HubConnection is null)
                 {
-                    return;
+                    return null;
                 }
+
+                SessionStorage!.AppState = AppState.CREATING_SESSION;
+                await InvokeAsync(StateHasChanged);
 
                 await MobileChatSignalR.HubConnection.StartAsync();
 
@@ -125,17 +143,37 @@
                 ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
             };
 
-            NavigationManager.NavigateTo("/channels");
+            return true;
         }
         else
         {
-            NavigationManager.NavigateTo("/");
+            return false;
         }
+    }
 
-        #if DEBUG
-        Console.WriteLine(ClientModel.CurrentFrameworkPlatform);
-        Console.WriteLine(JsonSerializer.Serialize(SessionStorage!.User));
-        #endif
+    private async Task SetAppState(AppState appState)
+    {
+        SessionStorage.AppState = appState;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetAppState()
+    {
+        switch (SessionStorage.AppState)
+        {
+            case AppState.INITIATING:
+                return "Initiating";
+                case AppState.LOADING_CACHE:
+                return "Loading Cache";
+                case AppState.ESTABLISHING_CONNECTION:
+                return "Establishing Connection";
+                case AppState.CREATING_SESSION:
+                return "Creating Session";
+            case AppState.CONNECTED:
+                return "Connected";
+            default:
+                return "Unknown";
+        }
     }
 
     [JSInvokable]
@@ -164,5 +202,16 @@
         SessionStorage.User = null;
 
         NavigationManager.NavigateTo("/", true);
+    }
+
+    private void PrintStateLog()
+    {
+#if DEBUG
+        Console.WriteLine("\n");
+        Console.WriteLine("[State]\t" + SessionStorage.AppState);
+        Console.WriteLine("[Framework]\t" + ClientModel.CurrentFrameworkPlatform);
+        Console.WriteLine("[Connection Id]\t" + SessionStorage.User?.ConnectionId);
+        Console.WriteLine("\n");
+#endif
     }
 }

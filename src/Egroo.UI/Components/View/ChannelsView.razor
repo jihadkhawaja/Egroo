@@ -1,4 +1,6 @@
-﻿@inject SessionStorage SessionStorage
+﻿@inherits ProtectedViewBase
+
+@inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject IChatUser ChatUserService
 @inject IChatChannel ChatChannelService
@@ -100,10 +102,8 @@ else
 
     private Guid selectedChannelId { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAccess()
     {
-        IsBusy = true;
-
         CurrentUserChannels = await GetChannels();
 
         IsBusy = false;
@@ -141,9 +141,9 @@ else
         StateHasChanged();
     }
 
-    private async Task<KeyValuePair<Channel, bool>[]> GetChannels()
+    private async Task<KeyValuePair<Channel, bool>[]?> GetChannels()
     {
-        Channel[] channels = await ChatChannelService.GetUserChannels();
+        Channel[]? channels = await ChatChannelService.GetUserChannels();
 
         if (channels is null)
         {
@@ -156,13 +156,13 @@ else
 
         for (int i = 0; i < channels.Length; i++)
         {
-            User[] friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
+            User[]? friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
 
             channels[i].Title = string.Empty;
             foreach (User friend in friends)
             {
                 User? user = await ChatUserService.GetUserPublicInfo(friend.Id);
-                if (friend.Id == SessionStorage.User.Id)
+                if (friend.Id == SessionStorage.User!.Id)
                 {
                     channels[i].Title += $"{user?.Username} (You)";
                 }
@@ -176,7 +176,7 @@ else
 
             channels[i].Title = channels[i].Title?.TrimEnd(',', ' ');
 
-            bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User.Id);
+            bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User!.Id);
 
             results[i] = new KeyValuePair<Channel, bool>(channels[i], isChannelAdmin);
         }
