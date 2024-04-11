@@ -35,7 +35,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github", "Github", "{1D4F32
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "jihadkhawaja.chat.shared", "jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj", "{81ED69C8-08B3-4529-A65D-98C988ECF479}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.chat.shared", "jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj", "{81ED69C8-08B3-4529-A65D-98C988ECF479}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

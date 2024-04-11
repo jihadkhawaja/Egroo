@@ -5,6 +5,8 @@
 @using jihadkhawaja.chat.client.Core
 @using jihadkhawaja.chat.client.Services
 
+@inherits ProtectedViewBase
+
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
 @inject IChatUser ChatUserService
@@ -98,7 +100,7 @@
 
     private EgrooDB CacheDB { get; set; } = null!;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         HubEvents();
 

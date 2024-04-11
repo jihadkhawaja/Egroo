@@ -1,5 +1,8 @@
 ﻿@using Egroo.UI.Models;
 @using jihadkhawaja.chat.client.Services;
+
+@inherits ProtectedViewBase
+
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject StorageService StorageService
@@ -10,7 +13,7 @@
 </MudContainer>
 
 @code{
-    [Inject] IDialogService DialogService { get; set; }
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
     private async Task SignOut()
     {
