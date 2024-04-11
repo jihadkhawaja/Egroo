@@ -85,8 +85,7 @@ namespace jihadkhawaja.chat.server.Hubs
         }
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            User? connectedUser = await UserService
-                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
+            User? connectedUser = await GetConnectedUser();
             if (connectedUser != null)
             {
                 connectedUser.ConnectionId = null;

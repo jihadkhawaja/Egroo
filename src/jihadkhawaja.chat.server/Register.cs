@@ -45,7 +45,7 @@ public static class Register
 
     private static void ConfigureJwtAuthentication(IServiceCollection services)
     {
-        string jwtKey = Configuration.GetSection("Secrets")["Jwt"] 
+        string jwtKey = Configuration.GetSection("Secrets")["Jwt"]
             ?? throw new NullReferenceException(nameof(jwtKey));
 
         services.AddAuthentication(options =>
@@ -56,7 +56,7 @@ public static class Register
         .AddJwtBearer(options =>
         {
             options.TokenValidationParameters.ValidateIssuerSigningKey = true;
-            options.TokenValidationParameters.IssuerSigningKey = 
+            options.TokenValidationParameters.IssuerSigningKey =
             new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             options.TokenValidationParameters.ValidateIssuer = false;
             options.TokenValidationParameters.ValidateAudience = false;
