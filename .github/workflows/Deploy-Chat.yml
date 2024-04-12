@@ -42,7 +42,7 @@ jobs:
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
                 },
                 "Api": {
-                  "AllowedOrigins": [ "https://egroo.org/", "https://www.egroo.org/" ]
+                  "AllowedOrigins": [ "https://egroo.org/", "https://www.egroo.org/", "https://api.egroo.org/"]
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_PROD }}"
