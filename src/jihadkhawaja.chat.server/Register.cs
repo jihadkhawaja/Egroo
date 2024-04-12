@@ -46,14 +46,14 @@ public static class Register
         {
             app.UseSwagger();
             app.UseSwaggerUI();
-            app.UseCors("CorsPolicyDev");
         }
         else
         {
             app.UseHttpsRedirection();
-            app.UseCors("CorsPolicy");
+            
         }
 
+        app.UseCors("CorsPolicy");
         app.UseRateLimiter();
         app.UseAuthentication();
         app.UseAuthorization();
@@ -189,17 +189,6 @@ public class ChatServiceBuilder
 
         //CORS
         var allowedOrigins = _configuration.GetSection("Api:AllowedOrigins").Get<string[]>();
-
-        services.AddCors(options =>
-        {
-            options.AddPolicy("CorsPolicyDev",
-            policy =>
-            {
-                policy.AllowAnyOrigin();
-                policy.AllowAnyHeader();
-                policy.AllowAnyMethod();
-            });
-        });
 
         if (allowedOrigins is null || allowedOrigins.Length == 0)
         {
