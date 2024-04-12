@@ -40,13 +40,13 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateUpdated = DateTimeOffset.UtcNow
             };
 
-            if (Register.Configuration == null)
+            if (Configuration == null)
             {
                 return null;
             }
 
             var generatedToken = await TokenGenerator.GenerateJwtToken(
-                user, Register.Configuration.GetSection("Secrets")["Jwt"]);
+                user, Configuration.GetSection("Secrets")["Jwt"]);
             string token = generatedToken.Access_Token;
 
             if (await UserService.Create(user))
@@ -79,7 +79,7 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 return null;
             }
-            else if (Register.Configuration == null)
+            else if (Configuration == null)
             {
                 return null;
             }
@@ -92,7 +92,7 @@ namespace jihadkhawaja.chat.server.Hubs
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
 
             var generatedToken = await TokenGenerator.GenerateJwtToken(
-                registeredUser, Register.Configuration.GetSection("Secrets")["Jwt"]);
+                registeredUser, Configuration.GetSection("Secrets")["Jwt"]);
             string token = generatedToken.Access_Token;
 
             await UserService.Update(registeredUser);
@@ -126,7 +126,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             var generatedToken = await TokenGenerator.GenerateJwtToken(
-                user, Register.Configuration.GetSection("Secrets")["Jwt"]);
+                user, Configuration.GetSection("Secrets")["Jwt"]);
             string newtoken = generatedToken.Access_Token;
 
             user.ConnectionId = Context.ConnectionId;

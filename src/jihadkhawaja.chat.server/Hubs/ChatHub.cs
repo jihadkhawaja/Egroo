@@ -3,6 +3,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -10,6 +11,8 @@ namespace jihadkhawaja.chat.server.Hubs
 {
     public partial class ChatHub : Hub
     {
+        [Inject]
+        private IConfiguration Configuration { get; set; }
         [Inject]
         private IEntity<User> UserService { get; set; }
         [Inject]
@@ -22,10 +25,12 @@ namespace jihadkhawaja.chat.server.Hubs
         private IEntity<Message> MessageService { get; set; }
         [Inject]
         private IEntity<UserPendingMessage> UserPendingMessageService { get; set; }
-        public ChatHub(IEntity<User> UserService, IEntity<UserFriend> UserFriendsService,
+        public ChatHub(IConfiguration Configuration,
+            IEntity<User> UserService, IEntity<UserFriend> UserFriendsService,
             IEntity<Channel> ChannelService, IEntity<ChannelUser> ChannelUsersService,
             IEntity<Message> MessageService, IEntity<UserPendingMessage> UserPendingMessageService)
         {
+            this.Configuration = Configuration;
             this.UserService = UserService;
             this.UserFriendsService = UserFriendsService;
             this.ChannelService = ChannelService;
