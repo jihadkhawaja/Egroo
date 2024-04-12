@@ -9,7 +9,6 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Net;
@@ -40,17 +39,6 @@ public static class Register
                 DataContext db = scope.ServiceProvider.GetRequiredService<DataContext>();
                 db.Database.Migrate();
             }
-        }
-
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
-        else
-        {
-            app.UseHttpsRedirection();
-            
         }
 
         app.UseCors("CorsPolicy");
@@ -189,6 +177,10 @@ public class ChatServiceBuilder
 
         //CORS
         var allowedOrigins = _configuration.GetSection("Api:AllowedOrigins").Get<string[]>();
+
+#if DEBUG
+        allowedOrigins = null;
+#endif
 
         if (allowedOrigins is null || allowedOrigins.Length == 0)
         {
