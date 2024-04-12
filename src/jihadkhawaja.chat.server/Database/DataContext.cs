@@ -15,24 +15,24 @@ namespace jihadkhawaja.chat.server.Database
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)
         {
-            if (string.IsNullOrWhiteSpace(Register.DbConnectionStringKey))
+            if (string.IsNullOrWhiteSpace(Register.ChatService.DbConnectionStringKey))
             {
-                throw new ArgumentException($"Key \"{nameof(Register.DbConnectionStringKey)}\" can't be empty");
+                throw new ArgumentException($"Key \"{nameof(Register.ChatService.DbConnectionStringKey)}\" can't be empty");
             }
-            else if (string.IsNullOrWhiteSpace(Configuration.GetConnectionString(Register.DbConnectionStringKey)))
+            else if (string.IsNullOrWhiteSpace(Configuration.GetConnectionString(Register.ChatService.DbConnectionStringKey)))
             {
-                throw new ArgumentException($"Connection string value of \"{nameof(Register.DbConnectionStringKey)}\" is empty or doesn't exist");
+                throw new ArgumentException($"Connection string value of \"{nameof(Register.ChatService.DbConnectionStringKey)}\" is empty or doesn't exist");
             }
 
-            switch (Register.SelectedDatabase)
+            switch (Register.ChatService.SelectedDatabase)
             {
-                case Register.DatabaseEnum.Postgres:
-                    options.UseNpgsql(Configuration.GetConnectionString(Register.DbConnectionStringKey), b =>
-                    b.MigrationsAssembly(Register.CurrentExecutionAssemblyName));
+                case DatabaseEnum.Postgres:
+                    options.UseNpgsql(Configuration.GetConnectionString(Register.ChatService.DbConnectionStringKey), b =>
+                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName));
                     break;
-                case Register.DatabaseEnum.SqlServer:
-                    options.UseSqlServer(Configuration.GetConnectionString(Register.DbConnectionStringKey), b =>
-                    b.MigrationsAssembly(Register.CurrentExecutionAssemblyName));
+                case DatabaseEnum.SqlServer:
+                    options.UseSqlServer(Configuration.GetConnectionString(Register.ChatService.DbConnectionStringKey), b =>
+                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName));
                     break;
                 default:
                     throw new NotImplementedException();

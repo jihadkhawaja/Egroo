@@ -5,33 +5,14 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 //logger
 builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
-//change to your liking
-#if DEBUG
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", builder =>
-    builder
-    .AllowAnyOrigin()
-    .AllowAnyMethod()
-    .AllowAnyHeader());
-});
-#else
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("CorsPolicy", builder =>
-    builder
-    .WithOrigins("https://egroo.org", "https://www.egroo.org")
-    .AllowAnyMethod()
-    .AllowAnyHeader());
-});
-#endif
-
-//mobile chat service
-builder.Services.AddChatServices(
-    builder.Configuration,
-    typeof(Program),
-    Register.DatabaseEnum.Postgres
-    );
+// Add Egroo chat services
+builder.Services.AddChatServices()
+    .WithConfiguration(builder.Configuration)
+    .WithExecutionClassType(typeof(Program))
+    .WithDatabase(DatabaseEnum.Postgres)
+    .WithAutoMigrateDatabase(true)
+    .WithDbConnectionStringKey("DefaultConnection")
+    .Build();
 
 WebApplication app = builder.Build();
 
@@ -47,9 +28,7 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
-app.UseCors("CorsPolicy");
-
-//chat hub
-app.UseMobileChatServices();
+// Use Egroo chat services
+app.UseChatServices();
 
 app.Run();

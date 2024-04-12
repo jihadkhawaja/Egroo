@@ -131,6 +131,9 @@
             Messages = Messages.OrderBy(x => x.DateCreated)
             .ToList();
 
+            //update any unseen message
+            _= UpdateUnseenMessages();
+
             IsLoading = false;
 
             await InvokeAsync(StateHasChanged);
@@ -216,6 +219,17 @@
         InputContent = text;
     }
 
+    private async Task UpdateUnseenMessages()
+    {
+        for (int i = 0; i < Messages.Count(); i++)
+        {
+            if (Messages[i].DateSeen is null && Messages[i].SenderId != SessionStorage.User?.Id)
+            {
+                await ChatMessageService.UpdateMessage(Messages[i]);
+            }
+        }
+    }
+
     private void HubEvents()
     {
         MobileChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
@@ -239,7 +253,7 @@
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
             {
-                await ChatMessageService.UpdateMessage(message.Id);
+                await ChatMessageService.UpdateMessage(message);
             }
 
             await CacheDB.Messages.Add(message);
@@ -258,12 +272,21 @@
                 return;
             }
 
-            int index = Messages.IndexOf(message);
-            Messages[index] = message;
+            for (int i = 0; i < Messages.Count(); i++)
+            {
+                if (message.ReferenceId == Messages[i].ReferenceId)
+                {
+                    Messages[i].Id = message.Id;
+                    Messages[i].DateSeen = message.DateUpdated;
+                    Messages[i].DateSeen = message.DateSeen;
 
-            await CacheDB.Messages.Put(message);
+                    await CacheDB.Messages.Put(Messages[i], Messages[i].ReferenceId);
 
-            await InvokeAsync(StateHasChanged);
+                    await InvokeAsync(StateHasChanged);
+
+                    return;
+                }
+            }
         });
     }
 }
