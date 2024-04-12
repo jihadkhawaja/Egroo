@@ -40,6 +40,9 @@ jobs:
                 "ConnectionStrings": {
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST }}';Port=5432;User Id=postgres;Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
                 },
+                  "Api": {
+                  "AllowedOrigins": [ "https://jihadkhawaja.com/", "https://dev-api-chat.jihadkhawaja.com/" ]
+                },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"
                 }
