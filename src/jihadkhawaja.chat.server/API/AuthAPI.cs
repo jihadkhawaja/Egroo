@@ -16,6 +16,7 @@ namespace jihadkhawaja.chat.server.API
 {
     public static class AuthAPI
     {
+        //TODO
         public static void MapAuthentication(this IEndpointRouteBuilder routes)
         {
             var group = routes.MapGroup("/api/v1/Auth")

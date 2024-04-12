@@ -31,7 +31,11 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.MAUI", "Egroo.MAUI\Eg
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github", "Github", "{1D4F32F0-5F9B-4B85-A75B-A9E407FB91E9}"
 	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\Deploy-Chat.yml = ..\.github\workflows\Deploy-Chat.yml
+		..\.github\workflows\Docker.yml = ..\.github\workflows\Docker.yml
 		..\LICENSE = ..\LICENSE
+		..\.github\workflows\MSTest.yml = ..\.github\workflows\MSTest.yml
+		..\.github\workflows\Nuget.yml = ..\.github\workflows\Nuget.yml
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
