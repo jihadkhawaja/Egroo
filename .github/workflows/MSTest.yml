@@ -69,7 +69,7 @@ jobs:
             rm /home/ubuntu/images/mobilechat-server.tar
             docker kill mobilechat-server
             docker system prune -f
-            docker run --name mobilechat-server -p 43222:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server:latest
+            docker run --name mobilechat-server -p 43222:8080 --restart always -d jihadkhawaja/mobilechat-server:latest
 
   uni-test:
     runs-on: ubuntu-latest
