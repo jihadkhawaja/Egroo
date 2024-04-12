@@ -73,7 +73,7 @@ jobs:
             rm /home/ubuntu/images/mobilechat-server-prod.tar
             docker kill mobilechat-server-prod
             docker system prune -f
-            docker run --name mobilechat-server-prod -p 49117:8080 --restart always -v public:/app/wwwroot/public -d jihadkhawaja/mobilechat-server-prod:latest
+            docker run --name mobilechat-server-prod -p 49117:8080 --restart always -d jihadkhawaja/mobilechat-server-prod:latest
   dotnet-build-wasm:
     name: Dotnet Build wasm
     runs-on: ubuntu-latest
