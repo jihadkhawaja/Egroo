@@ -17,14 +17,14 @@ namespace jihadkhawaja.chat.client.Services
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(SendMessage), message);
         }
 
-        public async Task<bool> UpdateMessage(Guid messageid)
+        public async Task<bool> UpdateMessage(Message message)
         {
             if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(UpdateMessage), messageid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(UpdateMessage), message);
         }
 
         public async Task SendPendingMessages()

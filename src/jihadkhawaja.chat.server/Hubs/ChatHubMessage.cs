@@ -28,7 +28,6 @@ namespace jihadkhawaja.chat.server.Hubs
 
             //save msg to db
             message.Id = Guid.NewGuid();
-            message.DateCreated = DateTime.UtcNow;
             message.DateSent = DateTime.UtcNow;
 
             if (await MessageService.Create(message))
@@ -63,10 +62,10 @@ namespace jihadkhawaja.chat.server.Hubs
             };
 
             //In case client was offline or had connection cut
-            if(!IgnorePendingMessages)
+            if (!IgnorePendingMessages)
             {
                 await UserPendingMessageService.CreateOrUpdate(userPendingMessage);
-            } 
+            }
 
             if (string.IsNullOrEmpty(user.ConnectionId))
             {
@@ -87,14 +86,19 @@ namespace jihadkhawaja.chat.server.Hubs
             return false;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task<bool> UpdateMessage(Guid messageid)
+        public async Task<bool> UpdateMessage(Message message)
         {
-            if (messageid == Guid.Empty)
+            if (message.Id == Guid.Empty
+                || string.IsNullOrWhiteSpace(message.Content))
             {
                 return false;
             }
 
-            Message dbMessage = await MessageService.ReadFirst(x => x.Id == messageid);
+            Message dbMessage = await MessageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
+            if(dbMessage is null)
+            {
+                return false;
+            }
             dbMessage.DateSeen = DateTimeOffset.UtcNow;
             dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 

@@ -9,6 +9,8 @@ namespace jihadkhawaja.chat.shared.Models
         public Guid SenderId { get; set; }
         [Required]
         public Guid ChannelId { get; set; }
+        [Required]
+        public Guid ReferenceId { get; set; } = Guid.NewGuid();
         public DateTimeOffset? DateSent { get; set; }
         public DateTimeOffset? DateSeen { get; set; }
         [NotMapped]

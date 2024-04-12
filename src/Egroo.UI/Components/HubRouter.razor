@@ -37,11 +37,6 @@ else
 
     private bool IsBusy { get; set; } = true;
 
-    protected override void OnInitialized()
-    {
-        PrintStateLog();
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -60,6 +55,8 @@ else
 
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
+
+            PrintStateLog();
         }
     }
 
