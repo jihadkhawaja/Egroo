@@ -1,0 +1,17 @@
+# service description
+services:
+
+  egroo-api-test:
+    image: jihadkhawaja/mobilechat-server:latest
+    entrypoint: ["dotnet", "Egroo.Server.dll"]
+    container_name: egroo-api-test
+    hostname: egroo-api-test
+    restart: unless-stopped
+    networks:
+      - configurations_CN
+    ports:
+      - "43222:8080"
+
+networks:
+  configurations_CN:
+    external: true

@@ -67,13 +67,34 @@ jobs:
           script: |
             docker load -i /home/ubuntu/images/mobilechat-server.tar
             rm /home/ubuntu/images/mobilechat-server.tar
-            docker kill mobilechat-server
-            docker system prune -f
-            docker run --name mobilechat-server -p 43222:8080 --restart always -d jihadkhawaja/mobilechat-server:latest
+
+  docker-compose:
+    name: Docker Compose
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v2
+        - name: copy docker-compose via ssh
+          uses: appleboy/scp-action@v0.1.3
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key: ${{ secrets.KEY }}
+            port: 22
+            source: "src/docker-compose-egroo-test.yml"
+            target: "/home/ubuntu/Configurations/"
+        - name: executing remote ssh commands
+          uses: appleboy/ssh-action@master
+          with:
+            host: ${{ secrets.REMOTE_HOST }}
+            username: ${{ secrets.REMOTE_USER }}
+            key: ${{ secrets.KEY }}
+            script: |
+                docker compose -f Configurations/src/docker-compose-egroo-test.yml up -d
 
   uni-test:
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: docker-compose
     steps:
     - uses: actions/checkout@v2
     - name: Setup .NET Core
@@ -108,8 +129,7 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker kill mobilechat-server
-            docker system prune -f
+              docker compose -f Configurations/src/docker-compose-egroo-test.yml down
   database-drop:
     name: Database drop
     needs: docker-stop
