@@ -142,4 +142,4 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker exec postgres psql -U postgres -c "drop database \"egroo-dev-test\" WITH ( FORCE );"
+            docker exec postgres psql -U ${{ secrets.REMOTE_USER_DB }} -c "drop database \"egroo-dev-test\" WITH ( FORCE );"
