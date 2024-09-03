@@ -87,7 +87,7 @@ jobs:
     needs: build
     steps:
       - name: Download nuget shared package artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageShared
 
@@ -105,7 +105,7 @@ jobs:
     needs: PublishShared
     steps:
       - name: Download nuget client package artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageClient
 
@@ -123,7 +123,7 @@ jobs:
     needs: PublishClient
     steps:
       - name: Download nuget package artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageServer
 
@@ -141,15 +141,15 @@ jobs:
     needs: build
     steps:
       - name: Download nuget package shared artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageShared
       - name: Download nuget package client artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageClient
       - name: Download nuget package server artifact
-        uses: actions/download-artifact@v1.0.0
+        uses: actions/download-artifact@v4.1.7
         with:
           name: nugetPackageServer
       - name: Create Release
