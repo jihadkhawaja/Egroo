@@ -1,52 +1,61 @@
-![MobileChat Icon](docs/icon.png)
+# Egroo
 
-# About
-MAUI Client with ASP.NET SignalR Server.
+<div align="center">
+  <img src="docs/icon.png" alt="MobileChat Icon" />
+</div>
+<br/>
 
-[![Server Nuget version](https://img.shields.io/nuget/v/jihadkhawaja.chat.server?color=776be7&label=server%20nuget%20version&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.chat.server/)
-[![Server Nuget downloads](https://img.shields.io/nuget/dt/jihadkhawaja.chat.server?color=776be7&label=server%20nuget%20downloads&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.chat.server/)
+A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **Blazor Auto**, and **ASP.NET SignalR**.
 
-[![Client Nuget version](https://img.shields.io/nuget/v/jihadkhawaja.chat.client?color=776be7&label=client%20nuget%20version&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.chat.client/)
-[![Client Nuget downloads](https://img.shields.io/nuget/dt/jihadkhawaja.chat.client?color=776be7&label=client%20nuget%20downloads&logo=nuget&style=flat-square)](https://www.nuget.org/packages/jihadkhawaja.chat.client/)
+[Visit Egroo Website](https://www.egroo.org/)
 
-Self-host chatting solution with cross-platform client application.
-
-## MAUI Supported Platforms
-- Windows 7 or higher
-- macOS 11 or higher
-- Android 7.0 (API 24) or higher
-- iOS 14 or higher
-
-## WASM Supported Platforms
-- Can be deployed to any browser that supports WebAssembly
+## Features
+- **Cross-platform Compatibility**: 
+  - MAUI: Windows, macOS, Android, iOS.
+  - WASM: Supported in modern browsers.
+- **Real-time Communication**: 
+  - Powered by SignalR for seamless, instant updates.
+- **Message Security**: 
+  - Messages are automatically deleted after being sent to the recipient, ensuring privacy.
+- **Customizable Server Hosting**: 
+  - Self-hosted backend for full control over data and infrastructure.
 
 ## Prerequisites
-| Platforms | .NET | Support |
-| :---: | :---: | :---: |
-| Xamarin | [.NET 5](https://dotnet.microsoft.com/download/dotnet/5.0) | Ended 01/2020 |
-| Blazor WASM, MAUI Hybrid | [.NET 6](https://dotnet.microsoft.com/download/dotnet/6.0) | Ended 01/2022 |
-| Blazor WASM, MAUI Hybrid | [.NET 7](https://dotnet.microsoft.com/download/dotnet/7.0) | Ended 04/2024 |
-| Blazor Auto, MAUI Hybrid | [.NET 8](https://dotnet.microsoft.com/download/dotnet/8.0) | :heavy_check_mark: |
+- **.NET 8** (recommended) for the latest features and support.
+- Compatible platforms:
+  - **MAUI**: Windows 7+, macOS 11+, Android 7.0+, iOS 14+.
+  - **WASM**: Any browser with WebAssembly support.
 
-# Documentation
-Find everything you need to get started at the [Wiki](https://github.com/jihadkhawaja/MobileChat/wiki)
+## Screenshots
+**Windows**
 
-# Showcase
+Authentication
 
-## Windows
-![mobilechat_1_auth](docs/mobilechat_1_auth.png)
-![mobilechat_1_friends](docs/mobilechat_1_friends.png)
-![mobilechat_1_channels](docs/mobilechat_1_channels.png)
-![mobilechat_1_channel](docs/mobilechat_1_channel.png)
+![Auth](docs/mobilechat_1_auth.png)
 
-## Android
+Friends List
+
+![Friends](docs/mobilechat_1_friends.png)
+
+Channels
+
+![Channels](docs/mobilechat_1_channels.png)
+
+Conversations
+
+![Conversations](docs/mobilechat_1_channel.png)
+
+**Android**  
+
 ![mobilechat_android](docs/mobilechat_android.png)
 
-### Features and Progress
-Check what's coming in future releases [here](https://github.com/users/jihadkhawaja/projects/3)
+## Contribution
+Contributions are welcome! Feel free to:
+- Fork the repository and submit pull requests.
+- Report issues or request features in the **Issues** tab.
 
-### Contribution
-Feel free to fork and **contribute** or **open an issue**. All contributions are welcome!
+## Community
+Join our **[Discord Server](https://discord.gg/9KMAM2RKVC)** to stay updated, share feedback, or ask questions.
 
-### Community
-Join the [Discord server](https://discord.gg/9KMAM2RKVC) to get updates, ask questions or send a feedback.
+## License
+This project is licensed under the **MIT License**.
