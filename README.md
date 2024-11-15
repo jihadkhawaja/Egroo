@@ -26,6 +26,9 @@ A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **
   - **MAUI**: Windows 7+, macOS 11+, Android 7.0+, iOS 14+.
   - **WASM**: Any browser with WebAssembly support.
 
+## Documentation
+Find everything you need to get started [here](https://github.com/jihadkhawaja/MobileChat/wiki).
+
 ## Screenshots
 **Windows**
 
