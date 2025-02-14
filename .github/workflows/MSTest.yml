@@ -10,7 +10,7 @@ jobs:
     name: Dotnet Build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -26,7 +26,7 @@ jobs:
     needs: dotnet-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Create appsettings
         run: |
               echo '{
@@ -73,7 +73,7 @@ jobs:
     needs: docker-build
     runs-on: ubuntu-latest
     steps:
-        - uses: actions/checkout@v2
+        - uses: actions/checkout@v4
         - name: copy docker-compose via ssh
           uses: appleboy/scp-action@v0.1.3
           with:
@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-compose
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v2
       with:
@@ -113,7 +113,7 @@ jobs:
       continue-on-error: false
 
     - name: Upload Test Results
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: Test Results
         path: TestResults/*.trx
