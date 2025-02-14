@@ -13,6 +13,7 @@ A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **
 [![MSTest](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
 [![Docker](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml)
 [![chat-deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml)
+[![CodeQL](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql)
 
 ## Features
 - **Cross-platform Compatibility**: 
