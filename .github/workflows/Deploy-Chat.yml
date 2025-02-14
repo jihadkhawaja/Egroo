@@ -11,7 +11,7 @@ jobs:
     name: Dotnet Build api
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -30,7 +30,7 @@ jobs:
     needs: dotnet-build-api
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Create appsettings
         run: |
               echo '{
@@ -78,7 +78,7 @@ jobs:
     name: Dotnet Build wasm
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
@@ -97,7 +97,7 @@ jobs:
     needs: dotnet-build-wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: build docker image
         run: docker build -t jihadkhawaja/mobilechat-wasm-prod:latest -f src/Egroo/Egroo/Dockerfile .
       - name: save docker image
@@ -126,7 +126,7 @@ jobs:
     needs: [docker-build-wasm,docker-build-api]
     runs-on: ubuntu-latest
     steps:
-        - uses: actions/checkout@v2
+        - uses: actions/checkout@v4
         - name: copy docker-compose via ssh
           uses: appleboy/scp-action@v0.1.3
           with:
