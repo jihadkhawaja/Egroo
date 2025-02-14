@@ -19,7 +19,7 @@ jobs:
     outputs:
       VERSION: ${{ steps.output-version.outputs.VERSION }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -56,7 +56,7 @@ jobs:
         run: dotnet pack src/jihadkhawaja.chat.shared/jihadkhawaja.chat.shared.csproj -p:Version=${VERSION} -c Release
 
       - name: Upload NuGet Shared package to artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: nugetPackageShared
           path: src/jihadkhawaja.chat.shared/bin/Release/
@@ -67,7 +67,7 @@ jobs:
         run: dotnet pack src/jihadkhawaja.chat.client/jihadkhawaja.chat.client.csproj -p:Version=${VERSION} -c Release
 
       - name: Upload NuGet Client package to artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: nugetPackageClient
           path: src/jihadkhawaja.chat.client/bin/Release/
@@ -77,7 +77,7 @@ jobs:
         run: dotnet pack src/jihadkhawaja.chat.server/jihadkhawaja.chat.server.csproj -p:Version=${VERSION} -c Release
 
       - name: Upload NuGet package to GitHub
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: nugetPackageServer
           path: src/jihadkhawaja.chat.server/bin/Release/
