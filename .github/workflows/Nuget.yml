@@ -90,6 +90,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageShared
+          path: nugetPackageShared
 
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
@@ -108,6 +109,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageClient
+          path: nugetPackageClient
 
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
@@ -126,6 +128,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageServer
+          path: nugetPackageServer
 
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
@@ -144,14 +147,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageShared
+          path: nugetPackageShared
       - name: Download nuget package client artifact
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageClient
+          path: nugetPackageClient
       - name: Download nuget package server artifact
         uses: actions/download-artifact@v4
         with:
           name: nugetPackageServer
+          path: nugetPackageServer
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
