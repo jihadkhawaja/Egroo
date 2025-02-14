@@ -15,5 +15,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<bool> AcceptFriend(Guid friendId);
         Task<bool> DenyFriend(Guid friendId);
         Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20);
+        Task<bool> IsUsernameAvailable(string username);
     }
 }

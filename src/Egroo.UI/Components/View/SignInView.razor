@@ -1,21 +1,25 @@
 ﻿@using FluentValidation
 @using System.Text.Json
-@using Egroo.UI.Components.Layout;
-@using Egroo.UI.Constants;
-@using Egroo.UI.Models;
+@using Egroo.UI.Components.Layout
+@using Egroo.UI.Constants
+@using Egroo.UI.Models
 @using jihadkhawaja.chat.client
 @using jihadkhawaja.chat.client.Core
 @using jihadkhawaja.chat.client.Services
+@using jihadkhawaja.chat.shared.Models
 
 @inject StorageService StorageService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject IChatAuth ChatAuthService
+@inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-10 pt-8">
     <MudIconButton Icon="@Icons.Material.Filled.Home" Href="/" Size="Size.Large" Class="mb-4" />
     <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign In</MudText>
-    <MudText>Don't have an account? <span><MudButton Href="signup">SIGNUP</MudButton></span></MudText>
+    <MudText>
+        Don't have an account? <span><MudButton Href="signup">SIGNUP</MudButton></span>
+    </MudText>
 
     <MudGrid Class="mt-8" Justify="Justify.Center">
         <MudItem xs="12" sm="8" md="6">
@@ -26,22 +30,23 @@
                     </CardHeaderContent>
                 </MudCardHeader>
                 <MudCardContent>
-                    <MudForm @ref="@form" ValidationDelay="0">
-                        <MudTextField @bind-Value="@Username"
-                                    Immediate="true"
-                                    Required="true"
-                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                    Label="Username" />
-
-                        <MudTextField @bind-Value="@Password"
-                                    Immediate="true"
-                                    Required="true"
-                                    Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
-                                    Label="Password" InputType="InputType.Password" />
+                    <MudForm @ref="form" ValidationDelay="0">
+                        <MudTextField @bind-Value="Username"
+                                      Immediate="true"
+                                      Required="true"
+                                      Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                      Label="Username" />
+                        <MudTextField @bind-Value="Password"
+                                      Immediate="true"
+                                      Required="true"
+                                      Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
+                                      Label="Password" InputType="InputType.Password" />
                     </MudForm>
                 </MudCardContent>
                 <MudCardActions Class="d-flex justify-center">
-                    <MudButton OnClick="Submit" Disabled=@IsBusy ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" Style="width:50%;">SUBMIT</MudButton>
+                    <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
+                               Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                               Style="width:50%;">SUBMIT</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>
@@ -49,7 +54,6 @@
 </MudContainer>
 
 @code {
-    [Inject] ISnackbar Snackbar { get; set; }
     MudForm form;
 
     string Username { get; set; }
@@ -61,14 +65,12 @@
         if (string.IsNullOrWhiteSpace(text))
         {
             yield return "Field is required!";
-            yield break;
         }
     }
 
     private async Task Submit()
     {
         IsBusy = true;
-
         await form.Validate();
 
         if (!form.IsValid)
@@ -78,50 +80,66 @@
             return;
         }
 
-        dynamic dynamicObj = await ChatAuthService.SignIn(Username, Password);
-        Dictionary<string, object> result = null;
-        if (dynamicObj is not null)
+        try
         {
-            result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-        }
+            // Use the strongly-typed AuthResponse from ChatAuthService.SignIn.
+            var result = await ChatAuthService.SignIn(Username, Password);
 
-        //check user
-        if (result is not null)
-        {
-            Guid Id = Guid.Parse(result["id"].ToString());
-            string Token = result["token"].ToString();
-
-            User user = new()
+            if (result == null || !result.Success)
             {
-                Id = Id,
-            };
+                Snackbar.Add(result?.Message ?? "Failed to sign in. Please try again.", MudBlazor.Severity.Error);
+                IsBusy = false;
+                return;
+            }
 
+            // Retrieve token and user id from the response.
+            var token = result.Token;
+            var userId = result.UserId;
+
+            if (string.IsNullOrWhiteSpace(token) || userId == null)
+            {
+                Snackbar.Add("Invalid server response.", MudBlazor.Severity.Error);
+                IsBusy = false;
+                return;
+            }
+
+            // Save token in storage based on the current platform.
             switch (ClientModel.CurrentFrameworkPlatform)
             {
                 case FrameworkPlatform.MAUI:
                     StorageService.CreateDirectory(ClientModel.AppDataPath);
-                    StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, Token, false, true);
+                    StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, token, false, true);
                     break;
                 case FrameworkPlatform.WASM:
                 case FrameworkPlatform.SERVER:
-                    await StorageService.SetLocalStorage("token", Token);
+                    await StorageService.SetLocalStorage("token", token);
                     break;
                 default:
                     throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
             }
 
-            SessionStorage.User = user;
+            // Update session storage with token and user information.
+            SessionStorage.Token = token;
+            SessionStorage.User = new User
+                {
+                    Id = userId.Value,
+                    Username = Username // Optionally, update with a server-provided username.
+                };
 
+            // Initialize and start the SignalR connection.
             MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
             await MobileChatSignalR.HubConnection.StartAsync();
 
+            // Navigate to the channels page.
             NavigationManager.NavigateTo("/channels", true);
         }
-        else
+        catch (Exception ex)
         {
-            Snackbar.Add("Failed to sign in, Please try again", MudBlazor.Severity.Error);
+            Snackbar.Add($"An error occurred: {ex.Message}", MudBlazor.Severity.Error);
         }
-
-        IsBusy = false;
+        finally
+        {
+            IsBusy = false;
+        }
     }
 }

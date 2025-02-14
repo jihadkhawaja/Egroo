@@ -116,5 +116,15 @@ namespace jihadkhawaja.chat.client.Services
 
             return await MobileChatSignalR.HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUser), query, maxResult);
         }
+
+        public async Task<bool> IsUsernameAvailable(string username)
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);
+        }
     }
 }

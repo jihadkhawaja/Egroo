@@ -1,21 +1,23 @@
 ﻿@using Egroo.UI.Components.Layout
 @using Egroo.UI.Models
 @using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.chat.shared.Interfaces;
-@using jihadkhawaja.chat.client.Core;
+@using jihadkhawaja.chat.shared.Interfaces
+@using jihadkhawaja.chat.client.Core
 @using Egroo.UI.Constants
-@using System.Text.Json;
-@using jihadkhawaja.chat.client.Services;
+@using System.Text.Json
+@using jihadkhawaja.chat.client.Services
+@using jihadkhawaja.chat.shared.Models
 
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
 @inject NavigationManager NavigationManager
 @inject IChatUser ChatUserService
 @inject IChatAuth ChatAuthService
+@inject ISnackbar Snackbar
 
 @if (IsBusy)
 {
-    <div style="width:100vw;height:100vh;background-color:var(--mud-palette-background)">
+    <div style="width:100vw; height:100vh; background-color:var(--mud-palette-background)">
         <MudProgressLinear Indeterminate Color="Color.Primary" />
         <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
             @GetAppState()
@@ -27,47 +29,41 @@ else
     @ChildContent
 }
 
-
 @code {
-    [Inject]
-    private ISnackbar Snackbar { get; set; } = null!;
-
-    [Parameter]
-    public RenderFragment? ChildContent { get; set; }
-
+    [Parameter] public RenderFragment? ChildContent { get; set; }
     private bool IsBusy { get; set; } = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
+        if (!firstRender)
+            return;
+
+        // If the connection is already established, simply show the content.
+        if (MobileChatSignalR.HubConnection is not null)
         {
-            if (MobileChatSignalR.HubConnection is not null)
-            {
-                IsBusy = false;
-                await InvokeAsync(StateHasChanged);
-                return;
-            }
-
-            await LoadCache();
-            await EstablishSession();
-
-            await SetAppState(AppState.CONNECTED);
-
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
-
-            PrintStateLog();
-        }
-    }
-
-    private async Task LoadCache()
-    {
-        if (!string.IsNullOrWhiteSpace(SessionStorage!.Token))
-        {
             return;
         }
 
-        await SetAppState(AppState.LOADING_CACHE);
+        await LoadCacheAsync();
+        await EstablishSessionAsync();
+        await SetAppStateAsync(AppState.CONNECTED);
+
+        IsBusy = false;
+        await InvokeAsync(StateHasChanged);
+        PrintStateLog();
+    }
+
+    /// <summary>
+    /// Loads a token from local storage (or file) into the session storage.
+    /// </summary>
+    private async Task LoadCacheAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(SessionStorage.Token))
+            return;
+
+        await SetAppStateAsync(AppState.LOADING_CACHE);
 
         switch (ClientModel.CurrentFrameworkPlatform)
         {
@@ -83,107 +79,110 @@ else
         }
     }
 
-    private async Task EstablishSession()
+    /// <summary>
+    /// Establishes a session by refreshing the token (if available) and setting up the SignalR connection.
+    /// </summary>
+    private async Task EstablishSessionAsync()
     {
-        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
-        await SetAppState(AppState.ESTABLISHING_CONNECTION);
+        // Initialize and start the SignalR connection.
+        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        await SetAppStateAsync(AppState.ESTABLISHING_CONNECTION);
         await MobileChatSignalR.HubConnection!.StartAsync();
 
-        if (!string.IsNullOrEmpty(SessionStorage!.Token))
+        // If a token exists, try to refresh the session.
+        if (!string.IsNullOrEmpty(SessionStorage.Token))
         {
-            dynamic dynamicObj = await ChatAuthService.RefreshSession(SessionStorage.Token);
-            Dictionary<string, object> result = null;
-            if (dynamicObj is not null)
+            var refreshResponse = await ChatAuthService.RefreshSession(SessionStorage.Token);
+
+            if (!refreshResponse.Success || string.IsNullOrWhiteSpace(refreshResponse.Token))
             {
-                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-            }
-            if (string.IsNullOrWhiteSpace(result["token"].ToString()))
-            {
-                await SignOut();
+                await SignOutAsync();
                 return;
             }
 
-            if (SessionStorage.Token != result["token"].ToString())
+            // Update the token if it has changed.
+            if (SessionStorage.Token != refreshResponse.Token)
             {
-                SessionStorage.Token = result["token"].ToString();
-
-                await MobileChatSignalR.HubConnection.StopAsync();
-                await MobileChatSignalR.HubConnection.DisposeAsync();
-
-                MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage?.Token);
-
-                if (MobileChatSignalR.HubConnection is null)
-                {
-                    return;
-                }
-
-                SessionStorage!.AppState = AppState.CREATING_SESSION;
-                await InvokeAsync(StateHasChanged);
-
-                await MobileChatSignalR.HubConnection.StartAsync();
-
-                switch (ClientModel.CurrentFrameworkPlatform)
-                {
-                    case FrameworkPlatform.MAUI:
-                        StorageService.CreateDirectory(ClientModel.AppDataPath);
-                        StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, result["token"].ToString(), false, true);
-                        break;
-                    case FrameworkPlatform.WASM:
-                    case FrameworkPlatform.SERVER:
-                        await StorageService.SetLocalStorage("token", result["token"].ToString());
-                        break;
-                    default:
-                        throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
-                }
+                SessionStorage.Token = refreshResponse.Token;
+                await RestartSignalRConnectionAsync();
+                await UpdateTokenStorageAsync(SessionStorage.Token);
             }
 
-            SessionStorage!.User = new()
+            // Update the user info in session.
+            SessionStorage.User = new User
             {
-                Id = Guid.Parse(result["id"].ToString()),
-                Username = await ChatUserService.GetCurrentUserUsername(),
-                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId,
+                Id = refreshResponse.UserId ?? Guid.Empty,
+                Username = await ChatUserService.GetCurrentUserUsername() ?? string.Empty,
+                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId
             };
         }
     }
 
-    private async Task SetAppState(AppState appState)
+    /// <summary>
+    /// Stops and restarts the SignalR connection with the new token.
+    /// </summary>
+    private async Task RestartSignalRConnectionAsync()
+    {
+        await MobileChatSignalR.HubConnection.StopAsync();
+        await MobileChatSignalR.HubConnection.DisposeAsync();
+
+        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        SessionStorage.AppState = AppState.CREATING_SESSION;
+        await InvokeAsync(StateHasChanged);
+        await MobileChatSignalR.HubConnection.StartAsync();
+    }
+
+    /// <summary>
+    /// Updates the token in local storage or file based on the current platform.
+    /// </summary>
+    private async Task UpdateTokenStorageAsync(string token)
+    {
+        switch (ClientModel.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                StorageService.CreateDirectory(ClientModel.AppDataPath);
+                StorageService.WriteToJsonFile("token", ClientModel.AppDataPath, token, false, true);
+                break;
+            case FrameworkPlatform.WASM:
+            case FrameworkPlatform.SERVER:
+                await StorageService.SetLocalStorage("token", token);
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
+        }
+    }
+
+    /// <summary>
+    /// Sets the current app state and triggers a UI update.
+    /// </summary>
+    private async Task SetAppStateAsync(AppState appState)
     {
         SessionStorage.AppState = appState;
         await InvokeAsync(StateHasChanged);
     }
 
-    private string GetAppState()
+    /// <summary>
+    /// Returns a string representation of the current app state.
+    /// </summary>
+    private string GetAppState() => SessionStorage.AppState switch
     {
-        switch (SessionStorage.AppState)
-        {
-            case AppState.INITIATING:
-                return "Initiating";
-                case AppState.LOADING_CACHE:
-                return "Loading Cache";
-                case AppState.ESTABLISHING_CONNECTION:
-                return "Establishing Connection";
-                case AppState.CREATING_SESSION:
-                return "Creating Session";
-            case AppState.CONNECTED:
-                return "Connected";
-            default:
-                return "Unknown";
-        }
-    }
+        AppState.INITIATING => "Initiating",
+        AppState.LOADING_CACHE => "Loading Cache",
+        AppState.ESTABLISHING_CONNECTION => "Establishing Connection",
+        AppState.CREATING_SESSION => "Creating Session",
+        AppState.CONNECTED => "Connected",
+        _ => "Unknown"
+    };
 
-    [JSInvokable]
-    public static async Task OnClosedWindow()
-    {
-        ChatUserService chatUserService = new();
-        await chatUserService.CloseUserSession();
-    }
-
-    private async Task SignOut()
+    /// <summary>
+    /// Signs the user out by clearing the token from storage and navigating to the home page.
+    /// </summary>
+    private async Task SignOutAsync()
     {
         switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
-                string path = Path.Combine(ClientModel.AppDataPath);
+                var path = Path.Combine(ClientModel.AppDataPath);
                 StorageService.DeleteDirectory(path);
                 break;
             case FrameworkPlatform.WASM:
@@ -195,18 +194,25 @@ else
         }
 
         SessionStorage.User = null;
-
         NavigationManager.NavigateTo("/", true);
+    }
+
+    [JSInvokable]
+    public static async Task OnClosedWindow()
+    {
+        // NOTE: Ideally, use DI to resolve IChatUser rather than creating a new instance.
+        ChatUserService chatUserService = new ChatUserService();
+        await chatUserService.CloseUserSession();
     }
 
     private void PrintStateLog()
     {
-#if DEBUG
-        Console.WriteLine("\n");
-        Console.WriteLine("[State]\t" + SessionStorage.AppState);
-        Console.WriteLine("[Framework]\t" + ClientModel.CurrentFrameworkPlatform);
-        Console.WriteLine("[Connection Id]\t" + SessionStorage.User?.ConnectionId);
-        Console.WriteLine("\n");
-#endif
+        #if DEBUG
+            Console.WriteLine();
+            Console.WriteLine($"[State]\t{SessionStorage.AppState}");
+            Console.WriteLine($"[Framework]\t{ClientModel.CurrentFrameworkPlatform}");
+            Console.WriteLine($"[Connection Id]\t{SessionStorage.User?.ConnectionId}");
+            Console.WriteLine();
+        #endif
     }
 }

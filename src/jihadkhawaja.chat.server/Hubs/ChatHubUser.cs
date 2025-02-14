@@ -315,5 +315,17 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = x.DateCreated,
             });
         }
+        [AllowAnonymous]
+        public async Task<bool> IsUsernameAvailable(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                return false;
+            }
+
+            username = username.ToLower();
+            var user = await UserService.ReadFirst(x => x.Username == username);
+            return user is null;
+        }
     }
 }
