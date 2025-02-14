@@ -1,8 +1,8 @@
 ﻿using jihadkhawaja.chat.client.Core;
+using jihadkhawaja.chat.client.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
-using jihadkhawaja.chat.client.Services;
-using System.Text.Json;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace Egroo.Server.Test
 {
@@ -11,8 +11,7 @@ namespace Egroo.Server.Test
     {
         private IChatAuth ChatAuthService { get; set; } = null!;
         private IChatChannel ChatChannelService { get; set; } = null!;
-
-        private static Channel Channel { get; set; }
+        private static Channel? Channel { get; set; }
 
         [TestInitialize]
         public async Task Initialize()
@@ -23,44 +22,46 @@ namespace Egroo.Server.Test
             MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
             await MobileChatSignalR.HubConnection.StartAsync();
 
-            dynamic? dynamicObj = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
-            Dictionary<string, object>? result = null;
-            if (dynamicObj is not null)
-            {
-                result = JsonSerializer.Deserialize<Dictionary<string, object>>(dynamicObj);
-            }
+            // Ensure user exists before signing in
+            await ChatAuthService.SignUp("test", "HvrnS4Q4zJ$xaW!3");
+            var signInResponse = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
 
-            //check user
-            if (result is not null)
-            {
-                string Token = result["token"].ToString();
+            Assert.IsNotNull(signInResponse, "Sign-in response is null.");
+            Assert.IsTrue(signInResponse.Success, $"Sign-in failed: {signInResponse.Message}");
+            Assert.IsNotNull(signInResponse.Token, "Sign-in did not return a token.");
 
-                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, Token);
-                await MobileChatSignalR.HubConnection.StartAsync();
-            }
-            else
-            {
-                MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-                await MobileChatSignalR.HubConnection.StartAsync();
-            }
-        }
-        [TestMethod]
-        public async Task CreateChannelTest2()
-        {
+            // Reinitialize SignalR with authentication
+            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, signInResponse.Token);
+            await MobileChatSignalR.HubConnection.StartAsync();
+
+            // Ensure a channel is created
             Channel = await ChatChannelService.CreateChannel("test");
-
-            Assert.IsNotNull(Channel);
+            Assert.IsNotNull(Channel, "Failed to create channel.");
         }
 
-        [TestMethod]
-        public async Task DeleteChannelTest1()
+        [TestMethod, Priority(1)]
+        public async Task CreateChannelTest()
         {
-            Assert.IsTrue(await ChatChannelService.DeleteChannel(Channel.Id));
+            // This test is redundant since channel is created in Initialize, but we verify creation
+            Assert.IsNotNull(Channel, "CreateChannelTest failed. Channel is null.");
+        }
+
+        [TestMethod, Priority(2)]
+        public async Task DeleteChannelTest()
+        {
+            Assert.IsNotNull(Channel, "DeleteChannelTest failed. No channel exists.");
+
+            bool isDeleted = await ChatChannelService.DeleteChannel(Channel.Id);
+            Assert.IsTrue(isDeleted, "Failed to delete channel.");
         }
 
         [TestCleanup]
         public async Task Cleanup()
         {
+            if (MobileChatSignalR.HubConnection.State == HubConnectionState.Connected)
+            {
+                await MobileChatSignalR.HubConnection.StopAsync();
+            }
         }
     }
 }
