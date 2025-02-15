@@ -95,7 +95,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             Message dbMessage = await MessageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
-            if(dbMessage is null)
+            if (dbMessage is null)
             {
                 return false;
             }
@@ -138,8 +138,11 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 foreach (var userpendingmessage in UserPendingMessages)
                 {
-                    Message message = await MessageService
+                    Message? message = await MessageService
                         .ReadFirst(x => x.Id == userpendingmessage.MessageId);
+
+                    if (message is null) continue;
+
                     message.Content = userpendingmessage.Content;
 
                     await SendClientMessage(ConnectedUser, message, true);

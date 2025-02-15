@@ -120,7 +120,7 @@ else
             return;
         }
 
-        SearchedUserFriends = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
+        SearchedUserFriends = await ChatUserService.SearchUserFriends(value) ?? Enumerable.Empty<User>();
 
         await InvokeAsync(StateHasChanged);
     }

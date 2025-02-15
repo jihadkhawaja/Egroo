@@ -112,6 +112,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     Id = user.Id,
                     Username = user.Username,
                     ConnectionId = user.ConnectionId,
+                    IsOnline = user.IsOnline,
                 });
             }
 

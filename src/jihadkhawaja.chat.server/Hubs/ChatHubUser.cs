@@ -315,6 +315,61 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = x.DateCreated,
             });
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
+        {
+            HttpContext? hc = Context.GetHttpContext();
+            if (hc == null)
+            {
+                return null;
+            }
+
+            var identity = hc.User.Identity as ClaimsIdentity;
+            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return null;
+            }
+
+            Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
+
+            // Get the friend records for the current user.
+            UserFriend[]? friendRecords = await GetUserFriends(ConnectorUserId);
+            if (friendRecords == null || friendRecords.Length == 0)
+            {
+                return new List<User>();
+            }
+
+            // Extract the friend IDs. In each record, the friend is the one that is not the current user.
+            var friendIds = friendRecords
+                .Select(fr => fr.UserId == ConnectorUserId ? fr.FriendUserId : fr.UserId)
+                .Distinct()
+                .ToList();
+
+            // Query the user service for users whose IDs are in the friend list
+            // and whose username matches the query.
+            IEnumerable<User>? friends = await UserService.Read(x =>
+                 friendIds.Contains(x.Id) &&
+                 x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase));
+
+            if (friends == null)
+            {
+                return null;
+            }
+
+            // Order and limit the results.
+            friends = friends.OrderBy(x => x.Username).Take(maxResult);
+
+            // Project to a new User object (if needed).
+            return friends.Select(x => new User
+            {
+                Username = x.Username,
+                LastLoginDate = x.LastLoginDate,
+                IsOnline = x.IsOnline,
+                DateCreated = x.DateCreated,
+                AvatarBase64 = x.AvatarBase64 // include additional fields as needed
+            });
+        }
         [AllowAnonymous]
         public async Task<bool> IsUsernameAvailable(string username)
         {
