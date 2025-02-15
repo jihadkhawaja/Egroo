@@ -13,18 +13,14 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task CloseUserSession()
         {
-            // Retrieve the current user's ID using our helper method.
             var userId = GetUserIdFromContext();
             if (userId.HasValue)
             {
-                // Remove the current connection from the user's active connection list.
                 if (_userConnections.TryGetValue(userId.Value, out var connections))
                 {
                     lock (connections)
                     {
                         connections.Remove(Context.ConnectionId);
-
-                        // If no connections remain, remove the user entry.
                         if (connections.Count == 0)
                         {
                             _userConnections.TryRemove(userId.Value, out _);
@@ -32,7 +28,6 @@ namespace jihadkhawaja.chat.server.Hubs
                     }
                 }
 
-                // Update the user's status in the database if no active connections exist.
                 if (!_userConnections.ContainsKey(userId.Value))
                 {
                     var user = await _userService.ReadFirst(x => x.Id == userId.Value);
@@ -41,11 +36,10 @@ namespace jihadkhawaja.chat.server.Hubs
                         user.IsOnline = false;
                         user.ConnectionId = null;
                         await _userService.Update(user);
+                        await NotifyFriendsOfStatusChange(user);
                     }
                 }
             }
-
-            // Optionally abort the connection to force disconnection.
             Context.Abort();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]

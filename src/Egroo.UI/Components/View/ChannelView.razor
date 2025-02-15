@@ -138,7 +138,7 @@
 
     protected override void OnInitialized()
     {
-        HubEvents();
+        RegisterMessagingEvents();
         RegisterCallEvents();
 
         var moduleFactory = new EsModuleFactory(JSRuntime);
@@ -231,7 +231,7 @@
         }
     }
 
-    private void HubEvents()
+    private void RegisterMessagingEvents()
     {
         MobileChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
         {

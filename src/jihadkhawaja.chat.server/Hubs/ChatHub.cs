@@ -154,8 +154,9 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         /// <summary>
-        /// Called when a client connects to the hub.
-        /// Adds the connection ID to the user's connection list and marks the user as online if it's the first connection.
+        /// Called when a client connects.
+        /// Adds the connection ID to the user's connection list.
+        /// If it's the first connection, marks the user as online and notifies friends.
         /// </summary>
         public override async Task OnConnectedAsync()
         {
@@ -174,6 +175,7 @@ namespace jihadkhawaja.chat.server.Hubs
                         return existingConnections;
                     });
 
+                // If this is the user's first active connection.
                 if (_userConnections[userId.Value].Count == 1)
                 {
                     var user = await _userService.ReadFirst(x => x.Id == userId.Value);
@@ -182,6 +184,9 @@ namespace jihadkhawaja.chat.server.Hubs
                         user.IsOnline = true;
                         user.ConnectionId = Context.ConnectionId;
                         await _userService.Update(user);
+
+                        // Notify online friends that the user is now online.
+                        await NotifyFriendsOfStatusChange(user);
                     }
                 }
             }
@@ -190,8 +195,9 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         /// <summary>
-        /// Called when a client disconnects from the hub.
-        /// Removes the connection ID from the user's connection list and marks the user as offline if no connections remain.
+        /// Called when a client disconnects.
+        /// Removes the connection ID from the user's connection list.
+        /// If no active connections remain, marks the user as offline and notifies friends.
         /// </summary>
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
@@ -218,11 +224,46 @@ namespace jihadkhawaja.chat.server.Hubs
                         user.IsOnline = false;
                         user.ConnectionId = null;
                         await _userService.Update(user);
+
+                        // Notify online friends that the user is now offline.
+                        await NotifyFriendsOfStatusChange(user);
                     }
                 }
             }
 
             await base.OnDisconnectedAsync(exception);
+        }
+
+        /// <summary>
+        /// Notifies each online friend of the changed user's online status.
+        /// The event "FriendStatusChanged" is sent to each online friend's connection(s),
+        /// passing the changed user's ID and new online status.
+        /// </summary>
+        /// <param name="changedUser">The user whose status has changed.</param>
+        private async Task NotifyFriendsOfStatusChange(User changedUser)
+        {
+            // Retrieve friend relationships where the changed user is involved and the request was accepted.
+            // Adjust the predicate according to your data model.
+            var friendRelations = await _userFriendsService.Read(x =>
+                (x.UserId == changedUser.Id || x.FriendUserId == changedUser.Id) &&
+                x.DateAcceptedOn != null);
+
+            // Determine the friend IDs (the other party in the relationship).
+            var friendIds = friendRelations
+                .Select(x => x.UserId == changedUser.Id ? x.FriendUserId : x.UserId)
+                .Distinct()
+                .ToList();
+
+            // For each friend that is online, send the "FriendStatusChanged" event.
+            foreach (var friendId in friendIds)
+            {
+                if (IsUserOnline(friendId))
+                {
+                    var connectionIds = GetUserConnectionIds(friendId);
+                    await Clients.Clients(connectionIds)
+                        .SendAsync("FriendStatusChanged", changedUser.Id, changedUser.IsOnline);
+                }
+            }
         }
     }
 }
