@@ -13,20 +13,45 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task CloseUserSession()
         {
-            User? connectedUser = await UserService
-                .ReadFirst(x => x.ConnectionId == Context.ConnectionId);
-            if (connectedUser != null)
+            // Retrieve the current user's ID using our helper method.
+            var userId = GetUserIdFromContext();
+            if (userId.HasValue)
             {
-                connectedUser.ConnectionId = null;
-                connectedUser.IsOnline = false;
+                // Remove the current connection from the user's active connection list.
+                if (_userConnections.TryGetValue(userId.Value, out var connections))
+                {
+                    lock (connections)
+                    {
+                        connections.Remove(Context.ConnectionId);
 
-                await UserService.Update(connectedUser);
+                        // If no connections remain, remove the user entry.
+                        if (connections.Count == 0)
+                        {
+                            _userConnections.TryRemove(userId.Value, out _);
+                        }
+                    }
+                }
+
+                // Update the user's status in the database if no active connections exist.
+                if (!_userConnections.ContainsKey(userId.Value))
+                {
+                    var user = await _userService.ReadFirst(x => x.Id == userId.Value);
+                    if (user != null)
+                    {
+                        user.IsOnline = false;
+                        user.ConnectionId = null;
+                        await _userService.Update(user);
+                    }
+                }
             }
+
+            // Optionally abort the connection to force disconnection.
+            Context.Abort();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User?> GetUserPublicInfo(Guid userId)
         {
-            User? user = await UserService.ReadFirst(x => x.Id == userId);
+            User? user = await _userService.ReadFirst(x => x.Id == userId);
 
             if (user == null)
             {
@@ -41,7 +66,7 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 AvatarBase64 = user.AvatarBase64,
                 Username = user.Username,
-                IsOnline = user.IsOnline,
+                IsOnline = IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
                 DateCreated = user.DateCreated,
             };
@@ -58,7 +83,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            User? user = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
+            User? user = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
 
             if (user == null)
             {
@@ -99,7 +124,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-                User? currentUser = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
+                User? currentUser = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
 
                 if (currentUser == null)
                 {
@@ -109,13 +134,13 @@ namespace jihadkhawaja.chat.server.Hubs
                 friendusername = friendusername.ToLower();
 
                 //get friend id from username
-                User? friendUser = await UserService.ReadFirst(x => x.Username == friendusername);
+                User? friendUser = await _userService.ReadFirst(x => x.Username == friendusername);
                 if (friendUser == null || currentUser.Id == friendUser.Id)
                 {
                     return false;
                 }
 
-                if (await UserFriendsService.ReadFirst(
+                if (await _userFriendsService.ReadFirst(
                     x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
                 || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
                 {
@@ -129,7 +154,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     FriendUserId = friendUser.Id,
                     DateCreated = DateTime.UtcNow
                 };
-                await UserFriendsService.Create(entry);
+                await _userFriendsService.Create(entry);
             }
             catch
             {
@@ -165,19 +190,19 @@ namespace jihadkhawaja.chat.server.Hubs
                 friendusername = friendusername.ToLower();
 
                 //get user id from username
-                User? user = await UserService.ReadFirst(x => x.Id == ConnectorUserId);
+                User? user = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
                 if (user == null)
                 {
                     return false;
                 }
                 //get friend id from username
-                User? friendUser = await UserService.ReadFirst(x => x.Username == friendusername);
+                User? friendUser = await _userService.ReadFirst(x => x.Username == friendusername);
                 if (friendUser == null)
                 {
                     return false;
                 }
 
-                if (await UserFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
+                if (await _userFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
                 x.FriendUserId == user.Id && x.UserId == friendUser.Id) == null)
                 {
                     return false;
@@ -190,7 +215,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     DateCreated = DateTime.UtcNow
                 };
 
-                await UserFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
+                await _userFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
                 || x.FriendUserId == user.Id && x.UserId == friendUser.Id);
             }
             catch
@@ -203,20 +228,20 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriends(Guid userId)
         {
-            return (await UserFriendsService.Read(x => (x.UserId == userId
+            return (await _userFriendsService.Read(x => (x.UserId == userId
             && x.DateAcceptedOn is not null)
             || (x.FriendUserId == userId && x.DateAcceptedOn is not null))).ToArray();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriendRequests(Guid userId)
         {
-            return (await UserFriendsService.Read(x => x.FriendUserId == userId
+            return (await _userFriendsService.Read(x => x.FriendUserId == userId
             && x.DateAcceptedOn is null)).ToArray();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
         {
-            UserFriend? result = await UserFriendsService.ReadFirst(x => x.UserId == userId
+            UserFriend? result = await _userFriendsService.ReadFirst(x => x.UserId == userId
             && x.FriendUserId == friendId && x.DateAcceptedOn is not null);
 
             if (result is null)
@@ -245,7 +270,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            UserFriend? friendRequest = await UserFriendsService.ReadFirst(x => x.UserId == friendId
+            UserFriend? friendRequest = await _userFriendsService.ReadFirst(x => x.UserId == friendId
             && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
 
             if (friendRequest is null)
@@ -256,7 +281,7 @@ namespace jihadkhawaja.chat.server.Hubs
             friendRequest.DateAcceptedOn = DateTimeOffset.UtcNow;
 
             UserFriend[] friendRequests = [friendRequest];
-            return await UserFriendsService.Update(friendRequests);
+            return await _userFriendsService.Update(friendRequests);
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> DenyFriend(Guid friendId)
@@ -276,7 +301,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            return await UserFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
+            return await _userFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
@@ -296,7 +321,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            IEnumerable<User>? users = (await UserService.Read(x =>
+            IEnumerable<User>? users = (await _userService.Read(x =>
             x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase)
             && x.Id != ConnectorUserId))
             .OrderBy(x => x.Username).Take(maxResult);
@@ -348,7 +373,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             // Query the user service for users whose IDs are in the friend list
             // and whose username matches the query.
-            IEnumerable<User>? friends = await UserService.Read(x =>
+            IEnumerable<User>? friends = await _userService.Read(x =>
                  friendIds.Contains(x.Id) &&
                  x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase));
 
@@ -379,7 +404,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             username = username.ToLower();
-            var user = await UserService.ReadFirst(x => x.Username == username);
+            var user = await _userService.ReadFirst(x => x.Username == username);
             return user is null;
         }
     }

@@ -21,7 +21,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = DateTime.UtcNow,
             };
 
-            await ChannelService.Create(channel);
+            await _channelService.Create(channel);
 
             await AddChannelUsers(channel.Id, usernames);
 
@@ -43,7 +43,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    User? userToAdd = await UserService.ReadFirst(x => x.Username == usernames[i].ToLower());
+                    User? userToAdd = await _userService.ReadFirst(x => x.Username == usernames[i].ToLower());
 
                     if (userToAdd is null)
                     {
@@ -71,7 +71,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     }
                 }
 
-                await ChannelUsersService.Create(channelUsers);
+                await _channelUsersService.Create(channelUsers);
 
                 return true;
             }
@@ -82,7 +82,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> ChannelContainUser(Guid channelid, Guid userid)
         {
-            return await ChannelUsersService.ReadFirst(x => x.ChannelId == channelid && x.UserId == userid) != null;
+            return await _channelUsersService.ReadFirst(x => x.ChannelId == channelid && x.UserId == userid) != null;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User[]?> GetChannelUsers(Guid channelid)
@@ -90,10 +90,10 @@ namespace jihadkhawaja.chat.server.Hubs
             HashSet<User> channelUsers = new();
             try
             {
-                List<ChannelUser> currentChannelUsers = (await ChannelUsersService.Read(x => x.ChannelId == channelid)).ToList();
+                List<ChannelUser> currentChannelUsers = (await _channelUsersService.Read(x => x.ChannelId == channelid)).ToList();
                 foreach (ChannelUser user in currentChannelUsers)
                 {
-                    var userdata = await UserService.ReadFirst(x => x.Id == user.UserId);
+                    var userdata = await _userService.ReadFirst(x => x.Id == user.UserId);
 
                     if (userdata != null)
                     {
@@ -111,8 +111,8 @@ namespace jihadkhawaja.chat.server.Hubs
                 {
                     Id = user.Id,
                     Username = user.Username,
-                    ConnectionId = user.ConnectionId,
-                    IsOnline = user.IsOnline,
+                    ConnectionId = GetUserConnectionIds(user.Id).LastOrDefault(),
+                    IsOnline = IsUserOnline(user.Id),
                 });
             }
 
@@ -126,11 +126,11 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 var ConnectedUser = await GetConnectedUser();
 
-                List<ChannelUser> channelUsers = (await ChannelUsersService
+                List<ChannelUser> channelUsers = (await _channelUsersService
                     .Read(x => x.UserId == ConnectedUser.Id)).ToList();
                 foreach (ChannelUser cu in channelUsers)
                 {
-                    Channel? channel = await ChannelService.ReadFirst(x => x.Id == cu.ChannelId);
+                    Channel? channel = await _channelService.ReadFirst(x => x.Id == cu.ChannelId);
 
                     if (channel == null)
                     {
@@ -147,7 +147,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
         {
-            ChannelUser? channelAdmin = await ChannelUsersService.ReadFirst(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
+            ChannelUser? channelAdmin = await _channelUsersService.ReadFirst(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
 
             if (channelAdmin is null)
             {
@@ -168,17 +168,17 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            if (!await ChannelUsersService.Delete(x => x.ChannelId == channelId))
+            if (!await _channelUsersService.Delete(x => x.ChannelId == channelId))
             {
                 return false;
             }
 
-            if (!await MessageService.Delete(x => x.ChannelId == channelId))
+            if (!await _messageService.Delete(x => x.ChannelId == channelId))
             {
                 return false;
             }
 
-            return await ChannelService.Delete(x => x.Id == channelId);
+            return await _channelService.Delete(x => x.Id == channelId);
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> LeaveChannel(Guid channelId)
@@ -190,7 +190,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            return await ChannelUsersService.Delete(x => x.UserId == ConnectedUser.Id && x.ChannelId == channelId);
+            return await _channelUsersService.Delete(x => x.UserId == ConnectedUser.Id && x.ChannelId == channelId);
         }
     }
 }

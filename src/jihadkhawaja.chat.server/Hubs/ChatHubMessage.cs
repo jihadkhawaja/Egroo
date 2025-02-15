@@ -21,16 +21,21 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            if (string.IsNullOrEmpty(message.Content) || string.IsNullOrWhiteSpace(message.Content))
+            if (string.IsNullOrEmpty(message.Content)
+                || string.IsNullOrWhiteSpace(message.Content))
             {
                 return false;
             }
 
+            // Encrypt message content
+            message.Content = _encryptionService.Encrypt(message.Content);
+
             //save msg to db
             message.Id = Guid.NewGuid();
             message.DateSent = DateTime.UtcNow;
+            message.IsEncrypted = true;
 
-            if (await MessageService.Create(message))
+            if (await _messageService.Create(message))
             {
                 User[]? users = await GetChannelUsers(message.ChannelId);
                 if (users is null)
@@ -54,28 +59,40 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
+            if (!message.IsEncrypted)
+                message.Content = _encryptionService.Encrypt(message.Content);
+
+            message.IsEncrypted = true;
+
             UserPendingMessage userPendingMessage = new()
             {
                 UserId = user.Id,
                 MessageId = message.Id,
-                Content = message.Content
+                Content = message.Content,
+                IsEncrypted = message.IsEncrypted
             };
 
             //In case client was offline or had connection cut
             if (!IgnorePendingMessages)
             {
-                await UserPendingMessageService.CreateOrUpdate(userPendingMessage);
+                await _userPendingMessageService.CreateOrUpdate(userPendingMessage);
             }
 
-            if (string.IsNullOrEmpty(user.ConnectionId))
+            string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
+            if (string.IsNullOrEmpty(connectionId))
             {
                 return false;
             }
 
             try
             {
-                await Clients.Client(user.ConnectionId).SendAsync("ReceiveMessage", message);
-
+                Message messageToSend = message;
+                if (message.IsEncrypted)
+                {
+                    messageToSend.Content = _encryptionService.Decrypt(message.Content);
+                    messageToSend.IsEncrypted = false;
+                }
+                await Clients.Client(connectionId).SendAsync("ReceiveMessage", messageToSend);
                 return true;
             }
             catch (Exception ex)
@@ -94,7 +111,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            Message dbMessage = await MessageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
+            Message dbMessage = await _messageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
             if (dbMessage is null)
             {
                 return false;
@@ -103,7 +120,7 @@ namespace jihadkhawaja.chat.server.Hubs
             dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 
             //save msg to db
-            if (await MessageService.Update(dbMessage))
+            if (await _messageService.Update(dbMessage))
             {
                 User[]? users = await GetChannelUsers(dbMessage.ChannelId);
                 if (users is null)
@@ -112,12 +129,13 @@ namespace jihadkhawaja.chat.server.Hubs
                 }
                 foreach (User user in users)
                 {
-                    if (string.IsNullOrEmpty(user.ConnectionId))
+                    string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
+                    if (string.IsNullOrEmpty(connectionId))
                     {
                         continue;
                     }
 
-                    await Clients.Client(user.ConnectionId).SendAsync("UpdateMessage", dbMessage);
+                    await Clients.Client(connectionId).SendAsync("UpdateMessage", dbMessage);
                 }
 
                 return true;
@@ -131,14 +149,14 @@ namespace jihadkhawaja.chat.server.Hubs
             var ConnectedUser = await GetConnectedUser();
 
             IEnumerable<UserPendingMessage> UserPendingMessages =
-                await UserPendingMessageService
+                await _userPendingMessageService
                 .Read(x => x.UserId == ConnectedUser.Id);
 
             if (UserPendingMessages is not null)
             {
                 foreach (var userpendingmessage in UserPendingMessages)
                 {
-                    Message? message = await MessageService
+                    Message? message = await _messageService
                         .ReadFirst(x => x.Id == userpendingmessage.MessageId);
 
                     if (message is null) continue;
@@ -155,7 +173,7 @@ namespace jihadkhawaja.chat.server.Hubs
             var ConnectedUser = await GetConnectedUser();
 
             UserPendingMessage UserPendingMessage =
-                await UserPendingMessageService
+                await _userPendingMessageService
                 .ReadFirst(x => x.UserId == ConnectedUser.Id
                     && x.MessageId == messageid
                     && x.DateUserReceivedOn is null
@@ -163,11 +181,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (UserPendingMessage is not null)
             {
-                UserPendingMessage.DateDeleted = DateTimeOffset.UtcNow;
-                UserPendingMessage.DateUserReceivedOn = DateTimeOffset.UtcNow;
-                UserPendingMessage.Content = null;
-                await UserPendingMessageService
-                .Update(UserPendingMessage);
+                await _userPendingMessageService.Delete(x => x.Id == UserPendingMessage.Id);
             }
         }
     }
