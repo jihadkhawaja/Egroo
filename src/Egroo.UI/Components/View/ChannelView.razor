@@ -305,7 +305,7 @@
 
         // Filter out the current user and select only online users.
         var availableUsers = channelUsers
-            .Where(u => u.Id != SessionStorage.User.Id && u.IsOnline)
+            .Where(u => u.Id != SessionStorage.User!.Id && u.IsOnline)
             .ToList();
 
         if (!availableUsers.Any())
@@ -328,12 +328,12 @@
             DotNetObjectReference.Create(new SignalCallbackHelper(async (signalJson) =>
             {
                 // Send the offer/answer signal via SignalR.
-                await ChatCallService.SendSignal(signalJson, TargetUser.ConnectionId);
+                await ChatCallService.SendSignal(signalJson, TargetUser!.ConnectionId!);
             })),
             DotNetObjectReference.Create(new SignalCallbackHelper(async (candidateJson) =>
             {
                 // Send ICE candidate via SignalR.
-                await ChatCallService.SendSignal(candidateJson, TargetUser.ConnectionId);
+                await ChatCallService.SendSignal(candidateJson, TargetUser!.ConnectionId!);
             })),
             isCaller);
     }
@@ -342,13 +342,14 @@
     {
         // Choose the first available online user.
         var target = await GetTargetUser();
+        if (target is null
+            || string.IsNullOrEmpty(target.ConnectionId))
+            return;
+
         TargetUser = target;
 
         // Initiate the call via SignalR.
         await ChatCallService.CallUser(target);
-
-        // Start local audio capture and create a peer connection.
-        await StartCallAsync(true);
 
         IsCalling = true;
         IsIncomingCall = false;
@@ -367,6 +368,9 @@
             IsIncomingCall = false;
             CallStatusMessage = $"In call with {ActiveCallUser.Username}";
             await InvokeAsync(StateHasChanged);
+
+            // Start local audio capture and create a peer connection.
+            await StartCallAsync(false);
         }
     }
 
@@ -417,6 +421,9 @@
             ActiveCallUser = acceptingUser;
             CallStatusMessage = $"Call accepted by {acceptingUser.Username}";
             await InvokeAsync(StateHasChanged);
+
+            // Start local audio capture and create a peer connection.
+            await StartCallAsync(true);
         };
 
         ChatCallService.OnCallDeclined += async (decliningUser, reason) =>
