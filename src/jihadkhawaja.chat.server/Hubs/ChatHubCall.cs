@@ -18,6 +18,8 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task CallUser(User targetUser)
         {
+            if(targetUser == null) return;
+
             var callerId = GetUserIdFromContext();
             if (!callerId.HasValue) return;
 

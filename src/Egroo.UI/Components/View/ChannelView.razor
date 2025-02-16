@@ -1,4 +1,5 @@
 ﻿@using BlazorDexie.JsModule
+@using Egroo.UI.Helpers
 @using Microsoft.AspNetCore.SignalR.Client
 @using MudBlazor
 @using jihadkhawaja.chat.client
@@ -37,7 +38,7 @@
     {
         <MudStack>
             <MudPaper id="messages-container" Elevation="0" Class="pa-4"
-                      Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
+            Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
                 @if (!Messages.Any())
                 {
                     <MudText>No Messages</MudText>
@@ -50,23 +51,23 @@
                             if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                         }
                     </MudStack>
@@ -74,16 +75,16 @@
             </MudPaper>
             <MudStack Row>
                 <MudTextField @ref="inputMudTextField" DisableUnderLine
-                              Value="InputContent"
-                              ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
-                              InputMode="InputMode.text" InputType="InputType.Text"
-                              AutoFocus="true"
-                              Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
-                              Lines="1" MaxLength="MaxMessageLength"
-                              Counter="MaxMessageLength" Disabled="InputDisabled" />
+                Value="InputContent"
+                ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                InputMode="InputMode.text" InputType="InputType.Text"
+                AutoFocus="true"
+                Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
+                Lines="1" MaxLength="MaxMessageLength"
+                Counter="MaxMessageLength" Disabled="InputDisabled" />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
-                               DisableElevation Class="mt-1 mb-6"
-                               OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
+                DisableElevation Class="mt-1 mb-6"
+                OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
             </MudStack>
         </MudStack>
     }
@@ -97,9 +98,9 @@
     <!-- Call Overlay UI -->
     <MudOverlay DarkBackground Visible="@IsCalling" />
     <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter"
-                TransformOrigin="Origin.CenterCenter"
-                OverflowBehavior="OverflowBehavior.FlipOnOpen"
-                Fixed Paper>
+    TransformOrigin="Origin.CenterCenter"
+    OverflowBehavior="OverflowBehavior.FlipOnOpen"
+    Fixed Paper>
         <MudItem Class="pa-4">
             <MudText Class="pb-2" Typo="Typo.h6">@CallStatusMessage</MudText>
             @if (IsIncomingCall)
@@ -280,9 +281,133 @@
 
     #region Call UI & Behavior
 
+    private async Task InitializeAudioAsync()
+    {
+        // Capture the microphone using JS interop.
+        bool started = await JSRuntime.InvokeAsync<bool>("webrtcInterop.startLocalStream");
+        if (!started)
+        {
+            Snackbar.Add("Failed to start audio capture.", Severity.Error);
+        }
+    }
+
+    private async Task<User?> GetTargetUser()
+    {
+        // Get all users in the channel.
+        var channelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
+        if (channelUsers == null || channelUsers.Length == 0)
+        {
+            Snackbar.Add("No users in this channel.", Severity.Warning);
+            return null;
+        }
+
+        // Filter out the current user and select only online users.
+        var availableUsers = channelUsers
+            .Where(u => u.Id != SessionStorage.User.Id && u.IsOnline)
+            .ToList();
+
+        if (!availableUsers.Any())
+        {
+            Snackbar.Add("No online users available to call.", Severity.Warning);
+            return null;
+        }
+
+        // Choose the first available online user.
+        return availableUsers.First();
+    }
+
+    private async Task StartCallAsync()
+    {
+        var target = await GetTargetUser();
+
+        if (target is null || string.IsNullOrEmpty(target.ConnectionId))
+        {
+            return;
+        }
+
+        // Initialize local audio capture.
+        await InitializeAudioAsync();
+
+        // Create a peer connection.
+        // - One for when an SDP offer/answer is generated.
+        // - One for when an ICE candidate is generated.
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.createPeerConnection",
+            DotNetObjectReference.Create(new SignalCallbackHelper(async (offerJson) =>
+            {
+                // Here you send the offer/answer via SignalR.
+                // Replace the empty string with the target user's connection ID if available.
+                await ChatCallService.SendSignal(offerJson, target.ConnectionId);
+            })),
+            DotNetObjectReference.Create(new SignalCallbackHelper(async (candidateJson) =>
+            {
+                // Send ICE candidate via SignalR.
+                await ChatCallService.SendSignal(candidateJson, target.ConnectionId);
+            })));
+    }
+
+    private async Task OnCallButtonClicked()
+    {
+        // Choose the first available online user.
+        var target = await GetTargetUser();
+        TargetUser = target;
+
+        // Initiate the call via SignalR.
+        await ChatCallService.CallUser(target);
+
+        // Start local audio capture and create a peer connection.
+        await StartCallAsync();
+
+        IsCalling = true;
+        IsIncomingCall = false;
+        ActiveCallUser = target;
+        CallStatusMessage = $"Calling {target.Username}...";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task AcceptCall()
+    {
+        if (ActiveCallUser is not null)
+        {
+            // When accepting, start your local audio and create the peer connection.
+            await StartCallAsync();
+            await ChatCallService.AnswerCall(true, ActiveCallUser);
+            IsIncomingCall = false;
+            CallStatusMessage = $"In call with {ActiveCallUser.Username}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task DeclineCall()
+    {
+        if (ActiveCallUser is not null)
+        {
+            await ChatCallService.AnswerCall(false, ActiveCallUser);
+            IsCalling = false;
+            IsIncomingCall = false;
+            ActiveCallUser = null;
+            CallStatusMessage = "Call declined";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HangUpCall()
+    {
+        // Stop the microphone stream
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.stopLocalStream");
+
+        // Hang up the call
+        await ChatCallService.HangUp();
+
+        IsCalling = false;
+        ActiveCallUser = null;
+        CallStatusMessage = "Call ended";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Event handler for incoming signaling messages.
+    // When a signal is received, we decide whether to set the remote description or add an ICE candidate.
     private void RegisterCallEvents()
     {
-        // Subscribe to call events from ChatCallService.
         ChatCallService.OnIncomingCall += async (callingUser) =>
         {
             IsCalling = true;
@@ -319,7 +444,21 @@
 
         ChatCallService.OnReceiveSignal += async (signalingUser, signal) =>
         {
-            // Process incoming WebRTC signaling if needed.
+            // Parse the signal type from the JSON signal message.
+            var signalObj = System.Text.Json.JsonDocument.Parse(signal);
+            string signalType = signalObj.RootElement.GetProperty("type").GetString();
+
+            if (signalType == "offer" || signalType == "answer")
+            {
+                // Set the remote description using the provided SDP.
+                await JSRuntime.InvokeVoidAsync("webrtcInterop.setRemoteDescription", signal);
+            }
+            else if (signalType == "candidate")
+            {
+                // Add the ICE candidate.
+                await JSRuntime.InvokeVoidAsync("webrtcInterop.addIceCandidate", signal);
+            }
+
             await InvokeAsync(StateHasChanged);
         };
 
@@ -328,73 +467,6 @@
             // Optionally update UI if you track user status changes.
             await InvokeAsync(StateHasChanged);
         };
-    }
-
-    private async Task OnCallButtonClicked()
-    {
-        // Use the chat channel service to get all users in the channel.
-        var channelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
-        if (channelUsers == null || channelUsers.Length == 0)
-        {
-            Snackbar.Add("No users in this channel.", Severity.Warning);
-            return;
-        }
-
-        // Filter out the current user and select only online users.
-        var availableUsers = channelUsers
-            .Where(u => u.Id != SessionStorage.User.Id && u.IsOnline)
-            .ToList();
-
-        if (!availableUsers.Any())
-        {
-            Snackbar.Add("No online users available to call.", Severity.Warning);
-            return;
-        }
-
-        // Choose the first available online user.
-        var target = availableUsers.First();
-        TargetUser = target;
-
-        // Initiate call using ChatCallService.
-        await ChatCallService.CallUser(target);
-        IsCalling = true;
-        IsIncomingCall = false;
-        ActiveCallUser = target;
-        CallStatusMessage = $"Calling {target.Username}...";
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task AcceptCall()
-    {
-        if (ActiveCallUser is not null)
-        {
-            await ChatCallService.AnswerCall(true, ActiveCallUser);
-            IsIncomingCall = false;
-            CallStatusMessage = $"In call with {ActiveCallUser.Username}";
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task DeclineCall()
-    {
-        if (ActiveCallUser is not null)
-        {
-            await ChatCallService.AnswerCall(false, ActiveCallUser);
-            IsCalling = false;
-            IsIncomingCall = false;
-            ActiveCallUser = null;
-            CallStatusMessage = "Call declined";
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private async Task HangUpCall()
-    {
-        await ChatCallService.HangUp();
-        IsCalling = false;
-        ActiveCallUser = null;
-        CallStatusMessage = "Call ended";
-        await InvokeAsync(StateHasChanged);
     }
 
     #endregion
