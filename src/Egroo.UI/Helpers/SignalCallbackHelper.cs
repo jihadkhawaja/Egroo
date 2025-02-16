@@ -11,11 +11,13 @@ namespace Egroo.UI.Helpers
             _callback = callback;
         }
 
-        [JSInvokable]
-        public async Task OnSignalGenerated(string json)
+        [JSInvokable("Invoke")]
+        public async Task Invoke(string message)
         {
-            await _callback(json);
+            if (_callback != null)
+            {
+                await _callback(message);
+            }
         }
     }
-
 }

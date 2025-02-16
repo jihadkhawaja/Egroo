@@ -120,6 +120,8 @@
     </MudPopover>
 </MudContainer>
 
+<audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
+
 @code {
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? ChannelId { get; set; }
@@ -316,33 +318,24 @@
         return availableUsers.First();
     }
 
-    private async Task StartCallAsync()
+    private async Task StartCallAsync(bool isCaller)
     {
-        var target = await GetTargetUser();
-
-        if (target is null || string.IsNullOrEmpty(target.ConnectionId))
-        {
-            return;
-        }
-
         // Initialize local audio capture.
         await InitializeAudioAsync();
 
-        // Create a peer connection.
-        // - One for when an SDP offer/answer is generated.
-        // - One for when an ICE candidate is generated.
+        // Create a peer connection; pass the 'isCaller' flag.
         await JSRuntime.InvokeVoidAsync("webrtcInterop.createPeerConnection",
-            DotNetObjectReference.Create(new SignalCallbackHelper(async (offerJson) =>
+            DotNetObjectReference.Create(new SignalCallbackHelper(async (signalJson) =>
             {
-                // Here you send the offer/answer via SignalR.
-                // Replace the empty string with the target user's connection ID if available.
-                await ChatCallService.SendSignal(offerJson, target.ConnectionId);
+                // Send the offer/answer signal via SignalR.
+                await ChatCallService.SendSignal(signalJson, TargetUser.ConnectionId);
             })),
             DotNetObjectReference.Create(new SignalCallbackHelper(async (candidateJson) =>
             {
                 // Send ICE candidate via SignalR.
-                await ChatCallService.SendSignal(candidateJson, target.ConnectionId);
-            })));
+                await ChatCallService.SendSignal(candidateJson, TargetUser.ConnectionId);
+            })),
+            isCaller);
     }
 
     private async Task OnCallButtonClicked()
@@ -355,7 +348,7 @@
         await ChatCallService.CallUser(target);
 
         // Start local audio capture and create a peer connection.
-        await StartCallAsync();
+        await StartCallAsync(true);
 
         IsCalling = true;
         IsIncomingCall = false;
@@ -369,7 +362,7 @@
         if (ActiveCallUser is not null)
         {
             // When accepting, start your local audio and create the peer connection.
-            await StartCallAsync();
+            await StartCallAsync(false);
             await ChatCallService.AnswerCall(true, ActiveCallUser);
             IsIncomingCall = false;
             CallStatusMessage = $"In call with {ActiveCallUser.Username}";
@@ -436,6 +429,9 @@
 
         ChatCallService.OnCallEnded += async (endedUser, message) =>
         {
+            // Stop the microphone and close the peer connection on this side.
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.stopLocalStream");
+
             IsCalling = false;
             ActiveCallUser = null;
             CallStatusMessage = $"Call ended: {message}";
