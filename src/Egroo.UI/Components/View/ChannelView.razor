@@ -15,7 +15,7 @@
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
 @inject IChatChannel ChatChannelService
-@inject IChatCall ChatCallService
+@inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 
@@ -27,7 +27,9 @@
             <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
         </MudStack>
         <!-- Call Button -->
-        <MudIconButton Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
+        <MudTooltip Text="Call">
+            <MudIconButton Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
+        </MudTooltip>
     </MudStack>
 
     <!-- Messages Container -->
@@ -94,7 +96,7 @@
 
     <!-- Call Overlay UI -->
     <MudOverlay DarkBackground Visible="@IsCalling" />
-    <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter" 
+    <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter"
                 TransformOrigin="Origin.CenterCenter"
                 OverflowBehavior="OverflowBehavior.FlipOnOpen"
                 Fixed Paper>
@@ -183,12 +185,12 @@
         InputContent = InputContent.Trim();
 
         Message message = new()
-        {
-            ChannelId = GetChannelId(),
-            DisplayName = SessionStorage?.User?.Username,
-            Content = InputContent,
-            SenderId = SessionStorage.User.Id,
-        };
+            {
+                ChannelId = GetChannelId(),
+                DisplayName = SessionStorage?.User?.Username,
+                Content = InputContent,
+                SenderId = SessionStorage.User.Id,
+            };
 
         if (await ChatMessageService.SendMessage(message))
         {
@@ -280,6 +282,7 @@
 
     private void RegisterCallEvents()
     {
+        // Subscribe to call events from ChatCallService.
         ChatCallService.OnIncomingCall += async (callingUser) =>
         {
             IsCalling = true;
@@ -301,23 +304,29 @@
         ChatCallService.OnCallDeclined += async (decliningUser, reason) =>
         {
             IsCalling = false;
-            CallStatusMessage = $"Call declined: {reason}";
             ActiveCallUser = null;
+            CallStatusMessage = $"Call declined: {reason}";
             await InvokeAsync(StateHasChanged);
         };
 
-        ChatCallService.OnCallEnded += async (signalingUser, signal) =>
+        ChatCallService.OnCallEnded += async (endedUser, message) =>
         {
             IsCalling = false;
-            CallStatusMessage = $"Call ended: {signal}";
             ActiveCallUser = null;
+            CallStatusMessage = $"Call ended: {message}";
             await InvokeAsync(StateHasChanged);
         };
 
         ChatCallService.OnReceiveSignal += async (signalingUser, signal) =>
         {
-            // Process WebRTC signaling here if needed.
-            await Task.CompletedTask;
+            // Process incoming WebRTC signaling if needed.
+            await InvokeAsync(StateHasChanged);
+        };
+
+        ChatCallService.OnUpdateUserList += async (users) =>
+        {
+            // Optionally update UI if you track user status changes.
+            await InvokeAsync(StateHasChanged);
         };
     }
 
@@ -346,8 +355,8 @@
         var target = availableUsers.First();
         TargetUser = target;
 
-        // Initiate call by invoking the hub method "CallUser" with the target user.
-        await MobileChatSignalR.HubConnection!.InvokeAsync("CallUser", target);
+        // Initiate call using ChatCallService.
+        await ChatCallService.CallUser(target);
         IsCalling = true;
         IsIncomingCall = false;
         ActiveCallUser = target;
@@ -359,7 +368,7 @@
     {
         if (ActiveCallUser is not null)
         {
-            await MobileChatSignalR.HubConnection!.InvokeAsync("AnswerCall", true, ActiveCallUser);
+            await ChatCallService.AnswerCall(true, ActiveCallUser);
             IsIncomingCall = false;
             CallStatusMessage = $"In call with {ActiveCallUser.Username}";
             await InvokeAsync(StateHasChanged);
@@ -370,7 +379,7 @@
     {
         if (ActiveCallUser is not null)
         {
-            await MobileChatSignalR.HubConnection!.InvokeAsync("AnswerCall", false, ActiveCallUser);
+            await ChatCallService.AnswerCall(false, ActiveCallUser);
             IsCalling = false;
             IsIncomingCall = false;
             ActiveCallUser = null;
@@ -381,7 +390,7 @@
 
     private async Task HangUpCall()
     {
-        await MobileChatSignalR.HubConnection!.InvokeAsync("HangUp");
+        await ChatCallService.HangUp();
         IsCalling = false;
         ActiveCallUser = null;
         CallStatusMessage = "Call ended";
