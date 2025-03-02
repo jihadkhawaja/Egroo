@@ -8,8 +8,9 @@ namespace jihadkhawaja.chat.client.Services
     public class ChatCallService : IChatCall
     {
         // Client-side events that UI components can subscribe to.
-        public event Func<User, Task>? OnIncomingCall;
-        public event Func<User, Task>? OnCallAccepted;
+        // Updated events to include an SDP string where applicable.
+        public event Func<User, string, Task>? OnIncomingCall;
+        public event Func<User, string, Task>? OnCallAccepted;
         public event Func<User, string, Task>? OnCallDeclined;
         public event Func<User, string, Task>? OnCallEnded;
         public event Func<User, string, Task>? OnReceiveSignal;
@@ -20,16 +21,16 @@ namespace jihadkhawaja.chat.client.Services
             if (MobileChatSignalR.HubConnection is not null)
             {
                 // Register hub event handlers.
-                MobileChatSignalR.HubConnection.On<User>("IncomingCall", async (callingUser) =>
+                MobileChatSignalR.HubConnection.On<User, string>("IncomingCall", async (callingUser, sdpOffer) =>
                 {
                     if (OnIncomingCall != null)
-                        await OnIncomingCall.Invoke(callingUser);
+                        await OnIncomingCall.Invoke(callingUser, sdpOffer);
                 });
 
-                MobileChatSignalR.HubConnection.On<User>("CallAccepted", async (acceptingUser) =>
+                MobileChatSignalR.HubConnection.On<User, string>("CallAccepted", async (acceptingUser, sdpAnswer) =>
                 {
                     if (OnCallAccepted != null)
-                        await OnCallAccepted.Invoke(acceptingUser);
+                        await OnCallAccepted.Invoke(acceptingUser, sdpAnswer);
                 });
 
                 MobileChatSignalR.HubConnection.On<User, string>("CallDeclined", async (decliningUser, reason) =>
@@ -58,20 +59,20 @@ namespace jihadkhawaja.chat.client.Services
             }
         }
 
-        public async Task CallUser(User targetUser)
+        public async Task CallUser(User targetUser, string offerSdp)
         {
             if (MobileChatSignalR.HubConnection is null)
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
 
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(CallUser), targetUser);
+            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
         }
 
-        public async Task AnswerCall(bool acceptCall, User caller)
+        public async Task AnswerCall(bool acceptCall, User caller, string answerSdp)
         {
             if (MobileChatSignalR.HubConnection is null)
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
 
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller);
+            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
         }
 
         public async Task HangUp()
@@ -89,5 +90,18 @@ namespace jihadkhawaja.chat.client.Services
 
             await MobileChatSignalR.HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
         }
+
+        public async Task SendIceCandidateToPeer(string candidateJson)
+        {
+            if (MobileChatSignalR.HubConnection is null)
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+
+            // Log or inspect the received candidate JSON
+            Console.WriteLine($"Received ICE Candidate: {candidateJson}");
+
+            // Send the ICE candidate to the peer through SignalR.
+            await MobileChatSignalR.HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
+        }
+
     }
 }

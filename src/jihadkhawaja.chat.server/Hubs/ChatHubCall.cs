@@ -3,22 +3,41 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using SIPSorcery.Net;  // SIP Sorcery for RTCPeerConnection and SDP handling.
 using System.Collections.Concurrent;
+using TinyJson;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public partial class ChatHub : IChatCall
     {
-        // These dictionaries are declared here (or in your ChatHubCall.cs partial)
+        // Dictionaries for call state management.
         private static readonly ConcurrentDictionary<Guid, UserCall> _userCalls = new();
         private static readonly ConcurrentDictionary<Guid, CallOffer> _callOffers = new();
 
+        // (In this updated design the RTCPeerConnection objects are no longer created on the server,
+        // since each client (browser) now creates its own connection with native WebRTC.)
+        // We retain the ICE candidate relay functionality only.
+        // private static readonly ConcurrentDictionary<Guid, RTCPeerConnection> _peerConnections = new();
+
+        // ICE server configuration (if needed for any server-side processing).
+        private static readonly RTCConfiguration _rtcConfig = new RTCConfiguration
+        {
+            iceServers = new List<RTCIceServer>
+            {
+                new RTCIceServer { urls = "stun:stun.l.google.com:19302" }
+                // Optionally add TURN servers here.
+            }
+        };
+
         #region Call Functionality
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task CallUser(User targetUser)
+        // Caller initiates the call.
+        // Updated to accept the SDP offer (which includes audio media) from the caller.
+        public async Task CallUser(User targetUser, string sdpOffer)
         {
-            if(targetUser == null) return;
+            if (targetUser == null) return;
 
             var callerId = GetUserIdFromContext();
             if (!callerId.HasValue) return;
@@ -28,7 +47,6 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (callee == null || !IsUserOnline(callee.Id))
             {
-                // Notify caller only that the target is not available.
                 var callerConns = GetUserConnectionIds(callerId.Value);
                 await Clients.Clients(callerConns)
                     .SendAsync("CallDeclined", targetUser, "The user is not available.");
@@ -43,17 +61,24 @@ namespace jihadkhawaja.chat.server.Hubs
                 return;
             }
 
-            if (caller != null && callee != null)
+            // Create and store a call offer with the caller's SDP offer.
+            var offer = new CallOffer
             {
-                _callOffers.TryAdd(callee.Id, new CallOffer { Caller = caller, Callee = callee });
-                var calleeConns = GetUserConnectionIds(callee.Id);
-                await Clients.Clients(calleeConns)
-                    .SendAsync("IncomingCall", caller);
-            }
+                Caller = caller,
+                Callee = callee,
+                SdpOffer = sdpOffer
+            };
+            _callOffers.TryAdd(callee.Id, offer);
+
+            // Relay the offer SDP to the callee.
+            var calleeConns = GetUserConnectionIds(callee.Id);
+            await Clients.Clients(calleeConns)
+                .SendAsync("IncomingCall", caller, sdpOffer);
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task AnswerCall(bool acceptCall, User caller)
+        // Callee answers the call.
+        // Updated to accept the SDP answer (which includes its own media) from the callee.
+        public async Task AnswerCall(bool acceptCall, User caller, string sdpAnswer)
         {
             var calleeId = GetUserIdFromContext();
             if (!calleeId.HasValue) return;
@@ -78,19 +103,21 @@ namespace jihadkhawaja.chat.server.Hubs
                 return;
             }
 
+            // Mark the call as active.
             var userCall = new UserCall { Users = new List<User> { callOffer.Caller, callOffer.Callee } };
             _userCalls.TryAdd(callOffer.Caller.Id, userCall);
             _userCalls.TryAdd(callee.Id, userCall);
             _callOffers.TryRemove(callOffer.Callee.Id, out _);
 
+            // Relay the SDP answer back to the caller.
             var callerConnsAccepted = GetUserConnectionIds(callOffer.Caller.Id);
             await Clients.Clients(callerConnsAccepted)
-                .SendAsync("CallAccepted", callOffer.Callee);
+                .SendAsync("CallAccepted", callOffer.Callee, sdpAnswer);
 
             await SendUserListUpdate();
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        // Ends the call.
         public async Task HangUp()
         {
             var userId = GetUserIdFromContext();
@@ -107,10 +134,11 @@ namespace jihadkhawaja.chat.server.Hubs
                 }
             }
 
+            // In this updated design, the clients handle their own peer connection cleanup.
             await SendUserListUpdate();
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        // Used for exchanging ICE candidates and other SDP signaling.
         public async Task SendSignal(string signal, string targetConnectionId)
         {
             var senderId = GetUserIdFromContext();
@@ -118,14 +146,26 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (!senderId.HasValue || target == null) return;
 
-            if (_userCalls.TryGetValue(senderId.Value, out var call) &&
-                call.Users.Any(u => u.Id == target.Id))
+            bool activeCall = _userCalls.TryGetValue(senderId.Value, out var call) &&
+                              call.Users.Any(u => u.Id == target.Id);
+            bool pendingOffer = _callOffers.ContainsKey(target.Id) || _callOffers.ContainsKey(senderId.Value);
+
+            if (activeCall || pendingOffer)
             {
                 var sender = await _userService.ReadFirst(x => x.Id == senderId.Value);
                 var targetConns = GetUserConnectionIds(target.Id);
                 await Clients.Clients(targetConns)
                     .SendAsync("ReceiveSignal", sender, signal);
             }
+        }
+
+        public async Task SendIceCandidateToPeer(string candidateJson)
+        {
+            // Here you can implement logic to send the ICE candidate to the correct peer.
+            Console.WriteLine($"Sending ICE Candidate to peer: {candidateJson}");
+
+            // You can send it to a specific client connection
+            await Clients.Others.SendAsync("ReceiveIceCandidate", candidateJson);
         }
 
         private async Task SendUserListUpdate()
@@ -141,7 +181,6 @@ namespace jihadkhawaja.chat.server.Hubs
                     onlineUsers.Add(user);
                 }
             }
-            // Optionally, you could send this update only to a specific channel group.
             await Clients.All.SendAsync("UpdateUserList", onlineUsers);
         }
         #endregion
