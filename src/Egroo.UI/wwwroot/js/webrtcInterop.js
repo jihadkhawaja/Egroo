@@ -2,7 +2,8 @@
     pc: null,
     localStream: null,
     iceCandidatesQueue: [], // To store ICE candidates until DotNetObjectReference is registered
-    statsInterval: null, // Interval ID for polling stats
+    statsInterval: null,    // Interval ID for polling stats
+    dotNetObject: null,
 
     registerSendIceCandidateToPeer: function (dotNetObject) {
         this.dotNetObject = dotNetObject;
@@ -30,48 +31,53 @@
             .catch(err => console.error("❌ Error getting stats:", err));
     },
 
-    // Start a call as the caller
+    // Start a call as the caller: returns the SDP offer string.
     startCall: async function () {
-        // Clean up any existing connection
         if (this.pc) {
             this.pc.close();
         }
 
-        // Request audio with additional constraints
+        // Use simple constraints for testing.
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-                video: false
-            });
+            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             console.log("🎙️ Local stream acquired", this.localStream);
-            if (this.localStream.getAudioTracks().length > 0) {
-                const audioTrack = this.localStream.getAudioTracks()[0];
-                audioTrack.enabled = true;
-                console.log("Local audio track properties:", {
-                    enabled: audioTrack.enabled,
-                    readyState: audioTrack.readyState,
-                    label: audioTrack.label
-                });
-            }
+            console.log("Audio tracks:", this.localStream.getAudioTracks());
         } catch (err) {
             console.error("❌ Error getting local stream:", err);
             return;
         }
 
-        // Create RTCPeerConnection
+        // (Optional) For debugging, attach the local stream so you can hear your own mic.
+        const localAudio = document.getElementById("localAudio");
+        if (localAudio) {
+            localAudio.srcObject = this.localStream;
+            localAudio.play().catch(err => console.error("Error playing local audio:", err));
+        }
+
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         this.pc = new RTCPeerConnection(config);
 
-        // Add the local audio track via addTrack
         if (this.localStream && this.localStream.getAudioTracks().length > 0) {
             let audioTrack = this.localStream.getAudioTracks()[0];
+            console.log("Audio track details:", {
+                enabled: audioTrack.enabled,
+                readyState: audioTrack.readyState,
+                label: audioTrack.label
+            });
+            audioTrack.enabled = true;
             this.pc.addTrack(audioTrack, this.localStream);
             console.log("✅ Added local audio track via addTrack.");
         } else {
             console.warn("⚠️ No local audio track available to add.");
         }
 
-        // Handle ICE candidate event
+        this.pc.onsignalingstatechange = () => {
+            console.log("Signaling state:", this.pc.signalingState);
+        };
+        this.pc.oniceconnectionstatechange = () => {
+            console.log("ICE connection state:", this.pc.iceConnectionState);
+        };
+
         this.pc.onicecandidate = event => {
             if (event.candidate) {
                 console.log("📡 Local ICE candidate:", event.candidate.candidate);
@@ -84,10 +90,13 @@
             }
         };
 
-        // Handle remote track event
         this.pc.ontrack = event => {
             console.log("🎧 Remote track received:", event);
             const remoteAudio = document.getElementById("remoteAudio");
+            if (!remoteAudio) {
+                console.error("Remote audio element not found.");
+                return;
+            }
             let stream = (event.streams && event.streams.length > 0)
                 ? event.streams[0]
                 : new MediaStream([event.track]);
@@ -99,57 +108,62 @@
                 .catch(err => console.error("❌ Error playing remote audio:", err));
         };
 
-        // Create the SDP offer
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
         console.log("📞 Created offer:", offer.sdp);
 
-        // Start polling audio stats every 5 seconds
         if (this.statsInterval) clearInterval(this.statsInterval);
         this.statsInterval = setInterval(() => this.pollAudioStats(), 5000);
 
         return offer.sdp;
     },
 
-    // Answer an incoming call
+    // Answer an incoming call: returns the SDP answer string.
     answerCall: async function (sdpOffer) {
         if (this.pc) {
             this.pc.close();
         }
 
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-                video: false
-            });
+            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             console.log("🎙️ Local stream acquired for answering", this.localStream);
-            if (this.localStream.getAudioTracks().length > 0) {
-                const audioTrack = this.localStream.getAudioTracks()[0];
-                audioTrack.enabled = true;
-                console.log("Local audio track properties (answer):", {
-                    enabled: audioTrack.enabled,
-                    readyState: audioTrack.readyState,
-                    label: audioTrack.label
-                });
-            }
+            console.log("Audio tracks (answer):", this.localStream.getAudioTracks());
         } catch (err) {
             console.error("❌ Error getting local stream:", err);
             return;
         }
 
+        // (Optional) For debugging, attach the local stream.
+        const localAudio = document.getElementById("localAudio");
+        if (localAudio) {
+            localAudio.srcObject = this.localStream;
+            localAudio.play().catch(err => console.error("Error playing local audio (answer):", err));
+        }
+
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         this.pc = new RTCPeerConnection(config);
 
-        // Add the local audio track via addTrack
         if (this.localStream && this.localStream.getAudioTracks().length > 0) {
             let audioTrack = this.localStream.getAudioTracks()[0];
+            console.log("Audio track (answer) details:", {
+                enabled: audioTrack.enabled,
+                readyState: audioTrack.readyState,
+                label: audioTrack.label
+            });
+            audioTrack.enabled = true;
             this.pc.addTrack(audioTrack, this.localStream);
             console.log("✅ Added local audio track via addTrack (answer).");
         } else {
             console.warn("⚠️ No local audio track available to add (answer).");
         }
 
-        // Handle ICE candidate event
+        this.pc.onsignalingstatechange = () => {
+            console.log("Signaling state (answer):", this.pc.signalingState);
+        };
+        this.pc.oniceconnectionstatechange = () => {
+            console.log("ICE connection state (answer):", this.pc.iceConnectionState);
+        };
+
         this.pc.onicecandidate = event => {
             if (event.candidate) {
                 console.log("📡 Local ICE candidate (answer):", event.candidate.candidate);
@@ -162,10 +176,13 @@
             }
         };
 
-        // Handle remote track event
         this.pc.ontrack = event => {
-            console.log("🎧 Remote track received:", event);
+            console.log("🎧 Remote track received (answer):", event);
             const remoteAudio = document.getElementById("remoteAudio");
+            if (!remoteAudio) {
+                console.error("Remote audio element not found.");
+                return;
+            }
             let stream = (event.streams && event.streams.length > 0)
                 ? event.streams[0]
                 : new MediaStream([event.track]);
@@ -173,12 +190,11 @@
             remoteAudio.muted = false;
             remoteAudio.volume = 1.0;
             remoteAudio.play()
-                .then(() => console.log("✅ Remote audio playing"))
-                .catch(err => console.error("❌ Error playing remote audio:", err));
+                .then(() => console.log("✅ Remote audio playing (answer)"))
+                .catch(err => console.error("❌ Error playing remote audio (answer):", err));
         };
 
         await this.pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
-
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
         console.log("📞 Created answer:", answer.sdp);
@@ -189,6 +205,7 @@
         return answer.sdp;
     },
 
+    // Add an ICE candidate received from the server.
     addIceCandidate: async function (candidateJson) {
         try {
             if (!this.pc) {
@@ -197,21 +214,17 @@
             }
             let candidate;
             try {
-                const parsedCandidate = JSON.parse(candidateJson);
-                if (parsedCandidate && parsedCandidate.candidate) {
-                    candidate = new RTCIceCandidate({
-                        candidate: parsedCandidate.candidate,
-                        sdpMid: parsedCandidate.sdpMid,
-                        sdpMLineIndex: parsedCandidate.sdpMLineIndex,
-                        usernameFragment: parsedCandidate.usernameFragment
-                    });
-                    console.log("📡 Adding ICE candidate:", candidate);
+                candidate = JSON.parse(candidateJson);
+                if (typeof candidate === "object" && candidate.candidate) {
+                    candidate = new RTCIceCandidate(candidate);
+                    console.log("📡 Adding ICE candidate (from JSON):", candidate);
                 } else {
-                    throw new Error("Invalid candidate format");
+                    throw new Error("Parsed candidate does not have expected properties.");
                 }
             } catch (err) {
-                console.error("❌ Error parsing ICE candidate JSON or invalid format:", err);
-                return;
+                console.warn("❌ Error parsing candidate JSON. Assuming candidateJson is an SDP string:", err);
+                candidate = new RTCIceCandidate({ candidate: candidateJson });
+                console.log("📡 Adding ICE candidate (from SDP string):", candidate);
             }
             await this.pc.addIceCandidate(candidate);
         } catch (err) {
@@ -219,6 +232,7 @@
         }
     },
 
+    // Close and clean up the connection.
     closePeer: function () {
         if (this.pc) {
             this.pc.onicecandidate = null;
@@ -238,6 +252,7 @@
         }
     },
 
+    // Set remote description with an SDP answer.
     setRemoteDescription: async function (sdp) {
         if (!this.pc) {
             console.error("No active RTCPeerConnection to set remote description.");

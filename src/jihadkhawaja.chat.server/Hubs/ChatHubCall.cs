@@ -3,7 +3,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using SIPSorcery.Net;  // SIP Sorcery for RTCPeerConnection and SDP handling.
+using SIPSorcery.Net;  // (Not used for RTCPeerConnection on server in this design)
 using System.Collections.Concurrent;
 using TinyJson;
 
@@ -16,12 +16,7 @@ namespace jihadkhawaja.chat.server.Hubs
         private static readonly ConcurrentDictionary<Guid, UserCall> _userCalls = new();
         private static readonly ConcurrentDictionary<Guid, CallOffer> _callOffers = new();
 
-        // (In this updated design the RTCPeerConnection objects are no longer created on the server,
-        // since each client (browser) now creates its own connection with native WebRTC.)
-        // We retain the ICE candidate relay functionality only.
-        // private static readonly ConcurrentDictionary<Guid, RTCPeerConnection> _peerConnections = new();
-
-        // ICE server configuration (if needed for any server-side processing).
+        // ICE server configuration (if needed for server‐side processing; not used for RTCPeerConnection here).
         private static readonly RTCConfiguration _rtcConfig = new RTCConfiguration
         {
             iceServers = new List<RTCIceServer>
@@ -34,13 +29,14 @@ namespace jihadkhawaja.chat.server.Hubs
         #region Call Functionality
 
         // Caller initiates the call.
-        // Updated to accept the SDP offer (which includes audio media) from the caller.
+        // Receives the SDP offer (which includes audio media) from the caller.
         public async Task CallUser(User targetUser, string sdpOffer)
         {
             if (targetUser == null) return;
 
             var callerId = GetUserIdFromContext();
-            if (!callerId.HasValue) return;
+            if (!callerId.HasValue)
+                return;
 
             var caller = await _userService.ReadFirst(x => x.Id == callerId.Value);
             var callee = await _userService.ReadFirst(x => x.Id == targetUser.Id);
@@ -77,11 +73,12 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         // Callee answers the call.
-        // Updated to accept the SDP answer (which includes its own media) from the callee.
+        // Receives the SDP answer (which includes its own media) from the callee.
         public async Task AnswerCall(bool acceptCall, User caller, string sdpAnswer)
         {
             var calleeId = GetUserIdFromContext();
-            if (!calleeId.HasValue) return;
+            if (!calleeId.HasValue)
+                return;
 
             var callee = await _userService.ReadFirst(x => x.Id == calleeId.Value);
             var callOffer = _callOffers.Values.FirstOrDefault(o => o.Callee.Id == calleeId.Value);
@@ -121,7 +118,8 @@ namespace jihadkhawaja.chat.server.Hubs
         public async Task HangUp()
         {
             var userId = GetUserIdFromContext();
-            if (!userId.HasValue) return;
+            if (!userId.HasValue)
+                return;
 
             if (_userCalls.TryRemove(userId.Value, out var call))
             {
@@ -134,7 +132,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 }
             }
 
-            // In this updated design, the clients handle their own peer connection cleanup.
+            // Clients handle their own peer connection cleanup.
             await SendUserListUpdate();
         }
 
@@ -144,7 +142,8 @@ namespace jihadkhawaja.chat.server.Hubs
             var senderId = GetUserIdFromContext();
             var target = await GetUserFromConnectionId(targetConnectionId);
 
-            if (!senderId.HasValue || target == null) return;
+            if (!senderId.HasValue || target == null)
+                return;
 
             bool activeCall = _userCalls.TryGetValue(senderId.Value, out var call) &&
                               call.Users.Any(u => u.Id == target.Id);
@@ -159,12 +158,14 @@ namespace jihadkhawaja.chat.server.Hubs
             }
         }
 
+        // ICE candidate relay method.
         public async Task SendIceCandidateToPeer(string candidateJson)
         {
-            // Here you can implement logic to send the ICE candidate to the correct peer.
+            // Log the candidate.
             Console.WriteLine($"Sending ICE Candidate to peer: {candidateJson}");
 
-            // You can send it to a specific client connection
+            // For simplicity, send it to all other connected clients.
+            // You might refine this logic to target only the intended peer.
             await Clients.Others.SendAsync("ReceiveIceCandidate", candidateJson);
         }
 

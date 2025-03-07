@@ -118,9 +118,11 @@
             }
         </MudItem>
     </MudPopover>
-</MudContainer>
 
-<audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
+    <!-- Audio Elements -->
+    @* <audio id="localAudio" autoplay playsinline controls style="display:block;"></audio> *@
+    <audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
+</MudContainer>
 
 @code {
     [Parameter] public string? Title { get; set; }
