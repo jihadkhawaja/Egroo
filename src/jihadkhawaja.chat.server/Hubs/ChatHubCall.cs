@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using SIPSorcery.Net;  // (Not used for RTCPeerConnection on server in this design)
 using System.Collections.Concurrent;
-using TinyJson;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
@@ -21,7 +20,7 @@ namespace jihadkhawaja.chat.server.Hubs
         {
             iceServers = new List<RTCIceServer>
             {
-                new RTCIceServer { urls = "stun:stun.l.google.com:19302" }
+                new RTCIceServer { urls = "stun:stun.sipsorcery.com" }
                 // Optionally add TURN servers here.
             }
         };
@@ -158,15 +157,39 @@ namespace jihadkhawaja.chat.server.Hubs
             }
         }
 
-        // ICE candidate relay method.
+        // ICE candidate relay method (corrected to target specific peer).
         public async Task SendIceCandidateToPeer(string candidateJson)
         {
-            // Log the candidate.
-            Console.WriteLine($"Sending ICE Candidate to peer: {candidateJson}");
+            var senderId = GetUserIdFromContext();
+            if (!senderId.HasValue)
+                return;
 
-            // For simplicity, send it to all other connected clients.
-            // You might refine this logic to target only the intended peer.
-            await Clients.Others.SendAsync("ReceiveIceCandidate", candidateJson);
+            // Check if the sender is in an active call
+            if (_userCalls.TryGetValue(senderId.Value, out var call))
+            {
+                // Send to all other users in the call (for group calls, adjust if 1:1)
+                foreach (var user in call.Users.Where(u => u.Id != senderId.Value))
+                {
+                    var targetConns = GetUserConnectionIds(user.Id);
+                    Console.WriteLine($"Forwarding ICE candidate to user {user.Username} via connections: {string.Join(",", targetConns)}");
+                    await Clients.Clients(targetConns).SendAsync("ReceiveIceCandidate", candidateJson);
+                }
+            }
+            else
+            {
+                // Check if there's a pending offer (caller or callee)
+                var pendingOffer = _callOffers.Values.FirstOrDefault(o =>
+                    o.Caller.Id == senderId.Value || o.Callee.Id == senderId.Value);
+                if (pendingOffer != null)
+                {
+                    var targetId = pendingOffer.Caller.Id == senderId.Value
+                        ? pendingOffer.Callee.Id
+                        : pendingOffer.Caller.Id;
+                    var targetConns = GetUserConnectionIds(targetId);
+                    Console.WriteLine($"Forwarding ICE candidate to user {targetId} via connections: {string.Join(",", targetConns)}");
+                    await Clients.Clients(targetConns).SendAsync("ReceiveIceCandidate", candidateJson);
+                }
+            }
         }
 
         private async Task SendUserListUpdate()
