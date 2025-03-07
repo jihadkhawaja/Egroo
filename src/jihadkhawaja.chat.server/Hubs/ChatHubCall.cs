@@ -171,7 +171,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 foreach (var user in call.Users.Where(u => u.Id != senderId.Value))
                 {
                     var targetConns = GetUserConnectionIds(user.Id);
-                    Console.WriteLine($"Forwarding ICE candidate to user {user.Username} via connections: {string.Join(",", targetConns)}");
+                    Console.WriteLine($"Forwarding ICE candidate to user {user.Id} via connections: {string.Join(",", targetConns)}");
                     await Clients.Clients(targetConns).SendAsync("ReceiveIceCandidate", candidateJson);
                 }
             }
