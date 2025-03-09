@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using jihadkhawaja.chat.server.Database;
@@ -11,9 +12,11 @@ using jihadkhawaja.chat.server.Database;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250215172039_encrypted-base")]
+    partial class encryptedbase
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -152,6 +155,10 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("text")
                         .HasColumnName("avatarbase64");
 
+                    b.Property<string>("ConnectionId")
+                        .HasColumnType("text")
+                        .HasColumnName("connectionid");
+
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
                         .HasColumnType("timestamp with time zone")
@@ -172,6 +179,10 @@ namespace Egroo.Server.Migrations
                     b.Property<bool>("IsEncrypted")
                         .HasColumnType("boolean")
                         .HasColumnName("isencrypted");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isonline");
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
                         .HasColumnType("timestamp with time zone")

@@ -15,6 +15,7 @@ namespace jihadkhawaja.chat.client
             services.AddScoped<IChatUser, ChatUserService>();
             services.AddScoped<IChatChannel, ChatChannelService>();
             services.AddScoped<IChatMessage, ChatMessageService>();
+            services.AddScoped<ChatCallService>();
 
             services.AddDexieWrapper();
             services.AddScoped<EgrooDB>();

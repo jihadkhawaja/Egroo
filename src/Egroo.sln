@@ -41,6 +41,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github", "Github", "{1D4F32
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.chat.shared", "jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj", "{81ED69C8-08B3-4529-A65D-98C988ECF479}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{967316A0-F74A-4941-9113-897DB47AC2D6}"
+	ProjectSection(SolutionItems) = preProject
+		..\README.md = ..\README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

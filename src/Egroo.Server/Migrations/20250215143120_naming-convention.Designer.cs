@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using jihadkhawaja.chat.server.Database;
@@ -11,9 +12,11 @@ using jihadkhawaja.chat.server.Database;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250215143120_naming-convention")]
+    partial class namingconvention
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -41,10 +44,6 @@ namespace Egroo.Server.Migrations
                     b.Property<DateTimeOffset?>("DateUpdated")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dateupdated");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
 
                     b.HasKey("Id");
 
@@ -78,10 +77,6 @@ namespace Egroo.Server.Migrations
                     b.Property<bool>("IsAdmin")
                         .HasColumnType("boolean")
                         .HasColumnName("isadmin");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -124,10 +119,6 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dateupdated");
 
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
-
                     b.Property<Guid>("ReferenceId")
                         .HasColumnType("uuid")
                         .HasColumnName("referenceid");
@@ -152,6 +143,10 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("text")
                         .HasColumnName("avatarbase64");
 
+                    b.Property<string>("ConnectionId")
+                        .HasColumnType("text")
+                        .HasColumnName("connectionid");
+
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
                         .HasColumnType("timestamp with time zone")
@@ -169,9 +164,9 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("incall");
 
-                    b.Property<bool>("IsEncrypted")
+                    b.Property<bool>("IsOnline")
                         .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnName("isonline");
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
                         .HasColumnType("timestamp with time zone")
@@ -228,10 +223,6 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("frienduserid");
 
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("userid");
@@ -268,10 +259,6 @@ namespace Egroo.Server.Migrations
                     b.Property<DateTimeOffset?>("DateUserReceivedOn")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("dateuserreceivedon");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
 
                     b.Property<Guid>("MessageId")
                         .HasColumnType("uuid")
