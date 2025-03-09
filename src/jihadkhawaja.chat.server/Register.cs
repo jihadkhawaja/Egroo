@@ -133,7 +133,7 @@ public class ChatServiceBuilder
         ConfigureEntityServices(_services);
         ConfigureDatabase(_services);
         ConfigureSignalR(_services);
-        ConfigureSIPWebSocket(_services);
+        // ConfigureSIPWebSocket(_services);
 
         return _services;
     }

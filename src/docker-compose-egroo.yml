@@ -10,7 +10,7 @@ services:
     networks:
       - configurations_CN
     ports:
-      - "49117:8081"
+      - "49117:8080"
 
   egroo-web:
     image: jihadkhawaja/mobilechat-wasm-prod:latest
