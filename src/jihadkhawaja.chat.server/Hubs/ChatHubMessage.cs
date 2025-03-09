@@ -16,13 +16,20 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            if (message.SenderId == Guid.Empty)
+            // Validate the connected user is the same as sender
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null || connectedUser.Id != message.SenderId)
             {
                 return false;
             }
 
-            if (string.IsNullOrEmpty(message.Content)
-                || string.IsNullOrWhiteSpace(message.Content))
+            // Ensure the user is part of the channel
+            if (!await ChannelContainUser(message.ChannelId, message.SenderId))
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(message.Content))
             {
                 return false;
             }
@@ -30,7 +37,7 @@ namespace jihadkhawaja.chat.server.Hubs
             // Encrypt message content
             message.Content = _encryptionService.Encrypt(message.Content);
 
-            //save msg to db
+            // Save message to db
             message.Id = Guid.NewGuid();
             message.DateSent = DateTime.UtcNow;
             message.IsEncrypted = true;

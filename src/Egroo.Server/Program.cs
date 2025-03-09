@@ -100,6 +100,18 @@ builder.Services.AddAuthentication(options =>
                 context.Token = accessToken;
             }
             return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
+        {
+            // Allow unauthenticated access to the SignalR hub
+            if (context.Request.Path.StartsWithSegments("/chathub"))
+            {
+                context.NoResult();
+                context.Response.StatusCode = 200;
+                context.Response.Headers["Content-Type"] = "application/json";
+                context.Response.WriteAsync("{\"error\":\"Unauthenticated access allowed\"}");
+            }
+            return Task.CompletedTask;
         }
     };
 });

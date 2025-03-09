@@ -17,5 +17,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20);
         Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20);
         Task<bool> IsUsernameAvailable(string username);
+        Task<bool> DeleteUser();
     }
 }

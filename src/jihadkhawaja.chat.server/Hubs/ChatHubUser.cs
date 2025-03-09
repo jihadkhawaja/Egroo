@@ -401,5 +401,56 @@ namespace jihadkhawaja.chat.server.Hubs
             var user = await _userService.ReadFirst(x => x.Username == username);
             return user is null;
         }
+
+        //delete only the current user's account from request context
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> DeleteUser()
+        {
+            HttpContext? hc = Context.GetHttpContext();
+            if (hc == null)
+            {
+                return false;
+            }
+
+            var identity = hc.User.Identity as ClaimsIdentity;
+            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
+            if (userIdClaim == null)
+            {
+                return false;
+            }
+
+            Guid userId;
+            if (!Guid.TryParse(userIdClaim.Value, out userId))
+            {
+                return false;
+            }
+
+            try
+            {
+                //user
+                await _userService.Delete(x => x.Id == userId);
+                await _userFriendsService.Delete(x => x.UserId == userId || x.FriendUserId == userId);
+
+                //messages
+                await _messageService.Delete(x => x.SenderId == userId);
+                await _userPendingMessageService.Delete(x => x.UserId == userId);
+
+                //channels
+                await _channelUsersService.Delete(x => x.UserId == userId);
+                List<ChannelUser> channelUsers = (await _channelUsersService.Read(x => x.UserId == userId)).ToList();
+                foreach (ChannelUser cu in channelUsers)
+                {
+                    if ((await _channelUsersService.Read(x => x.ChannelId == cu.ChannelId)).Count() == 1)
+                    {
+                        await _channelService.Delete(x => x.Id == cu.ChannelId);
+                    }
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
     }
 }

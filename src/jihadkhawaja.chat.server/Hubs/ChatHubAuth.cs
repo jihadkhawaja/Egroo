@@ -17,7 +17,7 @@ namespace jihadkhawaja.chat.server.Hubs
             user.LastLoginDate = DateTimeOffset.UtcNow;
             user.DateUpdated = DateTimeOffset.UtcNow;
         }
-
+        [AllowAnonymous]
         public async Task<Operation.Response> SignUp(string username, string password)
         {
             if (!PatternMatchHelper.IsValidUsername(username) ||
@@ -91,7 +91,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 Message = "Failed to create user."
             };
         }
-
+        [AllowAnonymous]
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             username = username.ToLower();
@@ -158,7 +158,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 Token = token
             };
         }
-
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<Operation.Response> RefreshSession(string oldtoken)
         {
             var tokenHandler = new JwtSecurityTokenHandler();

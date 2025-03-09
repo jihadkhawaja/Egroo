@@ -5,17 +5,17 @@
     statsInterval: null,    // Interval ID for polling stats
     dotNetObject: null,
 
+    // Registers the DotNetObjectReference for sending ICE candidates via SignalR.
     registerSendIceCandidateToPeer: function (dotNetObject) {
         this.dotNetObject = dotNetObject;
         console.log("📡 DotNetObjectReference registered for SendIceCandidateToPeer");
-
-        // Send any previously queued ICE candidates
         this.iceCandidatesQueue.forEach(candidate => {
             this.dotNetObject.invokeMethodAsync('SendIceCandidate', JSON.stringify(candidate));
         });
         this.iceCandidatesQueue = []; // Clear the queue
     },
 
+    // Polls and logs audio RTP stats.
     pollAudioStats: function () {
         if (!this.pc) return;
         this.pc.getStats(null)
@@ -31,13 +31,22 @@
             .catch(err => console.error("❌ Error getting stats:", err));
     },
 
+    // Toggle local audio (monitoring) on/off.
+    toggleLocalAudio: function () {
+        const localAudio = document.getElementById("localAudio");
+        if (localAudio) {
+            localAudio.muted = !localAudio.muted;
+            console.log("Local audio muted:", localAudio.muted);
+        } else {
+            console.warn("Local audio element not found.");
+        }
+    },
+
     // Start a call as the caller: returns the SDP offer string.
     startCall: async function () {
         if (this.pc) {
             this.pc.close();
         }
-
-        // Use simple constraints for testing.
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             console.log("🎙️ Local stream acquired", this.localStream);
@@ -46,17 +55,15 @@
             console.error("❌ Error getting local stream:", err);
             return;
         }
-
-        // (Optional) For debugging, attach the local stream so you can hear your own mic.
+        // For debugging, attach the local stream to a local audio element (muted by default).
         const localAudio = document.getElementById("localAudio");
         if (localAudio) {
             localAudio.srcObject = this.localStream;
+            localAudio.muted = true; // start local monitor as off
             localAudio.play().catch(err => console.error("Error playing local audio:", err));
         }
-
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         this.pc = new RTCPeerConnection(config);
-
         if (this.localStream && this.localStream.getAudioTracks().length > 0) {
             let audioTrack = this.localStream.getAudioTracks()[0];
             console.log("Audio track details:", {
@@ -70,14 +77,12 @@
         } else {
             console.warn("⚠️ No local audio track available to add.");
         }
-
         this.pc.onsignalingstatechange = () => {
             console.log("Signaling state:", this.pc.signalingState);
         };
         this.pc.oniceconnectionstatechange = () => {
             console.log("ICE connection state:", this.pc.iceConnectionState);
         };
-
         this.pc.onicecandidate = event => {
             if (event.candidate) {
                 console.log("📡 Local ICE candidate:", event.candidate.candidate);
@@ -89,7 +94,6 @@
                 }
             }
         };
-
         this.pc.ontrack = event => {
             console.log("🎧 Remote track received:", event);
             const remoteAudio = document.getElementById("remoteAudio");
@@ -107,14 +111,11 @@
                 .then(() => console.log("✅ Remote audio playing"))
                 .catch(err => console.error("❌ Error playing remote audio:", err));
         };
-
         const offer = await this.pc.createOffer();
         await this.pc.setLocalDescription(offer);
         console.log("📞 Created offer:", offer.sdp);
-
         if (this.statsInterval) clearInterval(this.statsInterval);
         this.statsInterval = setInterval(() => this.pollAudioStats(), 5000);
-
         return offer.sdp;
     },
 
@@ -123,7 +124,6 @@
         if (this.pc) {
             this.pc.close();
         }
-
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
             console.log("🎙️ Local stream acquired for answering", this.localStream);
@@ -132,17 +132,15 @@
             console.error("❌ Error getting local stream:", err);
             return;
         }
-
-        // (Optional) For debugging, attach the local stream.
+        // For debugging, attach the local stream.
         const localAudio = document.getElementById("localAudio");
         if (localAudio) {
             localAudio.srcObject = this.localStream;
+            localAudio.muted = true; // start local monitor as off
             localAudio.play().catch(err => console.error("Error playing local audio (answer):", err));
         }
-
         const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
         this.pc = new RTCPeerConnection(config);
-
         if (this.localStream && this.localStream.getAudioTracks().length > 0) {
             let audioTrack = this.localStream.getAudioTracks()[0];
             console.log("Audio track (answer) details:", {
@@ -156,14 +154,12 @@
         } else {
             console.warn("⚠️ No local audio track available to add (answer).");
         }
-
         this.pc.onsignalingstatechange = () => {
             console.log("Signaling state (answer):", this.pc.signalingState);
         };
         this.pc.oniceconnectionstatechange = () => {
             console.log("ICE connection state (answer):", this.pc.iceConnectionState);
         };
-
         this.pc.onicecandidate = event => {
             if (event.candidate) {
                 console.log("📡 Local ICE candidate (answer):", event.candidate.candidate);
@@ -175,7 +171,6 @@
                 }
             }
         };
-
         this.pc.ontrack = event => {
             console.log("🎧 Remote track received (answer):", event);
             const remoteAudio = document.getElementById("remoteAudio");
@@ -193,15 +188,12 @@
                 .then(() => console.log("✅ Remote audio playing (answer)"))
                 .catch(err => console.error("❌ Error playing remote audio (answer):", err));
         };
-
         await this.pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
         const answer = await this.pc.createAnswer();
         await this.pc.setLocalDescription(answer);
         console.log("📞 Created answer:", answer.sdp);
-
         if (this.statsInterval) clearInterval(this.statsInterval);
         this.statsInterval = setInterval(() => this.pollAudioStats(), 5000);
-
         return answer.sdp;
     },
 

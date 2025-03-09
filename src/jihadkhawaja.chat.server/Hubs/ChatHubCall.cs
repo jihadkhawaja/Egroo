@@ -8,7 +8,6 @@ using System.Collections.Concurrent;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
-    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
     public partial class ChatHub : IChatCall
     {
         // Dictionaries for call state management.
@@ -29,6 +28,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
         // Caller initiates the call.
         // Receives the SDP offer (which includes audio media) from the caller.
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task CallUser(User targetUser, string sdpOffer)
         {
             if (targetUser == null) return;
@@ -73,6 +73,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
         // Callee answers the call.
         // Receives the SDP answer (which includes its own media) from the callee.
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task AnswerCall(bool acceptCall, User caller, string sdpAnswer)
         {
             var calleeId = GetUserIdFromContext();
@@ -114,6 +115,7 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         // Ends the call.
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task HangUp()
         {
             var userId = GetUserIdFromContext();
@@ -136,6 +138,7 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         // Used for exchanging ICE candidates and other SDP signaling.
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendSignal(string signal, string targetConnectionId)
         {
             var senderId = GetUserIdFromContext();
@@ -158,6 +161,7 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         // ICE candidate relay method (corrected to target specific peer).
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendIceCandidateToPeer(string candidateJson)
         {
             var senderId = GetUserIdFromContext();

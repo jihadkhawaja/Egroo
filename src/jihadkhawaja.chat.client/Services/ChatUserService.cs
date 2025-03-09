@@ -136,5 +136,15 @@ namespace jihadkhawaja.chat.client.Services
 
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);
         }
+
+        public async Task<bool> DeleteUser()
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
+        }
     }
 }

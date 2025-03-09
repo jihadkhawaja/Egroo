@@ -28,8 +28,8 @@
             <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
         </MudStack>
         <!-- Call Button -->
-        <MudTooltip Text="Call">
-            <MudIconButton Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
+        <MudTooltip Text="Call (WIP)">
+            <MudIconButton Disabled Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
         </MudTooltip>
     </MudStack>
 
@@ -112,7 +112,10 @@
             }
             else
             {
-                <MudStack Justify="Justify.Center">
+                <MudStack Justify="Justify.Center" Spacing="3">
+                    <MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="ToggleLocalMonitor">
+                        @(LocalMonitorEnabled ? "Turn Off Local Monitor" : "Turn On Local Monitor")
+                    </MudButton>
                     <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="HangUpCall">Hang Up</MudButton>
                 </MudStack>
             }
@@ -120,7 +123,7 @@
     </MudPopover>
 
     <!-- Audio Elements -->
-    @* <audio id="localAudio" autoplay playsinline controls style="display:block;"></audio> *@
+    <audio id="localAudio" autoplay playsinline style="display:none;"></audio>
     <audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
 </MudContainer>
 
@@ -142,6 +145,7 @@
     private string CallStatusMessage { get; set; } = string.Empty;
     private User? ActiveCallUser { get; set; }
     private User? TargetUser { get; set; }
+    private bool LocalMonitorEnabled { get; set; } = false;
 
     // Store the remote SDP offer when receiving an incoming call.
     private string? incomingOfferSdp;
@@ -292,12 +296,12 @@
     // Caller: Initiate the call.
     private async Task OnCallButtonClicked()
     {
-        // Request microphone permission and create caller RTCPeerConnection.
-        string offerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.startCall");
         var target = await GetTargetUser();
         if (target is null || string.IsNullOrEmpty(target.ConnectionId))
             return;
 
+        // Request microphone permission and create caller RTCPeerConnection.
+        string offerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.startCall");
         TargetUser = target;
         // Send the offer SDP via SignalR.
         await ChatCallService.CallUser(target, offerSdp);
@@ -306,6 +310,12 @@
         ActiveCallUser = target;
         CallStatusMessage = $"Calling {target.Username}...";
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleLocalMonitor()
+    {
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.toggleLocalAudio");
+        LocalMonitorEnabled = !LocalMonitorEnabled;
     }
 
     // Called when an incoming call arrives.
