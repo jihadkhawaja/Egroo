@@ -23,21 +23,21 @@ else
                     <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                         <MudGrid Justify="Justify.SpaceBetween">
                             <MudItem>
-                                <ScopeView Title="@user.Username" Subtitle="@user.LastLoginDate?.Date.ToShortDateString()" />
+                                <ScopeView Title=@user.Username Subtitle=@user.LastLoginDate?.Date.ToShortDateString() />
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
                                     @if (SessionStorage.User.Id == user.Id)
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                       Disabled />
+                                            OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" Disabled />
                                     }
                                     else
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                       OnClick="@(async () => await RemoveChannelUser(GetChannelId(), user.Id))" />
+                                                OnClick="@(async () => await RemoveChannelUser(GetChannelId()))" />
                                     }
-
+                                        
                                 </MudStack>
                             </MudItem>
                         </MudGrid>
@@ -92,11 +92,11 @@ else
         return Guid.Empty;
     }
 
-    private async Task RemoveChannelUser(Guid channelId, Guid userId)
+    private async Task RemoveChannelUser(Guid channelid)
     {
         bool? result = await DialogService.ShowMessageBox(
             "Warning",
-            "Are you sure you want to remove this user?",
+            "Are you sure you want to remove user?",
             yesText: "Remove", cancelText: "Cancel");
 
         if (!result.HasValue || !result.Value)
@@ -104,15 +104,15 @@ else
             return;
         }
 
-        if (await ChatChannelService.RemoveChannelUser(channelId, userId))
+        if (await ChatChannelService.LeaveChannel(channelid))
         {
-            Snackbar.Add("Removed user from channel", Severity.Success);
+            Snackbar.Add($"Removed user from channel", Severity.Success);
 
             await RefetchData();
         }
         else
         {
-            Snackbar.Add("User doesn't exist", Severity.Error);
+            Snackbar.Add($"User doesn't exist", Severity.Error);
         }
     }
 }

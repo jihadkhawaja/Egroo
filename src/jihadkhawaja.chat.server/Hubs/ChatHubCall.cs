@@ -1,216 +1,230 @@
-﻿using jihadkhawaja.chat.shared.Interfaces;
+﻿/*
+ * 
+ * Thanks Shhzdmrz for the app demo
+ * https://github.com/Shhzdmrz/SignalRCoreWebRTC
+ * 
+ */
+
+using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using SIPSorcery.Net;  // (Not used for RTCPeerConnection on server in this design)
-using System.Collections.Concurrent;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
     public partial class ChatHub : IChatCall
     {
-        // Dictionaries for call state management.
-        private static readonly ConcurrentDictionary<Guid, UserCall> _userCalls = new();
-        private static readonly ConcurrentDictionary<Guid, CallOffer> _callOffers = new();
-
-        // ICE server configuration (if needed for server‐side processing; not used for RTCPeerConnection here).
-        private static readonly RTCConfiguration _rtcConfig = new RTCConfiguration
-        {
-            iceServers = new List<RTCIceServer>
-            {
-                new RTCIceServer { urls = "stun:stun.sipsorcery.com" }
-                // Optionally add TURN servers here.
-            }
-        };
-
-        #region Call Functionality
-
-        // Caller initiates the call.
-        // Receives the SDP offer (which includes audio media) from the caller.
+        private readonly List<User> _Users = new();
+        private readonly List<UserCall> _UserCalls = new();
+        private readonly List<CallOffer> _CallOffers = new();
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task CallUser(User targetUser, string sdpOffer)
+        public async Task Join(string username)
         {
-            if (targetUser == null) return;
-
-            var callerId = GetUserIdFromContext();
-            if (!callerId.HasValue)
-                return;
-
-            var caller = await _userService.ReadFirst(x => x.Id == callerId.Value);
-            var callee = await _userService.ReadFirst(x => x.Id == targetUser.Id);
-
-            if (callee == null || !IsUserOnline(callee.Id))
+            // Add the new user
+            _Users.Add(new User
             {
-                var callerConns = GetUserConnectionIds(callerId.Value);
-                await Clients.Clients(callerConns)
-                    .SendAsync("CallDeclined", targetUser, "The user is not available.");
-                return;
-            }
+                Username = username,
+                ConnectionId = Context.ConnectionId
+            });
 
-            if (_userCalls.ContainsKey(callee.Id))
-            {
-                var callerConns = GetUserConnectionIds(callerId.Value);
-                await Clients.Clients(callerConns)
-                    .SendAsync("CallDeclined", targetUser, $"{callee.Username} is in another call.");
-                return;
-            }
-
-            // Create and store a call offer with the caller's SDP offer.
-            var offer = new CallOffer
-            {
-                Caller = caller,
-                Callee = callee,
-                SdpOffer = sdpOffer
-            };
-            _callOffers.TryAdd(callee.Id, offer);
-
-            // Relay the offer SDP to the callee.
-            var calleeConns = GetUserConnectionIds(callee.Id);
-            await Clients.Clients(calleeConns)
-                .SendAsync("IncomingCall", caller, sdpOffer);
-        }
-
-        // Callee answers the call.
-        // Receives the SDP answer (which includes its own media) from the callee.
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task AnswerCall(bool acceptCall, User caller, string sdpAnswer)
-        {
-            var calleeId = GetUserIdFromContext();
-            if (!calleeId.HasValue)
-                return;
-
-            var callee = await _userService.ReadFirst(x => x.Id == calleeId.Value);
-            var callOffer = _callOffers.Values.FirstOrDefault(o => o.Callee.Id == calleeId.Value);
-
-            if (callOffer == null || callee == null)
-            {
-                var callerConns = GetUserConnectionIds(caller.Id);
-                await Clients.Clients(callerConns)
-                    .SendAsync("CallDeclined", caller, "Call offer expired.");
-                return;
-            }
-
-            if (!acceptCall)
-            {
-                _callOffers.TryRemove(callOffer.Callee.Id, out _);
-                var callerConns = GetUserConnectionIds(callOffer.Caller.Id);
-                await Clients.Clients(callerConns)
-                    .SendAsync("CallDeclined", callOffer.Caller, $"{callee.Username} declined your call.");
-                return;
-            }
-
-            // Mark the call as active.
-            var userCall = new UserCall { Users = new List<User> { callOffer.Caller, callOffer.Callee } };
-            _userCalls.TryAdd(callOffer.Caller.Id, userCall);
-            _userCalls.TryAdd(callee.Id, userCall);
-            _callOffers.TryRemove(callOffer.Callee.Id, out _);
-
-            // Relay the SDP answer back to the caller.
-            var callerConnsAccepted = GetUserConnectionIds(callOffer.Caller.Id);
-            await Clients.Clients(callerConnsAccepted)
-                .SendAsync("CallAccepted", callOffer.Callee, sdpAnswer);
-
+            // Send down the new list to all clients
             await SendUserListUpdate();
         }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task CallUser(User targetConnectionId)
+        {
+            var callingUser = _Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            var targetUser = _Users.SingleOrDefault(u => u.ConnectionId == targetConnectionId.ConnectionId);
 
-        // Ends the call.
+            // Make sure the person we are trying to call is still here
+            if (targetUser == null)
+            {
+                // If not, let the caller know
+                await CallDeclined(targetConnectionId, "The user you called has left.");
+                return;
+            }
+
+            // And that they aren't already in a call
+            if (GetUserCall(targetUser.ConnectionId) != null)
+            {
+                await CallDeclined(targetConnectionId, string.Format("{0} is already in a call.", targetUser.Username));
+                return;
+            }
+
+            // They are here, so tell them someone wants to talk
+            await IncomingCall(callingUser);
+
+            // Create an offer
+            _CallOffers.Add(new CallOffer
+            {
+                Caller = callingUser,
+                Callee = targetUser
+            });
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task AnswerCall(bool acceptCall, User targetConnectionId)
+        {
+            var callingUser = _Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            var targetUser = _Users.SingleOrDefault(u => u.ConnectionId == targetConnectionId.ConnectionId);
+
+            // This can only happen if the server-side came down and clients were cleared, while the user
+            // still held their browser session.
+            if (callingUser == null)
+            {
+                return;
+            }
+
+            // Make sure the original caller has not left the page yet
+            if (targetUser == null)
+            {
+                await CallEnded(targetConnectionId, "The other user in your call has left.");
+                return;
+            }
+
+            // Send a decline message if the callee said no
+            if (acceptCall == false)
+            {
+                await CallDeclined(callingUser, string.Format("{0} did not accept your call.", callingUser.Username));
+                return;
+            }
+
+            // Make sure there is still an active offer.  If there isn't, then the other use hung up before the Callee answered.
+            var offerCount = _CallOffers.RemoveAll(c => c.Callee.ConnectionId == callingUser.ConnectionId
+                                                  && c.Caller.ConnectionId == targetUser.ConnectionId);
+            if (offerCount < 1)
+            {
+                await CallEnded(targetConnectionId, string.Format("{0} has already hung up.", targetUser.Username));
+                return;
+            }
+
+            // And finally... make sure the user hasn't accepted another call already
+            if (GetUserCall(targetUser.ConnectionId) != null)
+            {
+                // And that they aren't already in a call
+                await CallDeclined(targetConnectionId, string.Format("{0} chose to accept someone elses call instead of yours :(", targetUser.Username));
+                return;
+            }
+
+            // Remove all the other offers for the call initiator, in case they have multiple calls out
+            _CallOffers.RemoveAll(c => c.Caller.ConnectionId == targetUser.ConnectionId);
+
+            // Create a new call to match these folks up
+            _UserCalls.Add(new UserCall
+            {
+                Users = new List<User> { callingUser, targetUser }
+            });
+
+            // Tell the original caller that the call was accepted
+            await CallAccepted(callingUser);
+
+            // Update the user list, since thes two are now in a call
+            await SendUserListUpdate();
+        }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task HangUp()
         {
-            var userId = GetUserIdFromContext();
-            if (!userId.HasValue)
-                return;
+            var callingUser = _Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
 
-            if (_userCalls.TryRemove(userId.Value, out var call))
+            if (callingUser == null)
             {
-                foreach (var otherUser in call.Users.Where(u => u.Id != userId.Value))
+                return;
+            }
+
+            var currentCall = GetUserCall(callingUser.ConnectionId);
+
+            // Send a hang up message to each user in the call, if there is one
+            if (currentCall != null)
+            {
+                foreach (var user in currentCall.Users.Where(u => u.ConnectionId != callingUser.ConnectionId))
                 {
-                    _userCalls.TryRemove(otherUser.Id, out _);
-                    var otherUserConns = GetUserConnectionIds(otherUser.Id);
-                    await Clients.Clients(otherUserConns)
-                        .SendAsync("CallEnded", otherUser, "The other party ended the call.");
+                    await CallEnded(callingUser, string.Format("{0} has hung up.", callingUser.Username));
+                }
+
+                // Remove the call from the list if there is only one (or none) person left.  This should
+                // always trigger now, but will be useful when we implement conferencing.
+                currentCall.Users.RemoveAll(u => u.ConnectionId == callingUser.ConnectionId);
+                if (currentCall.Users.Count < 2)
+                {
+                    _UserCalls.Remove(currentCall);
                 }
             }
 
-            // Clients handle their own peer connection cleanup.
+            // Remove all offers initiating from the caller
+            _CallOffers.RemoveAll(c => c.Caller.ConnectionId == callingUser.ConnectionId);
+
             await SendUserListUpdate();
         }
 
-        // Used for exchanging ICE candidates and other SDP signaling.
+        // WebRTC Signal Handler
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendSignal(string signal, string targetConnectionId)
         {
-            var senderId = GetUserIdFromContext();
-            var target = await GetUserFromConnectionId(targetConnectionId);
+            var callingUser = _Users.SingleOrDefault(u => u.ConnectionId == Context.ConnectionId);
+            var targetUser = _Users.SingleOrDefault(u => u.ConnectionId == targetConnectionId);
 
-            if (!senderId.HasValue || target == null)
-                return;
-
-            bool activeCall = _userCalls.TryGetValue(senderId.Value, out var call) &&
-                              call.Users.Any(u => u.Id == target.Id);
-            bool pendingOffer = _callOffers.ContainsKey(target.Id) || _callOffers.ContainsKey(senderId.Value);
-
-            if (activeCall || pendingOffer)
+            // Make sure both users are valid
+            if (callingUser == null || targetUser == null)
             {
-                var sender = await _userService.ReadFirst(x => x.Id == senderId.Value);
-                var targetConns = GetUserConnectionIds(target.Id);
-                await Clients.Clients(targetConns)
-                    .SendAsync("ReceiveSignal", sender, signal);
+                return;
+            }
+
+            // Make sure that the person sending the signal is in a call
+            var userCall = GetUserCall(callingUser.ConnectionId);
+
+            // ...and that the target is the one they are in a call with
+            if (userCall != null && userCall.Users.Exists(u => u.ConnectionId == targetUser.ConnectionId))
+            {
+                // These folks are in a call together, let's let em talk WebRTC
+                await ReceiveSignal(callingUser, signal);
             }
         }
 
-        // ICE candidate relay method (corrected to target specific peer).
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task SendIceCandidateToPeer(string candidateJson)
-        {
-            var senderId = GetUserIdFromContext();
-            if (!senderId.HasValue)
-                return;
-
-            // Check if the sender is in an active call
-            if (_userCalls.TryGetValue(senderId.Value, out var call))
-            {
-                // Send to all other users in the call (for group calls, adjust if 1:1)
-                foreach (var user in call.Users.Where(u => u.Id != senderId.Value))
-                {
-                    var targetConns = GetUserConnectionIds(user.Id);
-                    Console.WriteLine($"Forwarding ICE candidate to user {user.Id} via connections: {string.Join(",", targetConns)}");
-                    await Clients.Clients(targetConns).SendAsync("ReceiveIceCandidate", candidateJson);
-                }
-            }
-            else
-            {
-                // Check if there's a pending offer (caller or callee)
-                var pendingOffer = _callOffers.Values.FirstOrDefault(o =>
-                    o.Caller.Id == senderId.Value || o.Callee.Id == senderId.Value);
-                if (pendingOffer != null)
-                {
-                    var targetId = pendingOffer.Caller.Id == senderId.Value
-                        ? pendingOffer.Callee.Id
-                        : pendingOffer.Caller.Id;
-                    var targetConns = GetUserConnectionIds(targetId);
-                    Console.WriteLine($"Forwarding ICE candidate to user {targetId} via connections: {string.Join(",", targetConns)}");
-                    await Clients.Clients(targetConns).SendAsync("ReceiveIceCandidate", candidateJson);
-                }
-            }
-        }
+        #region Private Helpers
 
         private async Task SendUserListUpdate()
         {
-            var onlineUsers = new List<User>();
-            foreach (var userId in _userConnections.Keys)
-            {
-                var user = await _userService.ReadFirst(x => x.Id == userId);
-                if (user != null)
-                {
-                    user.IsOnline = true;
-                    user.InCall = _userCalls.ContainsKey(userId);
-                    onlineUsers.Add(user);
-                }
-            }
-            await Clients.All.SendAsync("UpdateUserList", onlineUsers);
+            _Users.ForEach(u => u.InCall = (GetUserCall(u.ConnectionId) != null));
+            await UpdateUserList(_Users);
         }
+
+        private UserCall GetUserCall(string connectionId)
+        {
+            var matchingCall =
+                _UserCalls.SingleOrDefault(uc => uc.Users.SingleOrDefault(u => u.ConnectionId == connectionId) != null);
+            return matchingCall;
+        }
+
+        public async Task UpdateUserList(List<User> userList)
+        {
+            await Clients.All.SendAsync("UpdateUserList", userList);
+        }
+
+        public async Task CallAccepted(User acceptingUser)
+        {
+            await Clients.All.SendAsync("CallAccepted", acceptingUser);
+        }
+
+        public async Task CallDeclined(User decliningUser, string reason)
+        {
+            await Clients.All.SendAsync("CallDeclined", reason);
+        }
+
+        public async Task IncomingCall(User callingUser)
+        {
+            await Clients.All.SendAsync("IncomingCall", callingUser);
+        }
+
+        public async Task ReceiveSignal(User signalingUser, string signal)
+        {
+            await Clients.All.SendAsync("ReceiveSignal", signal);
+        }
+
+        public Task CallEnded(User signalingUser, string signal)
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion
     }
 }

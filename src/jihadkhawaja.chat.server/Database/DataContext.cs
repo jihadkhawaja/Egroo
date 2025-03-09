@@ -1,5 +1,4 @@
 ﻿using jihadkhawaja.chat.shared.Models;
-using jihadkhawaja.infrastructure.Database.Conventions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -12,12 +11,6 @@ namespace jihadkhawaja.chat.server.Database
         public DataContext(IConfiguration configuration)
         {
             Configuration = configuration;
-        }
-
-        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
-        {
-            base.ConfigureConventions(configurationBuilder);
-            configurationBuilder.Conventions.Add(_ => new LowerCaseNamingConvention());
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder options)

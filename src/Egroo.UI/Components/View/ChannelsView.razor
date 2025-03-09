@@ -1,6 +1,4 @@
-﻿@using Microsoft.AspNetCore.SignalR.Client
-@using jihadkhawaja.chat.client.Core
-@inherits ProtectedViewBase
+﻿@inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
@@ -18,7 +16,7 @@ else
         <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h6">Channels</MudText>
             <MudButton OnClick="CreateChannel" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-            StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
+                       StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
         </MudStack>
         @if (CurrentUserChannels is null)
         {
@@ -31,27 +29,27 @@ else
                 <MudPaper Outlined="true" Class="pa-2 mb-4">
                     <MudStack>
                         <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
-                        <MudTextField T="string" Placeholder="Search friends"
-                        Value="@SearchQuery" TextChanged="OnSearchFriends"
-                        Immediate Class="mb-2"></MudTextField>
+                         <MudTextField T="string" Placeholder="Search friends"
+                                       Value="@SearchQuery" TextChanged="OnSearchFriends"
+                                       Immediate Class="mb-2"></MudTextField>
 
-                        @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
-                        {
-                            <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                                <MudGrid Justify="Justify.SpaceBetween">
-                                    <MudItem>
+                            @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                            {
+                                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                                     <MudGrid Justify="Justify.SpaceBetween">
+                                         <MudItem>
                                         <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
-                                    </MudItem>
-                                    <MudItem>
-                                        <MudStack Row Style="height:100%;">
-                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                            Icon="@Icons.Material.Filled.Add" Color="Color.Success"
-                                            OnClick="@(async () => await AddUserToChannel(friend.Username))" />
-                                        </MudStack>
-                                    </MudItem>
-                                </MudGrid>
-                            </MudPaper>
-                        }
+                                         </MudItem>
+                                         <MudItem>
+                                             <MudStack Row Style="height:100%;">
+                                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
+                                                                Icon="@Icons.Material.Filled.Add" Color="Color.Success"
+                                                            OnClick="@(async () => await AddUserToChannel(friend.Username))" />
+                                             </MudStack>
+                                         </MudItem>
+                                     </MudGrid>
+                                 </MudPaper>
+                            }
                     </MudStack>
                 </MudPaper>
             }
@@ -69,16 +67,16 @@ else
                                     @if (channel.Value)
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add"
-                                        OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                                       OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Edit"
-                                        OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.Title)))" />
+                                                       OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.Title)))" />
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                        OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                                       OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
                                     }
                                     else
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Error"
-                                        OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
+                                                       OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
                                     }
                                 </MudStack>
                             </MudItem>
@@ -104,11 +102,6 @@ else
 
     private Guid selectedChannelId { get; set; }
 
-    protected override void OnInitialized()
-    {
-        RegisterHubEvents();
-    }
-
     protected override async Task OnAccess()
     {
         CurrentUserChannels = await GetChannels();
@@ -127,7 +120,7 @@ else
             return;
         }
 
-        SearchedUserFriends = await ChatUserService.SearchUserFriends(value) ?? Enumerable.Empty<User>();
+        SearchedUserFriends = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
 
         await InvokeAsync(StateHasChanged);
     }
@@ -281,15 +274,6 @@ else
         {
             Snackbar.Add($"Something went wrong!", Severity.Error);
         }
-    }
-
-    private void RegisterHubEvents()
-    {
-        MobileChatSignalR.HubConnection?.On<Guid>("ChannelChange", async (channelId) =>
-        {
-            CurrentUserChannels = await GetChannels();
-            await InvokeAsync(StateHasChanged);
-        });
     }
 
     private void NavigateTo(string link)

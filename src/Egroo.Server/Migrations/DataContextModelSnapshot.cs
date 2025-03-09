@@ -26,264 +26,201 @@ namespace Egroo.Server.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
-                    b.ToTable("channels");
+                    b.ToTable("Channels");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ChannelId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("channelid");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsAdmin")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isadmin");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("channelusers");
+                    b.ToTable("ChannelUsers");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Message", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("ChannelId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("channelid");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateSeen")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateseen");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateSent")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datesent");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("ReferenceId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("referenceid");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SenderId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("senderid");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("messages");
+                    b.ToTable("Messages");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("AvatarBase64")
-                        .HasColumnType("text")
-                        .HasColumnName("avatarbase64");
+                        .HasColumnType("text");
+
+                    b.Property<string>("ConnectionId")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("InCall")
-                        .HasColumnType("boolean")
-                        .HasColumnName("incall");
+                        .HasColumnType("boolean");
 
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lastlogindate");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Password")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("password");
+                        .HasColumnType("text");
 
                     b.Property<string>("Role")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("role");
+                        .HasColumnType("text");
 
                     b.Property<string>("Username")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("username");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("users");
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFriend", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("DateAcceptedOn")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateacceptedon");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("FriendUserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("frienduserid");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("usersfriends");
+                    b.ToTable("UsersFriends");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserPendingMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Content")
-                        .HasColumnType("text")
-                        .HasColumnName("content");
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset?>("DateCreated")
                         .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DateUserReceivedOn")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateuserreceivedon");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("MessageId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("messageid");
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.ToTable("userspendingmessages");
+                    b.ToTable("UsersPendingMessages");
                 });
 #pragma warning restore 612, 618
         }
