@@ -1,9 +1,13 @@
 ﻿@using BlazorDexie.JsModule
+@using Egroo.UI.Helpers
 @using Microsoft.AspNetCore.SignalR.Client
+@using MudBlazor
 @using jihadkhawaja.chat.client
 @using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Core
 @using jihadkhawaja.chat.client.Services
+@using jihadkhawaja.chat.shared.Models
+@using System.Net.Http.Json
 
 @inherits ProtectedViewBase
 
@@ -11,20 +15,31 @@
 @inject StorageService StorageService
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
+@inject IChatChannel ChatChannelService
+@inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexStart" Class="mb-2">
-        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
-        <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+    <!-- Header with Back, Title, and Call Button -->
+    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+        <MudStack Row AlignItems="AlignItems.Center">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
+            <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+        </MudStack>
+        <!-- Call Button -->
+        <MudTooltip Text="Call (WIP)">
+            <MudIconButton Disabled Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
+        </MudTooltip>
     </MudStack>
 
+    <!-- Messages Container -->
     @if (!IsLoading)
     {
         <MudStack>
             <MudPaper id="messages-container" Elevation="0" Class="pa-4"
-                Style="height: calc(100vh - 280px); overflow-x:hidden;overflow-y:auto;">
-                @if (Messages.Count() == 0)
+                      Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
+                @if (!Messages.Any())
                 {
                     <MudText>No Messages</MudText>
                 }
@@ -33,24 +48,24 @@
                     <MudStack>
                         @foreach (var message in Messages)
                         {
-                            @if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
+                            if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
                                              SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
                                              SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else
                             {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content" 
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
                                              IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
                                              SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
@@ -60,119 +75,135 @@
             </MudPaper>
             <MudStack Row>
                 <MudTextField @ref="inputMudTextField" DisableUnderLine
-                          Value="InputContent"
-                          ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
-                          InputMode="InputMode.text" InputType="InputType.Text"
-                          AutoFocus="true"
-                          Label="Your message here" Variant="Variant.Filled" @onkeydown="@EnterPressed"
-                          Lines="1" MaxLength="MaxMessageLength"
-                          Counter="MaxMessageLength" Disabled="InputDisabled" />
+                              Value="InputContent"
+                              ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                              InputMode="InputMode.text" InputType="InputType.Text"
+                              AutoFocus="true"
+                              Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
+                              Lines="1" MaxLength="MaxMessageLength"
+                              Counter="MaxMessageLength" Disabled="InputDisabled" />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
-                                  DisableElevation Class="mt-1 mb-6"
+                               DisableElevation Class="mt-1 mb-6"
                                OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
             </MudStack>
         </MudStack>
     }
     else
     {
-        <div style="width:100%;height:100%;text-align:center;">
+        <div style="width:100%; height:100%; text-align:center;">
             <MudProgressCircular Indeterminate Size="Size.Medium" />
         </div>
     }
+
+    <!-- Call Overlay UI -->
+    <MudOverlay DarkBackground Visible="@IsCalling" />
+    <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter"
+                TransformOrigin="Origin.CenterCenter"
+                OverflowBehavior="OverflowBehavior.FlipOnOpen"
+                Fixed Paper>
+        <MudItem Class="pa-4">
+            <MudText Class="pb-2" Typo="Typo.h6">@CallStatusMessage</MudText>
+            @if (IsIncomingCall)
+            {
+                <MudStack Row Spacing="3" Justify="Justify.Center">
+                    <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="AcceptCall">Accept</MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeclineCall">Decline</MudButton>
+                </MudStack>
+            }
+            else
+            {
+                <MudStack Justify="Justify.Center" Spacing="3">
+                    <MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="ToggleLocalMonitor">
+                        @(LocalMonitorEnabled ? "Turn Off Local Monitor" : "Turn On Local Monitor")
+                    </MudButton>
+                    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="HangUpCall">Hang Up</MudButton>
+                </MudStack>
+            }
+        </MudItem>
+    </MudPopover>
+
+    <!-- Audio Elements -->
+    <audio id="localAudio" autoplay playsinline style="display:none;"></audio>
+    <audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
 </MudContainer>
 
 @code {
-    [Inject] ISnackbar Snackbar { get; set; } = null!;
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? ChannelId { get; set; }
 
-    [Parameter]
-    public string? Title { get; set; }
-    [Parameter]
-    public string? ChannelId { get; set; }
-
-    private List<Message> Messages { get; set; }
+    private List<Message> Messages { get; set; } = new();
     private bool IsLoading { get; set; } = true;
-
-    MudTextField<string> inputMudTextField { get; set; } = null!;
+    private MudTextField<string> inputMudTextField { get; set; } = null!;
     private string? InputContent { get; set; }
-    private int MessageLinesCount { get; set; }
     private int MaxMessageLength { get; set; } = 300;
     private bool InputDisabled { get; set; }
-
     private EgrooDB CacheDB { get; set; } = null!;
+
+    // Call-related state
+    private bool IsCalling { get; set; } = false;
+    private bool IsIncomingCall { get; set; } = false;
+    private string CallStatusMessage { get; set; } = string.Empty;
+    private User? ActiveCallUser { get; set; }
+    private User? TargetUser { get; set; }
+    private bool LocalMonitorEnabled { get; set; } = false;
+
+    // Store the remote SDP offer when receiving an incoming call.
+    private string? incomingOfferSdp;
 
     protected override void OnInitialized()
     {
-        HubEvents();
-
-        //init Cached DB
+        RegisterMessagingEvents();
+        RegisterCallEvents();
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
-
         Messages = new();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Register SendIceCandidateToPeer DotNetObjectReference
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.registerSendIceCandidateToPeer", DotNetObjectReference.Create(this));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            //get pending messages
             await ChatMessageService.SendPendingMessages();
-
-            //fetch cached messages
             var messages = (await CacheDB.Messages
-            .Where(nameof(Message.ChannelId))
-            .IsEqual(GetChannelId())
-            .Limit(50).ToList()) ?? new();
-
-            //add cached messages
+                .Where(nameof(Message.ChannelId))
+                .IsEqual(GetChannelId())
+                .Limit(50).ToList()) ?? new List<Message>();
             Messages.AddRange(messages);
-
-            //reorder
-            Messages = Messages.OrderBy(x => x.DateCreated)
-            .ToList();
-
-            //update any unseen message
-            _= UpdateUnseenMessages();
-
+            Messages = Messages.OrderBy(x => x.DateCreated).ToList();
+            _ = UpdateUnseenMessages();
             IsLoading = false;
-
             await InvokeAsync(StateHasChanged);
-
             ScrollToMessagesEnd();
         }
-
         await base.OnAfterRenderAsync(firstRender);
     }
 
     private Guid GetChannelId()
     {
-        Guid id;
-        if (Guid.TryParse(ChannelId, out id))
-        {
-            return id;
-        }
-
-        return Guid.Empty;
+        return Guid.TryParse(ChannelId, out Guid id) ? id : Guid.Empty;
     }
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrEmpty(InputContent) || string.IsNullOrWhiteSpace(InputContent))
-        {
+        if (string.IsNullOrWhiteSpace(InputContent))
             return;
-        }
 
         InputDisabled = true;
-
         InputContent = InputContent.Trim();
 
         Message message = new()
-        {
-            ChannelId = GetChannelId(),
-            DisplayName = SessionStorage?.User?.Username,
-            Content = InputContent,
-            SenderId = SessionStorage.User.Id,
-        };
+            {
+                ChannelId = GetChannelId(),
+                DisplayName = SessionStorage?.User?.Username,
+                Content = InputContent,
+                SenderId = SessionStorage.User.Id,
+            };
 
         if (await ChatMessageService.SendMessage(message))
         {
@@ -181,11 +212,9 @@
         }
         else
         {
-            Snackbar.Add("Failed to send message, Please check your connection and try again", MudBlazor.Severity.Error);
+            Snackbar.Add("Failed to send message, please check your connection and try again.", Severity.Error);
         }
-
         InputDisabled = false;
-
         await InvokeAsync(StateHasChanged);
     }
 
@@ -202,91 +231,221 @@
         JSRuntime.InvokeVoidAsync("scrollToEnd", "messages-container");
     }
 
-    private bool IsCurrentUserMessage(Guid senderid)
-    {
-        if (senderid == SessionStorage.User.Id)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+    private bool IsCurrentUserMessage(Guid senderId) => senderId == SessionStorage.User?.Id;
 
-    private void OnInputContent(string text)
-    {
-        InputContent = text;
-    }
+    private void OnInputContent(string text) => InputContent = text;
 
     private async Task UpdateUnseenMessages()
     {
-        for (int i = 0; i < Messages.Count(); i++)
+        foreach (var msg in Messages)
         {
-            if (Messages[i].DateSeen is null && Messages[i].SenderId != SessionStorage.User?.Id)
+            if (msg.DateSeen is null && msg.SenderId != SessionStorage.User?.Id)
             {
-                await ChatMessageService.UpdateMessage(Messages[i]);
+                await ChatMessageService.UpdateMessage(msg);
             }
         }
     }
 
-    private void HubEvents()
+    private void RegisterMessagingEvents()
     {
         MobileChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
-            {
                 return;
-            }
 
-            Message? cachedMessage = Messages.FirstOrDefault(x => x.Id == message.Id);
-            if (cachedMessage is not null)
+            if (Messages.Any(x => x.Id == message.Id))
             {
                 await ChatMessageService.UpdatePendingMessage(message.Id);
                 return;
             }
 
-            User? senderUser = await ChatUserService.GetUserPublicInfo(message.SenderId);
+            var senderUser = await ChatUserService.GetUserPublicInfo(message.SenderId);
             message.DisplayName = senderUser?.Username;
-
             Messages.Add(message);
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
-            {
                 await ChatMessageService.UpdateMessage(message);
-            }
 
             await CacheDB.Messages.Add(message);
-
             await ChatMessageService.UpdatePendingMessage(message.Id);
-
             await InvokeAsync(StateHasChanged);
-
             ScrollToMessagesEnd();
         });
 
         MobileChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
-            {
                 return;
-            }
 
-            for (int i = 0; i < Messages.Count(); i++)
+            for (int i = 0; i < Messages.Count; i++)
             {
                 if (message.ReferenceId == Messages[i].ReferenceId)
                 {
                     Messages[i].Id = message.Id;
-                    Messages[i].DateSeen = message.DateUpdated;
                     Messages[i].DateSeen = message.DateSeen;
-
                     await CacheDB.Messages.Put(Messages[i], Messages[i].ReferenceId);
-
                     await InvokeAsync(StateHasChanged);
-
                     return;
                 }
             }
         });
     }
+
+    #region Call UI & Behavior
+
+    // Caller: Initiate the call.
+    private async Task OnCallButtonClicked()
+    {
+        var target = await GetTargetUser();
+        if (target is null || string.IsNullOrEmpty(target.ConnectionId))
+            return;
+
+        // Request microphone permission and create caller RTCPeerConnection.
+        string offerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.startCall");
+        TargetUser = target;
+        // Send the offer SDP via SignalR.
+        await ChatCallService.CallUser(target, offerSdp);
+        IsCalling = true;
+        IsIncomingCall = false;
+        ActiveCallUser = target;
+        CallStatusMessage = $"Calling {target.Username}...";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleLocalMonitor()
+    {
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.toggleLocalAudio");
+        LocalMonitorEnabled = !LocalMonitorEnabled;
+    }
+
+    // Called when an incoming call arrives.
+    private async Task OnIncomingCall(User callingUser, string sdpOffer)
+    {
+        // Store the received SDP offer for later use.
+        incomingOfferSdp = sdpOffer;
+        IsCalling = true;
+        IsIncomingCall = true;
+        ActiveCallUser = callingUser;
+        CallStatusMessage = $"Incoming call from {callingUser.Username}";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task<User?> GetTargetUser()
+    {
+        var channelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
+        if (channelUsers == null || channelUsers.Length == 0 || SessionStorage.User is null)
+        {
+            Snackbar.Add("No users in this channel.", Severity.Warning);
+            return null;
+        }
+
+        var availableUsers = channelUsers
+            .Where(u => u.Id != SessionStorage.User!.Id && u.IsOnline)
+            .ToList();
+
+        if (!availableUsers.Any())
+        {
+            Snackbar.Add("No online users available to call.", Severity.Warning);
+            return null;
+        }
+
+        return availableUsers.First();
+    }
+
+    // Callee: Accept the incoming call.
+    private async Task AcceptCall()
+    {
+        if (ActiveCallUser is not null && incomingOfferSdp != null)
+        {
+            // Use the stored offer to answer.
+            string answerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.answerCall", incomingOfferSdp);
+            await ChatCallService.AnswerCall(true, ActiveCallUser, answerSdp);
+            IsIncomingCall = false;
+            CallStatusMessage = $"In call with {ActiveCallUser.Username}";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task DeclineCall()
+    {
+        if (ActiveCallUser is not null)
+        {
+            await ChatCallService.AnswerCall(false, ActiveCallUser, "");
+            IsCalling = false;
+            IsIncomingCall = false;
+            ActiveCallUser = null;
+            CallStatusMessage = "Call declined";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task HangUpCall()
+    {
+        await ChatCallService.HangUp();
+        // Stop the local audio stream (microphone) by calling closePeer.
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.closePeer");
+        IsCalling = false;
+        ActiveCallUser = null;
+        CallStatusMessage = "Call ended";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task SendIceCandidate(string candidateJson)
+    {
+        Console.WriteLine($"Received ICE Candidate: {candidateJson}");
+        // Forward the candidate via SignalR only (not SDP)
+        await ChatCallService.SendIceCandidateToPeer(candidateJson);
+    }
+
+    private void RegisterCallEvents()
+    {
+        // Register the incoming call event.
+        ChatCallService.OnIncomingCall += async (callingUser, sdpOffer) =>
+        {
+            await OnIncomingCall(callingUser, sdpOffer);
+        };
+
+        ChatCallService.OnCallAccepted += async (acceptingUser, sdpAnswer) =>
+        {
+            // For the caller: set remote description using the SDP answer.
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.setRemoteDescription", sdpAnswer);
+            IsCalling = true;
+            IsIncomingCall = false;
+            ActiveCallUser = acceptingUser;
+            CallStatusMessage = $"Call accepted by {acceptingUser.Username}";
+            await InvokeAsync(StateHasChanged);
+        };
+
+        ChatCallService.OnCallDeclined += async (decliningUser, reason) =>
+        {
+            IsCalling = false;
+            ActiveCallUser = null;
+            CallStatusMessage = $"Call declined: {reason}";
+            await InvokeAsync(StateHasChanged);
+        };
+
+        ChatCallService.OnCallEnded += async (endedUser, message) =>
+        {
+            // Ensure both sides close their local media streams.
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.closePeer");
+            IsCalling = false;
+            ActiveCallUser = null;
+            CallStatusMessage = $"Call ended: {message}";
+            await InvokeAsync(StateHasChanged);
+        };
+
+        ChatCallService.OnReceiveSignal += async (signalingUser, signal) =>
+        {
+            // If the signal is an ICE candidate, add it.
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.addIceCandidate", signal);
+            await InvokeAsync(StateHasChanged);
+        };
+
+        ChatCallService.OnUpdateUserList += async (users) =>
+        {
+            await InvokeAsync(StateHasChanged);
+        };
+    }
+    #endregion
 }

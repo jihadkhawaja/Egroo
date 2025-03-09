@@ -27,14 +27,24 @@ namespace jihadkhawaja.chat.client.Services
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(AddChannelUsers), channelId, friendEmailorusername);
         }
 
-        public async Task<User[]?> GetChannelUsers(Guid channelid)
+        public async Task<User[]?> GetChannelUsers(Guid channelId)
         {
             if (MobileChatSignalR.HubConnection is null)
             {
                 throw new NullReferenceException("MobileChatClient SignalR not initialized");
             }
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<User[]>(nameof(GetChannelUsers), channelid);
+            return await MobileChatSignalR.HubConnection.InvokeAsync<User[]>(nameof(GetChannelUsers), channelId);
+        }
+
+        public async Task<Channel?> GetChannel(Guid channelId)
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            return await MobileChatSignalR.HubConnection.InvokeAsync<Channel>(nameof(GetChannel), channelId);
         }
 
         public async Task<Channel[]?> GetUserChannels()
@@ -85,6 +95,16 @@ namespace jihadkhawaja.chat.client.Services
             }
 
             return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(LeaveChannel), channelId);
+        }
+
+        public async Task<bool> RemoveChannelUser(Guid channelId, Guid userId)
+        {
+            if (MobileChatSignalR.HubConnection is null)
+            {
+                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+            }
+
+            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(RemoveChannelUser), channelId, userId);
         }
     }
 }

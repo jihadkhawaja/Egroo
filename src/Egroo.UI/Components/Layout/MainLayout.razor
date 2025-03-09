@@ -16,8 +16,16 @@
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
             <MudSpacer />
-            <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
-            <MudText Class="ml-4">@SessionStorage?.User?.Username</MudText>
+            <MudText Class="mr-4">@SessionStorage?.User?.Username</MudText>
+            <MudMenu>
+                <ActivatorContent>
+                    <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                </ActivatorContent>
+                <ChildContent>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Logout" IconColor="Color.Error"
+                    Label="Logout" Href="settings">Logout</MudMenuItem>
+                </ChildContent>
+            </MudMenu>
         </MudAppBar>
         <MudDrawer @bind-Open="IsDrawerOpen" Elevation="1">
             <MudDrawerHeader>
