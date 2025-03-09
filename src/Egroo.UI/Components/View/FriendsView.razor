@@ -1,4 +1,6 @@
-﻿@inherits ProtectedViewBase
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@using jihadkhawaja.chat.client.Core
+@inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
 @inject IChatUser ChatUserService
@@ -89,7 +91,7 @@ else
                                     </MudTooltip>
                                 }                               
                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                       OnClick="@(async () => await RemoveFriend(friend.Username))" />
+                                OnClick="@(async () => await RemoveFriend(friend.Username))" />
                             </MudStack>
                         </MudItem>
                     </MudGrid>
@@ -111,6 +113,11 @@ else
     private bool IsBusy { get; set; } = true;
 
     private bool addFriendPopOverIsOpen;
+
+    protected override void OnInitialized()
+    {
+        RegisterFriendsEvents();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -172,17 +179,27 @@ else
 
     private async Task<User[]> GetFriendsRequest()
     {
-        UserFriend[] users = await ChatUserService.GetUserFriendRequests(SessionStorage.User.Id);
-        User[] friendRequests = new User[users.Length];
-
-        for (int i = 0; i < users.Length; i++)
+        User? sessionUser = SessionStorage.User;
+        if (sessionUser == null)
         {
-            User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
-            user.Id = users[i].UserId;
-            friendRequests[i] = user;
+            return Array.Empty<User>();
         }
 
-        return friendRequests;
+        UserFriend[]? userFriendRequests = await ChatUserService.GetUserFriendRequests(sessionUser.Id);
+        if (userFriendRequests == null)
+        {
+            return Array.Empty<User>();
+        }
+        User[] friendRequestsPublicUsers = new User[userFriendRequests.Length];
+
+        for (int i = 0; i < userFriendRequests.Length; i++)
+        {
+            User? user = await ChatUserService.GetUserPublicInfo(userFriendRequests[i].UserId);
+            user.Id = userFriendRequests[i].UserId;
+            friendRequestsPublicUsers[i] = user;
+        }
+
+        return friendRequestsPublicUsers;
     }
 
     private async Task AddFriend(string usernameToAdd)
@@ -272,5 +289,18 @@ else
         SearchedUsers = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
 
         await InvokeAsync(StateHasChanged);
+    }
+
+    private void RegisterFriendsEvents()
+    {
+        MobileChatSignalR.HubConnection?.On<Guid, bool>("FriendStatusChanged", async (userId, isOnline) =>
+        {
+            var friend = UserFriends.FirstOrDefault(f => f.Id == userId);
+            if (friend != null)
+            {
+                friend.IsOnline = isOnline;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
     }
 }

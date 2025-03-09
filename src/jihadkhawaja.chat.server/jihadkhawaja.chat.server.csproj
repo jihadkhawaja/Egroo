@@ -21,6 +21,7 @@
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.3" />
 	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.3" />
 	  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.2" />
+	  <PackageReference Include="SIPSorcery" Version="8.0.9" />
 	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
 	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.0" />
 	  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.3">

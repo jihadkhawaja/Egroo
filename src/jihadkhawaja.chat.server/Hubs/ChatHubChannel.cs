@@ -2,6 +2,7 @@
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
@@ -21,7 +22,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = DateTime.UtcNow,
             };
 
-            await ChannelService.Create(channel);
+            await _channelService.Create(channel);
 
             await AddChannelUsers(channel.Id, usernames);
 
@@ -39,11 +40,11 @@ namespace jihadkhawaja.chat.server.Hubs
                     return false;
                 }
 
-                ChannelUser[] channelUsers = new ChannelUser[usernames.Length];
+                ChannelUser[] channelUsersToBeAdded = new ChannelUser[usernames.Length];
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    User? userToAdd = await UserService.ReadFirst(x => x.Username == usernames[i].ToLower());
+                    User? userToAdd = await _userService.ReadFirst(x => x.Username == usernames[i].ToLower());
 
                     if (userToAdd is null)
                     {
@@ -57,7 +58,7 @@ namespace jihadkhawaja.chat.server.Hubs
                         continue;
                     }
 
-                    channelUsers[i] = new ChannelUser()
+                    channelUsersToBeAdded[i] = new ChannelUser()
                     {
                         Id = Guid.NewGuid(),
                         ChannelId = channelid,
@@ -67,22 +68,43 @@ namespace jihadkhawaja.chat.server.Hubs
 
                     if (ConnectedUser.Id == currentuserid)
                     {
-                        channelUsers[i].IsAdmin = true;
+                        channelUsersToBeAdded[i].IsAdmin = true;
                     }
                 }
 
-                await ChannelUsersService.Create(channelUsers);
+                bool issuccess = await _channelUsersService.Create(channelUsersToBeAdded);
 
-                return true;
+                if (issuccess)
+                    await NotifyChannelChange(channelid);
+
+                return issuccess;
             }
             catch { }
 
             return false;
         }
+        //remove user by channel admin
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<bool> RemoveChannelUser(Guid channelid, Guid userid)
+        {
+            var ConnectedUser = await GetConnectedUser();
+            if (ConnectedUser == null)
+            {
+                return false;
+            }
+            if (!await IsChannelAdmin(channelid, ConnectedUser.Id))
+            {
+                return false;
+            }
+            bool issuccess = await _channelUsersService.Delete(x => x.ChannelId == channelid && x.UserId == userid);
+            if (issuccess)
+                await NotifyChannelChange(channelid, userid);
+            return issuccess;
+        }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> ChannelContainUser(Guid channelid, Guid userid)
         {
-            return await ChannelUsersService.ReadFirst(x => x.ChannelId == channelid && x.UserId == userid) != null;
+            return await _channelUsersService.ReadFirst(x => x.ChannelId == channelid && x.UserId == userid) != null;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User[]?> GetChannelUsers(Guid channelid)
@@ -90,10 +112,10 @@ namespace jihadkhawaja.chat.server.Hubs
             HashSet<User> channelUsers = new();
             try
             {
-                List<ChannelUser> currentChannelUsers = (await ChannelUsersService.Read(x => x.ChannelId == channelid)).ToList();
+                List<ChannelUser> currentChannelUsers = (await _channelUsersService.Read(x => x.ChannelId == channelid)).ToList();
                 foreach (ChannelUser user in currentChannelUsers)
                 {
-                    var userdata = await UserService.ReadFirst(x => x.Id == user.UserId);
+                    var userdata = await _userService.ReadFirst(x => x.Id == user.UserId);
 
                     if (userdata != null)
                     {
@@ -111,7 +133,8 @@ namespace jihadkhawaja.chat.server.Hubs
                 {
                     Id = user.Id,
                     Username = user.Username,
-                    ConnectionId = user.ConnectionId,
+                    ConnectionId = GetUserConnectionIds(user.Id).LastOrDefault(),
+                    IsOnline = IsUserOnline(user.Id),
                 });
             }
 
@@ -125,11 +148,11 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 var ConnectedUser = await GetConnectedUser();
 
-                List<ChannelUser> channelUsers = (await ChannelUsersService
+                List<ChannelUser> channelUsers = (await _channelUsersService
                     .Read(x => x.UserId == ConnectedUser.Id)).ToList();
                 foreach (ChannelUser cu in channelUsers)
                 {
-                    Channel? channel = await ChannelService.ReadFirst(x => x.Id == cu.ChannelId);
+                    Channel? channel = await _channelService.ReadFirst(x => x.Id == cu.ChannelId);
 
                     if (channel == null)
                     {
@@ -144,9 +167,28 @@ namespace jihadkhawaja.chat.server.Hubs
             return userChannels.ToArray();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<Channel?> GetChannel(Guid channelId)
+        {
+            var ConnectedUser = await GetConnectedUser();
+            if (ConnectedUser == null)
+            {
+                return null;
+            }
+            Channel? channel = await _channelService.ReadFirst(x => x.Id == channelId);
+            if (channel == null)
+            {
+                return null;
+            }
+            if (!await ChannelContainUser(channelId, ConnectedUser.Id))
+            {
+                return null;
+            }
+            return channel;
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
         {
-            ChannelUser? channelAdmin = await ChannelUsersService.ReadFirst(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
+            ChannelUser? channelAdmin = await _channelUsersService.ReadFirst(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
 
             if (channelAdmin is null)
             {
@@ -167,17 +209,26 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            if (!await ChannelUsersService.Delete(x => x.ChannelId == channelId))
+            // Capture channel users before deletion.
+            User[]? prevChannelUsers = await GetChannelUsers(channelId);
+            Guid[] prevUserIds = prevChannelUsers?.Select(u => u.Id).ToArray() ?? Array.Empty<Guid>();
+
+            if (!await _channelUsersService.Delete(x => x.ChannelId == channelId))
             {
                 return false;
             }
 
-            if (!await MessageService.Delete(x => x.ChannelId == channelId))
+            if (!await _messageService.Delete(x => x.ChannelId == channelId))
             {
                 return false;
             }
 
-            return await ChannelService.Delete(x => x.Id == channelId);
+            bool issuccess = await _channelService.Delete(x => x.Id == channelId);
+
+            if (issuccess)
+                await NotifyChannelChange(channelId, prevUserIds);
+
+            return issuccess;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> LeaveChannel(Guid channelId)
@@ -189,7 +240,41 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            return await ChannelUsersService.Delete(x => x.UserId == ConnectedUser.Id && x.ChannelId == channelId);
+            bool issuccess = await _channelUsersService.Delete(x => x.UserId == ConnectedUser.Id && x.ChannelId == channelId);
+
+            if (issuccess)
+                await NotifyChannelChange(channelId);
+
+            return issuccess;
+        }
+
+        //notify about channel changes
+        //notify about channel changes
+        private async Task NotifyChannelChange(Guid channelId, params Guid[]? extraUserIds)
+        {
+            var channelUsers = await GetChannelUsers(channelId);
+            HashSet<Guid> notifiedUserIds = new();
+
+            // Notify all users currently in the channel
+            foreach (User user in channelUsers)
+            {
+                notifiedUserIds.Add(user.Id);
+                var userConns = GetUserConnectionIds(user.Id);
+                await Clients.Clients(userConns).SendAsync("ChannelChange", channelId);
+            }
+
+            // Additionally notify users provided in the extraUserIds parameter if not already notified
+            if (extraUserIds != null)
+            {
+                foreach (Guid userId in extraUserIds)
+                {
+                    if (!notifiedUserIds.Contains(userId))
+                    {
+                        var userConns = GetUserConnectionIds(userId);
+                        await Clients.Clients(userConns).SendAsync("ChannelChange", channelId);
+                    }
+                }
+            }
         }
     }
 }

@@ -38,25 +38,35 @@ else
         if (!firstRender)
             return;
 
-        // If the connection is already established, simply show the content.
-        if (MobileChatSignalR.HubConnection is not null)
+        try
+        {
+            // If the connection is already established, update UI and exit.
+            if (MobileChatSignalR.HubConnection is not null)
+            {
+                IsBusy = false;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            // Initialize session
+            await LoadCacheAsync();
+            await EstablishSessionAsync();
+            await SetAppStateAsync(AppState.CONNECTED);
+            PrintStateLog();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Initialization error: {ex.Message}", Severity.Error);
+        }
+        finally
         {
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
-            return;
         }
-
-        await LoadCacheAsync();
-        await EstablishSessionAsync();
-        await SetAppStateAsync(AppState.CONNECTED);
-
-        IsBusy = false;
-        await InvokeAsync(StateHasChanged);
-        PrintStateLog();
     }
 
     /// <summary>
-    /// Loads a token from local storage (or file) into the session storage.
+    /// Loads a token from local storage or file into the session storage.
     /// </summary>
     private async Task LoadCacheAsync()
     {
@@ -89,7 +99,7 @@ else
         await SetAppStateAsync(AppState.ESTABLISHING_CONNECTION);
         await MobileChatSignalR.HubConnection!.StartAsync();
 
-        // If a token exists, try to refresh the session.
+        // If a token exists, refresh session; otherwise, continue.
         if (!string.IsNullOrEmpty(SessionStorage.Token))
         {
             var refreshResponse = await ChatAuthService.RefreshSession(SessionStorage.Token);
@@ -100,7 +110,7 @@ else
                 return;
             }
 
-            // Update the token if it has changed.
+            // Update token if it has changed.
             if (SessionStorage.Token != refreshResponse.Token)
             {
                 SessionStorage.Token = refreshResponse.Token;
@@ -119,7 +129,7 @@ else
     }
 
     /// <summary>
-    /// Stops and restarts the SignalR connection with the new token.
+    /// Stops and restarts the SignalR connection with a new token.
     /// </summary>
     private async Task RestartSignalRConnectionAsync()
     {
@@ -164,18 +174,19 @@ else
     /// <summary>
     /// Returns a string representation of the current app state.
     /// </summary>
-    private string GetAppState() => SessionStorage.AppState switch
-    {
-        AppState.INITIATING => "Initiating",
-        AppState.LOADING_CACHE => "Loading Cache",
-        AppState.ESTABLISHING_CONNECTION => "Establishing Connection",
-        AppState.CREATING_SESSION => "Creating Session",
-        AppState.CONNECTED => "Connected",
-        _ => "Unknown"
-    };
+    private string GetAppState() =>
+        SessionStorage.AppState switch
+        {
+            AppState.INITIATING => "Initiating",
+            AppState.LOADING_CACHE => "Loading Cache",
+            AppState.ESTABLISHING_CONNECTION => "Establishing Connection",
+            AppState.CREATING_SESSION => "Creating Session",
+            AppState.CONNECTED => "Connected",
+            _ => "Unknown"
+        };
 
     /// <summary>
-    /// Signs the user out by clearing the token from storage and navigating to the home page.
+    /// Signs the user out by clearing token from storage and navigating to the home page.
     /// </summary>
     private async Task SignOutAsync()
     {
@@ -197,22 +208,30 @@ else
         NavigationManager.NavigateTo("/", true);
     }
 
+    /// <summary>
+    /// Called from JavaScript when the window is closed.
+    /// 
+    /// TODO: Use DI to resolve IChatUser rather than creating a new instance.
+    /// </summary>
     [JSInvokable]
     public static async Task OnClosedWindow()
     {
-        // NOTE: Ideally, use DI to resolve IChatUser rather than creating a new instance.
         ChatUserService chatUserService = new ChatUserService();
         await chatUserService.CloseUserSession();
     }
 
+    /// <summary>
+    /// Prints app state and connection details to the console (only in DEBUG).
+    /// </summary>
     private void PrintStateLog()
     {
-        #if DEBUG
-            Console.WriteLine();
-            Console.WriteLine($"[State]\t{SessionStorage.AppState}");
-            Console.WriteLine($"[Framework]\t{ClientModel.CurrentFrameworkPlatform}");
-            Console.WriteLine($"[Connection Id]\t{SessionStorage.User?.ConnectionId}");
-            Console.WriteLine();
-        #endif
+#if DEBUG
+        var log = $@"
+        [State]         {SessionStorage.AppState}
+        [Framework]     {ClientModel.CurrentFrameworkPlatform}
+        [ConnectionId]  {SessionStorage.User?.ConnectionId}
+        ";
+        Console.WriteLine(log);
+#endif
     }
 }
