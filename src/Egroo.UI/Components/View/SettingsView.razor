@@ -1,6 +1,4 @@
-﻿@using BlazorDexie.JsModule
-@using Egroo.UI.Models;
-@using jihadkhawaja.chat.client.CacheDB
+﻿@using Egroo.UI.Models;
 @using jihadkhawaja.chat.client.Services;
 
 @inherits ProtectedViewBase
@@ -8,49 +6,25 @@
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject StorageService StorageService
-@inject IDialogService DialogService
-@inject IChatUser ChatUserService
-@inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
-    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="@(() => SignOut())">
-        LOGOUT
-    </MudButton>
-
-    <MudPaper Class="pa-4 my-4" Elevation="4">
-        <MudText Typo="Typo.h6">Delete Account</MudText>
-        <MudText Color="Color.Error" Typo="Typo.body2" Class="mb-2">
-            Permanently delete your account and <strong>all associated data</strong>. This action <strong>cannot</strong> be undone.
-        </MudText>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" OnClick="DeleteUser">
-            DELETE ALL USER DATA
-        </MudButton>
-    </MudPaper>
+    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="SignOut">LOGOUT</MudButton>
 </MudContainer>
 
-@code {
-    private EgrooDB CacheDB { get; set; } = null!;
+@code{
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
-    protected override void OnInitialized()
+    private async Task SignOut()
     {
-        var moduleFactory = new EsModuleFactory(JSRuntime);
-        CacheDB = new EgrooDB(moduleFactory);
-    }
-
-    private async Task SignOut(bool hasDialog = true)
-    {
-        if (hasDialog)
-        {
-            bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBox(
             "Warning",
-            "Are you sure you want to logout? All your localy saved messages will be deleted.",
+            "Are you sure you want to logout?",
             yesText: "Logout", cancelText: "Cancel");
 
-            if (!result.HasValue || !result.Value)
-            {
-                return;
-            }
+        if (!result.HasValue || !result.Value)
+        {
+            return;
         }
 
         switch (ClientModel.CurrentFrameworkPlatform)
@@ -67,26 +41,8 @@
                 throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
         }
 
-        await CacheDB.Delete();
-
         SessionStorage.User = null;
 
         NavigationManager.NavigateTo("/", true);
-    }
-
-    private async Task DeleteUser()
-    {
-        bool? result = await DialogService.ShowMessageBox(
-            "Confirm Delete Account",
-            "Are you sure you want to permanently delete your account and all associated data? This action cannot be undone.",
-            yesText: "Delete", cancelText: "Cancel");
-
-        if (!result.HasValue || !result.Value)
-        {
-            return;
-        }
-
-        await ChatUserService.DeleteUser();
-        await SignOut(false);
     }
 }

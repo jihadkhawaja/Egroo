@@ -12,12 +12,14 @@ namespace jihadkhawaja.chat.server.Hubs
 {
     public partial class ChatHub : IChatAuth
     {
-        private void UpdateUserStatus(ref User user)
+        private void UpdateUserOnlineStatus(User user)
         {
+            user.ConnectionId = Context.ConnectionId;
+            user.IsOnline = true;
             user.LastLoginDate = DateTimeOffset.UtcNow;
             user.DateUpdated = DateTimeOffset.UtcNow;
         }
-        [AllowAnonymous]
+
         public async Task<Operation.Response> SignUp(string username, string password)
         {
             if (!PatternMatchHelper.IsValidUsername(username) ||
@@ -32,7 +34,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             username = username.ToLower();
 
-            if (await _userService.ReadFirst(x => x.Username == username) != null)
+            if (await UserService.ReadFirst(x => x.Username == username) != null)
             {
                 return new Operation.Response
                 {
@@ -48,11 +50,13 @@ namespace jihadkhawaja.chat.server.Hubs
                 Username = username,
                 Password = encryptedPassword,
                 Role = "Member",
+                ConnectionId = Context.ConnectionId,
+                IsOnline = true,
                 LastLoginDate = DateTimeOffset.UtcNow,
                 DateUpdated = DateTimeOffset.UtcNow
             };
 
-            if (_configuration == null)
+            if (Configuration == null)
             {
                 return new Operation.Response
                 {
@@ -61,7 +65,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
+            var jwtSecret = Configuration.GetSection("Secrets")["Jwt"];
             if (string.IsNullOrEmpty(jwtSecret))
             {
                 return new Operation.Response
@@ -74,7 +78,7 @@ namespace jihadkhawaja.chat.server.Hubs
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            if (await _userService.Create(user))
+            if (await UserService.Create(user))
             {
                 return new Operation.Response
                 {
@@ -91,12 +95,12 @@ namespace jihadkhawaja.chat.server.Hubs
                 Message = "Failed to create user."
             };
         }
-        [AllowAnonymous]
+
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             username = username.ToLower();
 
-            var user = await _userService.ReadFirst(x => x.Username == username);
+            var user = await UserService.ReadFirst(x => x.Username == username);
             if (user == null)
             {
                 return new Operation.Response
@@ -124,7 +128,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            if (_configuration == null)
+            if (Configuration == null)
             {
                 return new Operation.Response
                 {
@@ -133,9 +137,9 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            UpdateUserStatus(ref user);
+            UpdateUserOnlineStatus(user);
 
-            var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
+            var jwtSecret = Configuration.GetSection("Secrets")["Jwt"];
             if (string.IsNullOrEmpty(jwtSecret))
             {
                 return new Operation.Response
@@ -148,7 +152,7 @@ namespace jihadkhawaja.chat.server.Hubs
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            await _userService.Update(user);
+            await UserService.Update(user);
 
             return new Operation.Response
             {
@@ -158,7 +162,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 Token = token
             };
         }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+
         public async Task<Operation.Response> RefreshSession(string oldtoken)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -187,7 +191,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            var user = await _userService.ReadFirst(x => x.Id == userId);
+            var user = await UserService.ReadFirst(x => x.Id == userId);
             if (user == null)
             {
                 return new Operation.Response
@@ -197,7 +201,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            if (_configuration == null)
+            if (Configuration == null)
             {
                 return new Operation.Response
                 {
@@ -206,7 +210,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 };
             }
 
-            var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
+            var jwtSecret = Configuration.GetSection("Secrets")["Jwt"];
             if (string.IsNullOrEmpty(jwtSecret))
             {
                 return new Operation.Response
@@ -219,8 +223,8 @@ namespace jihadkhawaja.chat.server.Hubs
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string newToken = generatedToken.Access_Token;
 
-            UpdateUserStatus(ref user);
-            await _userService.Update(user);
+            UpdateUserOnlineStatus(user);
+            await UserService.Update(user);
 
             return new Operation.Response
             {
@@ -234,7 +238,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
         {
-            var registeredUser = await _userService.ReadFirst(x => x.Username == username);
+            var registeredUser = await UserService.ReadFirst(x => x.Username == username);
             if (registeredUser == null)
             {
                 return new Operation.Result
@@ -266,7 +270,7 @@ namespace jihadkhawaja.chat.server.Hubs
             registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
 
-            if (await _userService.Update(registeredUser))
+            if (await UserService.Update(registeredUser))
             {
                 return new Operation.Result
                 {

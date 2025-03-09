@@ -10,6 +10,5 @@ namespace jihadkhawaja.chat.shared.Models
         public DateTimeOffset? DateCreated { get; set; } = DateTimeOffset.UtcNow;
         public DateTimeOffset? DateUpdated { get; set; }
         public DateTimeOffset? DateDeleted { get; set; }
-        public bool IsEncrypted { get; set; }
     }
 }

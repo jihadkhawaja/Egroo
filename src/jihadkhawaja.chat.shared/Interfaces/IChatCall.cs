@@ -4,10 +4,11 @@ namespace jihadkhawaja.chat.shared.Interfaces
 {
     public interface IChatCall
     {
-        Task CallUser(User targetUser, string offerSdp);
-        Task AnswerCall(bool acceptCall, User caller, string answerSdp);
-        Task HangUp();
-        Task SendSignal(string signal, string targetConnectionId);
-        Task SendIceCandidateToPeer(string candidateJson);
+        Task UpdateUserList(List<User> userList);
+        Task CallAccepted(User acceptingUser);
+        Task CallDeclined(User decliningUser, string reason);
+        Task IncomingCall(User callingUser);
+        Task ReceiveSignal(User signalingUser, string signal);
+        Task CallEnded(User signalingUser, string signal);
     }
 }
