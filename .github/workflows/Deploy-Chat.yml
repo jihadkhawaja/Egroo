@@ -143,4 +143,5 @@ jobs:
             username: ${{ secrets.REMOTE_USER }}
             key: ${{ secrets.KEY }}
             script: |
-                docker compose -f Configurations/src/docker-compose-egroo.yml up -d
+                docker compose -f Configurations/src/docker-compose-egroo.yml up -d --force-recreate
+                docker image prune -f
