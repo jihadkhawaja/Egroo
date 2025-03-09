@@ -67,6 +67,10 @@ jobs:
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_PROD }}"
+                },
+                "Encryption": {
+                  "Key": "${{ secrets.ENCRYPTION_KEY }}",
+                  "IV": "${{ secrets.ENCRYPTION_IV }}"
                 }
               }' > src/Egroo.Server/appsettings.json
       - name: build docker image
