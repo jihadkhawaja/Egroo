@@ -130,6 +130,7 @@ jobs:
           key: ${{ secrets.KEY }}
           script: |
               docker compose -f Configurations/src/docker-compose-egroo-test.yml down
+              docker image prune -f
   database-drop:
     name: Database drop
     needs: docker-stop
