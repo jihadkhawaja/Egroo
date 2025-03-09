@@ -120,6 +120,7 @@ jobs:
   docker-stop:
     name: Docker Stop
     needs: uni-test
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: executing remote ssh commands
@@ -134,6 +135,7 @@ jobs:
   database-drop:
     name: Database drop
     needs: docker-stop
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: executing remote ssh commands
