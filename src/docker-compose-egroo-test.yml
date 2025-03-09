@@ -10,7 +10,7 @@ services:
     networks:
       - configurations_CN
     ports:
-      - "43222:8080"
+      - "43222:8081"
 
 networks:
   configurations_CN:
