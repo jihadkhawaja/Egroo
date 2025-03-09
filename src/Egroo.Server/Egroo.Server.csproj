@@ -10,12 +10,13 @@
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'xamarinchatsrWeb' " />
   <ItemGroup>
     <Compile Remove="RestClient\**" />
+    <Compile Remove="wwwroot\images\**" />
     <Content Remove="RestClient\**" />
+    <Content Remove="wwwroot\images\**" />
     <EmbeddedResource Remove="RestClient\**" />
+    <EmbeddedResource Remove="wwwroot\images\**" />
     <None Remove="RestClient\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="wwwroot\css\main.css" />
+    <None Remove="wwwroot\images\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -36,10 +37,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="wwwroot\images\" />
+    <ProjectReference Include="..\jihadkhawaja.chat.server\jihadkhawaja.chat.server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\jihadkhawaja.chat.server\jihadkhawaja.chat.server.csproj" />
+    <Folder Include="wwwroot\" />
   </ItemGroup>
 </Project>
