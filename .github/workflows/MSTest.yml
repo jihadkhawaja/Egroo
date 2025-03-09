@@ -36,12 +36,34 @@ jobs:
                     "Microsoft.AspNetCore": "Warning"
                   }
                 },
+                "Serilog": {
+                  "WriteTo": [
+                    {
+                      "Name": "File",
+                      "Args": {
+                        "path": "logs/log.txt",
+                        "rollingInterval": "Day"
+                      }
+                    },
+                    {
+                      "Name": "Console",
+                      "Args": {
+                        "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
+                        "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
+                      }
+                    }
+                  ]
+                },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"
+                },
+                "Encryption": {
+                "Key": "${{ secrets.ENCRYPTION_KEY }}",
+                "IV": "${{ secrets.ENCRYPTION_IV }}"
                 }
               }' > src/Egroo.Server/appsettings.json
       - name: build docker image
@@ -120,6 +142,7 @@ jobs:
   docker-stop:
     name: Docker Stop
     needs: uni-test
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: executing remote ssh commands
@@ -134,6 +157,7 @@ jobs:
   database-drop:
     name: Database drop
     needs: docker-stop
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - name: executing remote ssh commands

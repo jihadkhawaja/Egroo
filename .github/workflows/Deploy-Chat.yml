@@ -40,6 +40,24 @@ jobs:
                     "Microsoft.AspNetCore": "Warning"
                   }
                 },
+                "Serilog": {
+                  "WriteTo": [
+                    {
+                      "Name": "File",
+                      "Args": {
+                        "path": "logs/log.txt",
+                        "rollingInterval": "Day"
+                      }
+                    },
+                    {
+                      "Name": "Console",
+                      "Args": {
+                        "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
+                        "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
+                      }
+                    }
+                  ]
+                },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
                   "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
@@ -49,6 +67,10 @@ jobs:
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_PROD }}"
+                },
+                "Encryption": {
+                  "Key": "${{ secrets.ENCRYPTION_KEY }}",
+                  "IV": "${{ secrets.ENCRYPTION_IV }}"
                 }
               }' > src/Egroo.Server/appsettings.json
       - name: build docker image
