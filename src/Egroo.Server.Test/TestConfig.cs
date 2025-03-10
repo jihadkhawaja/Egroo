@@ -7,7 +7,7 @@
         public static string ApiBaseUrl = "http://localhost:5175/";
 #else
         public static string HubConnectionUrl = "https://dev-api-chat.jihadkhawaja.com/chathub";
-        public static string ApiUrl ="https://dev-api-chat.jihadkhawaja.com/";
+        public static string ApiBaseUrl ="https://dev-api-chat.jihadkhawaja.com/";
 #endif
     }
 }

@@ -41,7 +41,7 @@ else
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
                             <MudGrid Justify="Justify.SpaceBetween">
                                 <MudItem xs="8">
-                                    <ScopeView Title="@GetChannelTitle(channel.Key)" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
+                                    <ScopeView Title="@channel.Key.GetTitle()" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
                                 </MudItem>
                                 <MudItem xs="4">
                                     <MudStack Row Style="height:100%;">
@@ -143,7 +143,7 @@ else
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
                             <MudGrid Justify="Justify.SpaceBetween">
                                 <MudItem>
-                                    <ScopeView Title="@GetChannelTitle(channel.Key)" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
+                                    <ScopeView Title="@channel.Key.GetTitle()" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
                                 </MudItem>
                                 <MudItem>
                                     <MudStack Row Style="height:100%;">
@@ -152,7 +152,7 @@ else
                                             <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add"
                                                            OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
                                             <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Edit"
-                                                           OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, GetChannelTitle(channel.Key))))" />
+                                                           OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.GetTitle())))" />
                                             <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                                            OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
                                         }
@@ -303,8 +303,7 @@ else
         return results;
     }
 
-    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{GetChannelTitle(channel)}");
-    private string? GetChannelTitle(Channel channel) => string.IsNullOrWhiteSpace(channel.Title) ? channel.DefaultTitle : channel.Title;
+    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{channel.GetTitle()}");
 
     private async Task CreateChannel()
     {
