@@ -1,8 +1,10 @@
-﻿using jihadkhawaja.chat.server.Database;
+﻿using jihadkhawaja.chat.server.API;
+using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.server.Interfaces;
 using jihadkhawaja.chat.server.Services;
 using jihadkhawaja.chat.server.SIP;
+using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -39,6 +41,9 @@ public static class Register
                 db.Database.Migrate();
             }
         }
+
+        // Map API endpoints.
+        app.MapAuthentication();
 
         // Map SignalR hubs.
         app.MapHub<ChatHub>("/chathub", options =>
@@ -130,12 +135,18 @@ public class ChatServiceBuilder
             System.Reflection.Assembly.GetAssembly(_executionClassType).GetName().Name;
         AutoMigrateDatabase = _autoMigrateDatabase;
 
+        ConfigureAPI(_services);
         ConfigureEntityServices(_services);
         ConfigureDatabase(_services);
         ConfigureSignalR(_services);
         // ConfigureSIPWebSocket(_services);
 
         return _services;
+    }
+
+    private void ConfigureAPI(IServiceCollection services)
+    {
+        services.AddScoped<IAuth, AuthService>();
     }
 
     private void ConfigureSignalR(IServiceCollection services)

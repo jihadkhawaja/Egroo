@@ -16,6 +16,9 @@ namespace jihadkhawaja.chat.client.Services
         public event Func<User, string, Task>? OnReceiveSignal;
         public event Func<List<User>, Task>? OnUpdateUserList;
 
+        private HubConnection HubConnection => MobileChatSignalR.HubConnection
+            ?? throw new NullReferenceException("SignalR not initialized");
+
         public ChatCallService()
         {
             if (MobileChatSignalR.HubConnection is not null)
@@ -59,49 +62,19 @@ namespace jihadkhawaja.chat.client.Services
             }
         }
 
-        public async Task CallUser(User targetUser, string offerSdp)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+        public Task CallUser(User targetUser, string offerSdp)
+            => HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
 
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
-        }
+        public Task AnswerCall(bool acceptCall, User caller, string answerSdp)
+            => HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
 
-        public async Task AnswerCall(bool acceptCall, User caller, string answerSdp)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
+        public Task HangUp()
+            => HubConnection.InvokeAsync(nameof(HangUp));
 
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
-        }
+        public Task SendSignal(string signal, string targetConnectionId)
+            => HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
 
-        public async Task HangUp()
-        {
-            if (MobileChatSignalR.HubConnection is null)
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(HangUp));
-        }
-
-        public async Task SendSignal(string signal, string targetConnectionId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
-        }
-
-        public async Task SendIceCandidateToPeer(string candidateJson)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-
-            // Log or inspect the received candidate JSON
-            Console.WriteLine($"Received ICE Candidate: {candidateJson}");
-
-            // Send the ICE candidate to the peer through SignalR.
-            await MobileChatSignalR.HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
-        }
-
+        public Task SendIceCandidateToPeer(string candidateJson)
+            => HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
     }
 }

@@ -18,74 +18,156 @@ else
         <MudStack Class="mb-8" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudText Typo="Typo.h6">Channels</MudText>
             <MudButton OnClick="CreateChannel" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
-            StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
+                       StartIcon="@Icons.Material.Filled.Add">Create Channel</MudButton>
         </MudStack>
-        @if (CurrentUserChannels is null)
-        {
-            <MudText GutterBottom Typo="Typo.h6">No channels yet..</MudText>
-        }
-        else
-        {
-            @if (addFriendPopOverIsOpen)
-            {
-                <MudPaper Outlined="true" Class="pa-2 mb-4">
-                    <MudStack>
-                        <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
-                        <MudTextField T="string" Placeholder="Search friends"
-                        Value="@SearchQuery" TextChanged="OnSearchFriends"
-                        Immediate Class="mb-2"></MudTextField>
 
-                        @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+        <!-- Combined Channels Search -->
+        <MudTextField T="string" Placeholder="Search Channels" Value="@PublicChannelsSearchQuery"
+                      TextChanged="OnSearchPublicChannels" Immediate Class="mb-8" />
+
+        @if (!string.IsNullOrWhiteSpace(PublicChannelsSearchQuery))
+        {
+            @* Searched Your Channels *@
+            <MudText Typo="Typo.h6" Class="mb-2">Your Channels</MudText>
+            @if (SearchedUserChannels is null || SearchedUserChannels.Length == 0)
+            {
+                <MudText Class="mb-8">No channels found in your channels.</MudText>
+            }
+            else
+            {
+                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0" Class="mb-8">
+                    @foreach (var channel in SearchedUserChannels)
+                    {
+                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
+                            <MudGrid Justify="Justify.SpaceBetween">
+                                <MudItem xs="8">
+                                    <ScopeView Title="@GetChannelTitle(channel.Key)" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
+                                </MudItem>
+                                <MudItem xs="4">
+                                    <MudStack Row Style="height:100%;">
+                                        @if (channel.Value)
+                                        {
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add"
+                                                           OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Edit"
+                                                           OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.DefaultTitle)))" />
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                           OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                        }
+                                        else
+                                        {
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Error"
+                                                           OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
+                                        }
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+
+            @* Searched Public Channels *@
+            <MudText Typo="Typo.h6" Class="mb-2">Public Channels</MudText>
+            @if (PublicChannels is not null)
+            {
+                @if (PublicChannels.Length == 0)
+                {
+                    <MudText Class="mb-8">No public channels found.</MudText>
+                }
+                else
+                {
+                    <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0" Class="mb-8">
+                        @foreach (var channel in PublicChannels)
                         {
                             <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                                <MudGrid Justify="Justify.SpaceBetween">
-                                    <MudItem>
-                                        <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                                <MudGrid Justify="Justify.SpaceBetween" AlignItems="Center">
+                                    <MudItem xs="8">
+                                        <ScopeView Title="@channel.Title" Subtitle="@string.Format("Created {0}", channel.DateCreated?.Date.ToShortDateString())" />
                                     </MudItem>
-                                    <MudItem>
-                                        <MudStack Row Style="height:100%;">
-                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                            Icon="@Icons.Material.Filled.Add" Color="Color.Success"
-                                            OnClick="@(async () => await AddUserToChannel(friend.Username))" />
+                                    <MudItem xs="4">
+                                        <MudStack Row Justify="Justify.FlexEnd" AlignItems="AlignItems.Center">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Login" Color="Color.Primary"
+                                                           OnClick="@(async () => await JoinChannel(channel))" />
                                         </MudStack>
                                     </MudItem>
                                 </MudGrid>
                             </MudPaper>
                         }
                     </MudStack>
-                </MudPaper>
+                }
             }
-
-            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-                @foreach (var channel in CurrentUserChannels)
+        }
+        else
+        {
+            @* No search active: display default user channels *@
+            @if (CurrentUserChannels is null)
+            {
+                <MudText GutterBottom Typo="Typo.h6">No channels yet..</MudText>
+            }
+            else
+            {
+                @if (addFriendPopOverIsOpen)
                 {
-                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
-                        <MudGrid Justify="Justify.SpaceBetween">
-                            <MudItem>
-                                <ScopeView Title=@channel.Key.Title Subtitle=@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString()) />
-                            </MudItem>
-                            <MudItem>
-                                <MudStack Row Style="height:100%;">
-                                    @if (channel.Value)
-                                    {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add"
-                                        OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Edit"
-                                        OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, channel.Key.Title)))" />
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                        OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
-                                    }
-                                    else
-                                    {
-                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Error"
-                                        OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
-                                    }
-                                </MudStack>
-                            </MudItem>
-                        </MudGrid>
+                    <MudPaper Outlined="true" Class="pa-2 mb-4">
+                        <MudStack>
+                            <MudText GutterBottom Typo="Typo.body1">Add Friend</MudText>
+                            <MudTextField T="string" Placeholder="Search friends"
+                                          Value="@SearchQuery" TextChanged="OnSearchFriends"
+                                          Immediate Class="mb-2"></MudTextField>
+
+                            @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                            {
+                                <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                                    <MudGrid Justify="Justify.SpaceBetween">
+                                        <MudItem>
+                                            <ScopeView Title="@friend.Username" Subtitle="@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString())" />
+                                        </MudItem>
+                                        <MudItem>
+                                            <MudStack Row Style="height:100%;">
+                                                <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
+                                                               Icon="@Icons.Material.Filled.Add" Color="Color.Success"
+                                                               OnClick="@(async () => await AddUserToChannel(friend.Username))" />
+                                            </MudStack>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudPaper>
+                            }
+                        </MudStack>
                     </MudPaper>
                 }
-            </MudStack>
+
+                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                    @foreach (var channel in CurrentUserChannels)
+                    {
+                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg clickable-paper" Outlined Elevation="2" onclick="@(() => OpenChannel(channel.Key))">
+                            <MudGrid Justify="Justify.SpaceBetween">
+                                <MudItem>
+                                    <ScopeView Title="@GetChannelTitle(channel.Key)" Subtitle="@string.Format("Created {0}", channel.Key.DateCreated?.Date.ToShortDateString())" />
+                                </MudItem>
+                                <MudItem>
+                                    <MudStack Row Style="height:100%;">
+                                        @if (channel.Value)
+                                        {
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Add"
+                                                           OnClick="@(() => ToggleAddFriendPopOverIsOpen(channel.Key.Id))" />
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Edit"
+                                                           OnClick="@(() => NavigateTo(string.Format("/channeldetail/{0}/{1}", channel.Key.Id, GetChannelTitle(channel.Key))))" />
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                           OnClick="@(async () => await DeleteChannel(channel.Key.Id))" />
+                                        }
+                                        else
+                                        {
+                                            <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.ExitToApp" Color="Color.Error"
+                                                           OnClick="@(async () => await LeaveChannel(channel.Key.Id))" />
+                                        }
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
         }
     </MudContainer>
 }
@@ -103,6 +185,11 @@ else
     private string? SearchQuery { get; set; }
 
     private Guid selectedChannelId { get; set; }
+
+    // Properties for channels search
+    private string? PublicChannelsSearchQuery { get; set; }
+    private Channel[]? PublicChannels { get; set; }
+    private KeyValuePair<Channel, bool>[]? SearchedUserChannels { get; set; }
 
     protected override void OnInitialized()
     {
@@ -132,6 +219,33 @@ else
         await InvokeAsync(StateHasChanged);
     }
 
+    // Combined channels search handler
+    private async Task OnSearchPublicChannels(string value)
+    {
+        PublicChannelsSearchQuery = value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            PublicChannels = null;
+            SearchedUserChannels = null;
+            CurrentUserChannels = await GetChannels();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        PublicChannels = await ChatChannelService.SearchPublicChannels(value) ?? Array.Empty<Channel>();
+
+        var allUserChannels = await GetChannels() ?? Array.Empty<KeyValuePair<Channel, bool>>();
+        SearchedUserChannels = allUserChannels
+            .Where(kvp =>
+                (!string.IsNullOrWhiteSpace(kvp.Key.Title) && kvp.Key.Title.Contains(value, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrWhiteSpace(kvp.Key.DefaultTitle) && kvp.Key.DefaultTitle.Contains(value, StringComparison.OrdinalIgnoreCase))
+            )
+            .ToArray();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
     public void ToggleAddFriendPopOverIsOpen(Guid channelid)
     {
         if (addFriendPopOverIsOpen)
@@ -157,31 +271,29 @@ else
             return null;
         }
 
-        bool[] currentUserIsAdmin = new bool[channels.Length];
-
         KeyValuePair<Channel, bool>[] results = new KeyValuePair<Channel, bool>[channels.Length];
 
         for (int i = 0; i < channels.Length; i++)
         {
             User[]? friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
 
-            channels[i].Title = string.Empty;
+            channels[i].DefaultTitle = string.Empty;
             foreach (User friend in friends)
             {
                 User? user = await ChatUserService.GetUserPublicInfo(friend.Id);
                 if (friend.Id == SessionStorage.User!.Id)
                 {
-                    channels[i].Title += $"{user?.Username} (You)";
+                    channels[i].DefaultTitle += $"{user?.Username} (You)";
                 }
                 else
                 {
-                    channels[i].Title += user?.Username;
+                    channels[i].DefaultTitle += user?.Username;
                 }
 
-                channels[i].Title += ", ";
+                channels[i].DefaultTitle += ", ";
             }
 
-            channels[i].Title = channels[i].Title?.TrimEnd(',', ' ');
+            channels[i].DefaultTitle = channels[i].DefaultTitle?.TrimEnd(',', ' ');
 
             bool isChannelAdmin = await IsChannelAdmin(channels[i].Id, SessionStorage.User!.Id);
 
@@ -191,7 +303,8 @@ else
         return results;
     }
 
-    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{channel.Title}");
+    private void OpenChannel(Channel channel) => NavigationManager.NavigateTo($"/chat/{channel.Id.ToString()}/{GetChannelTitle(channel)}");
+    private string? GetChannelTitle(Channel channel) => string.IsNullOrWhiteSpace(channel.Title) ? channel.DefaultTitle : channel.Title;
 
     private async Task CreateChannel()
     {
@@ -280,6 +393,20 @@ else
         else
         {
             Snackbar.Add($"Something went wrong!", Severity.Error);
+        }
+    }
+
+    private async Task JoinChannel(Channel channel)
+    {
+        bool result = await ChatChannelService.AddChannelUsers(channel.Id, SessionStorage.User.Username);
+        if (result)
+        {
+            Snackbar.Add("Joined channel", Severity.Success);
+            OpenChannel(channel);
+        }
+        else
+        {
+            Snackbar.Add("Unable to join channel", Severity.Error);
         }
     }
 

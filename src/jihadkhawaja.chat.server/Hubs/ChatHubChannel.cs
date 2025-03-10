@@ -40,7 +40,24 @@ namespace jihadkhawaja.chat.server.Hubs
                     return false;
                 }
 
+                // Get the channel to check if it is public.
+                Channel? channel = await _channelService.ReadFirst(x => x.Id == channelid);
+                if (channel == null)
+                {
+                    return false;
+                }
+                bool isPublic = channel.IsPublic;
+
+                // Retrieve existing channel users.
+                var existingChannelUsers = await _channelUsersService.Read(x => x.ChannelId == channelid);
+                // For non-public channels, only admins may add users once there are existing users.
+                if (!isPublic && existingChannelUsers.Any() && !await IsChannelAdmin(channelid, ConnectedUser.Id))
+                {
+                    return false;
+                }
+
                 ChannelUser[] channelUsersToBeAdded = new ChannelUser[usernames.Length];
+                int newUsersAddedCount = 0;
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
@@ -58,7 +75,7 @@ namespace jihadkhawaja.chat.server.Hubs
                         continue;
                     }
 
-                    channelUsersToBeAdded[i] = new ChannelUser()
+                    var channelUser = new ChannelUser()
                     {
                         Id = Guid.NewGuid(),
                         ChannelId = channelid,
@@ -66,10 +83,21 @@ namespace jihadkhawaja.chat.server.Hubs
                         DateCreated = DateTime.UtcNow,
                     };
 
-                    if (ConnectedUser.Id == currentuserid)
+                    // For public channels, assign the first joining user as admin (creator) if the channel is empty.
+                    if (isPublic &&
+                        !existingChannelUsers.Any() && // no users in channel already
+                        newUsersAddedCount == 0)
                     {
-                        channelUsersToBeAdded[i].IsAdmin = true;
+                        channelUser.IsAdmin = true;
                     }
+                    // For non-public channels, if the sender is the one being added, assign admin.
+                    else if (!isPublic && ConnectedUser.Id == currentuserid)
+                    {
+                        channelUser.IsAdmin = true;
+                    }
+
+                    channelUsersToBeAdded[i] = channelUser;
+                    newUsersAddedCount++;
                 }
 
                 bool issuccess = await _channelUsersService.Create(channelUsersToBeAdded);
@@ -79,9 +107,10 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 return issuccess;
             }
-            catch { }
-
-            return false;
+            catch
+            {
+                return false;
+            }
         }
         //remove user by channel admin
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -248,7 +277,31 @@ namespace jihadkhawaja.chat.server.Hubs
             return issuccess;
         }
 
-        //notify about channel changes
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public async Task<Channel[]?> SearchPublicChannels(string searchTerm)
+        {
+            try
+            {
+                var publicChannels = await _channelService.Read(x => x.IsPublic);
+                List<Channel> result = new();
+
+                foreach (var channel in publicChannels)
+                {
+                    if (!string.IsNullOrWhiteSpace(channel.Title) &&
+                        channel.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Add(channel);
+                    }
+                }
+
+                return result.ToArray();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         //notify about channel changes
         private async Task NotifyChannelChange(Guid channelId, params Guid[]? extraUserIds)
         {

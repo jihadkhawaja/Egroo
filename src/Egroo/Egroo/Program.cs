@@ -1,6 +1,7 @@
 using Egroo.Client;
 using Egroo.Components;
 using Egroo.UI;
+using Egroo.UI.Constants;
 using Egroo.UI.Models;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
@@ -8,8 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
+    //.AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(Source.ConnectionURL),
+});
 
 ClientModel.MyMudThemeProvider = builder =>
 {
@@ -45,7 +51,7 @@ app.UseStaticFiles();
 app.UseAntiforgery();
 
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
+    //.AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(Egroo.Client._Imports).Assembly);
 

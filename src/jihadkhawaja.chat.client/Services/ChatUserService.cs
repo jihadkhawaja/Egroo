@@ -7,144 +7,49 @@ namespace jihadkhawaja.chat.client.Services
 {
     public class ChatUserService : IChatUser
     {
-        public async Task<bool> AddFriend(string friendEmailorusername)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        private HubConnection HubConnection => MobileChatSignalR.HubConnection
+            ?? throw new NullReferenceException("SignalR not initialized");
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(AddFriend), friendEmailorusername);
-        }
+        public Task<bool> AddFriend(string friendEmailorusername)
+            => HubConnection.InvokeAsync<bool>(nameof(AddFriend), friendEmailorusername);
 
-        public async Task<bool> RemoveFriend(string friendEmailorusername)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<bool> RemoveFriend(string friendEmailorusername)
+            => HubConnection.InvokeAsync<bool>(nameof(RemoveFriend), friendEmailorusername);
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(RemoveFriend), friendEmailorusername);
-        }
+        public Task CloseUserSession()
+            => HubConnection.InvokeAsync(nameof(CloseUserSession));
 
-        public async Task CloseUserSession()
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<User?> GetUserPublicInfo(Guid userId)
+            => HubConnection.InvokeAsync<User?>(nameof(GetUserPublicInfo), userId);
 
-            await MobileChatSignalR.HubConnection.InvokeAsync(nameof(CloseUserSession));
-        }
+        public Task<string?> GetCurrentUserUsername()
+            => HubConnection.InvokeAsync<string?>(nameof(GetCurrentUserUsername));
 
-        public async Task<User?> GetUserPublicInfo(Guid userId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
+            => HubConnection.InvokeAsync<bool>(nameof(GetUserIsFriend), userId, friendId);
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<User>(nameof(GetUserPublicInfo), userId);
-        }
+        public Task<UserFriend[]?> GetUserFriends(Guid userId)
+            => HubConnection.InvokeAsync<UserFriend[]?>(nameof(GetUserFriends), userId);
 
-        public async Task<string?> GetCurrentUserUsername()
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<UserFriend[]?> GetUserFriendRequests(Guid userId)
+            => HubConnection.InvokeAsync<UserFriend[]?>(nameof(GetUserFriendRequests), userId);
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<string>(nameof(GetCurrentUserUsername));
-        }
+        public Task<bool> AcceptFriend(Guid friendId)
+            => HubConnection.InvokeAsync<bool>(nameof(AcceptFriend), friendId);
 
-        public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<bool> DenyFriend(Guid friendId)
+            => HubConnection.InvokeAsync<bool>(nameof(DenyFriend), friendId);
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(GetUserIsFriend), userId, friendId);
-        }
+        public Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
+            => HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUser), query, maxResult);
 
-        public async Task<UserFriend[]?> GetUserFriends(Guid userId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
+        public Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
+            => HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUserFriends), query, maxResult);
 
-            return await MobileChatSignalR.HubConnection.InvokeAsync<UserFriend[]>(nameof(GetUserFriends), userId);
-        }
+        public Task<bool> IsUsernameAvailable(string username)
+            => HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);
 
-        public async Task<UserFriend[]?> GetUserFriendRequests(Guid userId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<UserFriend[]>(nameof(GetUserFriendRequests), userId);
-        }
-
-        public async Task<bool> AcceptFriend(Guid friendId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(AcceptFriend), friendId);
-        }
-
-        public async Task<bool> DenyFriend(Guid friendId)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(DenyFriend), friendId);
-        }
-
-        public async Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUser), query, maxResult);
-        }
-
-        public async Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUserFriends), query, maxResult);
-        }
-
-        public async Task<bool> IsUsernameAvailable(string username)
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);
-        }
-
-        public async Task<bool> DeleteUser()
-        {
-            if (MobileChatSignalR.HubConnection is null)
-            {
-                throw new NullReferenceException("MobileChatClient SignalR not initialized");
-            }
-
-            return await MobileChatSignalR.HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
-        }
+        public Task<bool> DeleteUser()
+            => HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
     }
 }

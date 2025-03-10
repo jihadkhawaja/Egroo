@@ -9,7 +9,7 @@ namespace Egroo.Server.Test
     [TestClass]
     public class MessageTest
     {
-        private IChatAuth ChatAuthService { get; set; } = null!;
+        private IAuth ChatAuthService { get; set; } = null!;
         private IChatChannel ChatChannelService { get; set; } = null!;
         private IChatMessage ChatMessageService { get; set; } = null!;
 
@@ -19,7 +19,9 @@ namespace Egroo.Server.Test
         [TestInitialize]
         public async Task Initialize()
         {
-            ChatAuthService = new ChatAuthService();
+            // Create a new HttpClient with a BaseAddress for AuthService only.
+            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
+            ChatAuthService = new AuthService(httpClient);
             ChatChannelService = new ChatChannelService();
             ChatMessageService = new ChatMessageService();
 

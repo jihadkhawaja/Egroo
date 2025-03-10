@@ -1,23 +1,32 @@
-﻿using jihadkhawaja.chat.server.Authorization;
+using jihadkhawaja.chat.server.Authorization;
 using jihadkhawaja.chat.server.Helpers;
+using jihadkhawaja.chat.server.Interfaces;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace jihadkhawaja.chat.server.Hubs
+namespace jihadkhawaja.chat.server.Services
 {
-    public partial class ChatHub : IChatAuth
+    public class AuthService : IAuth
     {
+        private readonly IConfiguration _configuration;
+        private readonly IEntity<User> _userService;
+
+        public AuthService(IEntity<User> userService, IConfiguration configuration)
+        {
+            _userService = userService;
+            _configuration = configuration;
+        }
+
         private void UpdateUserStatus(ref User user)
         {
             user.LastLoginDate = DateTimeOffset.UtcNow;
             user.DateUpdated = DateTimeOffset.UtcNow;
         }
-        [AllowAnonymous]
+
         public async Task<Operation.Response> SignUp(string username, string password)
         {
             if (!PatternMatchHelper.IsValidUsername(username) ||
@@ -91,7 +100,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 Message = "Failed to create user."
             };
         }
-        [AllowAnonymous]
+
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             username = username.ToLower();
@@ -158,7 +167,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 Token = token
             };
         }
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+
         public async Task<Operation.Response> RefreshSession(string oldtoken)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -231,7 +240,6 @@ namespace jihadkhawaja.chat.server.Hubs
             };
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
         {
             var registeredUser = await _userService.ReadFirst(x => x.Username == username);

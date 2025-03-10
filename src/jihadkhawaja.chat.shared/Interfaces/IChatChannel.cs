@@ -14,5 +14,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<Channel?> GetChannel(Guid channelId);
         Task<Channel[]?> GetUserChannels();
         Task<bool> IsChannelAdmin(Guid channelId, Guid userId);
+        Task<Channel[]?> SearchPublicChannels(string searchTerm);
     }
 }

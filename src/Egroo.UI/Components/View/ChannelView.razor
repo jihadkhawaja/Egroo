@@ -13,6 +13,7 @@
 
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
+@inject NavigationManager NavigationManager
 @inject IChatUser ChatUserService
 @inject IChatMessage ChatMessageService
 @inject IChatChannel ChatChannelService
@@ -21,11 +22,16 @@
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <!-- Header with Back, Title, and Call Button -->
+    <!-- Header with Back, Title, Edit (shown only if admin), and Call Button -->
     <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
         <MudStack Row AlignItems="AlignItems.Center">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
-            <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Href="/channels" />
+            <MudText Typo="Typo.h6" GutterBottom Class="ml-2">@Title</MudText>
+            @if (IsAdmin)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Medium" Color="Color.Primary"
+                               OnClick="EditChannel" Class="ml-2" />
+            }
         </MudStack>
         <!-- Call Button -->
         <MudTooltip Text="Call (WIP)">
@@ -131,6 +137,7 @@
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? ChannelId { get; set; }
 
+    private bool IsAdmin { get; set; }
     private List<Message> Messages { get; set; } = new();
     private bool IsLoading { get; set; } = true;
     private MudTextField<string> inputMudTextField { get; set; } = null!;
@@ -149,6 +156,17 @@
 
     // Store the remote SDP offer when receiving an incoming call.
     private string? incomingOfferSdp;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Determine if the current user is an admin of this channel.
+        // Assumes ChatChannelService provides an IsChannelAdmin method.
+        var channelId = GetChannelId();
+        if (channelId != Guid.Empty && SessionStorage?.User != null)
+        {
+            IsAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User.Id);
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -448,4 +466,9 @@
         };
     }
     #endregion
+
+    private void EditChannel()
+    {
+        NavigationManager.NavigateTo($"/channeldetail/{ChannelId}/{Title}");
+    }
 }
