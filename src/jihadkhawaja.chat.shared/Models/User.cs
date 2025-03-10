@@ -25,13 +25,13 @@ namespace jihadkhawaja.chat.shared.Models
 
     public class CallOffer
     {
-        public User Caller { get; set; }
-        public User Callee { get; set; }
+        public User? Caller { get; set; }
+        public User? Callee { get; set; }
         public string SdpOffer { get; set; } = string.Empty;
     }
 
     public class UserCall
     {
-        public List<User> Users { get; set; }
+        public List<User>? Users { get; set; }
     }
 }

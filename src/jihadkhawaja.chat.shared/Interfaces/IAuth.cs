@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.shared.Interfaces
 {
-    public interface IChatAuth
+    public interface IAuth
     {
         Task<Operation.Response> SignUp(string username, string password);
         Task<Operation.Response> SignIn(string username, string password);

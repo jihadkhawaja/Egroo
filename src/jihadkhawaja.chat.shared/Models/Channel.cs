@@ -5,6 +5,13 @@ namespace jihadkhawaja.chat.shared.Models
     public class Channel : EntityBase
     {
         [NotMapped]
+        public string? DefaultTitle { get; set; }
         public string? Title { get; set; }
+        public bool IsPublic { get; set; }
+
+        public string? GetTitle()
+        {
+            return string.IsNullOrWhiteSpace(Title) ? DefaultTitle : Title;
+        }
     }
 }
