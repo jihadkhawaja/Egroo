@@ -182,6 +182,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     if (user != null)
                     {
                         user.IsOnline = true;
+                        user.LastLoginDate = DateTimeOffset.UtcNow;
                         user.ConnectionId = Context.ConnectionId;
                         await _userService.Update(user);
 
@@ -222,6 +223,7 @@ namespace jihadkhawaja.chat.server.Hubs
                     if (user != null)
                     {
                         user.IsOnline = false;
+                        user.LastLoginDate = DateTimeOffset.UtcNow;
                         user.ConnectionId = null;
                         await _userService.Update(user);
 

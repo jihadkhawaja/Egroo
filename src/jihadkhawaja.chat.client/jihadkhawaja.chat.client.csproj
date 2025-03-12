@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<Authors>jihadkhawaja</Authors>
-	<Description>Chat data models shared solution for ASP.NET server and Client packages</Description>
-	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
+	<Description>Chat client solution for jihadkhawaja.chat.server</Description>
+	<Copyright>Copyright © 2025 jihadkhawaja</Copyright>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
 	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>

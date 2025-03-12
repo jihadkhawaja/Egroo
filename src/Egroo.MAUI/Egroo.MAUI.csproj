@@ -12,6 +12,10 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<EnableDefaultCssItems>false</EnableDefaultCssItems>
 
+		<!-- https://github.com/dotnet/maui/issues/23016 -->
+		<!-- Only when targeting windows arm64 -->
+		<!-- <UseMonoRuntime>false</UseMonoRuntime> -->
+
 		<Title>Egroo</Title>
 		<Product>Egroo</Product>
 		<Company>jihadkhawaja</Company>

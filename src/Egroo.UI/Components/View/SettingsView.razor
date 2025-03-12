@@ -13,24 +13,53 @@
 @inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
-    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="@(() => SignOut())">
-        LOGOUT
-    </MudButton>
+    <!-- Page Header -->
+    <MudText Typo="Typo.h3" GutterBottom="true">Settings</MudText>
 
+    <!-- Account Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
-        <MudText Typo="Typo.h6">Delete Account</MudText>
-        <MudText Color="Color.Error" Typo="Typo.body2" Class="mb-2">
-            Permanently delete your account and <strong>all associated data</strong>. This action <strong>cannot</strong> be undone.
-        </MudText>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" OnClick="DeleteUser">
-            DELETE ALL USER DATA
-        </MudButton>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Account</MudText>
+            <MudText Typo="Typo.body2">
+                Use the button below to sign out of your account. You will have to log in again to access your data.
+            </MudText>
+            <MudButton Color="Color.Info" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="@(() => SignOut())">
+                Logout
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Delete Account Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Delete Account</MudText>
+            <MudText Color="Color.Error" Typo="Typo.body2">
+                Permanently delete your account and <strong>all associated data</strong>. This action <strong>cannot</strong> be undone.
+            </MudText>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" OnClick="DeleteUser">
+                DELETE ALL USER DATA
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Report a Problem / Send Feedback Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4" hidden>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Report a Problem / Send Feedback</MudText>
+            <MudText Typo="Typo.body2">
+                If you are experiencing issues or have suggestions for improvement, please share your feedback below.
+            </MudText>
+            <MudTextField @bind-Value="FeedbackText" Label="Your Feedback" Lines="4" FullWidth="true" />
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitFeedback">
+                Submit Feedback
+            </MudButton>
+        </MudStack>
     </MudPaper>
 </MudContainer>
 
 @code {
     private EgrooDB CacheDB { get; set; } = null!;
+    private string FeedbackText { get; set; } = string.Empty;
 
     protected override void OnInitialized()
     {
@@ -43,9 +72,9 @@
         if (hasDialog)
         {
             bool? result = await DialogService.ShowMessageBox(
-            "Warning",
-            "Are you sure you want to logout? All your localy saved messages will be deleted.",
-            yesText: "Logout", cancelText: "Cancel");
+                "Warning",
+                "Are you sure you want to logout? All your locally saved messages will be deleted.",
+                yesText: "Logout", cancelText: "Cancel");
 
             if (!result.HasValue || !result.Value)
             {
@@ -88,5 +117,27 @@
 
         await ChatUserService.DeleteUser();
         await SignOut(false);
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (string.IsNullOrWhiteSpace(FeedbackText))
+        {
+            await DialogService.ShowMessageBox("Feedback", "Please enter your feedback before submitting.");
+            return;
+        }
+
+        //send feedback logic (TODO)
+        //
+
+        bool? confirmationResult = await DialogService.ShowMessageBox(
+            "Feedback Submitted",
+            "Thank you for your feedback!",
+            yesText: "OK");
+
+        if (confirmationResult.HasValue && confirmationResult.Value)
+        {
+            FeedbackText = string.Empty;
+        }
     }
 }

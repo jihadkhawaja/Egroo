@@ -1,0 +1,42 @@
+[
+  {
+    "Name": "Web + Server",
+    "Projects": [
+      {
+        "Path": "Egroo.Server\\Egroo.Server.csproj",
+        "Action": "Start",
+        "DebugTarget": "Server"
+      },
+      {
+        "Path": "Egroo\\Egroo\\Egroo.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      }
+    ]
+  },
+  {
+    "Name": "MAUI + Server",
+    "Projects": [
+      {
+        "Path": "Egroo.Server\\Egroo.Server.csproj",
+        "Action": "Start",
+        "DebugTarget": "Server"
+      },
+      {
+        "Path": "Egroo.MAUI\\Egroo.MAUI.csproj",
+        "Action": "Start",
+        "DebugTarget": "Windows Machine"
+      }
+    ]
+  },
+  {
+    "Name": "Server Only",
+    "Projects": [
+      {
+        "Path": "Egroo.Server\\Egroo.Server.csproj",
+        "Action": "Start",
+        "DebugTarget": "Server"
+      }
+    ]
+  }
+]

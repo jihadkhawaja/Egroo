@@ -6,13 +6,13 @@
     <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<Authors>jihadkhawaja</Authors>
-	<Description>Chat client solution for ASP.NET server</Description>
-	<Copyright>Copyright © 2022 jihadkhawaja</Copyright>
+	<Description>Shared code dependancy package for jihadkhawaja.chat.client and jihadkhawaja.chat.server NuGet packages (Not intended for direct referencing)</Description>
+	<Copyright>Copyright © 2025 jihadkhawaja</Copyright>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
 	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>
 	<PackageIcon>favico.png</PackageIcon>
-	<PackageTags>asp.net, blazor, signalr, chat, client</PackageTags>
+	<PackageTags>asp.net, blazor, signalr, chat, shared</PackageTags>
 	<PackageReleaseNotes>https://github.com/jihadkhawaja/Egroo/releases</PackageReleaseNotes>
   </PropertyGroup>
 
