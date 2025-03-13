@@ -35,11 +35,13 @@ namespace jihadkhawaja.chat.server.Database
             {
                 case DatabaseEnum.Postgres:
                     options.UseNpgsql(Configuration.GetConnectionString(Register.ChatService.DbConnectionStringKey), b =>
-                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName));
+                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName))
+                        .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
                     break;
                 case DatabaseEnum.SqlServer:
                     options.UseSqlServer(Configuration.GetConnectionString(Register.ChatService.DbConnectionStringKey), b =>
-                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName));
+                    b.MigrationsAssembly(Register.ChatService.CurrentExecutionAssemblyName))
+                        .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
                     break;
                 default:
                     throw new NotImplementedException();

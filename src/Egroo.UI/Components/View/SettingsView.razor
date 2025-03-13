@@ -2,7 +2,7 @@
 @using Egroo.UI.Models;
 @using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Services;
-
+@using jihadkhawaja.chat.shared.Models;  <!-- Ensure the shared model is accessible -->
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
@@ -29,6 +29,23 @@
         </MudStack>
     </MudPaper>
 
+    <!-- User Details & Security Settings Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudForm @ref="userForm">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.h6">User Details & Security Settings</MudText>
+                <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" />
+                <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
+                    Save Changes
+                </MudButton>
+            </MudStack>
+        </MudForm>
+    </MudPaper>
+
     <!-- Delete Account Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
         <MudStack Spacing="2">
@@ -43,7 +60,7 @@
     </MudPaper>
 
     <!-- Report a Problem / Send Feedback Section -->
-    <MudPaper Class="pa-4 my-4" Elevation="4" hidden>
+    <MudPaper Class="pa-4 my-4" Elevation="4">
         <MudStack Spacing="2">
             <MudText Typo="Typo.h6">Report a Problem / Send Feedback</MudText>
             <MudText Typo="Typo.body2">
@@ -59,12 +76,25 @@
 
 @code {
     private EgrooDB CacheDB { get; set; } = null!;
+    private MudForm userForm = null!;
     private string FeedbackText { get; set; } = string.Empty;
+    private User currentUser = new();
 
     protected override void OnInitialized()
     {
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
+
+        // Retrieve and initialize the current user
+        currentUser = SessionStorage.User ?? new User();
+        if (currentUser.UserDetail is null)
+        {
+            currentUser.UserDetail = new UserDetail();
+        }
+        if (currentUser.UserSecuriy is null)
+        {
+            currentUser.UserSecuriy = new UserSecurity();
+        }
     }
 
     private async Task SignOut(bool hasDialog = true)
@@ -127,9 +157,7 @@
             return;
         }
 
-        //send feedback logic (TODO)
-        //
-
+        // Send feedback logic (TODO)
         bool? confirmationResult = await DialogService.ShowMessageBox(
             "Feedback Submitted",
             "Thank you for your feedback!",
@@ -138,6 +166,30 @@
         if (confirmationResult.HasValue && confirmationResult.Value)
         {
             FeedbackText = string.Empty;
+        }
+    }
+
+    private async Task UpdateUserDetails()
+    {
+        // Trigger form validation if needed
+        await userForm.Validate();
+        if (!userForm.IsValid)
+        {
+            await DialogService.ShowMessageBox("Error", "Please correct the validation errors and try again.");
+            return;
+        }
+
+        // Update logic here - e.g., call a service to persist changes.
+        // For demonstration, show a confirmation dialog.
+        bool? result = await DialogService.ShowMessageBox(
+            "User Details Updated",
+            "Your user details and security settings have been saved.",
+            yesText: "OK");
+
+        if (result.HasValue && result.Value)
+        {
+            // Optionally refresh SessionStorage.User or perform additional actions.
+            SessionStorage.User = currentUser;
         }
     }
 }

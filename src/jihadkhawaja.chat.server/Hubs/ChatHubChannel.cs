@@ -3,6 +3,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
@@ -22,7 +23,15 @@ namespace jihadkhawaja.chat.server.Hubs
                 DateCreated = DateTime.UtcNow,
             };
 
-            await _channelService.Create(channel);
+            try
+            {
+                await _dbContext.AddAsync(channel);
+                await _dbContext.SaveChangesAsync();
+            }
+            catch
+            {
+                return null;
+            }
 
             await AddChannelUsers(channel.Id, usernames);
 
@@ -41,7 +50,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 }
 
                 // Get the channel to check if it is public.
-                Channel? channel = await _channelService.ReadFirst(x => x.Id == channelid);
+                Channel? channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == channelid);
                 if (channel == null)
                 {
                     return false;
@@ -49,7 +58,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 bool isPublic = channel.IsPublic;
 
                 // Retrieve existing channel users.
-                var existingChannelUsers = await _channelUsersService.Read(x => x.ChannelId == channelid);
+                var existingChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelid).ToListAsync();
                 // For non-public channels, only admins may add users once there are existing users.
                 if (!isPublic && existingChannelUsers.Any() && !await IsChannelAdmin(channelid, ConnectedUser.Id))
                 {
@@ -61,7 +70,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 for (int i = 0; i < usernames.Length; i++)
                 {
-                    User? userToAdd = await _userService.ReadFirst(x => x.Username == usernames[i].ToLower());
+                    User? userToAdd = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == usernames[i].ToLower());
 
                     if (userToAdd is null)
                     {
@@ -100,12 +109,12 @@ namespace jihadkhawaja.chat.server.Hubs
                     newUsersAddedCount++;
                 }
 
-                bool issuccess = await _channelUsersService.Create(channelUsersToBeAdded);
+                await _dbContext.ChannelUsers.AddRangeAsync(channelUsersToBeAdded);
+                await _dbContext.SaveChangesAsync();
 
-                if (issuccess)
-                    await NotifyChannelChange(channelid);
+                await NotifyChannelChange(channelid);
 
-                return issuccess;
+                return true;
             }
             catch
             {
@@ -125,15 +134,30 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 return false;
             }
-            bool issuccess = await _channelUsersService.Delete(x => x.ChannelId == channelid && x.UserId == userid);
-            if (issuccess)
+
+            try
+            {
+                ChannelUser? channelUser = await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelid && x.UserId == userid);
+                if (channelUser == null)
+                {
+                    return false;
+                }
+                _dbContext.ChannelUsers.Remove(channelUser);
+                await _dbContext.SaveChangesAsync();
+
                 await NotifyChannelChange(channelid, userid);
-            return issuccess;
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> ChannelContainUser(Guid channelid, Guid userid)
         {
-            return await _channelUsersService.ReadFirst(x => x.ChannelId == channelid && x.UserId == userid) != null;
+            return await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelid && x.UserId == userid) != null;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User[]?> GetChannelUsers(Guid channelid)
@@ -141,10 +165,10 @@ namespace jihadkhawaja.chat.server.Hubs
             HashSet<User> channelUsers = new();
             try
             {
-                List<ChannelUser> currentChannelUsers = (await _channelUsersService.Read(x => x.ChannelId == channelid)).ToList();
+                List<ChannelUser> currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelid).ToListAsync();
                 foreach (ChannelUser user in currentChannelUsers)
                 {
-                    var userdata = await _userService.ReadFirst(x => x.Id == user.UserId);
+                    var userdata = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == user.UserId);
 
                     if (userdata != null)
                     {
@@ -177,11 +201,11 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 var ConnectedUser = await GetConnectedUser();
 
-                List<ChannelUser> channelUsers = (await _channelUsersService
-                    .Read(x => x.UserId == ConnectedUser.Id)).ToList();
+                List<ChannelUser> channelUsers = await _dbContext.ChannelUsers
+                    .Where(x => x.UserId == ConnectedUser.Id).ToListAsync();
                 foreach (ChannelUser cu in channelUsers)
                 {
-                    Channel? channel = await _channelService.ReadFirst(x => x.Id == cu.ChannelId);
+                    Channel? channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == cu.ChannelId);
 
                     if (channel == null)
                     {
@@ -203,7 +227,7 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 return null;
             }
-            Channel? channel = await _channelService.ReadFirst(x => x.Id == channelId);
+            Channel? channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == channelId);
             if (channel == null)
             {
                 return null;
@@ -217,7 +241,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
         {
-            ChannelUser? channelAdmin = await _channelUsersService.ReadFirst(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
+            ChannelUser? channelAdmin = await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelId && x.UserId == userId && x.IsAdmin);
 
             if (channelAdmin is null)
             {
@@ -242,22 +266,25 @@ namespace jihadkhawaja.chat.server.Hubs
             User[]? prevChannelUsers = await GetChannelUsers(channelId);
             Guid[] prevUserIds = prevChannelUsers?.Select(u => u.Id).ToArray() ?? Array.Empty<Guid>();
 
-            if (!await _channelUsersService.Delete(x => x.ChannelId == channelId))
+            try
             {
-                return false;
-            }
+                var channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == channelId);
+                if (channel == null)
+                {
+                    return false;
+                }
+                _dbContext.Messages.RemoveRange(_dbContext.Messages.Where(x => x.ChannelId == channelId));
+                _dbContext.Channels.Remove(channel);
+                await _dbContext.SaveChangesAsync();
 
-            if (!await _messageService.Delete(x => x.ChannelId == channelId))
-            {
-                return false;
-            }
-
-            bool issuccess = await _channelService.Delete(x => x.Id == channelId);
-
-            if (issuccess)
                 await NotifyChannelChange(channelId, prevUserIds);
 
-            return issuccess;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> LeaveChannel(Guid channelId)
@@ -269,12 +296,22 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            bool issuccess = await _channelUsersService.Delete(x => x.UserId == ConnectedUser.Id && x.ChannelId == channelId);
-
-            if (issuccess)
+            try
+            {
+                ChannelUser? channelUser = await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelId && x.UserId == ConnectedUser.Id);
+                if (channelUser == null)
+                {
+                    return false;
+                }
+                _dbContext.ChannelUsers.Remove(channelUser);
+                await _dbContext.SaveChangesAsync();
                 await NotifyChannelChange(channelId);
-
-            return issuccess;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -282,7 +319,7 @@ namespace jihadkhawaja.chat.server.Hubs
         {
             try
             {
-                var publicChannels = await _channelService.Read(x => x.IsPublic);
+                var publicChannels = await _dbContext.Channels.Where(x => x.IsPublic).ToListAsync();
                 List<Channel> result = new();
 
                 foreach (var channel in publicChannels)

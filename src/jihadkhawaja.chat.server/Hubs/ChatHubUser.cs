@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace jihadkhawaja.chat.server.Hubs
@@ -30,13 +31,21 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 if (!_userConnections.ContainsKey(userId.Value))
                 {
-                    var user = await _userService.ReadFirst(x => x.Id == userId.Value);
+                    var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value);
                     if (user != null)
                     {
                         user.IsOnline = false;
                         user.ConnectionId = null;
-                        await _userService.Update(user);
-                        await NotifyFriendsOfStatusChange(user);
+                        try
+                        {
+                            _dbContext.Users.Update(user);
+                            await _dbContext.SaveChangesAsync();
+                            await NotifyFriendsOfStatusChange(user);
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
                     }
                 }
             }
@@ -45,7 +54,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<User?> GetUserPublicInfo(Guid userId)
         {
-            User? user = await _userService.ReadFirst(x => x.Id == userId);
+            User? user = await _dbContext.Users.Include("UserDetail").FirstOrDefaultAsync(x => x.Id == userId);
 
             if (user == null)
             {
@@ -58,7 +67,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             User userPublicResult = new()
             {
-                AvatarBase64 = user.AvatarBase64,
+                UserDetail = user.GetPublicDetail(),
                 Username = user.Username,
                 IsOnline = IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
@@ -77,7 +86,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            User? user = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
+            User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == ConnectorUserId);
 
             if (user == null)
             {
@@ -118,7 +127,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-                User? currentUser = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
+                User? currentUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == ConnectorUserId);
 
                 if (currentUser == null)
                 {
@@ -128,13 +137,13 @@ namespace jihadkhawaja.chat.server.Hubs
                 friendusername = friendusername.ToLower();
 
                 //get friend id from username
-                User? friendUser = await _userService.ReadFirst(x => x.Username == friendusername);
+                User? friendUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == friendusername);
                 if (friendUser == null || currentUser.Id == friendUser.Id)
                 {
                     return false;
                 }
 
-                if (await _userFriendsService.ReadFirst(
+                if (await _dbContext.UsersFriends.FirstOrDefaultAsync(
                     x => x.UserId == currentUser.Id && x.FriendUserId == friendUser.Id
                 || x.FriendUserId == currentUser.Id && x.UserId == friendUser.Id) != null)
                 {
@@ -148,14 +157,16 @@ namespace jihadkhawaja.chat.server.Hubs
                     FriendUserId = friendUser.Id,
                     DateCreated = DateTime.UtcNow
                 };
-                await _userFriendsService.Create(entry);
+
+                await _dbContext.UsersFriends.AddAsync(entry);
+                await _dbContext.SaveChangesAsync();
+
+                return true;
             }
             catch
             {
                 return false;
             }
-
-            return true;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> RemoveFriend(string friendusername)
@@ -184,19 +195,19 @@ namespace jihadkhawaja.chat.server.Hubs
                 friendusername = friendusername.ToLower();
 
                 //get user id from username
-                User? user = await _userService.ReadFirst(x => x.Id == ConnectorUserId);
+                User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == ConnectorUserId);
                 if (user == null)
                 {
                     return false;
                 }
                 //get friend id from username
-                User? friendUser = await _userService.ReadFirst(x => x.Username == friendusername);
+                User? friendUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == friendusername);
                 if (friendUser == null)
                 {
                     return false;
                 }
 
-                if (await _userFriendsService.ReadFirst(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
+                if (await _dbContext.UsersFriends.FirstOrDefaultAsync(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id ||
                 x.FriendUserId == user.Id && x.UserId == friendUser.Id) == null)
                 {
                     return false;
@@ -209,34 +220,42 @@ namespace jihadkhawaja.chat.server.Hubs
                     DateCreated = DateTime.UtcNow
                 };
 
-                await _userFriendsService.Delete(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
-                || x.FriendUserId == user.Id && x.UserId == friendUser.Id);
+                var friendToRemove = await _dbContext.UsersFriends.FirstOrDefaultAsync(x => x.UserId == user.Id && x.FriendUserId == friendUser.Id
+                    || x.FriendUserId == user.Id && x.UserId == friendUser.Id);
+                if (friendToRemove == null)
+                {
+                    return false;
+                }
+
+                _dbContext.UsersFriends.Remove(friendToRemove);
+                await _dbContext.SaveChangesAsync();
+
+                return true;
             }
             catch
             {
                 return false;
             }
-
-            return true;
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriends(Guid userId)
         {
-            return (await _userFriendsService.Read(x => (x.UserId == userId
-            && x.DateAcceptedOn is not null)
-            || (x.FriendUserId == userId && x.DateAcceptedOn is not null))).ToArray();
+            return await _dbContext.UsersFriends.Where(x =>
+            (x.UserId == userId && x.DateAcceptedOn != null)
+            || (x.FriendUserId == userId && x.DateAcceptedOn != null))
+                .ToArrayAsync();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<UserFriend[]?> GetUserFriendRequests(Guid userId)
         {
-            return (await _userFriendsService.Read(x => x.FriendUserId == userId
-            && x.DateAcceptedOn is null)).ToArray();
+            return await _dbContext.UsersFriends.Where(x => x.FriendUserId == userId
+            && x.DateAcceptedOn == null).ToArrayAsync();
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> GetUserIsFriend(Guid userId, Guid friendId)
         {
-            UserFriend? result = await _userFriendsService.ReadFirst(x => x.UserId == userId
-            && x.FriendUserId == friendId && x.DateAcceptedOn is not null);
+            UserFriend? result = await _dbContext.UsersFriends.FirstOrDefaultAsync(x => x.UserId == userId
+            && x.FriendUserId == friendId && x.DateAcceptedOn != null);
 
             if (result is null)
             {
@@ -264,8 +283,8 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            UserFriend? friendRequest = await _userFriendsService.ReadFirst(x => x.UserId == friendId
-            && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
+            UserFriend? friendRequest = await _dbContext.UsersFriends.FirstOrDefaultAsync(x => x.UserId == friendId
+            && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn == null);
 
             if (friendRequest is null)
             {
@@ -273,9 +292,17 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             friendRequest.DateAcceptedOn = DateTimeOffset.UtcNow;
+            try
+            {
+                _dbContext.UsersFriends.Update(friendRequest);
+                await _dbContext.SaveChangesAsync();
 
-            UserFriend[] friendRequests = [friendRequest];
-            return await _userFriendsService.Update(friendRequests);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> DenyFriend(Guid friendId)
@@ -295,7 +322,24 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            return await _userFriendsService.Delete(x => x.UserId == friendId && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn is null);
+            try
+            {
+                var friendRequest = await _dbContext.UsersFriends.FirstOrDefaultAsync(x =>
+                x.UserId == friendId && x.FriendUserId == ConnectorUserId && x.DateAcceptedOn == null);
+                if (friendRequest == null)
+                {
+                    return false;
+                }
+
+                _dbContext.UsersFriends.Remove(friendRequest);
+                await _dbContext.SaveChangesAsync();
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
@@ -315,10 +359,10 @@ namespace jihadkhawaja.chat.server.Hubs
 
             Guid ConnectorUserId = Guid.Parse(userIdClaim.Value);
 
-            IEnumerable<User>? users = (await _userService.Read(x =>
+            User[]? users = await _dbContext.Users.Where(x =>
             x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase)
-            && x.Id != ConnectorUserId))
-            .OrderBy(x => x.Username).Take(maxResult);
+            && x.Id != ConnectorUserId)
+            .OrderBy(x => x.Username).Take(maxResult).ToArrayAsync();
 
             if (users == null)
             {
@@ -367,9 +411,10 @@ namespace jihadkhawaja.chat.server.Hubs
 
             // Query the user service for users whose IDs are in the friend list
             // and whose username matches the query.
-            IEnumerable<User>? friends = await _userService.Read(x =>
+            User[]? friends = await _dbContext.Users.Where(x =>
                  friendIds.Contains(x.Id) &&
-                 x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase));
+                 x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase))
+                .ToArrayAsync();
 
             if (friends == null)
             {
@@ -377,7 +422,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             // Order and limit the results.
-            friends = friends.OrderBy(x => x.Username).Take(maxResult);
+            friends = friends.OrderBy(x => x.Username).Take(maxResult).ToArray();
 
             // Project to a new User object (if needed).
             return friends.Select(x => new User
@@ -386,7 +431,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 LastLoginDate = x.LastLoginDate,
                 IsOnline = x.IsOnline,
                 DateCreated = x.DateCreated,
-                AvatarBase64 = x.AvatarBase64 // include additional fields as needed
+                UserStorage = x.GetAvatar(),
             });
         }
         [AllowAnonymous]
@@ -398,7 +443,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             username = username.ToLower();
-            var user = await _userService.ReadFirst(x => x.Username == username);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
             return user is null;
         }
 
@@ -419,32 +464,72 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            Guid userId;
-            if (!Guid.TryParse(userIdClaim.Value, out userId))
+            if (!Guid.TryParse(userIdClaim.Value, out Guid userId))
             {
                 return false;
             }
 
             try
             {
-                //user
-                await _userService.Delete(x => x.Id == userId);
-                await _userFriendsService.Delete(x => x.UserId == userId || x.FriendUserId == userId);
-
-                //messages
-                await _messageService.Delete(x => x.SenderId == userId);
-                await _userPendingMessageService.Delete(x => x.UserId == userId);
-
-                //channels
-                await _channelUsersService.Delete(x => x.UserId == userId);
-                List<ChannelUser> channelUsers = (await _channelUsersService.Read(x => x.UserId == userId)).ToList();
-                foreach (ChannelUser cu in channelUsers)
+                // Delete user
+                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+                if (user != null)
                 {
-                    if ((await _channelUsersService.Read(x => x.ChannelId == cu.ChannelId)).Count() == 1)
-                    {
-                        await _channelService.Delete(x => x.Id == cu.ChannelId);
-                    }
+                    _dbContext.Users.Remove(user);
                 }
+
+                // Delete user friends
+                var userFriends = await _dbContext.UsersFriends
+                    .Where(x => x.UserId == userId || x.FriendUserId == userId)
+                    .ToListAsync();
+                if (userFriends.Any())
+                {
+                    _dbContext.UsersFriends.RemoveRange(userFriends);
+                }
+
+                // Delete messages sent by the user
+                var messages = await _dbContext.Messages
+                    .Where(x => x.SenderId == userId)
+                    .ToListAsync();
+                if (messages.Any())
+                {
+                    _dbContext.Messages.RemoveRange(messages);
+                }
+
+                // Delete pending messages for the user
+                var pendingMessages = await _dbContext.UsersPendingMessages
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+                if (pendingMessages.Any())
+                {
+                    _dbContext.UsersPendingMessages.RemoveRange(pendingMessages);
+                }
+
+                // Retrieve channel user records for the user
+                var userChannelUsers = await _dbContext.ChannelUsers
+                    .Where(x => x.UserId == userId)
+                    .ToListAsync();
+                if (userChannelUsers.Any())
+                {
+                    // For each channel, check if the current user is the only participant.
+                    foreach (var cu in userChannelUsers)
+                    {
+                        int channelUserCount = await _dbContext.ChannelUsers
+                            .CountAsync(x => x.ChannelId == cu.ChannelId);
+                        if (channelUserCount == 1)
+                        {
+                            var channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == cu.ChannelId);
+                            if (channel != null)
+                            {
+                                _dbContext.Channels.Remove(channel);
+                            }
+                        }
+                    }
+                    // Remove the channel user records for this user.
+                    _dbContext.ChannelUsers.RemoveRange(userChannelUsers);
+                }
+
+                await _dbContext.SaveChangesAsync();
                 return true;
             }
             catch

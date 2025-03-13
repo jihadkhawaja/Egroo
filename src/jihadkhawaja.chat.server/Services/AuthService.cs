@@ -1,9 +1,10 @@
 using jihadkhawaja.chat.server.Authorization;
+using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Helpers;
-using jihadkhawaja.chat.server.Interfaces;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -13,11 +14,11 @@ namespace jihadkhawaja.chat.server.Services
     public class AuthService : IAuth
     {
         private readonly IConfiguration _configuration;
-        private readonly IEntity<User> _userService;
+        private readonly DataContext _dbContext;
 
-        public AuthService(IEntity<User> userService, IConfiguration configuration)
+        public AuthService(DataContext dbContext, IConfiguration configuration)
         {
-            _userService = userService;
+            _dbContext = dbContext;
             _configuration = configuration;
         }
 
@@ -41,7 +42,7 @@ namespace jihadkhawaja.chat.server.Services
 
             username = username.ToLower();
 
-            if (await _userService.ReadFirst(x => x.Username == username) != null)
+            if (await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username) != null)
             {
                 return new Operation.Response
                 {
@@ -83,8 +84,11 @@ namespace jihadkhawaja.chat.server.Services
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            if (await _userService.Create(user))
+            try
             {
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
                 return new Operation.Response
                 {
                     Success = true,
@@ -93,19 +97,21 @@ namespace jihadkhawaja.chat.server.Services
                     Token = token
                 };
             }
-
-            return new Operation.Response
+            catch (Exception)
             {
-                Success = false,
-                Message = "Failed to create user."
-            };
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to create user."
+                };
+            }
         }
 
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             username = username.ToLower();
 
-            var user = await _userService.ReadFirst(x => x.Username == username);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
             if (user == null)
             {
                 return new Operation.Response
@@ -157,15 +163,27 @@ namespace jihadkhawaja.chat.server.Services
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            await _userService.Update(user);
-
-            return new Operation.Response
+            try
             {
-                Success = true,
-                Message = "Sign in successful.",
-                UserId = user.Id,
-                Token = token
-            };
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+
+                return new Operation.Response
+                {
+                    Success = true,
+                    Message = "Sign in successful.",
+                    UserId = user.Id,
+                    Token = token
+                };
+            }
+            catch (Exception)
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to update user."
+                };
+            }
         }
 
         public async Task<Operation.Response> RefreshSession(string oldtoken)
@@ -196,7 +214,7 @@ namespace jihadkhawaja.chat.server.Services
                 };
             }
 
-            var user = await _userService.ReadFirst(x => x.Id == userId);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
             if (user == null)
             {
                 return new Operation.Response
@@ -229,20 +247,33 @@ namespace jihadkhawaja.chat.server.Services
             string newToken = generatedToken.Access_Token;
 
             UpdateUserStatus(ref user);
-            await _userService.Update(user);
 
-            return new Operation.Response
+            try
             {
-                Success = true,
-                Message = "Session refreshed.",
-                UserId = user.Id,
-                Token = newToken
-            };
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+
+                return new Operation.Response
+                {
+                    Success = true,
+                    Message = "Session refreshed.",
+                    UserId = user.Id,
+                    Token = newToken
+                };
+            }
+            catch (Exception)
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to update user."
+                };
+            }
         }
 
         public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
         {
-            var registeredUser = await _userService.ReadFirst(x => x.Username == username);
+            var registeredUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
             if (registeredUser == null)
             {
                 return new Operation.Result
@@ -274,20 +305,25 @@ namespace jihadkhawaja.chat.server.Services
             registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
 
-            if (await _userService.Update(registeredUser))
+            try
             {
+                _dbContext.Users.Update(registeredUser);
+                await _dbContext.SaveChangesAsync();
+
                 return new Operation.Result
                 {
                     Success = true,
                     Message = "Password changed successfully."
                 };
             }
-
-            return new Operation.Result
+            catch (Exception)
             {
-                Success = false,
-                Message = "Failed to update password."
-            };
+                return new Operation.Result
+                {
+                    Success = false,
+                    Message = "Failed to update password."
+                };
+            }
         }
     }
 }

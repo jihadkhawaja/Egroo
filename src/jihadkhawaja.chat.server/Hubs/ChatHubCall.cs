@@ -3,6 +3,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using SIPSorcery.Net;  // (Not used for RTCPeerConnection on server in this design)
 using System.Collections.Concurrent;
 
@@ -37,8 +38,8 @@ namespace jihadkhawaja.chat.server.Hubs
             if (!callerId.HasValue)
                 return;
 
-            var caller = await _userService.ReadFirst(x => x.Id == callerId.Value);
-            var callee = await _userService.ReadFirst(x => x.Id == targetUser.Id);
+            var caller = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == callerId.Value);
+            var callee = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == targetUser.Id);
 
             if (callee == null || !IsUserOnline(callee.Id))
             {
@@ -80,7 +81,7 @@ namespace jihadkhawaja.chat.server.Hubs
             if (!calleeId.HasValue)
                 return;
 
-            var callee = await _userService.ReadFirst(x => x.Id == calleeId.Value);
+            var callee = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == calleeId.Value);
             var callOffer = _callOffers.Values.FirstOrDefault(o => o.Callee.Id == calleeId.Value);
 
             if (callOffer == null || callee == null)
@@ -153,7 +154,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (activeCall || pendingOffer)
             {
-                var sender = await _userService.ReadFirst(x => x.Id == senderId.Value);
+                var sender = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId.Value);
                 var targetConns = GetUserConnectionIds(target.Id);
                 await Clients.Clients(targetConns)
                     .SendAsync("ReceiveSignal", sender, signal);
@@ -201,7 +202,7 @@ namespace jihadkhawaja.chat.server.Hubs
             var onlineUsers = new List<User>();
             foreach (var userId in _userConnections.Keys)
             {
-                var user = await _userService.ReadFirst(x => x.Id == userId);
+                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
                 if (user != null)
                 {
                     user.IsOnline = true;

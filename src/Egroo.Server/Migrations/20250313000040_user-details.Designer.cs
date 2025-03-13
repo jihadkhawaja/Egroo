@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using jihadkhawaja.chat.server.Database;
@@ -12,9 +13,11 @@ using jihadkhawaja.chat.server.Database;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250313000040_user-details")]
+    partial class userdetails
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -320,58 +323,6 @@ namespace Egroo.Server.Migrations
                     b.ToTable("userdetail");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("createdby");
-
-                    b.Property<DateTimeOffset?>("DateCreated")
-                        .IsRequired()
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
-
-                    b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
-
-                    b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deletedby");
-
-                    b.Property<bool>("IsEncrypted")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isencrypted");
-
-                    b.Property<string>("Text")
-                        .HasColumnType("text")
-                        .HasColumnName("text");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updatedby");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("userfeedback");
-                });
-
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFriend", b =>
                 {
                     b.Property<Guid>("Id")
@@ -525,15 +476,6 @@ namespace Egroo.Server.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
-                {
-                    b.HasOne("jihadkhawaja.chat.shared.Models.User", null)
-                        .WithOne("UserFeedback")
-                        .HasForeignKey("jihadkhawaja.chat.shared.Models.UserFeedback", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserSecurity", b =>
                 {
                     b.HasOne("jihadkhawaja.chat.shared.Models.User", null)
@@ -555,8 +497,6 @@ namespace Egroo.Server.Migrations
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.User", b =>
                 {
                     b.Navigation("UserDetail");
-
-                    b.Navigation("UserFeedback");
 
                     b.Navigation("UserSecuriy");
 

@@ -1,11 +1,9 @@
 ﻿using jihadkhawaja.chat.server.API;
 using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Interfaces;
 using jihadkhawaja.chat.server.Services;
 using jihadkhawaja.chat.server.SIP;
 using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -136,7 +134,6 @@ public class ChatServiceBuilder
         AutoMigrateDatabase = _autoMigrateDatabase;
 
         ConfigureAPI(_services);
-        ConfigureEntityServices(_services);
         ConfigureDatabase(_services);
         ConfigureSignalR(_services);
         // ConfigureSIPWebSocket(_services);
@@ -157,16 +154,6 @@ public class ChatServiceBuilder
     private void ConfigureDatabase(IServiceCollection services)
     {
         services.AddDbContext<DataContext>();
-    }
-
-    private void ConfigureEntityServices(IServiceCollection services)
-    {
-        services.AddScoped<IEntity<User>, EntityService<User>>();
-        services.AddScoped<IEntity<UserFriend>, EntityService<UserFriend>>();
-        services.AddScoped<IEntity<Channel>, EntityService<Channel>>();
-        services.AddScoped<IEntity<ChannelUser>, EntityService<ChannelUser>>();
-        services.AddScoped<IEntity<Message>, EntityService<Message>>();
-        services.AddScoped<IEntity<UserPendingMessage>, EntityService<UserPendingMessage>>();
     }
 
     private void ConfigureSIPWebSocket(IServiceCollection services)

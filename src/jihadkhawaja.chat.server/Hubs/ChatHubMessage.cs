@@ -3,6 +3,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
@@ -42,13 +43,18 @@ namespace jihadkhawaja.chat.server.Hubs
             message.DateSent = DateTime.UtcNow;
             message.IsEncrypted = true;
 
-            if (await _messageService.Create(message))
+            try
             {
+                await _dbContext.Messages.AddAsync(message);
+                await _dbContext.SaveChangesAsync();
+
+                // Send message to all users in the channel
                 User[]? users = await GetChannelUsers(message.ChannelId);
-                if (users is null)
+                if (users == null)
                 {
                     return false;
                 }
+
                 foreach (User user in users)
                 {
                     await SendClientMessage(user, message, false);
@@ -56,8 +62,10 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 return true;
             }
-
-            return false;
+            catch
+            {
+                return false;
+            }
         }
         private async Task<bool> SendClientMessage(User user, Message message, bool IgnorePendingMessages)
         {
@@ -82,7 +90,15 @@ namespace jihadkhawaja.chat.server.Hubs
             //In case client was offline or had connection cut
             if (!IgnorePendingMessages)
             {
-                await _userPendingMessageService.CreateOrUpdate(userPendingMessage);
+                try
+                {
+                    await _dbContext.UsersPendingMessages.AddRangeAsync(userPendingMessage);
+                    await _dbContext.SaveChangesAsync();
+                }
+                catch
+                {
+                    return false;
+                }
             }
 
             string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
@@ -118,7 +134,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
             }
 
-            Message dbMessage = await _messageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
+            Message? dbMessage = await _dbContext.Messages.FirstOrDefaultAsync(x => x.ReferenceId == message.ReferenceId);
             if (dbMessage is null)
             {
                 return false;
@@ -127,8 +143,11 @@ namespace jihadkhawaja.chat.server.Hubs
             dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 
             //save msg to db
-            if (await _messageService.Update(dbMessage))
+            try
             {
+                _dbContext.Messages.Update(dbMessage);
+                await _dbContext.SaveChangesAsync();
+
                 User[]? users = await GetChannelUsers(dbMessage.ChannelId);
                 if (users is null)
                 {
@@ -147,24 +166,30 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 return true;
             }
-
-            return false;
+            catch
+            {
+                return false;
+            }
         }
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendPendingMessages()
         {
             var ConnectedUser = await GetConnectedUser();
+            if (ConnectedUser is null)
+            {
+                return;
+            }
 
             IEnumerable<UserPendingMessage> UserPendingMessages =
-                await _userPendingMessageService
-                .Read(x => x.UserId == ConnectedUser.Id);
+                await _dbContext.UsersPendingMessages
+                .Where(x => x.UserId == ConnectedUser.Id).ToListAsync();
 
             if (UserPendingMessages is not null)
             {
                 foreach (var userpendingmessage in UserPendingMessages)
                 {
-                    Message? message = await _messageService
-                        .ReadFirst(x => x.Id == userpendingmessage.MessageId);
+                    Message? message = await _dbContext.Messages
+                        .FirstOrDefaultAsync(x => x.Id == userpendingmessage.MessageId);
 
                     if (message is null) continue;
 
@@ -178,17 +203,29 @@ namespace jihadkhawaja.chat.server.Hubs
         public async Task UpdatePendingMessage(Guid messageid)
         {
             var ConnectedUser = await GetConnectedUser();
+            if (ConnectedUser is null)
+            {
+                return;
+            }
 
-            UserPendingMessage UserPendingMessage =
-                await _userPendingMessageService
-                .ReadFirst(x => x.UserId == ConnectedUser.Id
+            UserPendingMessage? UserPendingMessage =
+                await _dbContext.UsersPendingMessages
+                .FirstOrDefaultAsync(x => x.UserId == ConnectedUser.Id
                     && x.MessageId == messageid
-                    && x.DateUserReceivedOn is null
-                    && x.DateDeleted is null);
+                    && x.DateUserReceivedOn == null
+                    && x.DateDeleted == null);
 
             if (UserPendingMessage is not null)
             {
-                await _userPendingMessageService.Delete(x => x.Id == UserPendingMessage.Id);
+                try
+                {
+                    _dbContext.UsersPendingMessages.Remove(UserPendingMessage);
+                    await _dbContext.SaveChangesAsync();
+                }
+                catch
+                {
+                    return;
+                }
             }
         }
     }

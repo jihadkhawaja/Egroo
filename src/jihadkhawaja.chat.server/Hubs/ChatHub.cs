@@ -1,7 +1,8 @@
-﻿using jihadkhawaja.chat.server.Interfaces;
+﻿using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Concurrent;
 using System.IdentityModel.Tokens.Jwt;
@@ -16,30 +17,15 @@ namespace jihadkhawaja.chat.server.Hubs
             new ConcurrentDictionary<Guid, HashSet<string>>();
 
         private readonly IConfiguration _configuration;
-        private readonly IEntity<User> _userService;
-        private readonly IEntity<UserFriend> _userFriendsService;
-        private readonly IEntity<Channel> _channelService;
-        private readonly IEntity<ChannelUser> _channelUsersService;
-        private readonly IEntity<Message> _messageService;
-        private readonly IEntity<UserPendingMessage> _userPendingMessageService;
+        private readonly DataContext _dbContext;
         private readonly EncryptionService _encryptionService;
 
         public ChatHub(
             IConfiguration configuration,
-            IEntity<User> userService,
-            IEntity<UserFriend> userFriendsService,
-            IEntity<Channel> channelService,
-            IEntity<ChannelUser> channelUsersService,
-            IEntity<Message> messageService,
-            IEntity<UserPendingMessage> userPendingMessageService)
+            DataContext dbContext)
         {
             _configuration = configuration;
-            _userService = userService;
-            _userFriendsService = userFriendsService;
-            _channelService = channelService;
-            _channelUsersService = channelUsersService;
-            _messageService = messageService;
-            _userPendingMessageService = userPendingMessageService;
+            _dbContext = dbContext;
 
             // Initialize the encryption service with configuration values.
             _encryptionService = new EncryptionService(
@@ -89,7 +75,7 @@ namespace jihadkhawaja.chat.server.Hubs
             var userId = GetUserIdFromContext();
             if (userId.HasValue)
             {
-                return await _userService.ReadFirst(x => x.Id == userId.Value);
+                return await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value);
             }
             return null;
         }
@@ -131,7 +117,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             if (foundUserId.HasValue)
             {
-                return await _userService.ReadFirst(x => x.Id == foundUserId.Value);
+                return await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == foundUserId.Value);
             }
             return null;
         }
@@ -178,13 +164,21 @@ namespace jihadkhawaja.chat.server.Hubs
                 // If this is the user's first active connection.
                 if (_userConnections[userId.Value].Count == 1)
                 {
-                    var user = await _userService.ReadFirst(x => x.Id == userId.Value);
+                    var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value);
                     if (user != null)
                     {
                         user.IsOnline = true;
                         user.LastLoginDate = DateTimeOffset.UtcNow;
                         user.ConnectionId = Context.ConnectionId;
-                        await _userService.Update(user);
+                        try
+                        {
+                            _dbContext.Update(user);
+                            await _dbContext.SaveChangesAsync();
+                        }
+                        catch (Exception)
+                        {
+                            // Handle the exception.
+                        }
 
                         // Notify online friends that the user is now online.
                         await NotifyFriendsOfStatusChange(user);
@@ -219,13 +213,21 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 if (!IsUserOnline(userId.Value))
                 {
-                    var user = await _userService.ReadFirst(x => x.Id == userId.Value);
+                    var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId.Value);
                     if (user != null)
                     {
                         user.IsOnline = false;
                         user.LastLoginDate = DateTimeOffset.UtcNow;
                         user.ConnectionId = null;
-                        await _userService.Update(user);
+                        try
+                        {
+                            _dbContext.Update(user);
+                            await _dbContext.SaveChangesAsync();
+                        }
+                        catch (Exception)
+                        {
+                            // Handle the exception.
+                        }
 
                         // Notify online friends that the user is now offline.
                         await NotifyFriendsOfStatusChange(user);
@@ -246,9 +248,9 @@ namespace jihadkhawaja.chat.server.Hubs
         {
             // Retrieve friend relationships where the changed user is involved and the request was accepted.
             // Adjust the predicate according to your data model.
-            var friendRelations = await _userFriendsService.Read(x =>
+            var friendRelations = await _dbContext.UsersFriends.Where(x =>
                 (x.UserId == changedUser.Id || x.FriendUserId == changedUser.Id) &&
-                x.DateAcceptedOn != null);
+                x.DateAcceptedOn != null).ToListAsync();
 
             // Determine the friend IDs (the other party in the relationship).
             var friendIds = friendRelations
