@@ -10,8 +10,8 @@ namespace Egroo.Server.Test
     public class MessageTest
     {
         private IAuth ChatAuthService { get; set; } = null!;
-        private IChatChannel ChatChannelService { get; set; } = null!;
-        private IChatMessage ChatMessageService { get; set; } = null!;
+        private IChannel ChatChannelService { get; set; } = null!;
+        private IMessage ChatMessageService { get; set; } = null!;
 
         private static Channel? Channel { get; set; }
         private static User? User { get; set; }

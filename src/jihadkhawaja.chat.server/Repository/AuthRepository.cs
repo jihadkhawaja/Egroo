@@ -1,6 +1,7 @@
 using jihadkhawaja.chat.server.Authorization;
 using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Helpers;
+using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
@@ -9,17 +10,15 @@ using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace jihadkhawaja.chat.server.Services
+namespace jihadkhawaja.chat.server.Repository
 {
-    public class AuthService : IAuth
+    public class AuthRepository : BaseRepository, IAuth
     {
-        private readonly IConfiguration _configuration;
-        private readonly DataContext _dbContext;
-
-        public AuthService(DataContext dbContext, IConfiguration configuration)
+        public AuthRepository(DataContext dbContext, 
+            IConfiguration configuration, 
+            EncryptionService encryptionService)
+            : base(dbContext, configuration, encryptionService)
         {
-            _dbContext = dbContext;
-            _configuration = configuration;
         }
 
         private void UpdateUserStatus(ref User user)

@@ -3,7 +3,7 @@
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
-@inject IChatUser ChatUserService
+@inject IUser ChatUserService
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -146,14 +146,14 @@ else
         IsBusy = true;
 
         UserFriendRequests = await GetFriendsRequest();
-        UserFriends = await GetUsers();
+        UserFriends = await GetUserFriends();
 
         IsBusy = false;
 
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task<User[]> GetUsers()
+    private async Task<User[]> GetUserFriends()
     {
         UserFriend[] users = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
         User[] friends = new User[users.Length];

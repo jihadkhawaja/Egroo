@@ -9,12 +9,29 @@
 @inject NavigationManager NavigationManager
 @inject StorageService StorageService
 @inject IDialogService DialogService
-@inject IChatUser ChatUserService
+@inject IUser ChatUserService
 @inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <!-- Page Header -->
     <MudText Typo="Typo.h3" GutterBottom="true">Settings</MudText>
+
+    <!-- User Details & Security Settings Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudForm @ref="userForm">
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.h6">User Details</MudText>
+                <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" />
+                <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
+                <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
+                <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
+                    Save Changes
+                </MudButton>
+            </MudStack>
+        </MudForm>
+    </MudPaper>
 
     <!-- Account Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
@@ -27,23 +44,6 @@
                 Logout
             </MudButton>
         </MudStack>
-    </MudPaper>
-
-    <!-- User Details & Security Settings Section -->
-    <MudPaper Class="pa-4 my-4" Elevation="4">
-        <MudForm @ref="userForm">
-            <MudStack Spacing="2">
-                <MudText Typo="Typo.h6">User Details & Security Settings</MudText>
-                <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" />
-                <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
-                    Save Changes
-                </MudButton>
-            </MudStack>
-        </MudForm>
     </MudPaper>
 
     <!-- Delete Account Section -->
@@ -67,7 +67,7 @@
                 If you are experiencing issues or have suggestions for improvement, please share your feedback below.
             </MudText>
             <MudTextField @bind-Value="FeedbackText" Label="Your Feedback" Lines="4" FullWidth="true" />
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitFeedback">
+            <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitFeedback">
                 Submit Feedback
             </MudButton>
         </MudStack>

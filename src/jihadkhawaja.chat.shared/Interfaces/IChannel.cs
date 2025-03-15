@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.shared.Interfaces
 {
-    public interface IChatChannel
+    public interface IChannel
     {
         Task<Channel?> CreateChannel(params string[] usernames);
         Task<bool> DeleteChannel(Guid channelId);

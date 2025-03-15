@@ -1,5 +1,6 @@
 ﻿using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Security;
+using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -19,18 +20,23 @@ namespace jihadkhawaja.chat.server.Hubs
         private readonly IConfiguration _configuration;
         private readonly DataContext _dbContext;
         private readonly EncryptionService _encryptionService;
+        private readonly IUser _userRepository;
+        private readonly IChannel _channelRepository;
+        private readonly IMessage _messageRepository;
 
-        public ChatHub(
-            IConfiguration configuration,
-            DataContext dbContext)
+        public ChatHub(IConfiguration configuration,
+            DataContext dbContext,
+            EncryptionService encryptionService,
+            IUser userRepository,
+            IChannel channelRepository,
+            IMessage messageRepository)
         {
             _configuration = configuration;
             _dbContext = dbContext;
-
-            // Initialize the encryption service with configuration values.
-            _encryptionService = new EncryptionService(
-                keyString: _configuration["Encryption:Key"],
-                ivString: _configuration["Encryption:IV"]);
+            _encryptionService = encryptionService;
+            _userRepository = userRepository;
+            _channelRepository = channelRepository;
+            _messageRepository = messageRepository;
         }
 
         /// <summary>
@@ -85,7 +91,7 @@ namespace jihadkhawaja.chat.server.Hubs
         /// </summary>
         /// <param name="userId">The unique identifier of the user.</param>
         /// <returns>True if the user is online; otherwise, false.</returns>
-        public bool IsUserOnline(Guid userId)
+        public static bool IsUserOnline(Guid userId)
         {
             return _userConnections.TryGetValue(userId, out var connections) && connections.Count > 0;
         }

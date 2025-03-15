@@ -1,85 +1,59 @@
-﻿using jihadkhawaja.chat.shared.Interfaces;
+﻿using jihadkhawaja.chat.server.Repository;
+using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
-    public partial class ChatHub : IChatMessage
+    public partial class ChatHub : IMessageHub
     {
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> SendMessage(Message message)
         {
             if (message == null)
-            {
                 return false;
-            }
 
-            // Validate the connected user is the same as sender
             var connectedUser = await GetConnectedUser();
             if (connectedUser == null || connectedUser.Id != message.SenderId)
-            {
                 return false;
-            }
 
-            // Ensure the user is part of the channel
             if (!await ChannelContainUser(message.ChannelId, message.SenderId))
-            {
                 return false;
-            }
 
             if (string.IsNullOrWhiteSpace(message.Content))
-            {
                 return false;
-            }
 
-            // Encrypt message content
-            message.Content = _encryptionService.Encrypt(message.Content);
-
-            // Save message to db
-            message.Id = Guid.NewGuid();
-            message.DateSent = DateTime.UtcNow;
-            message.IsEncrypted = true;
-
-            try
-            {
-                await _dbContext.Messages.AddAsync(message);
-                await _dbContext.SaveChangesAsync();
-
-                // Send message to all users in the channel
-                User[]? users = await GetChannelUsers(message.ChannelId);
-                if (users == null)
-                {
-                    return false;
-                }
-
-                foreach (User user in users)
-                {
-                    await SendClientMessage(user, message, false);
-                }
-
-                return true;
-            }
-            catch
-            {
+            bool dbResult = await _messageRepository.SendMessage(message);
+            if (!dbResult)
                 return false;
+
+            User[]? users = await GetChannelUsers(message.ChannelId);
+            if (users == null)
+                return false;
+
+            foreach (User user in users)
+            {
+                await SendClientMessage(user, message, ignorePendingMessages: false);
             }
+
+            return true;
         }
-        private async Task<bool> SendClientMessage(User user, Message message, bool IgnorePendingMessages)
+
+        private async Task<bool> SendClientMessage(User user, Message message, bool ignorePendingMessages)
         {
             if (string.IsNullOrWhiteSpace(message.Content))
-            {
                 return false;
-            }
 
+            // Make sure the message content is encrypted.
             if (!message.IsEncrypted)
+            {
                 message.Content = _encryptionService.Encrypt(message.Content);
-
+            }
             message.IsEncrypted = true;
 
-            UserPendingMessage userPendingMessage = new()
+            UserPendingMessage pendingMsg = new()
             {
                 UserId = user.Id,
                 MessageId = message.Id,
@@ -87,28 +61,29 @@ namespace jihadkhawaja.chat.server.Hubs
                 IsEncrypted = message.IsEncrypted
             };
 
-            //In case client was offline or had connection cut
-            if (!IgnorePendingMessages)
+            if (_messageRepository is MessageRepository concreteRepo)
             {
-                try
+                // Save pending message if the client is offline.
+                if (!ignorePendingMessages)
                 {
-                    await _dbContext.UsersPendingMessages.AddRangeAsync(userPendingMessage);
-                    await _dbContext.SaveChangesAsync();
+                    bool pendingSaved = await concreteRepo.AddPendingMessage(pendingMsg);
+                    if (!pendingSaved)
+                        return false;
                 }
-                catch
-                {
-                    return false;
-                }
+            }
+            else
+            {
+                // Cannot save pending message without the concrete implementation.
+                return false;
             }
 
             string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
             if (string.IsNullOrEmpty(connectionId))
-            {
                 return false;
-            }
 
             try
             {
+                // Decrypt before sending to client.
                 Message messageToSend = message;
                 if (message.IsEncrypted)
                 {
@@ -120,113 +95,74 @@ namespace jihadkhawaja.chat.server.Hubs
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to send message for the following error: {ex}");
+                Console.WriteLine($"Failed to send message: {ex}");
             }
 
             return false;
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> UpdateMessage(Message message)
         {
-            if (message.Id == Guid.Empty
-                || string.IsNullOrWhiteSpace(message.Content))
-            {
+            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
                 return false;
-            }
 
-            Message? dbMessage = await _dbContext.Messages.FirstOrDefaultAsync(x => x.ReferenceId == message.ReferenceId);
-            if (dbMessage is null)
-            {
+            bool dbResult = await _messageRepository.UpdateMessage(message);
+            if (!dbResult)
                 return false;
-            }
-            dbMessage.DateSeen = DateTimeOffset.UtcNow;
-            dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 
-            //save msg to db
-            try
+            Message? updatedMessage = null;
+            if (_messageRepository is MessageRepository concreteRepo)
             {
-                _dbContext.Messages.Update(dbMessage);
-                await _dbContext.SaveChangesAsync();
-
-                User[]? users = await GetChannelUsers(dbMessage.ChannelId);
-                if (users is null)
-                {
-                    return false;
-                }
-                foreach (User user in users)
-                {
-                    string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
-                    if (string.IsNullOrEmpty(connectionId))
-                    {
-                        continue;
-                    }
-
-                    await Clients.Client(connectionId).SendAsync("UpdateMessage", dbMessage);
-                }
-
-                return true;
+                updatedMessage = await concreteRepo.GetMessageByReferenceId(message.ReferenceId);
             }
-            catch
-            {
+            if (updatedMessage == null)
                 return false;
+
+            User[]? users = await GetChannelUsers(updatedMessage.ChannelId);
+            if (users == null)
+                return false;
+
+            foreach (User user in users)
+            {
+                string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
+                if (string.IsNullOrEmpty(connectionId))
+                    continue;
+                await Clients.Client(connectionId).SendAsync("UpdateMessage", updatedMessage);
             }
+
+            return true;
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendPendingMessages()
         {
-            var ConnectedUser = await GetConnectedUser();
-            if (ConnectedUser is null)
-            {
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null)
                 return;
-            }
 
-            IEnumerable<UserPendingMessage> UserPendingMessages =
-                await _dbContext.UsersPendingMessages
-                .Where(x => x.UserId == ConnectedUser.Id).ToListAsync();
+            if (_messageRepository is not MessageRepository concreteRepo)
+                return;
 
-            if (UserPendingMessages is not null)
+            IEnumerable<UserPendingMessage> pendingMessages = await concreteRepo.GetPendingMessagesForUser(connectedUser.Id);
+            foreach (var pending in pendingMessages)
             {
-                foreach (var userpendingmessage in UserPendingMessages)
-                {
-                    Message? message = await _dbContext.Messages
-                        .FirstOrDefaultAsync(x => x.Id == userpendingmessage.MessageId);
-
-                    if (message is null) continue;
-
-                    message.Content = userpendingmessage.Content;
-
-                    await SendClientMessage(ConnectedUser, message, true);
-                }
+                var message = await concreteRepo.GetMessageById(pending.MessageId);
+                if (message == null)
+                    continue;
+                message.Content = pending.Content;
+                await SendClientMessage(connectedUser, message, ignorePendingMessages: true);
             }
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task UpdatePendingMessage(Guid messageid)
         {
-            var ConnectedUser = await GetConnectedUser();
-            if (ConnectedUser is null)
-            {
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null)
                 return;
-            }
 
-            UserPendingMessage? UserPendingMessage =
-                await _dbContext.UsersPendingMessages
-                .FirstOrDefaultAsync(x => x.UserId == ConnectedUser.Id
-                    && x.MessageId == messageid
-                    && x.DateUserReceivedOn == null
-                    && x.DateDeleted == null);
-
-            if (UserPendingMessage is not null)
-            {
-                try
-                {
-                    _dbContext.UsersPendingMessages.Remove(UserPendingMessage);
-                    await _dbContext.SaveChangesAsync();
-                }
-                catch
-                {
-                    return;
-                }
-            }
+            await _messageRepository.UpdatePendingMessage(messageid);
         }
     }
 }

@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace jihadkhawaja.chat.client.Services
 {
-    public class ChatCallService : IChatCall
+    public class ChatCallService : ICall
     {
         // Client-side events that UI components can subscribe to.
         // Updated events to include an SDP string where applicable.

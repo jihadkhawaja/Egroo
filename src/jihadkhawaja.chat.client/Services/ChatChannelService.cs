@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace jihadkhawaja.chat.client.Services
 {
-    public class ChatChannelService : IChatChannel
+    public class ChatChannelService : IChannel
     {
         private HubConnection HubConnection => MobileChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");

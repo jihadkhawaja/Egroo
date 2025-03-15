@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using SIPSorcery.Net;  // (Not used for RTCPeerConnection on server in this design)
+using SIPSorcery.Net;
 using System.Collections.Concurrent;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
-    public partial class ChatHub : IChatCall
+    public partial class ChatHub : ICall
     {
         // Dictionaries for call state management.
         private static readonly ConcurrentDictionary<Guid, UserCall> _userCalls = new();

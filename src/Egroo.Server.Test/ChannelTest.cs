@@ -10,7 +10,7 @@ namespace Egroo.Server.Test
     public class ChannelTest
     {
         private IAuth ChatAuthService { get; set; } = null!;
-        private IChatChannel ChatChannelService { get; set; } = null!;
+        private IChannel ChatChannelService { get; set; } = null!;
         private static Channel? Channel { get; set; }
 
         [TestInitialize]

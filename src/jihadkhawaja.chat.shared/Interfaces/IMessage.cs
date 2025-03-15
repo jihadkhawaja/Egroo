@@ -2,11 +2,14 @@
 
 namespace jihadkhawaja.chat.shared.Interfaces
 {
-    public interface IChatMessage
+    public interface IMessage
     {
         Task<bool> SendMessage(Message message);
         Task<bool> UpdateMessage(Message message);
-        Task SendPendingMessages();
         Task UpdatePendingMessage(Guid messageid);
+    }
+    public interface IMessageHub : IMessage
+    {
+        Task SendPendingMessages();
     }
 }

@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.shared.Interfaces
 {
-    public interface IChatCall
+    public interface ICall
     {
         Task CallUser(User targetUser, string offerSdp);
         Task AnswerCall(bool acceptCall, User caller, string answerSdp);

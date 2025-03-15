@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.shared.Interfaces
 {
-    public interface IChatUser
+    public interface IUser
     {
         Task CloseUserSession();
         Task<User?> GetUserPublicInfo(Guid userId);

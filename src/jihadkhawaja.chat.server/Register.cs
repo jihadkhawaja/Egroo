@@ -1,7 +1,8 @@
 ﻿using jihadkhawaja.chat.server.API;
 using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Services;
+using jihadkhawaja.chat.server.Repository;
+using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.server.SIP;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
@@ -143,7 +144,15 @@ public class ChatServiceBuilder
 
     private void ConfigureAPI(IServiceCollection services)
     {
-        services.AddScoped<IAuth, AuthService>();
+        services.AddHttpContextAccessor();
+        services.AddSingleton(new EncryptionService(
+                keyString: _configuration["Encryption:Key"],
+                ivString: _configuration["Encryption:IV"])
+            );
+        services.AddScoped<IAuth, AuthRepository>();
+        services.AddScoped<IUser, UserRepository>();
+        services.AddScoped<IChannel, ChannelRepository>();
+        services.AddScoped<IMessage, MessageRepository>();
     }
 
     private void ConfigureSignalR(IServiceCollection services)

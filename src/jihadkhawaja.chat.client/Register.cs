@@ -12,9 +12,9 @@ namespace jihadkhawaja.chat.client
         {
             //chat services
             services.AddScoped<IAuth, AuthService>();
-            services.AddScoped<IChatUser, ChatUserService>();
-            services.AddScoped<IChatChannel, ChatChannelService>();
-            services.AddScoped<IChatMessage, ChatMessageService>();
+            services.AddScoped<IUser, ChatUserService>();
+            services.AddScoped<IChannel, ChatChannelService>();
+            services.AddScoped<IMessageHub, ChatMessageService>();
             services.AddScoped<ChatCallService>();
 
             services.AddDexieWrapper();

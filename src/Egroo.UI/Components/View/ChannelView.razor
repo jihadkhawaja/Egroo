@@ -14,9 +14,9 @@
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
 @inject NavigationManager NavigationManager
-@inject IChatUser ChatUserService
-@inject IChatMessage ChatMessageService
-@inject IChatChannel ChatChannelService
+@inject IUser ChatUserService
+@inject IMessageHub ChatMessageService
+@inject IChannel ChatChannelService
 @inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
@@ -84,7 +84,7 @@
                               Value="InputContent"
                               ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
                               InputMode="InputMode.text" InputType="InputType.Text"
-                              AutoFocus="true"
+                              AutoFocus="false"
                               Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
                               Lines="1" MaxLength="MaxMessageLength"
                               Counter="MaxMessageLength" Disabled="InputDisabled" />
@@ -234,6 +234,8 @@
         }
         InputDisabled = false;
         await InvokeAsync(StateHasChanged);
+
+        await inputMudTextField.FocusAsync();
     }
 
     public async Task EnterPressed(KeyboardEventArgs e)
