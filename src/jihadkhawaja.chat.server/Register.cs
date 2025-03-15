@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Threading.RateLimiting;
 using WebSocketSharp.Net.WebSockets;
 using WebSocketSharp.Server;
 
@@ -40,6 +41,8 @@ public static class Register
                 db.Database.Migrate();
             }
         }
+
+        app.UseRateLimiter();
 
         // Map API endpoints.
         app.MapAuthentication();
@@ -153,6 +156,19 @@ public class ChatServiceBuilder
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessage, MessageRepository>();
+
+        services.AddRateLimiter(options =>
+        {
+            options.AddPolicy("Api", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: partition => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 100,
+                        Window = TimeSpan.FromMinutes(1),
+                        AutoReplenishment = true
+                    }));
+        });
     }
 
     private void ConfigureSignalR(IServiceCollection services)

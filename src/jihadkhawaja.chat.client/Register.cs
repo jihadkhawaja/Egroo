@@ -11,7 +11,7 @@ namespace jihadkhawaja.chat.client
         public static IServiceCollection AddChatServices(this IServiceCollection services)
         {
             //chat services
-            services.AddScoped<IAuth, AuthService>();
+            services.AddScoped<IAuthClient, AuthService>();
             services.AddScoped<IUser, ChatUserService>();
             services.AddScoped<IChannel, ChatChannelService>();
             services.AddScoped<IMessageHub, ChatMessageService>();

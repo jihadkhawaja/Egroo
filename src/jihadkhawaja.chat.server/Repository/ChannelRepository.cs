@@ -6,39 +6,17 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Security.Claims;
 
 namespace jihadkhawaja.chat.server.Repository
 {
     public class ChannelRepository : BaseRepository, IChannel
     {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public ChannelRepository(DataContext dbContext, 
-            IConfiguration configuration, 
-            EncryptionService encryptionService,
-            IHttpContextAccessor httpContextAccessor)
-            : base(dbContext, configuration, encryptionService)
+        public ChannelRepository(DataContext dbContext,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration,
+            EncryptionService encryptionService)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService)
         {
-            _httpContextAccessor = httpContextAccessor;
-        }
-
-        private async Task<User?> GetConnectedUser()
-        {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
-            {
-                return null;
-            }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var claim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (claim == null || !Guid.TryParse(claim.Value, out Guid userId))
-            {
-                return null;
-            }
-
-            return await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
         }
 
         public async Task<Channel?> CreateChannel(params string[] usernames)
@@ -179,9 +157,9 @@ namespace jihadkhawaja.chat.server.Repository
             return await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelId && x.UserId == userId) != null;
         }
 
-        public async Task<User[]?> GetChannelUsers(Guid channelId)
+        public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
-            HashSet<User> channelUsers = new();
+            HashSet<UserDto> channelUsers = new();
             try
             {
                 var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
@@ -197,7 +175,7 @@ namespace jihadkhawaja.chat.server.Repository
             catch { }
 
             // Only include basic user info
-            var users = channelUsers.Select(user => new User
+            var users = channelUsers.Select(user => new UserDto
             {
                 Id = user.Id,
                 Username = user.Username,

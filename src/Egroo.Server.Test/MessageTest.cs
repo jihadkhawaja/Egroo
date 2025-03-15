@@ -14,7 +14,7 @@ namespace Egroo.Server.Test
         private IMessage ChatMessageService { get; set; } = null!;
 
         private static Channel? Channel { get; set; }
-        private static User? User { get; set; }
+        private static UserDto? User { get; set; }
 
         [TestInitialize]
         public async Task Initialize()
@@ -35,7 +35,7 @@ namespace Egroo.Server.Test
             Assert.IsNotNull(signInResponse.UserId, "Sign-in did not return a user ID.");
 
             // Create User instance
-            User = new User
+            User = new UserDto
             {
                 Id = signInResponse.UserId.Value
             };

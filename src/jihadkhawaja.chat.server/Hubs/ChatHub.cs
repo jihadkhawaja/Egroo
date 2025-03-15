@@ -1,7 +1,7 @@
 ﻿using jihadkhawaja.chat.server.Database;
+using jihadkhawaja.chat.server.Models;
 using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;

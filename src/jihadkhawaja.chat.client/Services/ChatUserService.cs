@@ -19,8 +19,11 @@ namespace jihadkhawaja.chat.client.Services
         public Task CloseUserSession()
             => HubConnection.InvokeAsync(nameof(CloseUserSession));
 
-        public Task<User?> GetUserPublicInfo(Guid userId)
-            => HubConnection.InvokeAsync<User?>(nameof(GetUserPublicInfo), userId);
+        public Task<UserDto?> GetUserPublicDetails(Guid userId)
+            => HubConnection.InvokeAsync<UserDto?>(nameof(GetUserPublicDetails), userId);
+
+        public Task<UserDto?> GetUserPrivateDetails()
+            => HubConnection.InvokeAsync<UserDto?>(nameof(GetUserPrivateDetails));
 
         public Task<string?> GetCurrentUserUsername()
             => HubConnection.InvokeAsync<string?>(nameof(GetCurrentUserUsername));
@@ -40,16 +43,31 @@ namespace jihadkhawaja.chat.client.Services
         public Task<bool> DenyFriend(Guid friendId)
             => HubConnection.InvokeAsync<bool>(nameof(DenyFriend), friendId);
 
-        public Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
-            => HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUser), query, maxResult);
+        public Task<IEnumerable<UserDto>?> SearchUser(string query, int maxResult = 20)
+            => HubConnection.InvokeAsync<IEnumerable<UserDto>?>(nameof(SearchUser), query, maxResult);
 
-        public Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
-            => HubConnection.InvokeAsync<IEnumerable<User>?>(nameof(SearchUserFriends), query, maxResult);
+        public Task<IEnumerable<UserDto>?> SearchUserFriends(string query, int maxResult = 20)
+            => HubConnection.InvokeAsync<IEnumerable<UserDto>?>(nameof(SearchUserFriends), query, maxResult);
 
         public Task<bool> IsUsernameAvailable(string username)
             => HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);
 
         public Task<bool> DeleteUser()
             => HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
+
+        public Task<string?> GetAvatar(Guid userId)
+            => HubConnection.InvokeAsync<string?>(nameof(GetAvatar), userId);
+
+        public Task<string?> GetCover(Guid userId)
+            => HubConnection.InvokeAsync<string?>(nameof(GetCover), userId);
+
+        public Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
+            => HubConnection.InvokeAsync<bool>(nameof(UpdateDetails), displayname, email, firstname, lastname);
+
+        public Task<bool> UpdateAvatar(string? avatarBase64)
+            => HubConnection.InvokeAsync<bool>(nameof(UpdateAvatar), avatarBase64);
+
+        public Task<bool> UpdateCover(string? coverBase64)
+            => HubConnection.InvokeAsync<bool>(nameof(UpdateCover), coverBase64);
     }
 }

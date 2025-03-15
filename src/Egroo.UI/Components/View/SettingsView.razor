@@ -2,7 +2,7 @@
 @using Egroo.UI.Models;
 @using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Services;
-@using jihadkhawaja.chat.shared.Models;  <!-- Ensure the shared model is accessible -->
+@using jihadkhawaja.chat.shared.Models;
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
@@ -16,22 +16,32 @@
     <!-- Page Header -->
     <MudText Typo="Typo.h3" GutterBottom="true">Settings</MudText>
 
-    <!-- User Details & Security Settings Section -->
-    <MudPaper Class="pa-4 my-4" Elevation="4">
-        <MudForm @ref="userForm">
-            <MudStack Spacing="2">
-                <MudText Typo="Typo.h6">User Details</MudText>
-                <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" />
-                <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
-                <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
-                <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
-                    Save Changes
-                </MudButton>
-            </MudStack>
-        </MudForm>
-    </MudPaper>
+    <!-- Loading Spinner -->
+    @if (IsBusy)
+    {
+        <MudProgressCircular Size="Size.Large" Color="Color.Primary" />
+        return;
+    }
+
+    <!-- User Details Section -->
+    @if(currentUser is not null && currentUser.UserDetail is not null)
+    {
+        <MudPaper Class="pa-4 my-4" Elevation="4">
+            <MudForm @ref="userForm">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.h6">User Details</MudText>
+                    <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" Disabled />
+                    <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
+                    <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
+                    <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
+                    <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
+                    <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
+                        Save Changes
+                    </MudButton>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+    }
 
     <!-- Account Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
@@ -60,7 +70,7 @@
     </MudPaper>
 
     <!-- Report a Problem / Send Feedback Section -->
-    <MudPaper Class="pa-4 my-4" Elevation="4">
+    <MudPaper Class="pa-4 my-4" Elevation="4" hidden>
         <MudStack Spacing="2">
             <MudText Typo="Typo.h6">Report a Problem / Send Feedback</MudText>
             <MudText Typo="Typo.body2">
@@ -78,23 +88,26 @@
     private EgrooDB CacheDB { get; set; } = null!;
     private MudForm userForm = null!;
     private string FeedbackText { get; set; } = string.Empty;
-    private User currentUser = new();
+    private UserDto currentUser = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnAccessAsync()
     {
+        IsBusy = true;
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
 
         // Retrieve and initialize the current user
-        currentUser = SessionStorage.User ?? new User();
-        if (currentUser.UserDetail is null)
+        currentUser = SessionStorage.User ?? new UserDto();
+        var userWithDetail = await ChatUserService.GetUserPrivateDetails();
+        if (userWithDetail is null)
         {
             currentUser.UserDetail = new UserDetail();
         }
-        if (currentUser.UserSecuriy is null)
+        else
         {
-            currentUser.UserSecuriy = new UserSecurity();
+            currentUser = userWithDetail;
         }
+        IsBusy = false;
     }
 
     private async Task SignOut(bool hasDialog = true)
@@ -171,7 +184,6 @@
 
     private async Task UpdateUserDetails()
     {
-        // Trigger form validation if needed
         await userForm.Validate();
         if (!userForm.IsValid)
         {
@@ -179,8 +191,18 @@
             return;
         }
 
-        // Update logic here - e.g., call a service to persist changes.
-        // For demonstration, show a confirmation dialog.
+        bool isusccess = await ChatUserService.UpdateDetails(
+            displayname: currentUser.UserDetail?.DisplayName,
+            email: currentUser.UserDetail?.Email,
+            firstname: currentUser.UserDetail?.FirstName,
+            lastname: currentUser.UserDetail?.LastName);
+
+        if (!isusccess)
+        {
+            await DialogService.ShowMessageBox("Error", "Couldn't update user details.");
+            return;
+        }
+
         bool? result = await DialogService.ShowMessageBox(
             "User Details Updated",
             "Your user details and security settings have been saved.",
@@ -188,7 +210,6 @@
 
         if (result.HasValue && result.Value)
         {
-            // Optionally refresh SessionStorage.User or perform additional actions.
             SessionStorage.User = currentUser;
         }
     }

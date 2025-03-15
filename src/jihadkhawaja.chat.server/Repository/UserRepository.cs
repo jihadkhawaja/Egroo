@@ -1,27 +1,23 @@
 ﻿using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
+using jihadkhawaja.chat.server.Models;
 using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace jihadkhawaja.chat.server.Repository
 {
     public class UserRepository : BaseRepository, IUser
     {
-        private readonly IHttpContextAccessor _httpContextAccessor;
-
-        public UserRepository(DataContext dbContext, 
-            IConfiguration configuration, 
-            EncryptionService encryptionService,
-            IHttpContextAccessor httpContextAccessor)
-            : base(dbContext, configuration, encryptionService)
+        public UserRepository(DataContext dbContext,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration,
+            EncryptionService encryptionService)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService)
         {
-            _httpContextAccessor = httpContextAccessor;
         }
 
         // Stub for notifying friends about status change.
@@ -55,35 +51,7 @@ namespace jihadkhawaja.chat.server.Repository
             }
         }
 
-        private Guid? GetConnectorUserId()
-        {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext.User?.Identity?.IsAuthenticated == true)
-            {
-                var userIdClaim = httpContext.User.FindFirst(ClaimTypes.NameIdentifier);
-                if (userIdClaim != null && Guid.TryParse(userIdClaim.Value, out Guid userId))
-                {
-                    return userId;
-                }
-            }
-            else
-            {
-                string token = httpContext?.Request.Query["access_token"] ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    var tokenHandler = new JwtSecurityTokenHandler();
-                    var jwtToken = tokenHandler.ReadJwtToken(token);
-                    var claim = jwtToken.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-                    if (claim != null && Guid.TryParse(claim.Value, out Guid userId))
-                    {
-                        return userId;
-                    }
-                }
-            }
-            return null;
-        }
-
-        public async Task<User?> GetUserPublicInfo(Guid userId)
+        public async Task<UserDto?> GetUserPublicDetails(Guid userId)
         {
             User? user = await _dbContext.Users
                 .Include(x => x.UserDetail)
@@ -94,7 +62,7 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            User userPublicResult = new()
+            UserDto userPublicResult = new()
             {
                 UserDetail = user.GetPublicDetail(),
                 Username = user.Username,
@@ -104,6 +72,30 @@ namespace jihadkhawaja.chat.server.Repository
             };
 
             return userPublicResult;
+        }
+
+        public async Task<UserDto?> GetUserPrivateDetails()
+        {
+            User? user = await _dbContext.Users
+                .Include(x => x.UserDetail)
+                .FirstOrDefaultAsync(x => x.Id == GetConnectorUserId());
+
+            if (user == null || string.IsNullOrWhiteSpace(user.Username))
+            {
+                return null;
+            }
+
+            UserDto userPrivateResult = new()
+            {
+                Id = user.Id,
+                UserDetail = user.GetPrivateDetail(),
+                Username = user.Username,
+                IsOnline = ChatHub.IsUserOnline(user.Id),
+                LastLoginDate = user.LastLoginDate,
+                DateCreated = user.DateCreated,
+            };
+
+            return userPrivateResult;
         }
 
         public async Task<string?> GetCurrentUserUsername()
@@ -130,20 +122,11 @@ namespace jihadkhawaja.chat.server.Repository
                 return false;
             }
 
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return false;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return false;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
             User? currentUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
             if (currentUser == null)
             {
@@ -187,20 +170,11 @@ namespace jihadkhawaja.chat.server.Repository
                 return false;
             }
 
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return false;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return false;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
             friendusername = friendusername.ToLower();
 
             // Get user id from username
@@ -254,20 +228,11 @@ namespace jihadkhawaja.chat.server.Repository
 
         public async Task<bool> AcceptFriend(Guid friendId)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return false;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return false;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
 
             UserFriend? friendRequest = await _dbContext.UsersFriends.FirstOrDefaultAsync(x =>
                 x.UserId == friendId && x.FriendUserId == connectorUserId && x.DateAcceptedOn == null);
@@ -292,20 +257,11 @@ namespace jihadkhawaja.chat.server.Repository
 
         public async Task<bool> DenyFriend(Guid friendId)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return false;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return false;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
 
             try
             {
@@ -327,22 +283,13 @@ namespace jihadkhawaja.chat.server.Repository
             }
         }
 
-        public async Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
+        public async Task<IEnumerable<UserDto>?> SearchUser(string query, int maxResult = 20)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return null;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return null;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
 
             User[]? users = await _dbContext.Users.Where(x =>
                 x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase) &&
@@ -356,7 +303,7 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            return users.Select(x => new User
+            return users.Select(x => new UserDto
             {
                 Username = x.Username,
                 LastLoginDate = x.LastLoginDate,
@@ -365,28 +312,19 @@ namespace jihadkhawaja.chat.server.Repository
             });
         }
 
-        public async Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
+        public async Task<IEnumerable<UserDto>?> SearchUserFriends(string query, int maxResult = 20)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
+            Guid? connectorUserId = GetConnectorUserId();
+            if (!connectorUserId.HasValue)
             {
                 return null;
             }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return null;
-            }
-
-            Guid connectorUserId = Guid.Parse(userIdClaim.Value);
 
             // Get the friend records for the current user.
-            UserFriend[]? friendRecords = await GetUserFriends(connectorUserId);
+            UserFriend[]? friendRecords = await GetUserFriends(connectorUserId.Value);
             if (friendRecords == null || friendRecords.Length == 0)
             {
-                return new List<User>();
+                return new List<UserDto>();
             }
 
             // Extract the friend IDs.
@@ -408,7 +346,7 @@ namespace jihadkhawaja.chat.server.Repository
 
             friends = friends.OrderBy(x => x.Username).Take(maxResult).ToArray();
 
-            return friends.Select(x => new User
+            return friends.Select(x => new UserDto
             {
                 Username = x.Username,
                 LastLoginDate = x.LastLoginDate,
@@ -432,20 +370,8 @@ namespace jihadkhawaja.chat.server.Repository
 
         public async Task<bool> DeleteUser()
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            if (httpContext == null)
-            {
-                return false;
-            }
-
-            var identity = httpContext.User.Identity as ClaimsIdentity;
-            var userIdClaim = identity?.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier);
-            if (userIdClaim == null)
-            {
-                return false;
-            }
-
-            if (!Guid.TryParse(userIdClaim.Value, out Guid userId))
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId == null)
             {
                 return false;
             }
@@ -453,7 +379,7 @@ namespace jihadkhawaja.chat.server.Repository
             try
             {
                 // Delete user
-                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
+                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
                 if (user != null)
                 {
                     _dbContext.Users.Remove(user);
@@ -461,7 +387,7 @@ namespace jihadkhawaja.chat.server.Repository
 
                 // Delete user friends
                 var userFriends = await _dbContext.UsersFriends
-                    .Where(x => x.UserId == userId || x.FriendUserId == userId)
+                    .Where(x => x.UserId == connectorUserId || x.FriendUserId == connectorUserId)
                     .ToListAsync();
                 if (userFriends.Any())
                 {
@@ -470,7 +396,7 @@ namespace jihadkhawaja.chat.server.Repository
 
                 // Delete messages sent by the user
                 var messages = await _dbContext.Messages
-                    .Where(x => x.SenderId == userId)
+                    .Where(x => x.SenderId == connectorUserId)
                     .ToListAsync();
                 if (messages.Any())
                 {
@@ -479,7 +405,7 @@ namespace jihadkhawaja.chat.server.Repository
 
                 // Delete pending messages for the user
                 var pendingMessages = await _dbContext.UsersPendingMessages
-                    .Where(x => x.UserId == userId)
+                    .Where(x => x.UserId == connectorUserId)
                     .ToListAsync();
                 if (pendingMessages.Any())
                 {
@@ -488,7 +414,7 @@ namespace jihadkhawaja.chat.server.Repository
 
                 // Retrieve channel user records for the user
                 var userChannelUsers = await _dbContext.ChannelUsers
-                    .Where(x => x.UserId == userId)
+                    .Where(x => x.UserId == connectorUserId)
                     .ToListAsync();
                 if (userChannelUsers.Any())
                 {
@@ -509,6 +435,130 @@ namespace jihadkhawaja.chat.server.Repository
                     _dbContext.ChannelUsers.RemoveRange(userChannelUsers);
                 }
 
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<string?> GetAvatar(Guid userId)
+        {
+            User? user = await _dbContext.Users
+                .Include(x => x.UserStorage)
+                .FirstOrDefaultAsync(x => x.Id == userId);
+
+            if (user == null || string.IsNullOrWhiteSpace(user.Username))
+            {
+                return null;
+            }
+
+            return user.UserStorage?.AvatarImageBase64;
+        }
+
+        public async Task<string?> GetCover(Guid userId)
+        {
+            User? user = await _dbContext.Users
+                .Include(x => x.UserStorage)
+                .FirstOrDefaultAsync(x => x.Id == userId);
+
+            if (user == null || string.IsNullOrWhiteSpace(user.Username))
+            {
+                return null;
+            }
+
+            return user.UserStorage?.CoverImageBase64;
+        }
+
+        public async Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
+        {
+            User? user = await GetConnectedUserWithDetails();
+            if (user is null)
+            {
+                return false;
+            }
+
+            if (user.UserDetail is null)
+            {
+                user.UserDetail = new UserDetail();
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayname))
+            {
+                user.UserDetail.DisplayName = displayname;
+            }
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                user.UserDetail.Email = email;
+            }
+            if (!string.IsNullOrWhiteSpace(firstname))
+            {
+                user.UserDetail.FirstName = firstname;
+            }
+            if (!string.IsNullOrWhiteSpace(lastname))
+            {
+                user.UserDetail.LastName = lastname;
+            }
+
+            try
+            {
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateAvatar(string? avatarBase64)
+        {
+            User? user = await GetConnectedUserWithStorage();
+            if (user is null)
+            {
+                return false;
+            }
+
+            if (user.UserStorage is null)
+            {
+                user.UserStorage = new UserStorage();
+            }
+
+            user.UserStorage.AvatarImageBase64 = avatarBase64;
+
+            try
+            {
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> UpdateCover(string? coverBase64)
+        {
+            User? user = await GetConnectedUserWithStorage();
+            if (user == null)
+            {
+                return false;
+            }
+
+            if (user.UserStorage is null)
+            {
+                user.UserStorage = new UserStorage();
+            }
+
+            user.UserStorage.CoverImageBase64 = coverBase64;
+
+            try
+            {
+                _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }

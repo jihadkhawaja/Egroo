@@ -1,10 +1,12 @@
 using jihadkhawaja.chat.server.Authorization;
 using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Helpers;
+using jihadkhawaja.chat.server.Models;
 using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.IdentityModel.Tokens.Jwt;
@@ -14,10 +16,11 @@ namespace jihadkhawaja.chat.server.Repository
 {
     public class AuthRepository : BaseRepository, IAuth
     {
-        public AuthRepository(DataContext dbContext, 
-            IConfiguration configuration, 
+        public AuthRepository(DataContext dbContext,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration,
             EncryptionService encryptionService)
-            : base(dbContext, configuration, encryptionService)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService)
         {
         }
 
@@ -185,14 +188,38 @@ namespace jihadkhawaja.chat.server.Repository
             }
         }
 
-        public async Task<Operation.Response> RefreshSession(string oldtoken)
+        public async Task<Operation.Response> RefreshSession()
         {
+            // Extract the Authorization header from the current HTTP request
+            var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrEmpty(authHeader))
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Authorization header is missing."
+                };
+            }
+
+            // Expecting the header to be in the format "Bearer <token>"
+            var parts = authHeader.Split(' ');
+            if (parts.Length != 2 || !parts[0].Equals("Bearer", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Invalid Authorization header format."
+                };
+            }
+
+            var userToken = parts[1];
+
             var tokenHandler = new JwtSecurityTokenHandler();
             JwtSecurityToken jwtToken;
 
             try
             {
-                jwtToken = tokenHandler.ReadJwtToken(oldtoken);
+                jwtToken = tokenHandler.ReadJwtToken(userToken);
             }
             catch (Exception)
             {
@@ -270,9 +297,9 @@ namespace jihadkhawaja.chat.server.Repository
             }
         }
 
-        public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
+        public async Task<Operation.Result> ChangePassword(string oldpassword, string newpassword)
         {
-            var registeredUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
+            var registeredUser = await GetConnectedUser();
             if (registeredUser == null)
             {
                 return new Operation.Result

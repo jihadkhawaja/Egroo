@@ -15,10 +15,16 @@ namespace jihadkhawaja.chat.server.Hubs
             Context.Abort();
         }
 
-        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public Task<User?> GetUserPublicInfo(Guid userId)
+        [AllowAnonymous]
+        public Task<UserDto?> GetUserPublicDetails(Guid userId)
         {
-            return _userRepository.GetUserPublicInfo(userId);
+            return _userRepository.GetUserPublicDetails(userId);
+        }
+
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public Task<UserDto?> GetUserPrivateDetails()
+        {
+            return _userRepository.GetUserPrivateDetails();
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
@@ -70,13 +76,13 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public Task<IEnumerable<User>?> SearchUser(string query, int maxResult = 20)
+        public Task<IEnumerable<UserDto>?> SearchUser(string query, int maxResult = 20)
         {
             return _userRepository.SearchUser(query, maxResult);
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public Task<IEnumerable<User>?> SearchUserFriends(string query, int maxResult = 20)
+        public Task<IEnumerable<UserDto>?> SearchUserFriends(string query, int maxResult = 20)
         {
             return _userRepository.SearchUserFriends(query, maxResult);
         }
@@ -91,6 +97,31 @@ namespace jihadkhawaja.chat.server.Hubs
         public Task<bool> DeleteUser()
         {
             return _userRepository.DeleteUser();
+        }
+        [AllowAnonymous]
+        public Task<string?> GetAvatar(Guid userId)
+        {
+            return _userRepository.GetAvatar(userId);
+        }
+        [AllowAnonymous]
+        public Task<string?> GetCover(Guid userId)
+        {
+            return _userRepository.GetCover(userId);
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
+        {
+            return _userRepository.UpdateDetails(displayname, email, firstname, lastname);
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public Task<bool> UpdateAvatar(string? avatarBase64)
+        {
+            return _userRepository.UpdateAvatar(avatarBase64);
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public Task<bool> UpdateCover(string? coverBase64)
+        {
+            return _userRepository.UpdateCover(coverBase64);
         }
     }
 }

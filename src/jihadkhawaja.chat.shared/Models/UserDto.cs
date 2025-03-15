@@ -1,16 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace jihadkhawaja.chat.shared.Models
 {
-    [Index(nameof(Username), IsUnique = true)]
-    public class User : EntityBase
+    public class UserDto : EntityBase
     {
         [Required]
         public string? Username { get; set; }
-        [Required]
-        public string? Password { get; set; }
         [NotMapped]
         public string? ConnectionId { get; set; }
         [NotMapped]
@@ -21,7 +17,6 @@ namespace jihadkhawaja.chat.shared.Models
         public DateTimeOffset? LastLoginDate { get; set; }
         public UserDetail? UserDetail { get; set; }
         public UserStorage? UserStorage { get; set; }
-        public UserSecurity? UserSecuriy { get; set; }
         public UserFeedback? UserFeedback { get; set; }
 
         public UserDetail? GetPublicDetail()
@@ -36,9 +31,9 @@ namespace jihadkhawaja.chat.shared.Models
         {
             return new UserDetail
             {
+                DisplayName = UserDetail?.DisplayName,
                 FirstName = UserDetail?.FirstName,
                 LastName = UserDetail?.LastName,
-                DisplayName = UserDetail?.DisplayName,
                 Email = UserDetail?.Email,
                 PhoneNumber = UserDetail?.PhoneNumber,
                 PhoneCountryCode = UserDetail?.PhoneCountryCode,
@@ -140,13 +135,6 @@ namespace jihadkhawaja.chat.shared.Models
         public string? CoverImageBase64 { get; set; }
     }
 
-    public class UserSecurity
-    {
-        [Key]
-        public Guid UserId { get; set; }
-        public bool IsTwoFactorEnabled { get; set; }
-    }
-
     public class UserFeedback : EntityBase
     {
         public Guid UserId { get; set; }
@@ -155,13 +143,13 @@ namespace jihadkhawaja.chat.shared.Models
 
     public class CallOffer
     {
-        public User? Caller { get; set; }
-        public User? Callee { get; set; }
+        public UserDto? Caller { get; set; }
+        public UserDto? Callee { get; set; }
         public string SdpOffer { get; set; } = string.Empty;
     }
 
     public class UserCall
     {
-        public List<User>? Users { get; set; }
+        public List<UserDto>? Users { get; set; }
     }
 }

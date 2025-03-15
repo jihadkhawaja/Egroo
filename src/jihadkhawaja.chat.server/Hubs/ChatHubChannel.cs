@@ -82,7 +82,7 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public Task<User[]?> GetChannelUsers(Guid channelId)
+        public Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
             return _channelRepository.GetChannelUsers(channelId);
         }

@@ -2,6 +2,7 @@
 using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -9,10 +10,11 @@ namespace jihadkhawaja.chat.server.Repository
 {
     public class MessageRepository : BaseRepository, IMessage
     {
-        public MessageRepository(DataContext dbContext, 
-            IConfiguration configuration, 
+        public MessageRepository(DataContext dbContext,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration,
             EncryptionService encryptionService)
-            : base(dbContext, configuration, encryptionService)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService)
         {
         }
 

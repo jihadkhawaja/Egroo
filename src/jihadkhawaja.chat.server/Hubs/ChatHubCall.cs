@@ -30,7 +30,7 @@ namespace jihadkhawaja.chat.server.Hubs
         // Caller initiates the call.
         // Receives the SDP offer (which includes audio media) from the caller.
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task CallUser(User targetUser, string sdpOffer)
+        public async Task CallUser(UserDto targetUser, string sdpOffer)
         {
             if (targetUser == null) return;
 
@@ -75,7 +75,7 @@ namespace jihadkhawaja.chat.server.Hubs
         // Callee answers the call.
         // Receives the SDP answer (which includes its own media) from the callee.
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
-        public async Task AnswerCall(bool acceptCall, User caller, string sdpAnswer)
+        public async Task AnswerCall(bool acceptCall, UserDto caller, string sdpAnswer)
         {
             var calleeId = GetUserIdFromContext();
             if (!calleeId.HasValue)
@@ -102,7 +102,7 @@ namespace jihadkhawaja.chat.server.Hubs
             }
 
             // Mark the call as active.
-            var userCall = new UserCall { Users = new List<User> { callOffer.Caller, callOffer.Callee } };
+            var userCall = new UserCall { Users = new List<UserDto> { callOffer.Caller, callOffer.Callee } };
             _userCalls.TryAdd(callOffer.Caller.Id, userCall);
             _userCalls.TryAdd(callee.Id, userCall);
             _callOffers.TryRemove(callOffer.Callee.Id, out _);
@@ -199,7 +199,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
         private async Task SendUserListUpdate()
         {
-            var onlineUsers = new List<User>();
+            var onlineUsers = new List<UserDto>();
             foreach (var userId in _userConnections.Keys)
             {
                 var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);

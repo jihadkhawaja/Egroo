@@ -29,11 +29,11 @@ namespace jihadkhawaja.chat.server.Hubs
             if (!dbResult)
                 return false;
 
-            User[]? users = await GetChannelUsers(message.ChannelId);
+            UserDto[]? users = await GetChannelUsers(message.ChannelId);
             if (users == null)
                 return false;
 
-            foreach (User user in users)
+            foreach (UserDto user in users)
             {
                 await SendClientMessage(user, message, ignorePendingMessages: false);
             }
@@ -41,7 +41,7 @@ namespace jihadkhawaja.chat.server.Hubs
             return true;
         }
 
-        private async Task<bool> SendClientMessage(User user, Message message, bool ignorePendingMessages)
+        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages)
         {
             if (string.IsNullOrWhiteSpace(message.Content))
                 return false;
@@ -119,11 +119,11 @@ namespace jihadkhawaja.chat.server.Hubs
             if (updatedMessage == null)
                 return false;
 
-            User[]? users = await GetChannelUsers(updatedMessage.ChannelId);
+            UserDto[]? users = await GetChannelUsers(updatedMessage.ChannelId);
             if (users == null)
                 return false;
 
-            foreach (User user in users)
+            foreach (UserDto user in users)
             {
                 string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
                 if (string.IsNullOrEmpty(connectionId))

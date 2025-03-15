@@ -1,11 +1,12 @@
-﻿using jihadkhawaja.chat.shared.Models;
+﻿using jihadkhawaja.chat.server.Models;
+using jihadkhawaja.chat.shared.Models;
 using jihadkhawaja.infrastructure.Database.Conventions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
 namespace jihadkhawaja.chat.server.Database
 {
-    public class DataContext : DbContext
+    public class DataContext : DbContext, IDataEntities
     {
         protected readonly IConfiguration Configuration;
 
