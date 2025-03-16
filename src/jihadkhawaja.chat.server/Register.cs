@@ -42,6 +42,13 @@ public static class Register
             }
         }
 
+        // Add CSP globally
+        app.Use(async (context, next) =>
+        {
+            context.Response.Headers.TryAdd("Content-Security-Policy", "img-src 'self' data:;");
+            await next();
+        });
+
         app.UseRateLimiter();
 
         // Map API endpoints.
