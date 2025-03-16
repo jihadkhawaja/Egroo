@@ -303,12 +303,12 @@
     private async Task FetchAvatar()
     {
         KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
+        Console.WriteLine("Fetched Image:" + avatar);
 
         //new avatar preview after updating (compressed)
         if (avatar.HasValue)
         {
             newAvatarPreview = SessionStorage.User.CombineAvatarForPreview(avatar);
-            Console.WriteLine("Fetched Image:" + newAvatarPreview);
             await InvokeAsync(StateHasChanged);
         }
     }
