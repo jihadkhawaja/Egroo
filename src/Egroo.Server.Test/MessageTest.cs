@@ -9,17 +9,19 @@ namespace Egroo.Server.Test
     [TestClass]
     public class MessageTest
     {
-        private IChatAuth ChatAuthService { get; set; } = null!;
-        private IChatChannel ChatChannelService { get; set; } = null!;
-        private IChatMessage ChatMessageService { get; set; } = null!;
+        private IAuth ChatAuthService { get; set; } = null!;
+        private IChannel ChatChannelService { get; set; } = null!;
+        private IMessage ChatMessageService { get; set; } = null!;
 
         private static Channel? Channel { get; set; }
-        private static User? User { get; set; }
+        private static UserDto? User { get; set; }
 
         [TestInitialize]
         public async Task Initialize()
         {
-            ChatAuthService = new ChatAuthService();
+            // Create a new HttpClient with a BaseAddress for AuthService only.
+            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
+            ChatAuthService = new AuthService(httpClient);
             ChatChannelService = new ChatChannelService();
             ChatMessageService = new ChatMessageService();
 
@@ -33,7 +35,7 @@ namespace Egroo.Server.Test
             Assert.IsNotNull(signInResponse.UserId, "Sign-in did not return a user ID.");
 
             // Create User instance
-            User = new User
+            User = new UserDto
             {
                 Id = signInResponse.UserId.Value
             };

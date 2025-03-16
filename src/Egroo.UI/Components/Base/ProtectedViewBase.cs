@@ -10,6 +10,21 @@ namespace Egroo.UI.Components.Base
         [Inject]
         private SessionStorage SessionStorage { get; set; } = null!;
 
+        public bool IsBusy { get; set; }
+
+        protected override void OnInitialized()
+        {
+            if (string.IsNullOrEmpty(SessionStorage.Token)
+                || SessionStorage.User is null)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                OnAccess();
+            }
+        }
+
         protected override async Task OnInitializedAsync()
         {
             if (string.IsNullOrEmpty(SessionStorage.Token)
@@ -19,11 +34,15 @@ namespace Egroo.UI.Components.Base
             }
             else
             {
-                await OnAccess();
+                await OnAccessAsync();
             }
         }
 
-        protected virtual Task OnAccess()
+        protected virtual void OnAccess()
+        {
+        }
+
+        protected virtual Task OnAccessAsync()
         {
             return Task.CompletedTask;
         }

@@ -1,14 +1,13 @@
-# Egroo
+# [Egroo](https://www.egroo.org/)
 
 <div align="center">
-  <img src="docs/icon.png" alt="MobileChat Icon" />
+  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" />
 </div>
 <br/>
 
 A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **Blazor Auto**, and **ASP.NET SignalR**.
 
-[Visit Egroo Website](https://www.egroo.org/)
-
+## Build Status
 [![NuGets Push](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml)
 [![MSTest](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
 [![Docker](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml)
@@ -20,7 +19,7 @@ A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **
   - MAUI: Windows, macOS, Android, iOS.
   - WASM: Supported in modern browsers.
 - **Real-time Communication**: 
-  - Powered by SignalR for seamless, instant updates.
+  - Powered by SignalR and WebRTC for seamless, instant updates.
 - **Message Security**: 
   - Messages are automatically deleted after being sent to the recipient, ensuring privacy.
 - **Customizable Server Hosting**: 
@@ -33,30 +32,30 @@ A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **
   - **WASM**: Any browser with WebAssembly support.
 
 ## Documentation
-Find everything you need to get started [here](https://github.com/jihadkhawaja/MobileChat/wiki).
+Find everything you need to get started [here](https://github.com/jihadkhawaja/Egroo/wiki).
 
 ## Screenshots
 **Windows**
 
 Authentication
 
-![Auth](docs/mobilechat_1_auth.png)
+![Authentication](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_auth.png)
 
 Friends List
 
-![Friends](docs/mobilechat_1_friends.png)
+![Friends](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_friends.png)
 
 Channels
 
-![Channels](docs/mobilechat_1_channels.png)
+![Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_channels.png)
 
 Conversations
 
-![Conversations](docs/mobilechat_1_channel.png)
+![Conversations](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_channel.png)
 
-**Android**  
+Android
 
-![mobilechat_android](docs/mobilechat_android.png)
+![Android](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_android.png)
 
 ## Contribution
 Contributions are welcome! Feel free to:

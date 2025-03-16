@@ -54,21 +54,21 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "Bearer"
     });
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
-                    {
-                        {
-                            new OpenApiSecurityScheme
-                            {
-                                Name = "Bearer",
-                                In = ParameterLocation.Header,
-                                Reference = new OpenApiReference
-                                {
-                                    Id = "Bearer",
-                                    Type = ReferenceType.SecurityScheme
-                                }
-                            },
-                            new List<string>()
-                        }
-                    });
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Name = "Bearer",
+                In = ParameterLocation.Header,
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme
+                }
+            },
+            new List<string>()
+        }
+    });
 });
 #endregion
 #region JWT

@@ -5,7 +5,7 @@ namespace Egroo.UI.Services
     public class SessionStorage
     {
         public string? Token { get; set; }
-        public User? User { get; set; }
+        public UserDto? User { get; set; }
         public AppState AppState { get; set; }
     }
 

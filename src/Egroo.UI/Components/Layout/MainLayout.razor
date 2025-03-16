@@ -7,11 +7,12 @@
 @inherits LayoutComponentBase
 
 @inject SessionStorage SessionStorage
+@inject IUser ChatUserService
 
 <MudItem ChildContent="@ClientModel.MyMudProvider" />
 <MudItem ChildContent="@ClientModel.MyMudThemeProvider" />
 
-<HubRouter>
+<HubRouter OnRoutingCompleted="HandleRoutingComplete">
     <MudLayout>
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
@@ -19,16 +20,26 @@
             <MudText Class="mr-4">@SessionStorage?.User?.Username</MudText>
             <MudMenu>
                 <ActivatorContent>
-                    <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                    @if (string.IsNullOrWhiteSpace(avatarData))
+                    {
+                        <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar>
+                            <MudImage Src="@avatarData" Alt="Profile picture image"></MudImage>
+                        </MudAvatar>
+                    }
                 </ActivatorContent>
                 <ChildContent>
-                    <MudMenuItem Icon="@Icons.Material.Outlined.Logout" IconColor="Color.Error"
-                    Label="Logout" Href="settings">Logout</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Outlined.Settings" IconColor="Color.Default"
+                    Label="Settings" Href="settings">Settings</MudMenuItem>
                 </ChildContent>
             </MudMenu>
         </MudAppBar>
         <MudDrawer @bind-Open="IsDrawerOpen" Elevation="1">
             <MudDrawerHeader>
+                <MudImage Src="_content/Egroo.UI/favicon-32x32.png" Width="32" Height="32" Class="mr-4" />
                 <MudText Typo="Typo.h6">Egroo</MudText>
             </MudDrawerHeader>
             <NavMenu />
@@ -42,9 +53,29 @@
 
 @code {
     bool IsDrawerOpen = true;
+    string? avatarData;
+
+    private void HandleRoutingComplete()
+    {
+        _ = FetchAvatar();
+    }
 
     private void DrawerToggle()
     {
         IsDrawerOpen = !IsDrawerOpen;
+    }
+
+    private async Task FetchAvatar()
+    {
+        if (SessionStorage.User is null)
+            return;
+
+        MediaResult? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
+
+        if (avatar is not null)
+        {
+            avatarData = SessionStorage.User?.CombineAvatarForPreview(avatar);
+            await InvokeAsync(StateHasChanged);
+        }
     }
 }

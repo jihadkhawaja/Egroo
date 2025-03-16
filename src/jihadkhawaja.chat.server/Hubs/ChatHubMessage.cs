@@ -6,72 +6,53 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace jihadkhawaja.chat.server.Hubs
 {
-    public partial class ChatHub : IChatMessage
+    public partial class ChatHub : IMessageHub
     {
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> SendMessage(Message message)
         {
             if (message == null)
-            {
                 return false;
-            }
 
-            // Validate the connected user is the same as sender
             var connectedUser = await GetConnectedUser();
             if (connectedUser == null || connectedUser.Id != message.SenderId)
-            {
                 return false;
-            }
 
-            // Ensure the user is part of the channel
             if (!await ChannelContainUser(message.ChannelId, message.SenderId))
-            {
                 return false;
-            }
 
             if (string.IsNullOrWhiteSpace(message.Content))
-            {
                 return false;
-            }
 
-            // Encrypt message content
-            message.Content = _encryptionService.Encrypt(message.Content);
+            bool dbResult = await _messageRepository.SendMessage(message);
+            if (!dbResult)
+                return false;
 
-            // Save message to db
-            message.Id = Guid.NewGuid();
-            message.DateSent = DateTime.UtcNow;
-            message.IsEncrypted = true;
+            UserDto[]? users = await GetChannelUsers(message.ChannelId);
+            if (users == null)
+                return false;
 
-            if (await _messageService.Create(message))
+            foreach (UserDto user in users)
             {
-                User[]? users = await GetChannelUsers(message.ChannelId);
-                if (users is null)
-                {
-                    return false;
-                }
-                foreach (User user in users)
-                {
-                    await SendClientMessage(user, message, false);
-                }
-
-                return true;
+                await SendClientMessage(user, message, ignorePendingMessages: false);
             }
 
-            return false;
+            return true;
         }
-        private async Task<bool> SendClientMessage(User user, Message message, bool IgnorePendingMessages)
+
+        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages)
         {
             if (string.IsNullOrWhiteSpace(message.Content))
-            {
                 return false;
-            }
 
+            // Make sure the message content is encrypted.
             if (!message.IsEncrypted)
+            {
                 message.Content = _encryptionService.Encrypt(message.Content);
-
+            }
             message.IsEncrypted = true;
 
-            UserPendingMessage userPendingMessage = new()
+            UserPendingMessage pendingMsg = new()
             {
                 UserId = user.Id,
                 MessageId = message.Id,
@@ -79,20 +60,21 @@ namespace jihadkhawaja.chat.server.Hubs
                 IsEncrypted = message.IsEncrypted
             };
 
-            //In case client was offline or had connection cut
-            if (!IgnorePendingMessages)
+            // Save pending message if the client is offline.
+            if (!ignorePendingMessages)
             {
-                await _userPendingMessageService.CreateOrUpdate(userPendingMessage);
+                bool pendingSaved = await _messageRepository.AddPendingMessage(pendingMsg);
+                if (!pendingSaved)
+                    return false;
             }
 
             string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
             if (string.IsNullOrEmpty(connectionId))
-            {
                 return false;
-            }
 
             try
             {
+                // Decrypt before sending to client.
                 Message messageToSend = message;
                 if (message.IsEncrypted)
                 {
@@ -104,92 +86,68 @@ namespace jihadkhawaja.chat.server.Hubs
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to send message for the following error: {ex}");
+                Console.WriteLine($"Failed to send message: {ex}");
             }
 
             return false;
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task<bool> UpdateMessage(Message message)
         {
-            if (message.Id == Guid.Empty
-                || string.IsNullOrWhiteSpace(message.Content))
-            {
+            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
                 return false;
-            }
 
-            Message dbMessage = await _messageService.ReadFirst(x => x.ReferenceId == message.ReferenceId);
-            if (dbMessage is null)
-            {
+            bool dbResult = await _messageRepository.UpdateMessage(message);
+            if (!dbResult)
                 return false;
-            }
-            dbMessage.DateSeen = DateTimeOffset.UtcNow;
-            dbMessage.DateUpdated = DateTimeOffset.UtcNow;
 
-            //save msg to db
-            if (await _messageService.Update(dbMessage))
+            Message? updatedMessage = null;
+            updatedMessage = await _messageRepository.GetMessageByReferenceId(message.ReferenceId);
+            if (updatedMessage == null)
+                return false;
+
+            UserDto[]? users = await GetChannelUsers(updatedMessage.ChannelId);
+            if (users == null)
+                return false;
+
+            foreach (UserDto user in users)
             {
-                User[]? users = await GetChannelUsers(dbMessage.ChannelId);
-                if (users is null)
-                {
-                    return false;
-                }
-                foreach (User user in users)
-                {
-                    string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
-                    if (string.IsNullOrEmpty(connectionId))
-                    {
-                        continue;
-                    }
-
-                    await Clients.Client(connectionId).SendAsync("UpdateMessage", dbMessage);
-                }
-
-                return true;
+                string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
+                if (string.IsNullOrEmpty(connectionId))
+                    continue;
+                await Clients.Client(connectionId).SendAsync("UpdateMessage", updatedMessage);
             }
 
-            return false;
+            return true;
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task SendPendingMessages()
         {
-            var ConnectedUser = await GetConnectedUser();
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null)
+                return;
 
-            IEnumerable<UserPendingMessage> UserPendingMessages =
-                await _userPendingMessageService
-                .Read(x => x.UserId == ConnectedUser.Id);
-
-            if (UserPendingMessages is not null)
+            IEnumerable<UserPendingMessage> pendingMessages = await _messageRepository.GetPendingMessagesForUser(connectedUser.Id);
+            foreach (var pending in pendingMessages)
             {
-                foreach (var userpendingmessage in UserPendingMessages)
-                {
-                    Message? message = await _messageService
-                        .ReadFirst(x => x.Id == userpendingmessage.MessageId);
-
-                    if (message is null) continue;
-
-                    message.Content = userpendingmessage.Content;
-
-                    await SendClientMessage(ConnectedUser, message, true);
-                }
+                var message = await _messageRepository.GetMessageById(pending.MessageId);
+                if (message == null)
+                    continue;
+                message.Content = pending.Content;
+                await SendClientMessage(connectedUser, message, ignorePendingMessages: true);
             }
         }
+
         [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
         public async Task UpdatePendingMessage(Guid messageid)
         {
-            var ConnectedUser = await GetConnectedUser();
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null)
+                return;
 
-            UserPendingMessage UserPendingMessage =
-                await _userPendingMessageService
-                .ReadFirst(x => x.UserId == ConnectedUser.Id
-                    && x.MessageId == messageid
-                    && x.DateUserReceivedOn is null
-                    && x.DateDeleted is null);
-
-            if (UserPendingMessage is not null)
-            {
-                await _userPendingMessageService.Delete(x => x.Id == UserPendingMessage.Id);
-            }
+            await _messageRepository.UpdatePendingMessage(messageid);
         }
     }
 }

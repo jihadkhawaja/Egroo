@@ -2,40 +2,151 @@
 @using Egroo.UI.Models;
 @using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Services;
-
+@using jihadkhawaja.chat.shared.Models;
+@using Microsoft.AspNetCore.Components.Forms
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
 @inject StorageService StorageService
 @inject IDialogService DialogService
-@inject IChatUser ChatUserService
+@inject IUser ChatUserService
 @inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <MudText Typo="Typo.h3" GutterBottom>Settings</MudText>
-    <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="@(() => SignOut())">
-        LOGOUT
-    </MudButton>
+    <!-- Page Header -->
+    <MudText Typo="Typo.h3" GutterBottom="true">Settings</MudText>
 
+    <!-- Loading Spinner -->
+    @if (IsBusy)
+    {
+        <MudProgressCircular Size="Size.Large" Color="Color.Primary" />
+        return;
+    }
+
+    <!-- User Details Section -->
+    @if (currentUser is not null && currentUser.UserDetail is not null)
+    {
+        <MudPaper Class="pa-4 my-4" Elevation="4">
+            <MudForm @ref="userForm">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.h6">User Details</MudText>
+                    <MudText Color="Color.Secondary" GutterBottom>Public Information</MudText>
+                    <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" Disabled />
+                    <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
+
+                    <MudText Color="Color.Secondary" GutterBottom>Private Information</MudText>
+                    <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
+                    <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
+                    <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
+                    <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
+                        Save Changes
+                    </MudButton>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+    }
+
+    <!-- Update Avatar Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
-        <MudText Typo="Typo.h6">Delete Account</MudText>
-        <MudText Color="Color.Error" Typo="Typo.body2" Class="mb-2">
-            Permanently delete your account and <strong>all associated data</strong>. This action <strong>cannot</strong> be undone.
-        </MudText>
-        <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" OnClick="DeleteUser">
-            DELETE ALL USER DATA
-        </MudButton>
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Update Avatar</MudText>
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+            Accept="image/*"
+            MaximumFileCount="1"
+            FilesChanged="OnAvatarFilesChanged">
+                <ActivatorContent>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth>
+                        Select Avatar
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Max file size: 10 MB
+            </MudText>
+            @if (!string.IsNullOrEmpty(newAvatarPreview))
+            {
+                <MudAvatar Size="Size.Large">
+                    <MudImage Src="@newAvatarPreview" Alt="Profile picture image"></MudImage>
+                </MudAvatar>
+            }
+            <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAvatar" Disabled="@string.IsNullOrEmpty(newAvatarBase64)">
+                Save Avatar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+
+    <!-- Account Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Account</MudText>
+            <MudText Typo="Typo.body2">
+                Use the button below to sign out of your account. You will have to log in again to access your data.
+            </MudText>
+            <MudButton Color="Color.Info" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Logout" OnClick="@(() => SignOut())">
+                Logout
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Delete Account Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Delete Account</MudText>
+            <MudText Color="Color.Error" Typo="Typo.body2">
+                Permanently delete your account and <strong>all associated data</strong>. This action <strong>cannot</strong> be undone.
+            </MudText>
+            <MudButton Color="Color.Error" Variant="Variant.Filled" EndIcon="@Icons.Material.Filled.Delete" OnClick="DeleteUser">
+                DELETE ALL USER DATA
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    <!-- Report a Problem / Send Feedback Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Report a Problem / Send Feedback</MudText>
+            <MudText Typo="Typo.body2">
+                If you are experiencing issues or have suggestions for improvement, please share your feedback below.
+            </MudText>
+            <MudTextField @bind-Value="FeedbackText" Label="Your Feedback" Lines="4" FullWidth="true" />
+            <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="SubmitFeedback">
+                Submit Feedback
+            </MudButton>
+        </MudStack>
     </MudPaper>
 </MudContainer>
 
 @code {
     private EgrooDB CacheDB { get; set; } = null!;
+    private MudForm userForm = null!;
+    private string FeedbackText { get; set; } = string.Empty;
+    private UserDto currentUser = new();
 
-    protected override void OnInitialized()
+    // Variables for avatar update
+    private string? newAvatarBase64;
+    private string? newAvatarPreview;
+
+    protected override async Task OnAccessAsync()
     {
+        IsBusy = true;
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
+
+        // Retrieve and initialize the current user
+        currentUser = SessionStorage.User ?? new UserDto();
+        var userWithDetail = await ChatUserService.GetUserPrivateDetails();
+        if (userWithDetail is null)
+        {
+            currentUser.UserDetail = new UserDetail();
+        }
+        else
+        {
+            currentUser = userWithDetail;
+        }
+        _ = FetchAvatar();
+        IsBusy = false;
     }
 
     private async Task SignOut(bool hasDialog = true)
@@ -43,9 +154,9 @@
         if (hasDialog)
         {
             bool? result = await DialogService.ShowMessageBox(
-            "Warning",
-            "Are you sure you want to logout? All your localy saved messages will be deleted.",
-            yesText: "Logout", cancelText: "Cancel");
+                "Warning",
+                "Are you sure you want to logout? All your locally saved messages will be deleted.",
+                yesText: "Logout", cancelText: "Cancel");
 
             if (!result.HasValue || !result.Value)
             {
@@ -88,5 +199,119 @@
 
         await ChatUserService.DeleteUser();
         await SignOut(false);
+    }
+
+    private async Task SubmitFeedback()
+    {
+        if (string.IsNullOrWhiteSpace(FeedbackText))
+        {
+            await DialogService.ShowMessageBox("Feedback", "Please enter your feedback before submitting.");
+            return;
+        }
+
+        bool success = await ChatUserService.SendFeedback(FeedbackText);
+        if (!success)
+        {
+            await DialogService.ShowMessageBox("Error", "Failed to submit feedback. Please try again.");
+            return;
+        }
+
+        bool? confirmationResult = await DialogService.ShowMessageBox(
+            "Feedback Submitted",
+            "Thank you for your feedback!",
+            yesText: "OK");
+
+        if (confirmationResult.HasValue && confirmationResult.Value)
+        {
+            FeedbackText = string.Empty;
+        }
+    }
+
+    private async Task UpdateUserDetails()
+    {
+        await userForm.Validate();
+        if (!userForm.IsValid)
+        {
+            await DialogService.ShowMessageBox("Error", "Please correct the validation errors and try again.");
+            return;
+        }
+
+        bool isSuccess = await ChatUserService.UpdateDetails(
+            displayname: currentUser.UserDetail?.DisplayName,
+            email: currentUser.UserDetail?.Email,
+            firstname: currentUser.UserDetail?.FirstName,
+            lastname: currentUser.UserDetail?.LastName);
+
+        if (!isSuccess)
+        {
+            await DialogService.ShowMessageBox("Error", "Couldn't update user details.");
+            return;
+        }
+
+        bool? result = await DialogService.ShowMessageBox(
+            "User Details Updated",
+            "Your user details and security settings have been saved.",
+            yesText: "OK");
+
+        if (result.HasValue && result.Value)
+        {
+            SessionStorage.User = currentUser;
+        }
+    }
+
+    private async Task OnAvatarFilesChanged(IReadOnlyList<IBrowserFile> files)
+    {
+        if (files.Any())
+        {
+            var file = files.First();
+            // Check file size against 10 MB limit
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                newAvatarBase64 = null;
+                newAvatarPreview = null;
+                await DialogService.ShowMessageBox("Error", "File size exceeds the 10 MB limit.");
+                return;
+            }
+            var buffer = new byte[file.Size];
+            await file.OpenReadStream(10 * 1024 * 1024).ReadAsync(buffer);
+            newAvatarBase64 = Convert.ToBase64String(buffer);
+            newAvatarPreview = $"data:{file.ContentType};base64,{newAvatarBase64}";
+        }
+    }
+
+    // Save the new avatar using the IUser.UpdateAvatar method
+    private async Task SaveAvatar()
+    {
+        if (string.IsNullOrEmpty(newAvatarBase64))
+        {
+            return;
+        }
+        bool success = await ChatUserService.UpdateAvatar(newAvatarBase64);
+        if (success)
+        {
+            await DialogService.ShowMessageBox("Success", "Avatar updated successfully.");
+            // Clear the temporary values
+            newAvatarBase64 = null;
+            _ = FetchAvatar();
+        }
+        else
+        {
+            await DialogService.ShowMessageBox("Error", "Failed to update avatar. Please try again.");
+        }
+    }
+
+    private async Task FetchAvatar()
+    {
+        if (SessionStorage.User is null)
+            return;
+        
+        MediaResult? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
+
+        //new avatar preview after updating (compressed)
+        if (avatar is not null)
+        {
+            newAvatarPreview = SessionStorage.User.CombineAvatarForPreview(avatar);
+            await InvokeAsync(StateHasChanged);
+        }
     }
 }

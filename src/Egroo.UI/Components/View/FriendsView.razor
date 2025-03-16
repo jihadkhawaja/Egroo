@@ -3,7 +3,7 @@
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
-@inject IChatUser ChatUserService
+@inject IUser ChatUserService
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -26,7 +26,7 @@ else
                     Value="@SearchQuery" TextChanged="OnSearchUsers" 
                     Immediate Class="mb-2"></MudTextField>
 
-                    @foreach (var friend in SearchedUsers ?? Enumerable.Empty<User>())
+                    @foreach (var friend in SearchedUsers ?? Enumerable.Empty<UserDto>())
                     {
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                             <MudGrid Justify="Justify.SpaceBetween">
@@ -48,7 +48,7 @@ else
         }
 
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-            @foreach (var friendRequests in UserFriendRequests ?? Enumerable.Empty<User>())
+            @foreach (var friendRequests in UserFriendRequests ?? Enumerable.Empty<UserDto>())
             {
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
@@ -69,12 +69,24 @@ else
         </MudStack>
 
         <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-            @foreach (var friend in UserFriends ?? Enumerable.Empty<User>())
+            @foreach (var friend in UserFriends ?? Enumerable.Empty<UserDto>())
             {
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                            <MudStack Row Style="height:100%;">
+                                @if (string.IsNullOrWhiteSpace(friend.AvatarPreview))
+                                {
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large">@friend?.Username?.ToUpper()[0]</MudAvatar>
+                                }
+                                else
+                                {
+                                    <MudAvatar Size="Size.Large">
+                                        <MudImage Src="@friend.AvatarPreview" Alt="Profile picture image"></MudImage>
+                                    </MudAvatar>
+                                }
+                                <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                            </MudStack>
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -104,18 +116,17 @@ else
 @code {
     [Inject] IDialogService DialogService { get; set; } = null!;
 
-    private IEnumerable<User> UserFriendRequests { get; set; } = null!;
-    private IEnumerable<User> UserFriends { get; set; } = null!;
-    private IEnumerable<User> SearchedUsers { get; set; } = null!;
+    private IEnumerable<UserDto> UserFriendRequests { get; set; } = null!;
+    private IEnumerable<UserDto> UserFriends { get; set; } = null!;
+    private IEnumerable<UserDto> SearchedUsers { get; set; } = null!;
 
     private string? SearchQuery { get; set; }
 
-    private bool IsBusy { get; set; } = true;
-
     private bool addFriendPopOverIsOpen;
 
-    protected override void OnInitialized()
+    protected override void OnAccess()
     {
+        IsBusy = true;
         RegisterFriendsEvents();
     }
 
@@ -146,55 +157,69 @@ else
         IsBusy = true;
 
         UserFriendRequests = await GetFriendsRequest();
-        UserFriends = await GetUsers();
+        UserFriends = await GetUserFriends();
+        _ = FetchUsersAvatar(UserFriends);
 
         IsBusy = false;
 
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task<User[]> GetUsers()
+    private async Task<UserDto[]> GetUserFriends()
     {
-        UserFriend[] users = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
-        User[] friends = new User[users.Length];
-
-        for (int i = 0; i < users.Length; i++)
+        UserFriend[]? userFriends = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
+        if (userFriends == null)
         {
-            if (SessionStorage.User.Id == users[i].FriendUserId)
+            return Array.Empty<UserDto>();
+        }
+        UserDto[] users = new UserDto[userFriends.Length];
+
+        for (int i = 0; i < userFriends.Length; i++)
+        {
+            if (SessionStorage.User.Id == userFriends[i].FriendUserId)
             {
-                User? user = await ChatUserService.GetUserPublicInfo(users[i].UserId);
-                user.Id = users[i].UserId;
-                friends[i] = user;
+                UserDto? user = await ChatUserService.GetUserPublicDetails(userFriends[i].UserId);
+                user.Id = userFriends[i].UserId;
+                users[i] = user;
             }
             else
             {
-                User? user = await ChatUserService.GetUserPublicInfo(users[i].FriendUserId);
-                user.Id = users[i].FriendUserId;
-                friends[i] = user;
+                UserDto? user = await ChatUserService.GetUserPublicDetails(userFriends[i].FriendUserId);
+                user.Id = userFriends[i].FriendUserId;
+                users[i] = user;
             }
         }
 
-        return friends;
+        return users;
     }
 
-    private async Task<User[]> GetFriendsRequest()
+    private async Task FetchUsersAvatar(IEnumerable<UserDto> users)
     {
-        User? sessionUser = SessionStorage.User;
+        foreach (var user in users)
+        {
+            user.AvatarPreview = await FetchUserAvatar(user.Id);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task<UserDto[]> GetFriendsRequest()
+    {
+        UserDto? sessionUser = SessionStorage.User;
         if (sessionUser == null)
         {
-            return Array.Empty<User>();
+            return Array.Empty<UserDto>();
         }
 
         UserFriend[]? userFriendRequests = await ChatUserService.GetUserFriendRequests(sessionUser.Id);
         if (userFriendRequests == null)
         {
-            return Array.Empty<User>();
+            return Array.Empty<UserDto>();
         }
-        User[] friendRequestsPublicUsers = new User[userFriendRequests.Length];
+        UserDto[] friendRequestsPublicUsers = new UserDto[userFriendRequests.Length];
 
         for (int i = 0; i < userFriendRequests.Length; i++)
         {
-            User? user = await ChatUserService.GetUserPublicInfo(userFriendRequests[i].UserId);
+            UserDto? user = await ChatUserService.GetUserPublicDetails(userFriendRequests[i].UserId);
             user.Id = userFriendRequests[i].UserId;
             friendRequestsPublicUsers[i] = user;
         }
@@ -217,7 +242,7 @@ else
             usernameToAdd = string.Empty;
 
             SearchQuery = string.Empty;
-            SearchedUsers = Enumerable.Empty<User>();
+            SearchedUsers = Enumerable.Empty<UserDto>();
 
             await RefetchData();
         }
@@ -281,12 +306,12 @@ else
 
         if (string.IsNullOrWhiteSpace(value))
         {
-            SearchedUsers = Enumerable.Empty<User>();
+            SearchedUsers = Enumerable.Empty<UserDto>();
             await InvokeAsync(StateHasChanged);
             return;
         }
 
-        SearchedUsers = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<User>();
+        SearchedUsers = await ChatUserService.SearchUser(value) ?? Enumerable.Empty<UserDto>();
 
         await InvokeAsync(StateHasChanged);
     }
@@ -302,5 +327,12 @@ else
                 await InvokeAsync(StateHasChanged);
             }
         });
+    }
+
+    private async Task<string?> FetchUserAvatar(Guid userId)
+    {
+        MediaResult? avatar = await ChatUserService.GetAvatar(userId);
+
+        return SessionStorage.User?.CombineAvatarForPreview(avatar);
     }
 }

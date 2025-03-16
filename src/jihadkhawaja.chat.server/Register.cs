@@ -1,14 +1,16 @@
-﻿using jihadkhawaja.chat.server.Database;
+﻿using jihadkhawaja.chat.server.API;
+using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Interfaces;
-using jihadkhawaja.chat.server.Services;
+using jihadkhawaja.chat.server.Repository;
+using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.server.SIP;
-using jihadkhawaja.chat.shared.Models;
+using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Threading.RateLimiting;
 using WebSocketSharp.Net.WebSockets;
 using WebSocketSharp.Server;
 
@@ -39,6 +41,11 @@ public static class Register
                 db.Database.Migrate();
             }
         }
+
+        app.UseRateLimiter();
+
+        // Map API endpoints.
+        app.MapAuthentication();
 
         // Map SignalR hubs.
         app.MapHub<ChatHub>("/chathub", options =>
@@ -130,7 +137,7 @@ public class ChatServiceBuilder
             System.Reflection.Assembly.GetAssembly(_executionClassType).GetName().Name;
         AutoMigrateDatabase = _autoMigrateDatabase;
 
-        ConfigureEntityServices(_services);
+        ConfigureAPI(_services);
         ConfigureDatabase(_services);
         ConfigureSignalR(_services);
         // ConfigureSIPWebSocket(_services);
@@ -138,24 +145,44 @@ public class ChatServiceBuilder
         return _services;
     }
 
+    private void ConfigureAPI(IServiceCollection services)
+    {
+        services.AddHttpContextAccessor();
+        services.AddSingleton(new EncryptionService(
+                keyString: _configuration["Encryption:Key"],
+                ivString: _configuration["Encryption:IV"])
+            );
+        services.AddScoped<IAuth, AuthRepository>();
+        services.AddScoped<IUser, UserRepository>();
+        services.AddScoped<IChannel, ChannelRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
+
+        services.AddRateLimiter(options =>
+        {
+            options.AddPolicy("Api", httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    factory: partition => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 100,
+                        Window = TimeSpan.FromMinutes(1),
+                        AutoReplenishment = true
+                    }));
+        });
+    }
+
     private void ConfigureSignalR(IServiceCollection services)
     {
-        services.AddSignalR();
+        services.AddSignalR(options =>
+        {
+            // Set the maximum allowed message size to 10MB (10 * 1024 * 1024 bytes)
+            options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+        });
     }
 
     private void ConfigureDatabase(IServiceCollection services)
     {
         services.AddDbContext<DataContext>();
-    }
-
-    private void ConfigureEntityServices(IServiceCollection services)
-    {
-        services.AddScoped<IEntity<User>, EntityService<User>>();
-        services.AddScoped<IEntity<UserFriend>, EntityService<UserFriend>>();
-        services.AddScoped<IEntity<Channel>, EntityService<Channel>>();
-        services.AddScoped<IEntity<ChannelUser>, EntityService<ChannelUser>>();
-        services.AddScoped<IEntity<Message>, EntityService<Message>>();
-        services.AddScoped<IEntity<UserPendingMessage>, EntityService<UserPendingMessage>>();
     }
 
     private void ConfigureSIPWebSocket(IServiceCollection services)

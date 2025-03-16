@@ -11,7 +11,7 @@
 @inject StorageService StorageService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject IChatAuth ChatAuthService
+@inject IAuthClient ChatAuthService
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-10 pt-8">
@@ -120,7 +120,7 @@
 
             // Update session storage with token and user information.
             SessionStorage.Token = token;
-            SessionStorage.User = new User
+            SessionStorage.User = new UserDto
                 {
                     Id = userId.Value,
                     Username = Username // Optionally, update with a server-provided username.

@@ -13,19 +13,25 @@
 
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
-@inject IChatUser ChatUserService
-@inject IChatMessage ChatMessageService
-@inject IChatChannel ChatChannelService
+@inject NavigationManager NavigationManager
+@inject IUser ChatUserService
+@inject IMessageHub ChatMessageService
+@inject IChannel ChatChannelService
 @inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <!-- Header with Back, Title, and Call Button -->
+    <!-- Header with Back, Title, Edit (shown only if admin), and Call Button -->
     <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
         <MudStack Row AlignItems="AlignItems.Center">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Link="/channels" />
-            <MudText Typo="Typo.h6" GutterBottom>@Title</MudText>
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Href="/channels" />
+            <MudText Typo="Typo.h6" GutterBottom Class="ml-2">@Title</MudText>
+            @if (IsAdmin)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Medium" Color="Color.Primary"
+                OnClick="EditChannel" Class="ml-2" />
+            }
         </MudStack>
         <!-- Call Button -->
         <MudTooltip Text="Call (WIP)">
@@ -34,11 +40,11 @@
     </MudStack>
 
     <!-- Messages Container -->
-    @if (!IsLoading)
+    @if (!IsBusy)
     {
         <MudStack>
             <MudPaper id="messages-container" Elevation="0" Class="pa-4"
-                      Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
+            Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
                 @if (!Messages.Any())
                 {
                     <MudText>No Messages</MudText>
@@ -51,40 +57,40 @@
                             if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                             Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
-                                             IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                             SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                                Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
+                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
                         }
                     </MudStack>
                 }
             </MudPaper>
             <MudStack Row>
-                <MudTextField @ref="inputMudTextField" DisableUnderLine
-                              Value="InputContent"
-                              ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
-                              InputMode="InputMode.text" InputType="InputType.Text"
-                              AutoFocus="true"
-                              Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
-                              Lines="1" MaxLength="MaxMessageLength"
-                              Counter="MaxMessageLength" Disabled="InputDisabled" />
+                <MudTextField @ref="inputMudTextField" Underline="false"
+                Value="InputContent"
+                ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                InputMode="InputMode.text" InputType="InputType.Text"
+                AutoFocus="false"
+                Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
+                Lines="1" MaxLength="MaxMessageLength" ReadOnly="InputDisabled"
+                Counter="MaxMessageLength" AutoGrow />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
-                               DisableElevation Class="mt-1 mb-6"
-                               OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
+                Class="mt-1 mb-6"
+                OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
             </MudStack>
         </MudStack>
     }
@@ -98,9 +104,9 @@
     <!-- Call Overlay UI -->
     <MudOverlay DarkBackground Visible="@IsCalling" />
     <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter"
-                TransformOrigin="Origin.CenterCenter"
-                OverflowBehavior="OverflowBehavior.FlipOnOpen"
-                Fixed Paper>
+    TransformOrigin="Origin.CenterCenter"
+    OverflowBehavior="OverflowBehavior.FlipOnOpen"
+    Fixed Paper>
         <MudItem Class="pa-4">
             <MudText Class="pb-2" Typo="Typo.h6">@CallStatusMessage</MudText>
             @if (IsIncomingCall)
@@ -131,8 +137,8 @@
     [Parameter] public string? Title { get; set; }
     [Parameter] public string? ChannelId { get; set; }
 
+    private bool IsAdmin { get; set; }
     private List<Message> Messages { get; set; } = new();
-    private bool IsLoading { get; set; } = true;
     private MudTextField<string> inputMudTextField { get; set; } = null!;
     private string? InputContent { get; set; }
     private int MaxMessageLength { get; set; } = 300;
@@ -143,26 +149,33 @@
     private bool IsCalling { get; set; } = false;
     private bool IsIncomingCall { get; set; } = false;
     private string CallStatusMessage { get; set; } = string.Empty;
-    private User? ActiveCallUser { get; set; }
-    private User? TargetUser { get; set; }
+    private UserDto? ActiveCallUser { get; set; }
+    private UserDto? TargetUser { get; set; }
     private bool LocalMonitorEnabled { get; set; } = false;
 
     // Store the remote SDP offer when receiving an incoming call.
     private string? incomingOfferSdp;
 
-    protected override void OnInitialized()
+    protected override async Task OnAccessAsync()
     {
+        IsBusy = true;
         RegisterMessagingEvents();
         RegisterCallEvents();
         var moduleFactory = new EsModuleFactory(JSRuntime);
         CacheDB = new EgrooDB(moduleFactory);
         Messages = new();
-    }
 
-    protected override async Task OnInitializedAsync()
-    {
         // Register SendIceCandidateToPeer DotNetObjectReference
         await JSRuntime.InvokeVoidAsync("webrtcInterop.registerSendIceCandidateToPeer", DotNetObjectReference.Create(this));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var channelId = GetChannelId();
+        if (channelId != Guid.Empty && SessionStorage?.User != null)
+        {
+            IsAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User.Id);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -177,7 +190,7 @@
             Messages.AddRange(messages);
             Messages = Messages.OrderBy(x => x.DateCreated).ToList();
             _ = UpdateUnseenMessages();
-            IsLoading = false;
+            IsBusy = false;
             await InvokeAsync(StateHasChanged);
             ScrollToMessagesEnd();
         }
@@ -189,41 +202,41 @@
         return Guid.TryParse(ChannelId, out Guid id) ? id : Guid.Empty;
     }
 
+    public async Task EnterPressed(KeyboardEventArgs e)
+    {
+        if ((e.Code == "Enter" || e.Code == "NumpadEnter") && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
     private async Task SendMessage()
     {
         if (string.IsNullOrWhiteSpace(InputContent))
             return;
 
         InputDisabled = true;
-        InputContent = InputContent.Trim();
 
         Message message = new()
-            {
-                ChannelId = GetChannelId(),
-                DisplayName = SessionStorage?.User?.Username,
-                Content = InputContent,
-                SenderId = SessionStorage.User.Id,
-            };
+        {
+            ChannelId = GetChannelId(),
+            DisplayName = SessionStorage?.User?.Username,
+            Content = InputContent.Trim(),
+            SenderId = SessionStorage.User.Id,
+        };
 
         if (await ChatMessageService.SendMessage(message))
         {
-            InputContent = string.Empty;
             await inputMudTextField.Clear();
         }
         else
         {
             Snackbar.Add("Failed to send message, please check your connection and try again.", Severity.Error);
         }
-        InputDisabled = false;
-        await InvokeAsync(StateHasChanged);
-    }
 
-    public async Task EnterPressed(KeyboardEventArgs e)
-    {
-        if (e.Code == "Enter" || e.Code == "NumpadEnter")
-        {
-            await SendMessage();
-        }
+        InputDisabled = false;
+
+        await inputMudTextField.FocusAsync();
     }
 
     private void ScrollToMessagesEnd()
@@ -259,7 +272,7 @@
                 return;
             }
 
-            var senderUser = await ChatUserService.GetUserPublicInfo(message.SenderId);
+            var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
             message.DisplayName = senderUser?.Username;
             Messages.Add(message);
 
@@ -319,7 +332,7 @@
     }
 
     // Called when an incoming call arrives.
-    private async Task OnIncomingCall(User callingUser, string sdpOffer)
+    private async Task OnIncomingCall(UserDto callingUser, string sdpOffer)
     {
         // Store the received SDP offer for later use.
         incomingOfferSdp = sdpOffer;
@@ -330,7 +343,7 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task<User?> GetTargetUser()
+    private async Task<UserDto?> GetTargetUser()
     {
         var channelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
         if (channelUsers == null || channelUsers.Length == 0 || SessionStorage.User is null)
@@ -448,4 +461,9 @@
         };
     }
     #endregion
+
+    private void EditChannel()
+    {
+        NavigationManager.NavigateTo($"/channeldetail/{ChannelId}/{Title}");
+    }
 }

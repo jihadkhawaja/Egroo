@@ -8,12 +8,14 @@ namespace Egroo.Server.Test
     [TestClass]
     public class AuthTest
     {
-        private IChatAuth ChatAuthService { get; set; } = null!;
+        private IAuth ChatAuthService { get; set; } = null!;
 
         [TestInitialize]
         public async Task Initialize()
         {
-            ChatAuthService = new ChatAuthService();
+            // Create a new HttpClient with a BaseAddress. Ensure TestConfig.ApiBaseUrl is set appropriately.
+            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
+            ChatAuthService = new AuthService(httpClient);
 
             MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
             await MobileChatSignalR.HubConnection.StartAsync();

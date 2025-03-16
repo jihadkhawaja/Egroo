@@ -12,8 +12,8 @@
 @inject StorageService StorageService
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject IChatAuth ChatAuthService
-@inject IChatUser ChatUserService
+@inject IAuthClient ChatAuthService
+@inject IUser ChatUserService
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-10 pt-8">
@@ -34,26 +34,26 @@
                 <MudCardContent>
                     <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
                         <MudTextField @bind-Value="model.Username"
-                                      For="@(() => model.Username)"
-                                      Immediate="true" Required
-                                      Label="Username" />
+                        For="@(() => model.Username)"
+                        Immediate="true" Required
+                        Label="Username" />
 
-                        <MudTextField @bind-Value="model.Password"
-                                      For="@(() => model.Password)"
-                                      Immediate="true" Required
-                                      T="string" Label="Password" HelperText="Choose a strong password"
-                                      @ref="pwField1" InputType="InputType.Password" />
+                        <MudTextField @bind-Value="password"
+                        For="@(() => password)"
+                        Immediate="true" Required
+                        T="string" Label="Password" HelperText="Choose a strong password"
+                        @ref="pwField1" InputType="InputType.Password" />
 
                         <MudTextField T="string"
-                                      Label="Confirm Password" HelperText="Repeat the password"
-                                      InputType="InputType.Password"
-                                      Validation="@(new Func<string, string>(PasswordMatch))" Required />
+                        Label="Confirm Password" HelperText="Repeat the password"
+                        InputType="InputType.Password"
+                        Validation="@(new Func<string, string>(PasswordMatch))" Required />
                     </MudForm>
                 </MudCardContent>
                 <MudCardActions Class="d-flex justify-center">
                     <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
-                               Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
-                               Style="width:50%;">SUBMIT</MudButton>
+                    Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                    Style="width:50%;">SUBMIT</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>
@@ -64,7 +64,8 @@
     MudForm form;
     UserFluentValidator UserValidator;
     MudTextField<string> pwField1;
-    User model = new User();
+    UserDto model = new UserDto();
+    string password;
     bool IsBusy = false;
 
     protected override void OnInitialized()
@@ -78,6 +79,19 @@
         IsBusy = true;
         await form.Validate();
 
+        // Validate the password separately using the dedicated validator
+        var passwordValidator = new PasswordValidator();
+        var passwordResult = passwordValidator.Validate(password);
+        if (!passwordResult.IsValid)
+        {
+            foreach (var error in passwordResult.Errors)
+            {
+                Snackbar.Add(error.ErrorMessage, MudBlazor.Severity.Error);
+            }
+            IsBusy = false;
+            return;
+        }
+
         if (!form.IsValid)
         {
             Snackbar.Add("Please be sure to fill all fields correctly.", MudBlazor.Severity.Error);
@@ -88,7 +102,7 @@
         try
         {
             // Use the strongly typed AuthResponse from the ChatAuthService
-            var result = await ChatAuthService.SignUp(model.Username, model.Password);
+            var result = await ChatAuthService.SignUp(model?.Username, password);
 
             if (result != null && result.Success)
             {
@@ -101,7 +115,7 @@
                 }
 
                 // Create the user object with the returned Id
-                User user = new() { Id = result.UserId.Value };
+                UserDto user = new() { Id = result.UserId.Value };
                 var token = result.Token;
 
                 // Store the token depending on the platform
@@ -151,10 +165,10 @@
         return null;
     }
 
-    public class UserFluentValidator : AbstractValidator<User>
+    public class UserFluentValidator : AbstractValidator<UserDto>
     {
-        private readonly IChatUser ChatUserService;
-        public UserFluentValidator(IChatUser ChatUserService)
+        private readonly IUser ChatUserService;
+        public UserFluentValidator(IUser ChatUserService)
         {
             this.ChatUserService = ChatUserService;
 
@@ -169,20 +183,26 @@
                     return await ChatUserService.IsUsernameAvailable(username);
                 })
                 .WithMessage("Username is already taken.");
-
-            RuleFor(x => x.Password)
-                .Cascade(CascadeMode.Stop)
-                .NotEmpty()
-                .Matches(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$")
-                .WithMessage("Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
         }
 
         public Func<object, string, Task<IEnumerable<string>>> ValidateValue => async (model, propertyName) =>
         {
-            var result = await ValidateAsync(ValidationContext<User>.CreateWithOptions((User)model, x => x.IncludeProperties(propertyName)));
+            var result = await ValidateAsync(ValidationContext<UserDto>.CreateWithOptions((UserDto)model, x => x.IncludeProperties(propertyName)));
             if (result.IsValid)
                 return Array.Empty<string>();
             return result.Errors.Select(e => e.ErrorMessage);
         };
     }
+
+    public class PasswordValidator : AbstractValidator<string>
+    {
+        public PasswordValidator()
+        {
+            RuleFor(p => p)
+                .NotEmpty()
+                .Matches(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$")
+                .WithMessage("Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
+        }
+    }
+
 }
