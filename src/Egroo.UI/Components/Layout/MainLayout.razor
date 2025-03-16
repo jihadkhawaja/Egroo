@@ -12,7 +12,7 @@
 <MudItem ChildContent="@ClientModel.MyMudProvider" />
 <MudItem ChildContent="@ClientModel.MyMudThemeProvider" />
 
-<HubRouter>
+<HubRouter OnRoutingCompleted="HandleRoutingComplete">
     <MudLayout>
         <MudAppBar Elevation="0">
             <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="@((e) => DrawerToggle())" />
@@ -55,7 +55,7 @@
     bool IsDrawerOpen = true;
     string? avatarData;
 
-    protected override void OnInitialized()
+    private void HandleRoutingComplete()
     {
         _ = FetchAvatar();
     }
