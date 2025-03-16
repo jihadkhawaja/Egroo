@@ -2,6 +2,7 @@
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR.Client;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
@@ -55,6 +56,7 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> DeleteUser()
             => await HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
 
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(KeyValuePair<string?, string?>?))]
         public async Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
         {
             try
@@ -68,7 +70,7 @@ namespace jihadkhawaja.chat.client.Services
 
             return null;
         }
-
+        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(KeyValuePair<string?, string?>?))]
         public async Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
             => await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetCover), userId);
 
