@@ -56,7 +56,18 @@ namespace jihadkhawaja.chat.client.Services
             => await HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
 
         public async Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
-            => await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetAvatar), userId);
+        {
+            try
+            {
+                return await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetAvatar), userId);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return null;
+        }
 
         public async Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
             => await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetCover), userId);
