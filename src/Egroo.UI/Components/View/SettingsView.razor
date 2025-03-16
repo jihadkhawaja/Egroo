@@ -308,6 +308,7 @@
         if (avatar.HasValue)
         {
             newAvatarPreview = SessionStorage.User.CombineAvatarForPreview(avatar);
+            Console.WriteLine("Fetched Image:" + newAvatarPreview);
             await InvokeAsync(StateHasChanged);
         }
     }
