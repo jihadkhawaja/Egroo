@@ -302,6 +302,12 @@
 
     private async Task FetchAvatar()
     {
+        Console.WriteLine("Fetching Image..");
+        if (SessionStorage.User is null)
+        {
+            return;
+        }
+
         KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
         Console.WriteLine("Fetched Image:" + avatar);
 
