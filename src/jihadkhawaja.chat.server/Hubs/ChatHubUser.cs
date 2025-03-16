@@ -99,12 +99,12 @@ namespace jihadkhawaja.chat.server.Hubs
             return _userRepository.DeleteUser();
         }
         [AllowAnonymous]
-        public Task<string?> GetAvatar(Guid userId)
+        public Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
         {
             return _userRepository.GetAvatar(userId);
         }
         [AllowAnonymous]
-        public Task<string?> GetCover(Guid userId)
+        public Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
         {
             return _userRepository.GetCover(userId);
         }
@@ -122,6 +122,11 @@ namespace jihadkhawaja.chat.server.Hubs
         public Task<bool> UpdateCover(string? coverBase64)
         {
             return _userRepository.UpdateCover(coverBase64);
+        }
+        [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+        public Task<bool> SendFeedback(string text)
+        {
+            return _userRepository.SendFeedback(text);
         }
     }
 }

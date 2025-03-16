@@ -9,6 +9,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -19,8 +20,9 @@ namespace jihadkhawaja.chat.server.Repository
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService)
+            EncryptionService encryptionService,
+            ILogger<AuthRepository> logger)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
         {
         }
 
@@ -99,8 +101,9 @@ namespace jihadkhawaja.chat.server.Repository
                     Token = token
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to create user.");
                 return new Operation.Response
                 {
                     Success = false,
@@ -178,8 +181,9 @@ namespace jihadkhawaja.chat.server.Repository
                     Token = token
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update user.");
                 return new Operation.Response
                 {
                     Success = false,
@@ -221,8 +225,9 @@ namespace jihadkhawaja.chat.server.Repository
             {
                 jwtToken = tokenHandler.ReadJwtToken(userToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to read JWT token.");
                 return new Operation.Response
                 {
                     Success = false,
@@ -287,8 +292,9 @@ namespace jihadkhawaja.chat.server.Repository
                     Token = newToken
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update user.");
                 return new Operation.Response
                 {
                     Success = false,
@@ -342,8 +348,9 @@ namespace jihadkhawaja.chat.server.Repository
                     Message = "Password changed successfully."
                 };
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update password.");
                 return new Operation.Result
                 {
                     Success = false,

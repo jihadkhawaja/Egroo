@@ -1,4 +1,5 @@
-﻿using jihadkhawaja.chat.server.Database;
+﻿using ImageMagick;
+using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.server.Models;
 using jihadkhawaja.chat.server.Security;
@@ -7,6 +8,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace jihadkhawaja.chat.server.Repository
 {
@@ -15,16 +17,10 @@ namespace jihadkhawaja.chat.server.Repository
         public UserRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService)
+            EncryptionService encryptionService,
+            ILogger<UserRepository> logger)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
         {
-        }
-
-        // Stub for notifying friends about status change.
-        private async Task NotifyFriendsOfStatusChange(User user)
-        {
-            // Replace with your notification logic if needed.
-            await Task.CompletedTask;
         }
 
         public async Task CloseUserSession()
@@ -41,7 +37,6 @@ namespace jihadkhawaja.chat.server.Repository
                     {
                         _dbContext.Users.Update(user);
                         await _dbContext.SaveChangesAsync();
-                        await NotifyFriendsOfStatusChange(user);
                     }
                     catch
                     {
@@ -249,8 +244,9 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to accept friend request");
                 return false;
             }
         }
@@ -277,8 +273,9 @@ namespace jihadkhawaja.chat.server.Repository
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to deny friend request");
                 return false;
             }
         }
@@ -438,13 +435,14 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to delete user");
                 return false;
             }
         }
 
-        public async Task<string?> GetAvatar(Guid userId)
+        public async Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
         {
             User? user = await _dbContext.Users
                 .Include(x => x.UserStorage)
@@ -455,10 +453,10 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            return user.UserStorage?.AvatarImageBase64;
+            return new(user.UserStorage?.AvatarContentType, user.UserStorage?.AvatarImageBase64);
         }
 
-        public async Task<string?> GetCover(Guid userId)
+        public async Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
         {
             User? user = await _dbContext.Users
                 .Include(x => x.UserStorage)
@@ -469,12 +467,12 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            return user.UserStorage?.CoverImageBase64;
+            return new(user.UserStorage?.CoverContentType, user.UserStorage?.CoverImageBase64);
         }
 
         public async Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
         {
-            User? user = await GetConnectedUserWithDetails();
+            User? user = await GetConnectedUser(false, x => x.UserDetail);
             if (user is null)
             {
                 return false;
@@ -508,15 +506,21 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update user details");
                 return false;
             }
         }
 
         public async Task<bool> UpdateAvatar(string? avatarBase64)
         {
-            User? user = await GetConnectedUserWithStorage();
+            if (string.IsNullOrWhiteSpace(avatarBase64))
+            {
+                return false;
+            }
+
+            User? user = await GetConnectedUser(false, x => x.UserStorage);
             if (user is null)
             {
                 return false;
@@ -527,24 +531,44 @@ namespace jihadkhawaja.chat.server.Repository
                 user.UserStorage = new UserStorage();
             }
 
-            user.UserStorage.AvatarImageBase64 = avatarBase64;
-
             try
             {
+                // Convert Base64 to byte array
+                byte[] imageBytes = Convert.FromBase64String(avatarBase64);
+
+                using (var image = new MagickImage(imageBytes))
+                {
+                    // Resize while maintaining aspect ratio, fitting within 128x128
+                    image.Resize(new MagickGeometry(128, 128) { IgnoreAspectRatio = false });
+
+                    // Reduce quality to compress the image
+                    image.Quality = 75;
+
+                    // Convert back to Base64
+                    user.UserStorage.AvatarImageBase64 = Convert.ToBase64String(image.ToByteArray());
+                    user.UserStorage.AvatarContentType = image.Format.ToString();
+                }
+
                 _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update avatar image");
                 return false;
             }
         }
 
         public async Task<bool> UpdateCover(string? coverBase64)
         {
-            User? user = await GetConnectedUserWithStorage();
-            if (user == null)
+            if (string.IsNullOrWhiteSpace(coverBase64))
+            {
+                return false;
+            }
+
+            User? user = await GetConnectedUser(false, x => x.UserStorage);
+            if (user is null)
             {
                 return false;
             }
@@ -554,16 +578,62 @@ namespace jihadkhawaja.chat.server.Repository
                 user.UserStorage = new UserStorage();
             }
 
-            user.UserStorage.CoverImageBase64 = coverBase64;
-
             try
             {
+                // Convert Base64 to byte array
+                byte[] imageBytes = Convert.FromBase64String(coverBase64);
+
+                using (var image = new MagickImage(imageBytes))
+                {
+                    // Resize while maintaining aspect ratio, fitting within 128x128
+                    image.Resize(new MagickGeometry(2000, 600) { IgnoreAspectRatio = false });
+
+                    // Reduce quality to compress the image
+                    image.Quality = 75;
+
+                    // Convert back to Base64
+                    user.UserStorage.CoverImageBase64 = Convert.ToBase64String(image.ToByteArray());
+                    user.UserStorage.CoverContentType = image.Format.ToString();
+                }
+
                 _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to update cover image");
+                return false;
+            }
+        }
+
+        public async Task<bool> SendFeedback(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return false;
+            }
+
+            User? user = await GetConnectedUser(true, x => x.UserFeedbacks);
+            if (user is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                user.UserFeedbacks.Add(new UserFeedback
+                {
+                    Text = text
+                });
+
+                await _dbContext.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send feedback");
                 return false;
             }
         }

@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace jihadkhawaja.chat.shared.Models
@@ -11,13 +12,16 @@ namespace jihadkhawaja.chat.shared.Models
         public string? ConnectionId { get; set; }
         [NotMapped]
         public bool IsOnline { get; set; }
+        [NotMapped]
         public bool InCall { get; set; }
+        [NotMapped]
+        public string? AvatarPreview { get; set; }
         [Required]
         public string? Role { get; set; }
         public DateTimeOffset? LastLoginDate { get; set; }
         public UserDetail? UserDetail { get; set; }
         public UserStorage? UserStorage { get; set; }
-        public UserFeedback? UserFeedback { get; set; }
+        public ICollection<UserFeedback> UserFeedbacks { get; } = new List<UserFeedback>();
 
         public UserDetail? GetPublicDetail()
         {
@@ -65,6 +69,22 @@ namespace jihadkhawaja.chat.shared.Models
             {
                 CoverImageBase64 = UserStorage?.CoverImageBase64
             };
+        }
+
+        public string? CombineAvatarForPreview(KeyValuePair<string?, string?>? avatar)
+        {
+            if (avatar is null || !avatar.HasValue)
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(avatar.Value.Key)
+                || string.IsNullOrWhiteSpace(avatar.Value.Value))
+            {
+                return null;
+            }
+
+            return $"data:{avatar.Value.Key};base64,{avatar.Value.Value}";
         }
     }
 
@@ -131,14 +151,17 @@ namespace jihadkhawaja.chat.shared.Models
         public Guid UserId { get; set; }
         [Base64String]
         public string? AvatarImageBase64 { get; set; }
+        public string? AvatarContentType { get; set; }
         [Base64String]
         public string? CoverImageBase64 { get; set; }
+        public string? CoverContentType { get; set; }
     }
-
-    public class UserFeedback : EntityBase
+    [Index(nameof(UserId), IsUnique = false)]
+    public class UserFeedback : EntityChildBase
     {
         public Guid UserId { get; set; }
-        public string? Text { get; set; }
+        [Required]
+        public string Text { get; set; } = null!;
     }
 
     public class CallOffer

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using jihadkhawaja.chat.server.Database;
@@ -12,9 +13,11 @@ using jihadkhawaja.chat.server.Database;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20250316094033_contenttype")]
+    partial class contenttype
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -50,6 +53,14 @@ namespace Egroo.Server.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("deletedby");
+
+                    b.Property<bool>("InCall")
+                        .HasColumnType("boolean")
+                        .HasColumnName("incall");
+
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isencrypted");
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
                         .HasColumnType("timestamp with time zone")
@@ -125,6 +136,10 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deletedby");
 
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isencrypted");
+
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean")
                         .HasColumnName("ispublic");
@@ -177,6 +192,10 @@ namespace Egroo.Server.Migrations
                     b.Property<bool>("IsAdmin")
                         .HasColumnType("boolean")
                         .HasColumnName("isadmin");
+
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isencrypted");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid")
@@ -321,12 +340,10 @@ namespace Egroo.Server.Migrations
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
                 {
-                    b.Property<int>("Id")
+                    b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
+                        .HasColumnType("uuid")
                         .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
@@ -349,8 +366,11 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deletedby");
 
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isencrypted");
+
                     b.Property<string>("Text")
-                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("text");
 
@@ -364,7 +384,8 @@ namespace Egroo.Server.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("userfeedback");
                 });
@@ -404,6 +425,10 @@ namespace Egroo.Server.Migrations
                     b.Property<Guid>("FriendUserId")
                         .HasColumnType("uuid")
                         .HasColumnName("frienduserid");
+
+                    b.Property<bool>("IsEncrypted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isencrypted");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid")
@@ -481,17 +506,13 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("userid");
 
-                    b.Property<string>("AvatarContentType")
-                        .HasColumnType("text")
-                        .HasColumnName("avatarcontenttype");
-
                     b.Property<string>("AvatarImageBase64")
                         .HasColumnType("text")
                         .HasColumnName("avatarimagebase64");
 
-                    b.Property<string>("CoverContentType")
+                    b.Property<string>("ContentType")
                         .HasColumnType("text")
-                        .HasColumnName("covercontenttype");
+                        .HasColumnName("contenttype");
 
                     b.Property<string>("CoverImageBase64")
                         .HasColumnType("text")
@@ -523,8 +544,8 @@ namespace Egroo.Server.Migrations
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
                 {
                     b.HasOne("jihadkhawaja.chat.server.Models.User", null)
-                        .WithMany("UserFeedbacks")
-                        .HasForeignKey("UserId")
+                        .WithOne("UserFeedback")
+                        .HasForeignKey("jihadkhawaja.chat.shared.Models.UserFeedback", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -542,7 +563,7 @@ namespace Egroo.Server.Migrations
                 {
                     b.Navigation("UserDetail");
 
-                    b.Navigation("UserFeedbacks");
+                    b.Navigation("UserFeedback");
 
                     b.Navigation("UserSecuriy");
 

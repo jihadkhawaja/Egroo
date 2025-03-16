@@ -74,7 +74,19 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                            <MudStack Row Style="height:100%;">
+                                @if (string.IsNullOrWhiteSpace(friend.AvatarPreview))
+                                {
+                                    <MudAvatar Color="Color.Primary" Size="Size.Large">@friend?.Username?.ToUpper()[0]</MudAvatar>
+                                }
+                                else
+                                {
+                                    <MudAvatar Size="Size.Large">
+                                        <MudImage Src="@friend.AvatarPreview" Alt="Profile picture image"></MudImage>
+                                    </MudAvatar>
+                                }
+                                <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                            </MudStack>
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -146,6 +158,7 @@ else
 
         UserFriendRequests = await GetFriendsRequest();
         UserFriends = await GetUserFriends();
+        _ = FetchUsersAvatar(UserFriends);
 
         IsBusy = false;
 
@@ -178,6 +191,15 @@ else
         }
 
         return users;
+    }
+
+    private async Task FetchUsersAvatar(IEnumerable<UserDto> users)
+    {
+        foreach (var user in users)
+        {
+            user.AvatarPreview = await FetchUserAvatar(user.Id);
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task<UserDto[]> GetFriendsRequest()
@@ -305,5 +327,12 @@ else
                 await InvokeAsync(StateHasChanged);
             }
         });
+    }
+
+    private async Task<string?> FetchUserAvatar(Guid userId)
+    {
+        KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(userId);
+
+        return SessionStorage.User?.CombineAvatarForPreview(avatar);
     }
 }

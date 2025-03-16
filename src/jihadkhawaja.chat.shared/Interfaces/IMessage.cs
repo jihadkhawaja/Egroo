@@ -12,4 +12,11 @@ namespace jihadkhawaja.chat.shared.Interfaces
     {
         Task SendPendingMessages();
     }
+    public interface IMessageRepository : IMessage
+    {
+        Task<Message?> GetMessageByReferenceId(Guid referenceId);
+        Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId);
+        Task<Message?> GetMessageById(Guid messageId);
+        Task<bool> AddPendingMessage(UserPendingMessage pendingMessage);
+    }
 }

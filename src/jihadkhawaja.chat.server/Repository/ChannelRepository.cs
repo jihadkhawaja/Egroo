@@ -6,6 +6,7 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace jihadkhawaja.chat.server.Repository
 {
@@ -14,8 +15,9 @@ namespace jihadkhawaja.chat.server.Repository
         public ChannelRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService)
+            EncryptionService encryptionService,
+            ILogger<ChannelRepository> logger)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
         {
         }
 
@@ -37,8 +39,9 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.AddAsync(channel);
                 await _dbContext.SaveChangesAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to create channel.");
                 return null;
             }
 
@@ -116,8 +119,9 @@ namespace jihadkhawaja.chat.server.Repository
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to add users to channel.");
                 return false;
             }
         }
@@ -146,8 +150,9 @@ namespace jihadkhawaja.chat.server.Repository
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to remove user from channel.");
                 return false;
             }
         }
@@ -160,19 +165,19 @@ namespace jihadkhawaja.chat.server.Repository
         public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
             HashSet<UserDto> channelUsers = new();
-            try
+            var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
+            if (currentChannelUsers is null)
             {
-                var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
-                foreach (var cu in currentChannelUsers)
+                return null;
+            }
+            foreach (var cu in currentChannelUsers)
+            {
+                var userdata = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == cu.UserId);
+                if (userdata != null)
                 {
-                    var userdata = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == cu.UserId);
-                    if (userdata != null)
-                    {
-                        channelUsers.Add(userdata);
-                    }
+                    channelUsers.Add(userdata);
                 }
             }
-            catch { }
 
             // Only include basic user info
             var users = channelUsers.Select(user => new UserDto
@@ -189,26 +194,26 @@ namespace jihadkhawaja.chat.server.Repository
         public async Task<Channel[]?> GetUserChannels()
         {
             HashSet<Channel> userChannels = new();
-            try
+            var connectedUser = await GetConnectedUser();
+            if (connectedUser == null)
             {
-                var connectedUser = await GetConnectedUser();
-                if (connectedUser == null)
-                {
-                    return null;
-                }
+                return null;
+            }
 
-                var channelUsers = await _dbContext.ChannelUsers
-                    .Where(x => x.UserId == connectedUser.Id).ToListAsync();
-                foreach (var cu in channelUsers)
+            var channelUsers = await _dbContext.ChannelUsers
+                .Where(x => x.UserId == connectedUser.Id).ToListAsync();
+            if (channelUsers is null)
+            {
+                return null;
+            }
+            foreach (var cu in channelUsers)
+            {
+                var channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == cu.ChannelId);
+                if (channel != null)
                 {
-                    var channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == cu.ChannelId);
-                    if (channel != null)
-                    {
-                        userChannels.Add(channel);
-                    }
+                    userChannels.Add(channel);
                 }
             }
-            catch { }
 
             return userChannels.ToArray();
         }
@@ -263,8 +268,9 @@ namespace jihadkhawaja.chat.server.Repository
 
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to delete channel.");
                 return false;
             }
         }
@@ -288,8 +294,9 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to leave channel.");
                 return false;
             }
         }
@@ -312,8 +319,9 @@ namespace jihadkhawaja.chat.server.Repository
 
                 return result.ToArray();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to search public channels.");
                 return null;
             }
         }

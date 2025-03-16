@@ -5,16 +5,18 @@ using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace jihadkhawaja.chat.server.Repository
 {
-    public class MessageRepository : BaseRepository, IMessage
+    public class MessageRepository : BaseRepository, IMessageRepository
     {
         public MessageRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService)
+            EncryptionService encryptionService,
+            ILogger<MessageRepository> logger)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
         {
         }
 
@@ -35,8 +37,9 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error sending message");
                 return false;
             }
         }
@@ -59,8 +62,9 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error updating message");
                 return false;
             }
         }
@@ -80,14 +84,12 @@ namespace jihadkhawaja.chat.server.Repository
                     await _dbContext.SaveChangesAsync();
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Optionally log error
+                _logger.LogError(ex, "Error updating pending message");
             }
         }
-
-        // Helper methods for internal use
-
+        #region helper methods
         public async Task<Message?> GetMessageByReferenceId(Guid referenceId)
         {
             return await _dbContext.Messages.FirstOrDefaultAsync(x => x.ReferenceId == referenceId);
@@ -111,10 +113,12 @@ namespace jihadkhawaja.chat.server.Repository
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error adding pending message");
                 return false;
             }
         }
+        #endregion
     }
 }

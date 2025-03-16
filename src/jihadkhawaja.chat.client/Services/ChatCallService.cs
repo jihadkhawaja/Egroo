@@ -62,19 +62,19 @@ namespace jihadkhawaja.chat.client.Services
             }
         }
 
-        public Task CallUser(UserDto targetUser, string offerSdp)
-            => HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
+        public async Task CallUser(UserDto targetUser, string offerSdp)
+            => await HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
 
-        public Task AnswerCall(bool acceptCall, UserDto caller, string answerSdp)
-            => HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
+        public async Task AnswerCall(bool acceptCall, UserDto caller, string answerSdp)
+            => await HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
 
-        public Task HangUp()
-            => HubConnection.InvokeAsync(nameof(HangUp));
+        public async Task HangUp()
+            => await HubConnection.InvokeAsync(nameof(HangUp));
 
-        public Task SendSignal(string signal, string targetConnectionId)
-            => HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
+        public async Task SendSignal(string signal, string targetConnectionId)
+            => await HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
 
-        public Task SendIceCandidateToPeer(string candidateJson)
-            => HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
+        public async Task SendIceCandidateToPeer(string candidateJson)
+            => await HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
     }
 }

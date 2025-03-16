@@ -3,6 +3,7 @@
 @using jihadkhawaja.chat.client.CacheDB
 @using jihadkhawaja.chat.client.Services;
 @using jihadkhawaja.chat.shared.Models;
+@using Microsoft.AspNetCore.Components.Forms
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
@@ -24,16 +25,19 @@
     }
 
     <!-- User Details Section -->
-    @if(currentUser is not null && currentUser.UserDetail is not null)
+    @if (currentUser is not null && currentUser.UserDetail is not null)
     {
         <MudPaper Class="pa-4 my-4" Elevation="4">
             <MudForm @ref="userForm">
                 <MudStack Spacing="2">
                     <MudText Typo="Typo.h6">User Details</MudText>
+                    <MudText Color="Color.Secondary" GutterBottom>Public Information</MudText>
                     <MudTextField Value="currentUser.Username" Label="Username" ReadOnly="true" Disabled />
+                    <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
+
+                    <MudText Color="Color.Secondary" GutterBottom>Private Information</MudText>
                     <MudTextField @bind-Value="currentUser.UserDetail.FirstName" Label="First Name" />
                     <MudTextField @bind-Value="currentUser.UserDetail.LastName" Label="Last Name" />
-                    <MudTextField @bind-Value="currentUser.UserDetail.DisplayName" Label="Display Name" />
                     <MudTextField @bind-Value="currentUser.UserDetail.Email" Label="Email" />
                     <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="UpdateUserDetails">
                         Save Changes
@@ -42,6 +46,36 @@
             </MudForm>
         </MudPaper>
     }
+
+    <!-- Update Avatar Section -->
+    <MudPaper Class="pa-4 my-4" Elevation="4">
+        <MudStack Spacing="2">
+            <MudText Typo="Typo.h6">Update Avatar</MudText>
+            <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+            Accept="image/*"
+            MaximumFileCount="1"
+            FilesChanged="OnAvatarFilesChanged">
+                <ActivatorContent>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth>
+                        Select Avatar
+                    </MudButton>
+                </ActivatorContent>
+            </MudFileUpload>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                Max file size: 10 MB
+            </MudText>
+            @if (!string.IsNullOrEmpty(newAvatarPreview))
+            {
+                <MudAvatar Size="Size.Large">
+                    <MudImage Src="@newAvatarPreview" Alt="Profile picture image"></MudImage>
+                </MudAvatar>
+            }
+            <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveAvatar" Disabled="@string.IsNullOrEmpty(newAvatarBase64)">
+                Save Avatar
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
 
     <!-- Account Section -->
     <MudPaper Class="pa-4 my-4" Elevation="4">
@@ -70,7 +104,7 @@
     </MudPaper>
 
     <!-- Report a Problem / Send Feedback Section -->
-    <MudPaper Class="pa-4 my-4" Elevation="4" hidden>
+    <MudPaper Class="pa-4 my-4" Elevation="4">
         <MudStack Spacing="2">
             <MudText Typo="Typo.h6">Report a Problem / Send Feedback</MudText>
             <MudText Typo="Typo.body2">
@@ -90,6 +124,10 @@
     private string FeedbackText { get; set; } = string.Empty;
     private UserDto currentUser = new();
 
+    // Variables for avatar update
+    private string? newAvatarBase64;
+    private string? newAvatarPreview;
+
     protected override async Task OnAccessAsync()
     {
         IsBusy = true;
@@ -107,6 +145,7 @@
         {
             currentUser = userWithDetail;
         }
+        _ = FetchAvatar();
         IsBusy = false;
     }
 
@@ -170,7 +209,13 @@
             return;
         }
 
-        // Send feedback logic (TODO)
+        bool success = await ChatUserService.SendFeedback(FeedbackText);
+        if (!success)
+        {
+            await DialogService.ShowMessageBox("Error", "Failed to submit feedback. Please try again.");
+            return;
+        }
+
         bool? confirmationResult = await DialogService.ShowMessageBox(
             "Feedback Submitted",
             "Thank you for your feedback!",
@@ -191,13 +236,13 @@
             return;
         }
 
-        bool isusccess = await ChatUserService.UpdateDetails(
+        bool isSuccess = await ChatUserService.UpdateDetails(
             displayname: currentUser.UserDetail?.DisplayName,
             email: currentUser.UserDetail?.Email,
             firstname: currentUser.UserDetail?.FirstName,
             lastname: currentUser.UserDetail?.LastName);
 
-        if (!isusccess)
+        if (!isSuccess)
         {
             await DialogService.ShowMessageBox("Error", "Couldn't update user details.");
             return;
@@ -211,6 +256,59 @@
         if (result.HasValue && result.Value)
         {
             SessionStorage.User = currentUser;
+        }
+    }
+
+    private async Task OnAvatarFilesChanged(IReadOnlyList<IBrowserFile> files)
+    {
+        if (files.Any())
+        {
+            var file = files.First();
+            // Check file size against 10 MB limit
+            if (file.Size > 10 * 1024 * 1024)
+            {
+                newAvatarBase64 = null;
+                newAvatarPreview = null;
+                await DialogService.ShowMessageBox("Error", "File size exceeds the 10 MB limit.");
+                return;
+            }
+            var buffer = new byte[file.Size];
+            await file.OpenReadStream(10 * 1024 * 1024).ReadAsync(buffer);
+            newAvatarBase64 = Convert.ToBase64String(buffer);
+            newAvatarPreview = $"data:{file.ContentType};base64,{newAvatarBase64}";
+        }
+    }
+
+    // Save the new avatar using the IUser.UpdateAvatar method
+    private async Task SaveAvatar()
+    {
+        if (string.IsNullOrEmpty(newAvatarBase64))
+        {
+            return;
+        }
+        bool success = await ChatUserService.UpdateAvatar(newAvatarBase64);
+        if (success)
+        {
+            await DialogService.ShowMessageBox("Success", "Avatar updated successfully.");
+            // Clear the temporary values
+            newAvatarBase64 = null;
+            _ = FetchAvatar();
+        }
+        else
+        {
+            await DialogService.ShowMessageBox("Error", "Failed to update avatar. Please try again.");
+        }
+    }
+
+    private async Task FetchAvatar()
+    {
+        KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
+
+        //new avatar preview after updating (compressed)
+        if (avatar.HasValue)
+        {
+            newAvatarPreview = SessionStorage.User.CombineAvatarForPreview(avatar);
+            await InvokeAsync(StateHasChanged);
         }
     }
 }

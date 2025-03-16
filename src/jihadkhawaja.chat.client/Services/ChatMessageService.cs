@@ -10,16 +10,16 @@ namespace jihadkhawaja.chat.client.Services
         private HubConnection HubConnection => MobileChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
 
-        public Task<bool> SendMessage(Message message)
-            => HubConnection.InvokeAsync<bool>(nameof(SendMessage), message);
+        public async Task<bool> SendMessage(Message message)
+            => await HubConnection.InvokeAsync<bool>(nameof(SendMessage), message);
 
-        public Task<bool> UpdateMessage(Message message)
-            => HubConnection.InvokeAsync<bool>(nameof(UpdateMessage), message);
+        public async Task<bool> UpdateMessage(Message message)
+            => await HubConnection.InvokeAsync<bool>(nameof(UpdateMessage), message);
 
-        public Task SendPendingMessages()
-            => HubConnection.InvokeAsync(nameof(SendPendingMessages));
+        public async Task SendPendingMessages()
+            => await HubConnection.InvokeAsync(nameof(SendPendingMessages));
 
-        public Task UpdatePendingMessage(Guid messageid)
-            => HubConnection.InvokeAsync(nameof(UpdatePendingMessage), messageid);
+        public async Task UpdatePendingMessage(Guid messageid)
+            => await HubConnection.InvokeAsync(nameof(UpdatePendingMessage), messageid);
     }
 }

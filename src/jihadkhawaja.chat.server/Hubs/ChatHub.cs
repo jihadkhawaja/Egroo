@@ -22,14 +22,14 @@ namespace jihadkhawaja.chat.server.Hubs
         private readonly EncryptionService _encryptionService;
         private readonly IUser _userRepository;
         private readonly IChannel _channelRepository;
-        private readonly IMessage _messageRepository;
+        private readonly IMessageRepository _messageRepository;
 
         public ChatHub(IConfiguration configuration,
             DataContext dbContext,
             EncryptionService encryptionService,
             IUser userRepository,
             IChannel channelRepository,
-            IMessage messageRepository)
+            IMessageRepository messageRepository)
         {
             _configuration = configuration;
             _dbContext = dbContext;

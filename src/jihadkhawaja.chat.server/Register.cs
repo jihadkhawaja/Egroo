@@ -155,7 +155,7 @@ public class ChatServiceBuilder
         services.AddScoped<IAuth, AuthRepository>();
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
-        services.AddScoped<IMessage, MessageRepository>();
+        services.AddScoped<IMessageRepository, MessageRepository>();
 
         services.AddRateLimiter(options =>
         {
@@ -173,7 +173,11 @@ public class ChatServiceBuilder
 
     private void ConfigureSignalR(IServiceCollection services)
     {
-        services.AddSignalR();
+        services.AddSignalR(options =>
+        {
+            // Set the maximum allowed message size to 10MB (10 * 1024 * 1024 bytes)
+            options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+        });
     }
 
     private void ConfigureDatabase(IServiceCollection services)

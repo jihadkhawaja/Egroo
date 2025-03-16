@@ -80,16 +80,16 @@
                 }
             </MudPaper>
             <MudStack Row>
-                <MudTextField @ref="inputMudTextField" DisableUnderLine
+                <MudTextField @ref="inputMudTextField" Underline="false"
                 Value="InputContent"
                 ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
                 InputMode="InputMode.text" InputType="InputType.Text"
                 AutoFocus="false"
-                Label="Your message here" Variant="Variant.Filled" @onkeydown="EnterPressed"
-                Lines="1" MaxLength="MaxMessageLength"
-                Counter="MaxMessageLength" Disabled="InputDisabled" />
+                Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
+                Lines="1" MaxLength="MaxMessageLength" ReadOnly="InputDisabled"
+                Counter="MaxMessageLength" AutoGrow />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
-                DisableElevation Class="mt-1 mb-6"
+                Class="mt-1 mb-6"
                 OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
             </MudStack>
         </MudStack>
@@ -202,43 +202,41 @@
         return Guid.TryParse(ChannelId, out Guid id) ? id : Guid.Empty;
     }
 
+    public async Task EnterPressed(KeyboardEventArgs e)
+    {
+        if ((e.Code == "Enter" || e.Code == "NumpadEnter") && !e.ShiftKey)
+        {
+            await SendMessage();
+        }
+    }
+
     private async Task SendMessage()
     {
         if (string.IsNullOrWhiteSpace(InputContent))
             return;
 
         InputDisabled = true;
-        InputContent = InputContent.Trim();
 
         Message message = new()
-            {
-                ChannelId = GetChannelId(),
-                DisplayName = SessionStorage?.User?.Username,
-                Content = InputContent,
-                SenderId = SessionStorage.User.Id,
-            };
+        {
+            ChannelId = GetChannelId(),
+            DisplayName = SessionStorage?.User?.Username,
+            Content = InputContent.Trim(),
+            SenderId = SessionStorage.User.Id,
+        };
 
         if (await ChatMessageService.SendMessage(message))
         {
-            InputContent = string.Empty;
             await inputMudTextField.Clear();
         }
         else
         {
             Snackbar.Add("Failed to send message, please check your connection and try again.", Severity.Error);
         }
+
         InputDisabled = false;
-        await InvokeAsync(StateHasChanged);
 
         await inputMudTextField.FocusAsync();
-    }
-
-    public async Task EnterPressed(KeyboardEventArgs e)
-    {
-        if (e.Code == "Enter" || e.Code == "NumpadEnter")
-        {
-            await SendMessage();
-        }
     }
 
     private void ScrollToMessagesEnd()

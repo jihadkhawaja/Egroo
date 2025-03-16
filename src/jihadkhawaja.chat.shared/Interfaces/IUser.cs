@@ -7,8 +7,8 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task CloseUserSession();
         Task<UserDto?> GetUserPublicDetails(Guid userId);
         Task<UserDto?> GetUserPrivateDetails();
-        Task<string?> GetAvatar(Guid userId);
-        Task<string?> GetCover(Guid userId);
+        Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId);
+        Task<KeyValuePair<string?, string?>?> GetCover(Guid userId);
         Task<string?> GetCurrentUserUsername();
         Task<bool> AddFriend(string friendusername);
         Task<bool> RemoveFriend(string friendusername);
@@ -24,5 +24,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname);
         Task<bool> UpdateAvatar(string? avatarBase64);
         Task<bool> UpdateCover(string? coverBase64);
+        Task<bool> SendFeedback(string text);
     }
 }

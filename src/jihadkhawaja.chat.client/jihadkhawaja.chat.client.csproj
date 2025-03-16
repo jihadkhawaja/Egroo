@@ -17,9 +17,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-	  <PackageReference Include="BlazorDexie" Version="1.5.2" />
-	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.3" />
-	  <PackageReference Include="Microsoft.JSInterop.WebAssembly" Version="8.0.3" />
+	  <PackageReference Include="BlazorDexie" Version="1.6.4" />
+	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.14" />
+	  <PackageReference Include="Microsoft.JSInterop.WebAssembly" Version="8.0.14" />
   </ItemGroup>
 
   <ItemGroup>

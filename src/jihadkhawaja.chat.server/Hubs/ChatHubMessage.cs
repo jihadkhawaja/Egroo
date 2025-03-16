@@ -1,5 +1,4 @@
-﻿using jihadkhawaja.chat.server.Repository;
-using jihadkhawaja.chat.shared.Interfaces;
+﻿using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -61,20 +60,12 @@ namespace jihadkhawaja.chat.server.Hubs
                 IsEncrypted = message.IsEncrypted
             };
 
-            if (_messageRepository is MessageRepository concreteRepo)
+            // Save pending message if the client is offline.
+            if (!ignorePendingMessages)
             {
-                // Save pending message if the client is offline.
-                if (!ignorePendingMessages)
-                {
-                    bool pendingSaved = await concreteRepo.AddPendingMessage(pendingMsg);
-                    if (!pendingSaved)
-                        return false;
-                }
-            }
-            else
-            {
-                // Cannot save pending message without the concrete implementation.
-                return false;
+                bool pendingSaved = await _messageRepository.AddPendingMessage(pendingMsg);
+                if (!pendingSaved)
+                    return false;
             }
 
             string? connectionId = GetUserConnectionIds(user.Id).LastOrDefault();
@@ -112,10 +103,7 @@ namespace jihadkhawaja.chat.server.Hubs
                 return false;
 
             Message? updatedMessage = null;
-            if (_messageRepository is MessageRepository concreteRepo)
-            {
-                updatedMessage = await concreteRepo.GetMessageByReferenceId(message.ReferenceId);
-            }
+            updatedMessage = await _messageRepository.GetMessageByReferenceId(message.ReferenceId);
             if (updatedMessage == null)
                 return false;
 
@@ -141,13 +129,10 @@ namespace jihadkhawaja.chat.server.Hubs
             if (connectedUser == null)
                 return;
 
-            if (_messageRepository is not MessageRepository concreteRepo)
-                return;
-
-            IEnumerable<UserPendingMessage> pendingMessages = await concreteRepo.GetPendingMessagesForUser(connectedUser.Id);
+            IEnumerable<UserPendingMessage> pendingMessages = await _messageRepository.GetPendingMessagesForUser(connectedUser.Id);
             foreach (var pending in pendingMessages)
             {
-                var message = await concreteRepo.GetMessageById(pending.MessageId);
+                var message = await _messageRepository.GetMessageById(pending.MessageId);
                 if (message == null)
                     continue;
                 message.Content = pending.Content;
