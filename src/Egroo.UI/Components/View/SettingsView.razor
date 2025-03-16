@@ -303,7 +303,7 @@
     private async Task FetchAvatar()
     {
         Console.WriteLine("Fetching Image..");
-        Console.WriteLine("Session user is:" + SessionStorage.User);
+        Console.WriteLine("Session user is:" + SessionStorage.User?.Id);
         if (SessionStorage.User is null)
         {
             return;
