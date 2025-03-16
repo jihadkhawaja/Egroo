@@ -84,7 +84,7 @@ namespace jihadkhawaja.chat.shared.Models
                 return null;
             }
 
-            return $"data:image/{avatar.Value.Key};base64,{avatar.Value.Value}";
+            return $"data:image/{avatar.Value.Key.ToLower()};base64,{avatar.Value.Value}";
         }
     }
 
