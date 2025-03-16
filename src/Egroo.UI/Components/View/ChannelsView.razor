@@ -4,8 +4,8 @@
 
 @inject SessionStorage SessionStorage
 @inject NavigationManager NavigationManager
-@inject IChatUser ChatUserService
-@inject IChatChannel ChatChannelService
+@inject IUser ChatUserService
+@inject IChannel ChatChannelService
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -116,7 +116,7 @@ else
                                           Value="@SearchQuery" TextChanged="OnSearchFriends"
                                           Immediate Class="mb-2"></MudTextField>
 
-                            @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<User>())
+                            @foreach (var friend in SearchedUserFriends ?? Enumerable.Empty<UserDto>())
                             {
                                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                                     <MudGrid Justify="Justify.SpaceBetween">
@@ -176,9 +176,7 @@ else
     [Inject] IDialogService DialogService { get; set; } = null!;
 
     private IEnumerable<KeyValuePair<Channel, bool>>? CurrentUserChannels { get; set; }
-    private IEnumerable<User> SearchedUserFriends { get; set; } = null!;
-
-    private bool IsBusy { get; set; } = true;
+    private IEnumerable<UserDto> SearchedUserFriends { get; set; } = null!;
 
     private bool addFriendPopOverIsOpen;
 
@@ -191,13 +189,11 @@ else
     private Channel[]? PublicChannels { get; set; }
     private KeyValuePair<Channel, bool>[]? SearchedUserChannels { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnAccessAsync()
     {
+        IsBusy = true;
         RegisterHubEvents();
-    }
 
-    protected override async Task OnAccess()
-    {
         CurrentUserChannels = await GetChannels();
 
         IsBusy = false;
@@ -209,12 +205,12 @@ else
 
         if (string.IsNullOrWhiteSpace(value))
         {
-            SearchedUserFriends = Enumerable.Empty<User>();
+            SearchedUserFriends = Enumerable.Empty<UserDto>();
             await InvokeAsync(StateHasChanged);
             return;
         }
 
-        SearchedUserFriends = await ChatUserService.SearchUserFriends(value) ?? Enumerable.Empty<User>();
+        SearchedUserFriends = await ChatUserService.SearchUserFriends(value) ?? Enumerable.Empty<UserDto>();
 
         await InvokeAsync(StateHasChanged);
     }
@@ -275,12 +271,12 @@ else
 
         for (int i = 0; i < channels.Length; i++)
         {
-            User[]? friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
+            UserDto[]? friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
 
             channels[i].DefaultTitle = string.Empty;
-            foreach (User friend in friends)
+            foreach (UserDto friend in friends)
             {
-                User? user = await ChatUserService.GetUserPublicInfo(friend.Id);
+                UserDto? user = await ChatUserService.GetUserPublicDetails(friend.Id);
                 if (friend.Id == SessionStorage.User!.Id)
                 {
                     channels[i].DefaultTitle += $"{user?.Username} (You)";

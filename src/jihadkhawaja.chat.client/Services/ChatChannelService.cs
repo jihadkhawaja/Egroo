@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace jihadkhawaja.chat.client.Services
 {
-    public class ChatChannelService : IChatChannel
+    public class ChatChannelService : IChannel
     {
         private HubConnection HubConnection => MobileChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
@@ -16,8 +16,8 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> AddChannelUsers(Guid channelId, params string[] friendEmailorusername)
             => await HubConnection.InvokeAsync<bool>(nameof(AddChannelUsers), channelId, friendEmailorusername);
 
-        public async Task<User[]?> GetChannelUsers(Guid channelId)
-            => await HubConnection.InvokeAsync<User[]>(nameof(GetChannelUsers), channelId);
+        public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
+            => await HubConnection.InvokeAsync<UserDto[]>(nameof(GetChannelUsers), channelId);
 
         public async Task<Channel?> GetChannel(Guid channelId)
             => await HubConnection.InvokeAsync<Channel>(nameof(GetChannel), channelId);

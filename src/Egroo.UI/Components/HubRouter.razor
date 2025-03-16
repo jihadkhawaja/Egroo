@@ -1,6 +1,7 @@
 ﻿@using Egroo.UI.Components.Layout
 @using Egroo.UI.Models
 @using Microsoft.AspNetCore.SignalR.Client
+@using System.Net.Http.Headers
 @using jihadkhawaja.chat.shared.Interfaces
 @using jihadkhawaja.chat.client.Core
 @using Egroo.UI.Constants
@@ -11,8 +12,8 @@
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
 @inject NavigationManager NavigationManager
-@inject IChatUser ChatUserService
-@inject IAuth ChatAuthService
+@inject IUser ChatUserService
+@inject IAuthClient ChatAuthService
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -94,15 +95,19 @@ else
     /// </summary>
     private async Task EstablishSessionAsync()
     {
-        // Initialize and start the SignalR connection.
+        // Initialize and start the SignalR connection using the current token.
         MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
         await SetAppStateAsync(AppState.ESTABLISHING_CONNECTION);
         await MobileChatSignalR.HubConnection!.StartAsync();
 
-        // If a token exists, refresh session; otherwise, continue.
+        // If a token exists, update HttpClient with the cached token and refresh the session.
         if (!string.IsNullOrEmpty(SessionStorage.Token))
         {
-            var refreshResponse = await ChatAuthService.RefreshSession(SessionStorage.Token);
+            // Update the HttpClient's Authorization header with the cached token.
+            ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization = 
+                new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
+
+            var refreshResponse = await ChatAuthService.RefreshSession();
 
             if (!refreshResponse.Success || string.IsNullOrWhiteSpace(refreshResponse.Token))
             {
@@ -114,12 +119,15 @@ else
             if (SessionStorage.Token != refreshResponse.Token)
             {
                 SessionStorage.Token = refreshResponse.Token;
+                // Update HttpClient with the new token.
+                ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization = 
+                    new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
                 await RestartSignalRConnectionAsync();
                 await UpdateTokenStorageAsync(SessionStorage.Token);
             }
 
             // Update the user info in session.
-            SessionStorage.User = new User
+            SessionStorage.User = new UserDto
             {
                 Id = refreshResponse.UserId ?? Guid.Empty,
                 Username = await ChatUserService.GetCurrentUserUsername() ?? string.Empty,

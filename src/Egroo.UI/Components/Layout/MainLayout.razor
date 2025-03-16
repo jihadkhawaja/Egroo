@@ -7,6 +7,7 @@
 @inherits LayoutComponentBase
 
 @inject SessionStorage SessionStorage
+@inject IUser ChatUserService
 
 <MudItem ChildContent="@ClientModel.MyMudProvider" />
 <MudItem ChildContent="@ClientModel.MyMudThemeProvider" />
@@ -19,11 +20,20 @@
             <MudText Class="mr-4">@SessionStorage?.User?.Username</MudText>
             <MudMenu>
                 <ActivatorContent>
-                    <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                    @if (string.IsNullOrWhiteSpace(avatarData))
+                    {
+                        <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                    }
+                    else
+                    {
+                        <MudAvatar>
+                            <MudImage Src="@avatarData" Alt="Profile picture image"></MudImage>
+                        </MudAvatar>
+                    }
                 </ActivatorContent>
                 <ChildContent>
                     <MudMenuItem Icon="@Icons.Material.Outlined.Settings" IconColor="Color.Default"
-                                 Label="Settings" Href="settings">Settings</MudMenuItem>
+                    Label="Settings" Href="settings">Settings</MudMenuItem>
                 </ChildContent>
             </MudMenu>
         </MudAppBar>
@@ -43,9 +53,29 @@
 
 @code {
     bool IsDrawerOpen = true;
+    string? avatarData;
+
+    protected override void OnInitialized()
+    {
+        _ = FetchAvatar();
+    }
 
     private void DrawerToggle()
     {
         IsDrawerOpen = !IsDrawerOpen;
+    }
+
+    private async Task FetchAvatar()
+    {
+        if (SessionStorage.User is null)
+            return;
+
+        KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
+
+        if (avatar.HasValue)
+        {
+            avatarData = SessionStorage.User?.CombineAvatarForPreview(avatar);
+            await InvokeAsync(StateHasChanged);
+        }
     }
 }

@@ -1,24 +1,29 @@
 using jihadkhawaja.chat.server.Authorization;
+using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Helpers;
-using jihadkhawaja.chat.server.Interfaces;
+using jihadkhawaja.chat.server.Models;
+using jihadkhawaja.chat.server.Security;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
+using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace jihadkhawaja.chat.server.Services
+namespace jihadkhawaja.chat.server.Repository
 {
-    public class AuthService : IAuth
+    public class AuthRepository : BaseRepository, IAuth
     {
-        private readonly IConfiguration _configuration;
-        private readonly IEntity<User> _userService;
-
-        public AuthService(IEntity<User> userService, IConfiguration configuration)
+        public AuthRepository(DataContext dbContext,
+            IHttpContextAccessor httpContextAccessor,
+            IConfiguration configuration,
+            EncryptionService encryptionService,
+            ILogger<AuthRepository> logger)
+            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
         {
-            _userService = userService;
-            _configuration = configuration;
         }
 
         private void UpdateUserStatus(ref User user)
@@ -41,7 +46,7 @@ namespace jihadkhawaja.chat.server.Services
 
             username = username.ToLower();
 
-            if (await _userService.ReadFirst(x => x.Username == username) != null)
+            if (await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username) != null)
             {
                 return new Operation.Response
                 {
@@ -83,8 +88,11 @@ namespace jihadkhawaja.chat.server.Services
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            if (await _userService.Create(user))
+            try
             {
+                await _dbContext.Users.AddAsync(user);
+                await _dbContext.SaveChangesAsync();
+
                 return new Operation.Response
                 {
                     Success = true,
@@ -93,19 +101,22 @@ namespace jihadkhawaja.chat.server.Services
                     Token = token
                 };
             }
-
-            return new Operation.Response
+            catch (Exception ex)
             {
-                Success = false,
-                Message = "Failed to create user."
-            };
+                _logger.LogError(ex, "Failed to create user.");
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to create user."
+                };
+            }
         }
 
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             username = username.ToLower();
 
-            var user = await _userService.ReadFirst(x => x.Username == username);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
             if (user == null)
             {
                 return new Operation.Response
@@ -157,28 +168,66 @@ namespace jihadkhawaja.chat.server.Services
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
-            await _userService.Update(user);
-
-            return new Operation.Response
+            try
             {
-                Success = true,
-                Message = "Sign in successful.",
-                UserId = user.Id,
-                Token = token
-            };
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+
+                return new Operation.Response
+                {
+                    Success = true,
+                    Message = "Sign in successful.",
+                    UserId = user.Id,
+                    Token = token
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update user.");
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to update user."
+                };
+            }
         }
 
-        public async Task<Operation.Response> RefreshSession(string oldtoken)
+        public async Task<Operation.Response> RefreshSession()
         {
+            // Extract the Authorization header from the current HTTP request
+            var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrEmpty(authHeader))
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Authorization header is missing."
+                };
+            }
+
+            // Expecting the header to be in the format "Bearer <token>"
+            var parts = authHeader.Split(' ');
+            if (parts.Length != 2 || !parts[0].Equals("Bearer", StringComparison.OrdinalIgnoreCase))
+            {
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Invalid Authorization header format."
+                };
+            }
+
+            var userToken = parts[1];
+
             var tokenHandler = new JwtSecurityTokenHandler();
             JwtSecurityToken jwtToken;
 
             try
             {
-                jwtToken = tokenHandler.ReadJwtToken(oldtoken);
+                jwtToken = tokenHandler.ReadJwtToken(userToken);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to read JWT token.");
                 return new Operation.Response
                 {
                     Success = false,
@@ -196,7 +245,7 @@ namespace jihadkhawaja.chat.server.Services
                 };
             }
 
-            var user = await _userService.ReadFirst(x => x.Id == userId);
+            var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
             if (user == null)
             {
                 return new Operation.Response
@@ -229,20 +278,34 @@ namespace jihadkhawaja.chat.server.Services
             string newToken = generatedToken.Access_Token;
 
             UpdateUserStatus(ref user);
-            await _userService.Update(user);
 
-            return new Operation.Response
+            try
             {
-                Success = true,
-                Message = "Session refreshed.",
-                UserId = user.Id,
-                Token = newToken
-            };
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+
+                return new Operation.Response
+                {
+                    Success = true,
+                    Message = "Session refreshed.",
+                    UserId = user.Id,
+                    Token = newToken
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update user.");
+                return new Operation.Response
+                {
+                    Success = false,
+                    Message = "Failed to update user."
+                };
+            }
         }
 
-        public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
+        public async Task<Operation.Result> ChangePassword(string oldpassword, string newpassword)
         {
-            var registeredUser = await _userService.ReadFirst(x => x.Username == username);
+            var registeredUser = await GetConnectedUser();
             if (registeredUser == null)
             {
                 return new Operation.Result
@@ -274,20 +337,26 @@ namespace jihadkhawaja.chat.server.Services
             registeredUser.LastLoginDate = DateTimeOffset.UtcNow;
             registeredUser.DateUpdated = DateTimeOffset.UtcNow;
 
-            if (await _userService.Update(registeredUser))
+            try
             {
+                _dbContext.Users.Update(registeredUser);
+                await _dbContext.SaveChangesAsync();
+
                 return new Operation.Result
                 {
                     Success = true,
                     Message = "Password changed successfully."
                 };
             }
-
-            return new Operation.Result
+            catch (Exception ex)
             {
-                Success = false,
-                Message = "Failed to update password."
-            };
+                _logger.LogError(ex, "Failed to update password.");
+                return new Operation.Result
+                {
+                    Success = false,
+                    Message = "Failed to update password."
+                };
+            }
         }
     }
 }

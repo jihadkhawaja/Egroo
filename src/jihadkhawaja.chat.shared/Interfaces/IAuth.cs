@@ -6,7 +6,11 @@ namespace jihadkhawaja.chat.shared.Interfaces
     {
         Task<Operation.Response> SignUp(string username, string password);
         Task<Operation.Response> SignIn(string username, string password);
-        Task<Operation.Response> RefreshSession(string token);
-        Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword);
+        Task<Operation.Response> RefreshSession();
+        Task<Operation.Result> ChangePassword(string oldpassword, string newpassword);
+    }
+    public interface IAuthClient : IAuth
+    {
+        HttpClient HttpClient { get; }
     }
 }

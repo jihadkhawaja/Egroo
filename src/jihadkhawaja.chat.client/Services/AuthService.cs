@@ -4,19 +4,19 @@ using System.Net.Http.Json;
 
 namespace jihadkhawaja.chat.client.Services
 {
-    public class AuthService : IAuth
+    public class AuthService : IAuthClient
     {
-        private readonly HttpClient _http;
+        public HttpClient HttpClient { get; }
 
         public AuthService(HttpClient http)
         {
-            _http = http;
+            HttpClient = http;
         }
 
         public async Task<Operation.Response> SignUp(string username, string password)
         {
             var req = new { Username = username, Password = password };
-            var httpResponse = await _http.PostAsJsonAsync("api/v1/Auth/signup", req);
+            var httpResponse = await HttpClient.PostAsJsonAsync("api/v1/Auth/signup", req);
 
             if (!httpResponse.IsSuccessStatusCode)
                 return new Operation.Response { Success = false, Message = $"HTTP error: {httpResponse.StatusCode}" };
@@ -28,7 +28,7 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<Operation.Response> SignIn(string username, string password)
         {
             var req = new { Username = username, Password = password };
-            var httpResponse = await _http.PostAsJsonAsync("api/v1/Auth/signin", req);
+            var httpResponse = await HttpClient.PostAsJsonAsync("api/v1/Auth/signin", req);
 
             if (!httpResponse.IsSuccessStatusCode)
                 return new Operation.Response { Success = false, Message = $"HTTP error: {httpResponse.StatusCode}" };
@@ -37,10 +37,9 @@ namespace jihadkhawaja.chat.client.Services
             return response ?? new Operation.Response { Success = false, Message = "Empty response from API" };
         }
 
-        public async Task<Operation.Response> RefreshSession(string token)
+        public async Task<Operation.Response> RefreshSession()
         {
-            var req = new { OldToken = token };
-            var httpResponse = await _http.PostAsJsonAsync("api/v1/Auth/refreshsession", req);
+            var httpResponse = await HttpClient.GetAsync("api/v1/Auth/refreshsession");
 
             if (!httpResponse.IsSuccessStatusCode)
                 return new Operation.Response { Success = false, Message = $"HTTP error: {httpResponse.StatusCode}" };
@@ -49,10 +48,10 @@ namespace jihadkhawaja.chat.client.Services
             return response ?? new Operation.Response { Success = false, Message = "Empty response from API" };
         }
 
-        public async Task<Operation.Result> ChangePassword(string username, string oldpassword, string newpassword)
+        public async Task<Operation.Result> ChangePassword(string oldpassword, string newpassword)
         {
-            var req = new { Username = username, OldPassword = oldpassword, NewPassword = newpassword };
-            var httpResponse = await _http.PostAsJsonAsync("api/v1/Auth/changepassword", req);
+            var req = new { OldPassword = oldpassword, NewPassword = newpassword };
+            var httpResponse = await HttpClient.PutAsJsonAsync("api/v1/Auth/changepassword", req);
 
             if (!httpResponse.IsSuccessStatusCode)
                 return new Operation.Result { Success = false, Message = $"HTTP error: {httpResponse.StatusCode}" };

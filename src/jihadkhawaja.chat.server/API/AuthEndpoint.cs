@@ -23,15 +23,15 @@ namespace jihadkhawaja.chat.server.API
                 return await auth.SignIn(req.Username, req.Password);
             }).AllowAnonymous();
 
-            group.MapPost("/refreshsession", async (IAuth auth, RefreshSessionRequest req) =>
+            group.MapGet("/refreshsession", async (IAuth auth) =>
             {
-                return await auth.RefreshSession(req.OldToken);
-            });
+                return await auth.RefreshSession();
+            }).RequireAuthorization();
 
-            group.MapPost("/changepassword", async (IAuth auth, ChangePasswordRequest req) =>
+            group.MapPut("/changepassword", async (IAuth auth, ChangePasswordRequest req) =>
             {
-                return await auth.ChangePassword(req.Username, req.OldPassword, req.NewPassword);
-            });
+                return await auth.ChangePassword(req.OldPassword, req.NewPassword);
+            }).RequireAuthorization();
         }
     }
 
@@ -39,7 +39,5 @@ namespace jihadkhawaja.chat.server.API
 
     public record SignInRequest(string Username, string Password);
 
-    public record RefreshSessionRequest(string OldToken);
-
-    public record ChangePasswordRequest(string Username, string OldPassword, string NewPassword);
+    public record ChangePasswordRequest(string OldPassword, string NewPassword);
 }
