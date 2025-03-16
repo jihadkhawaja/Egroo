@@ -302,18 +302,13 @@
 
     private async Task FetchAvatar()
     {
-        Console.WriteLine("Fetching Image..");
-        Console.WriteLine("Session user is:" + SessionStorage.User?.Id);
         if (SessionStorage.User is null)
-        {
             return;
-        }
         
-        KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
-        Console.WriteLine("Fetched Image:" + avatar);
+        MediaResult? avatar = await ChatUserService.GetAvatar(SessionStorage.User.Id);
 
         //new avatar preview after updating (compressed)
-        if (avatar.HasValue)
+        if (avatar is not null)
         {
             newAvatarPreview = SessionStorage.User.CombineAvatarForPreview(avatar);
             await InvokeAsync(StateHasChanged);

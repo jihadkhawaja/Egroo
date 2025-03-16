@@ -442,32 +442,38 @@ namespace jihadkhawaja.chat.server.Repository
             }
         }
 
-        public async Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
+        public async Task<MediaResult?> GetAvatar(Guid userId)
         {
-            User? user = await _dbContext.Users
+            var user = await _dbContext.Users
                 .Include(x => x.UserStorage)
                 .FirstOrDefaultAsync(x => x.Id == userId);
 
-            if (user == null || string.IsNullOrWhiteSpace(user.Username))
+            if (user == null || string.IsNullOrWhiteSpace(user.Username)
+                || user.UserStorage is null
+                || string.IsNullOrWhiteSpace(user.UserStorage?.AvatarContentType)
+                || string.IsNullOrWhiteSpace(user.UserStorage?.AvatarImageBase64))
             {
                 return null;
             }
 
-            return new(user.UserStorage?.AvatarContentType, user.UserStorage?.AvatarImageBase64);
+            return new MediaResult(user.UserStorage.AvatarContentType, user.UserStorage.AvatarImageBase64);
         }
 
-        public async Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
+        public async Task<MediaResult?> GetCover(Guid userId)
         {
-            User? user = await _dbContext.Users
+            var user = await _dbContext.Users
                 .Include(x => x.UserStorage)
                 .FirstOrDefaultAsync(x => x.Id == userId);
 
-            if (user == null || string.IsNullOrWhiteSpace(user.Username))
+            if (user == null || string.IsNullOrWhiteSpace(user.Username)
+                || user.UserStorage is null
+                || string.IsNullOrWhiteSpace(user.UserStorage?.CoverContentType)
+                || string.IsNullOrWhiteSpace(user.UserStorage?.CoverImageBase64))
             {
                 return null;
             }
 
-            return new(user.UserStorage?.CoverContentType, user.UserStorage?.CoverImageBase64);
+            return new MediaResult(user.UserStorage.CoverContentType, user.UserStorage.CoverImageBase64);
         }
 
         public async Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)

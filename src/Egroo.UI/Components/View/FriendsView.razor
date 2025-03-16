@@ -331,7 +331,7 @@ else
 
     private async Task<string?> FetchUserAvatar(Guid userId)
     {
-        KeyValuePair<string?, string?>? avatar = await ChatUserService.GetAvatar(userId);
+        MediaResult? avatar = await ChatUserService.GetAvatar(userId);
 
         return SessionStorage.User?.CombineAvatarForPreview(avatar);
     }

@@ -71,20 +71,15 @@ namespace jihadkhawaja.chat.shared.Models
             };
         }
 
-        public string? CombineAvatarForPreview(KeyValuePair<string?, string?>? avatar)
+        public string? CombineAvatarForPreview(MediaResult? avatar)
         {
-            if (avatar is null || !avatar.HasValue)
+            if (string.IsNullOrWhiteSpace(avatar?.ContentType)
+                || string.IsNullOrWhiteSpace(avatar?.ImageBase64))
             {
                 return null;
             }
 
-            if (string.IsNullOrWhiteSpace(avatar.Value.Key)
-                || string.IsNullOrWhiteSpace(avatar.Value.Value))
-            {
-                return null;
-            }
-
-            return $"data:image/{avatar.Value.Key.ToLower()};base64,{avatar.Value.Value}";
+            return $"data:image/{avatar.ContentType.ToLower()};base64,{avatar.ImageBase64}";
         }
     }
 
@@ -175,4 +170,6 @@ namespace jihadkhawaja.chat.shared.Models
     {
         public List<UserDto>? Users { get; set; }
     }
+
+    public record MediaResult(string ContentType, string ImageBase64);
 }

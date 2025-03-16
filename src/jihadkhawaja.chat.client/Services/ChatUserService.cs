@@ -2,7 +2,6 @@
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
@@ -56,23 +55,11 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> DeleteUser()
             => await HubConnection.InvokeAsync<bool>(nameof(DeleteUser));
 
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(KeyValuePair<string?, string?>?))]
-        public async Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
-        {
-            try
-            {
-                return await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetAvatar), userId);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
+        public async Task<MediaResult?> GetAvatar(Guid userId)
+            => await HubConnection.InvokeAsync<MediaResult?>(nameof(GetAvatar), userId);
 
-            return null;
-        }
-        [DynamicDependency(DynamicallyAccessedMemberTypes.PublicConstructors, typeof(KeyValuePair<string?, string?>?))]
-        public async Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
-            => await HubConnection.InvokeAsync<KeyValuePair<string?, string?>?>(nameof(GetCover), userId);
+        public async Task<MediaResult?> GetCover(Guid userId)
+            => await HubConnection.InvokeAsync<MediaResult?>(nameof(GetCover), userId);
 
         public async Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
             => await HubConnection.InvokeAsync<bool>(nameof(UpdateDetails), displayname, email, firstname, lastname);

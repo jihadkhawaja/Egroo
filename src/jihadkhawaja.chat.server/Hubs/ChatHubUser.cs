@@ -99,12 +99,12 @@ namespace jihadkhawaja.chat.server.Hubs
             return _userRepository.DeleteUser();
         }
         [AllowAnonymous]
-        public Task<KeyValuePair<string?, string?>?> GetAvatar(Guid userId)
+        public Task<MediaResult?> GetAvatar(Guid userId)
         {
             return _userRepository.GetAvatar(userId);
         }
         [AllowAnonymous]
-        public Task<KeyValuePair<string?, string?>?> GetCover(Guid userId)
+        public Task<MediaResult?> GetCover(Guid userId)
         {
             return _userRepository.GetCover(userId);
         }
