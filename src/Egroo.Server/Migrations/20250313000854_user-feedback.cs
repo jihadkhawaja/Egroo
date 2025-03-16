@@ -15,7 +15,7 @@ namespace Egroo.Server.Migrations
                 name: "userfeedback",
                 columns: table => new
                 {
-                    id = table.Column<Guid>(type: "uuid", nullable: false),
+                    id = table.Column<int>(type: "integer", nullable: false),
                     userid = table.Column<Guid>(type: "uuid", nullable: false),
                     text = table.Column<string>(type: "text", nullable: true),
                     datecreated = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -41,7 +41,7 @@ namespace Egroo.Server.Migrations
                 name: "IX_userfeedback_userid",
                 table: "userfeedback",
                 column: "userid",
-                unique: true);
+                unique: false);
         }
 
         /// <inheritdoc />

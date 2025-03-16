@@ -31,15 +31,6 @@ namespace Egroo.Server.Migrations
             migrationBuilder.DropColumn(
                 name: "isencrypted",
                 table: "channels");
-
-            migrationBuilder.AlterColumn<int>(
-                name: "id",
-                table: "userfeedback",
-                type: "integer",
-                nullable: false,
-                oldClrType: typeof(Guid),
-                oldType: "uuid")
-                .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
         }
 
         /// <inheritdoc />
@@ -58,15 +49,6 @@ namespace Egroo.Server.Migrations
                 type: "boolean",
                 nullable: false,
                 defaultValue: false);
-
-            migrationBuilder.AlterColumn<Guid>(
-                name: "id",
-                table: "userfeedback",
-                type: "uuid",
-                nullable: false,
-                oldClrType: typeof(int),
-                oldType: "integer")
-                .OldAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn);
 
             migrationBuilder.AddColumn<bool>(
                 name: "isencrypted",
