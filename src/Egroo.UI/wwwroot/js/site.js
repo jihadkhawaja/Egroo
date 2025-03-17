@@ -4,9 +4,14 @@ function scrollToEnd(id) {
 }
 
 window.onbeforeunload = function () {
-    DotNet.invokeMethodAsync('Egroo.UI', 'OnClosedWindow')
-        .then(data => {
-            console.log("Window unloaded!");
-            console.log(data);
-        });
+    try {
+        DotNet.invokeMethodAsync('Egroo.UI', 'OnClosedWindow')
+            .then(data => {
+                console.log("Window unloaded!");
+                console.log(data);
+            });
+    }
+    catch (e) {
+        console.log(e);
+    }
 }

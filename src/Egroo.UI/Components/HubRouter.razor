@@ -228,8 +228,15 @@ else
     [JSInvokable]
     public static async Task OnClosedWindow()
     {
-        ChatUserService chatUserService = new ChatUserService();
-        await chatUserService.CloseUserSession();
+        try
+        {
+            ChatUserService chatUserService = new ChatUserService();
+            await chatUserService.CloseUserSession();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
     }
 
     /// <summary>

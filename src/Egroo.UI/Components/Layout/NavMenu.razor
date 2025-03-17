@@ -1,5 +1,23 @@
-﻿<MudNavMenu>
-    <MudNavLink Href="Channels" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Chat">Channels</MudNavLink>
-    <MudNavLink Href="Friends" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Contacts">Friends</MudNavLink>
-    <MudNavLink Href="Settings" Match="NavLinkMatch.Prefix" Icon="@Icons.Material.Filled.Settings">Settings</MudNavLink>
+﻿<MudNavMenu Style="display: flex; flex-direction: column; height: 100vh;">
+    <MudNavLink Href="Channels" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Chat">
+        Channels
+    </MudNavLink>
+    <MudNavLink Href="Friends" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Contacts">
+        Friends
+    </MudNavLink>
+    <div style="margin-top: auto;">
+        <MudNavLink Href="Settings" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Settings">
+            Settings
+        </MudNavLink>
+        <MudDivider DividerType="DividerType.FullWidth" />
+        <MudNavLink Href="About" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Info">
+            About
+        </MudNavLink>
+        <MudNavLink Href="https://github.com/jihadkhawaja/Egroo/releases/latest"
+                 Target="_blank" Rel="noopener noreferrer"
+                 Icon="@Icons.Custom.Brands.GitHub"
+                 Class="my-4">
+            Egroo 0.1.75
+        </MudNavLink>
+    </div>
 </MudNavMenu>

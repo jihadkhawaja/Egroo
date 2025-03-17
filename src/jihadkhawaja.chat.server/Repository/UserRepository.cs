@@ -288,9 +288,8 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            User[]? users = await _dbContext.Users.Where(x =>
-                x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase) &&
-                x.Id != connectorUserId)
+            User[]? users = await _dbContext.Users
+                .Where(x => x.Username.ToLower().Contains(query.ToLower()) && x.Id != connectorUserId)
                 .OrderBy(x => x.Username)
                 .Take(maxResult)
                 .ToArrayAsync();

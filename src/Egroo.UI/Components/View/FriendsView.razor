@@ -31,7 +31,8 @@ else
                         <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                             <MudGrid Justify="Justify.SpaceBetween">
                                 <MudItem>
-                                    <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                                    <AvatarView User="@friend" />
+                                    <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
                                 </MudItem>
                                 <MudItem>
                                     <MudStack Row Style="height:100%;">
@@ -53,7 +54,8 @@ else
                 <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
-                            <ScopeView Title=@friendRequests.Username Subtitle=@string.Format("Last Seen Online: {0}", friendRequests.LastLoginDate?.Date.ToShortDateString()) />
+                            <AvatarView User="@friendRequests" />
+                            <ScopeView Title=@friendRequests.Username Subtitle=@string.Format("Last Seen {0}", friendRequests.LastLoginDate?.Date.ToShortDateString()) />
                         </MudItem>
                         <MudItem>
                             <MudStack Row Style="height:100%;">
@@ -75,33 +77,12 @@ else
                     <MudGrid Justify="Justify.SpaceBetween">
                         <MudItem>
                             <MudStack Row Style="height:100%;">
-                                @if (string.IsNullOrWhiteSpace(friend.AvatarPreview))
-                                {
-                                    <MudAvatar Color="Color.Primary" Size="Size.Large">@friend?.Username?.ToUpper()[0]</MudAvatar>
-                                }
-                                else
-                                {
-                                    <MudAvatar Size="Size.Large">
-                                        <MudImage Src="@friend.AvatarPreview" Alt="Profile picture image"></MudImage>
-                                    </MudAvatar>
-                                }
-                                <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen Online: {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                                <AvatarView User="@friend" />
+                                <ScopeView Title=@friend.Username Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
                             </MudStack>
                         </MudItem>
                         <MudItem>
-                            <MudStack Row Style="height:100%;">
-                                @if(friend.IsOnline)
-                                {
-                                    <MudTooltip Text="Online">
-                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Circle" Color="Color.Success" />
-                                    </MudTooltip>
-                                }
-                                else
-                                {
-                                    <MudTooltip Text="Offline">
-                                        <MudIcon Style="font-size:3.5rem" Icon="@Icons.Material.Filled.Circle" Color="Color.Dark" />
-                                    </MudTooltip>
-                                }                               
+                            <MudStack Row Style="height:100%;">          
                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                 OnClick="@(async () => await RemoveFriend(friend.Username))" />
                             </MudStack>

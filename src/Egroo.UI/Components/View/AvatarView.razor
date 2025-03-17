@@ -1,0 +1,36 @@
+﻿<div style="position: relative; display: inline-block;">
+    @if (string.IsNullOrWhiteSpace(User?.AvatarPreview))
+    {
+        <MudAvatar Color="Color.Primary" Size="Size.Large">
+            @User?.Username?.ToUpper()[0]
+        </MudAvatar>
+    }
+    else
+    {
+        <MudAvatar Size="Size.Large">
+            <MudImage Src="@User.AvatarPreview" Alt="Profile picture image" />
+        </MudAvatar>
+    }
+
+    <div style="position: absolute; bottom: 0; right: 0;">
+        @if (User?.IsOnline ?? false)
+        {
+            <MudTooltip Text="Online">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Success"
+                         Style="font-size: 1rem; border: 2px solid white; border-radius: 50%;" />
+            </MudTooltip>
+        }
+        else
+        {
+            <MudTooltip Text="Offline">
+                <MudIcon Icon="@Icons.Material.Filled.Circle" Color="Color.Dark"
+                         Style="font-size: 1rem; border: 2px solid white; border-radius: 50%;" />
+            </MudTooltip>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public UserDto? User { get; set; }
+}
