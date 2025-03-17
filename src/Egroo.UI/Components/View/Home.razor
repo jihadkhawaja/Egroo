@@ -2,6 +2,7 @@
 @inject SessionStorage SessionStorage
 
 <MudAppBar Elevation="2">
+    <MudImage Src="_content/Egroo.UI/favicon-32x32.png" Alt="Egroo.org" Width="32" Height="32" Class="mr-4" />
     <MudText Typo="Typo.h6">Egroo</MudText>
     <MudSpacer />
     <MudIconButton Icon="@Icons.Custom.Brands.GitHub"
@@ -12,31 +13,71 @@
                    Href="/signin" />
 </MudAppBar>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-16 pt-16">
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <MudText Typo="Typo.h3">Welcome to Egroo!</MudText>
-    <MudText>Self-host chatting solution with cross-platform client application.</MudText>
+    <MudText Class="mt-4">
+        Egroo is a self-hosted chatting solution with a cross-platform client application.
+        Enjoy secure, private messaging while maintaining control over your data.
+    </MudText>
 
-    <MudStack Row Spacing="5" Class="mt-6">
+    <MudGrid Class="mt-8">
+        <MudItem xs="12" md="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">🔒 Secure Messaging</MudText>
+                    <MudText>Keep your conversations private with end-to-end encryption.</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">🧑‍🤝‍🧑 Cross-Platform</MudText>
+                    <MudText>Access your chats on any device – desktop, mobile, or web.</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.h5">🚀 Open Source</MudText>
+                    <MudText>Completely open-source – customize and extend as you like.</MudText>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudStack Row Spacing="5" Class="mt-12">
         <MudButton Variant="Variant.Filled" Color="Color.Primary"
                    StartIcon="@Icons.Custom.Brands.GitHub"
                    Href="https://github.com/jihadkhawaja/Egroo"
                    Target="_blank" Rel="noopener noreferrer">
             GitHub Repository
         </MudButton>
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+
+        <MudButton Variant="Variant.Filled" Color="Color.Secondary"
                    StartIcon="@Icons.Material.Filled.Login" Href="/signin">
             Sign In
         </MudButton>
     </MudStack>
 </MudContainer>
 
-@code{
+@code {
+    bool ShouldRenderPage { get; set; } = true;
+
     protected override void OnInitialized()
     {
-        if (!string.IsNullOrEmpty(SessionStorage.Token)
-            && SessionStorage.User is not null)
+        if (!string.IsNullOrEmpty(SessionStorage.Token) && SessionStorage.User is not null)
         {
             NavigationManager.NavigateTo("/channels");
+            ShouldRenderPage = false;
         }
+    }
+
+    protected override bool ShouldRender()
+    {
+        return ShouldRenderPage;
     }
 }

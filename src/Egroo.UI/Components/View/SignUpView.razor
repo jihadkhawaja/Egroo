@@ -34,26 +34,34 @@
                 <MudCardContent>
                     <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
                         <MudTextField @bind-Value="model.Username"
-                        For="@(() => model.Username)"
-                        Immediate="true" Required
-                        Label="Username" />
+                                      For="@(() => model.Username)"
+                                      Immediate="true" Required
+                                      Label="Username" />
 
-                        <MudTextField @bind-Value="password"
-                        For="@(() => password)"
-                        Immediate="true" Required
-                        T="string" Label="Password" HelperText="Choose a strong password"
-                        @ref="pwField1" InputType="InputType.Password" />
+                        <MudTextField @bind-Value="Password"
+                                      For="@(() => Password)"
+                                      Immediate="true" Required
+                                      T="string"
+                                      Label="Password"
+                                      HelperText="Choose a strong password"
+                                      @ref="pwField1"
+                                      InputType="InputType.Password"
+                                      Validation="@( (Func<string, string>)(x => PasswordValidator.ValidatePassword(x)) )" />
 
-                        <MudTextField T="string"
-                        Label="Confirm Password" HelperText="Repeat the password"
-                        InputType="InputType.Password"
-                        Validation="@(new Func<string, string>(PasswordMatch))" Required />
+                        <MudTextField @bind-Value="ConfirmPassword"
+                                      T="string"
+                                      Label="Confirm Password"
+                                      HelperText="Repeat the password"
+                                      InputType="InputType.Password"
+                                      @ref="confirmPasswordField"
+                                      Validation="@( (Func<string, string>)(x => PasswordMatch(x)) )"
+                                      Required />
                     </MudForm>
                 </MudCardContent>
                 <MudCardActions Class="d-flex justify-center">
                     <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
-                    Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
-                    Style="width:50%;">SUBMIT</MudButton>
+                               Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                               Style="width:50%;">SUBMIT</MudButton>
                 </MudCardActions>
             </MudCard>
         </MudItem>
@@ -63,14 +71,40 @@
 @code {
     MudForm form;
     UserFluentValidator UserValidator;
+    PasswordFluentValidator PasswordValidator;
     MudTextField<string> pwField1;
+    MudTextField<string> confirmPasswordField;
     UserDto model = new UserDto();
-    string password;
     bool IsBusy = false;
+
+    // Backing field for Password
+    private string _password = "";
+    public string Password
+    {
+        get => _password;
+        set
+        {
+            if (_password != value)
+            {
+                _password = value;
+                // Force revalidation of the confirm password field when password changes
+                confirmPasswordField?.Validate();
+            }
+        }
+    }
+
+    // Separate variable for Confirm Password
+    private string _confirmPassword = "";
+    public string ConfirmPassword
+    {
+        get => _confirmPassword;
+        set => _confirmPassword = value;
+    }
 
     protected override void OnInitialized()
     {
         UserValidator = new UserFluentValidator(ChatUserService);
+        PasswordValidator = new PasswordFluentValidator();
         base.OnInitialized();
     }
 
@@ -79,15 +113,11 @@
         IsBusy = true;
         await form.Validate();
 
-        // Validate the password separately using the dedicated validator
-        var passwordValidator = new PasswordValidator();
-        var passwordResult = passwordValidator.Validate(password);
-        if (!passwordResult.IsValid)
+        // Validate password using our custom method.
+        var passwordError = PasswordValidator.ValidatePassword(Password);
+        if (passwordError != null)
         {
-            foreach (var error in passwordResult.Errors)
-            {
-                Snackbar.Add(error.ErrorMessage, MudBlazor.Severity.Error);
-            }
+            Snackbar.Add(passwordError, MudBlazor.Severity.Error);
             IsBusy = false;
             return;
         }
@@ -101,12 +131,10 @@
 
         try
         {
-            // Use the strongly typed AuthResponse from the ChatAuthService
-            var result = await ChatAuthService.SignUp(model?.Username, password);
+            var result = await ChatAuthService.SignUp(model?.Username, Password);
 
             if (result != null && result.Success)
             {
-                // Ensure both the UserId and Token are returned.
                 if (result.UserId == null || string.IsNullOrEmpty(result.Token))
                 {
                     Snackbar.Add("Invalid response from server.", MudBlazor.Severity.Error);
@@ -114,11 +142,9 @@
                     return;
                 }
 
-                // Create the user object with the returned Id
                 UserDto user = new() { Id = result.UserId.Value };
                 var token = result.Token;
 
-                // Store the token depending on the platform
                 switch (ClientModel.CurrentFrameworkPlatform)
                 {
                     case FrameworkPlatform.MAUI:
@@ -133,7 +159,6 @@
                         throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
                 }
 
-                // Save token in session storage and initialize the SignalR connection
                 SessionStorage.Token = token;
                 SessionStorage.User = user;
 
@@ -144,7 +169,6 @@
             }
             else
             {
-                // If the username is already taken, the error message should reflect that.
                 Snackbar.Add(result?.Message ?? "Failed to sign up. Please try again.", MudBlazor.Severity.Error);
             }
         }
@@ -160,7 +184,8 @@
 
     private string PasswordMatch(string confirmPassword)
     {
-        if (pwField1.Value != confirmPassword)
+        // Compare the confirm password with the current Password value
+        if (Password != confirmPassword)
             return "Passwords don't match";
         return null;
     }
@@ -177,7 +202,6 @@
                 .NotEmpty()
                 .Matches(@"^[a-zA-Z0-9_]{3,16}$")
                 .WithMessage("Username must be between 3 and 16 characters, and can only contain letters, numbers, and underscores.")
-                // Async check for username availability
                 .MustAsync(async (username, cancellation) =>
                 {
                     return await ChatUserService.IsUsernameAvailable(username);
@@ -194,15 +218,24 @@
         };
     }
 
-    public class PasswordValidator : AbstractValidator<string>
+    public class PasswordFluentValidator : AbstractValidator<string>
     {
-        public PasswordValidator()
+        public PasswordFluentValidator()
         {
             RuleFor(p => p)
                 .NotEmpty()
+                .WithMessage("Password cannot be empty.")
                 .Matches(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9]).{8,}$")
                 .WithMessage("Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
         }
-    }
 
+        public string? ValidatePassword(string? password)
+        {
+            if (string.IsNullOrWhiteSpace(password))
+                return "Password cannot be empty.";
+
+            var result = this.Validate(password);
+            return result.IsValid ? null : result.Errors.First().ErrorMessage;
+        }
+    }
 }
