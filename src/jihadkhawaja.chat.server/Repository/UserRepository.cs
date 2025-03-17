@@ -332,7 +332,7 @@ namespace jihadkhawaja.chat.server.Repository
             // Query for friends whose username matches the query.
             User[]? friends = await _dbContext.Users.Where(x =>
                  friendIds.Contains(x.Id) &&
-                 x.Username.Contains(query, StringComparison.InvariantCultureIgnoreCase))
+                 x.Username.ToLower().Contains(query.ToLower()))
                 .ToArrayAsync();
 
             if (friends == null)
