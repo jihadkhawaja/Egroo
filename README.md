@@ -1,69 +1,68 @@
-# [Egroo](https://www.egroo.org/)
+﻿# [Egroo](https://www.egroo.org/)
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" />
+  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="150"/>
 </div>
-<br/>
 
-A self-hosted, cross-platform chat application built using **MAUI (Hybrid)**, **Blazor Auto**, and **ASP.NET SignalR**.
+A **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET**.
 
-## Build Status
+## 🚀 Build Status
+
 [![NuGets Push](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml)
 [![MSTest](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
 [![Docker](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml)
-[![chat-deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml)
+[![Chat Deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml)
 [![CodeQL](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql)
 
-## Features
-- **Cross-platform Compatibility**: 
-  - MAUI: Windows, macOS, Android, iOS.
-  - WASM: Supported in modern browsers.
+## ✨ Features
+
+- **Blazor Auto Mode**: 
+  - Loads server-side for faster initial page load, then seamlessly switches to WebAssembly (WASM) when cached.
+- **Progressive Web App (PWA)**: 
+  - Installable on devices for an app-like experience.
 - **Real-time Communication**: 
-  - Powered by SignalR and WebRTC for seamless, instant updates.
-- **Message Security**: 
-  - Messages are automatically deleted after being sent to the recipient, ensuring privacy.
-- **Customizable Server Hosting**: 
-  - Self-hosted backend for full control over data and infrastructure.
+  - Built with SignalR and WebRTC for fast, responsive messaging.
+- **Message Privacy**: 
+  - Messages are automatically deleted after delivery, ensuring confidentiality.
+- **Self-hosted Infrastructure**: 
+  - Full control over your data with a customizable backend.
 
-## Prerequisites
-- **.NET 8** (recommended) for the latest features and support.
-- Compatible platforms:
-  - **MAUI**: Windows 7+, macOS 11+, Android 7.0+, iOS 14+.
-  - **WASM**: Any browser with WebAssembly support.
+## 📋 Prerequisites
 
-## Documentation
-Find everything you need to get started [here](https://github.com/jihadkhawaja/Egroo/wiki).
+- **.NET 8** (recommended) for the latest features and optimizations.
+- **Browser**: Any modern browser with WebAssembly support.
 
-## Screenshots
-**Windows**
+## 📚 Documentation
 
-Authentication
+Comprehensive guides and setup instructions are available in the [Wiki](https://github.com/jihadkhawaja/Egroo/wiki).
 
-![Authentication](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_auth.png)
+## 📸 Screenshots
 
-Friends List
+### Friends List
+![Friends](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg)
 
-![Friends](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_friends.png)
+### Channels
+![Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg)
 
-Channels
+### Conversations
+![Conversations](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg)
 
-![Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_channels.png)
+### Responsive
+![Small Screen Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg)
+![Small Screen Channel](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg)
+![Small Screen About](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_about.jpg)
 
-Conversations
+## 🤝 Contribution
 
-![Conversations](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_1_channel.png)
+Contributions are welcome! To get started:
 
-Android
-
-![Android](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/mobilechat_android.png)
-
-## Contribution
-Contributions are welcome! Feel free to:
 - Fork the repository and submit pull requests.
-- Report issues or request features in the **Issues** tab.
+- Report bugs or request features via the [Issues](https://github.com/jihadkhawaja/Egroo/issues) tab.
 
-## Community
-Join our **[Discord Server](https://discord.gg/9KMAM2RKVC)** to stay updated, share feedback, or ask questions.
+## 🌐 Community
 
-## License
-This project is licensed under the **MIT License**.
+Join the discussion on our **[Discord Server](https://discord.gg/9KMAM2RKVC)** to connect, share ideas, and get help.
+
+## 📄 License
+
+This project is licensed under the [**MIT License**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).

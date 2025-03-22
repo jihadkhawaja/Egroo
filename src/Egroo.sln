@@ -27,23 +27,27 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo", "Egroo\Egroo\Egroo.
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.Client", "Egroo\Egroo.Client\Egroo.Client.csproj", "{97ED607B-6318-4A22-9D4E-11BE2CB81296}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Egroo.MAUI", "Egroo.MAUI\Egroo.MAUI.csproj", "{ECF7229C-8219-4B67-9584-ADEB2B6B5318}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Github", "Github", "{1D4F32F0-5F9B-4B85-A75B-A9E407FB91E9}"
 	ProjectSection(SolutionItems) = preProject
-		..\.github\workflows\Deploy-Chat.yml = ..\.github\workflows\Deploy-Chat.yml
-		..\.github\workflows\Docker.yml = ..\.github\workflows\Docker.yml
 		..\LICENSE = ..\LICENSE
-		..\.github\workflows\MSTest.yml = ..\.github\workflows\MSTest.yml
-		..\.github\workflows\Nuget.yml = ..\.github\workflows\Nuget.yml
 		..\README.md = ..\README.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "jihadkhawaja.chat.shared", "jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj", "{81ED69C8-08B3-4529-A65D-98C988ECF479}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{967316A0-F74A-4941-9113-897DB47AC2D6}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 	ProjectSection(SolutionItems) = preProject
-		..\README.md = ..\README.md
+		..\docs\CODE_OF_CONDUCT.md = ..\docs\CODE_OF_CONDUCT.md
+		..\docs\CONTRIBUTING.md = ..\docs\CONTRIBUTING.md
+		..\docs\pull_request_template.md = ..\docs\pull_request_template.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflow", "workflow", "{A0D30AA1-FCE4-4AD9-8454-0F706006C39E}"
+	ProjectSection(SolutionItems) = preProject
+		..\.github\workflows\Deploy-Chat.yml = ..\.github\workflows\Deploy-Chat.yml
+		..\.github\workflows\Docker.yml = ..\.github\workflows\Docker.yml
+		..\.github\workflows\MSTest.yml = ..\.github\workflows\MSTest.yml
+		..\.github\workflows\Nuget.yml = ..\.github\workflows\Nuget.yml
 	EndProjectSection
 EndProject
 Global
@@ -80,12 +84,6 @@ Global
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.Build.0 = Release|Any CPU
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318}.Release|Any CPU.Deploy.0 = Release|Any CPU
 		{81ED69C8-08B3-4529-A65D-98C988ECF479}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{81ED69C8-08B3-4529-A65D-98C988ECF479}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{81ED69C8-08B3-4529-A65D-98C988ECF479}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -102,8 +100,9 @@ Global
 		{A9E09E1B-8350-4D1F-9760-4BBFF50B01AC} = {806FB1EE-C13B-468E-BFE6-75B10033A553}
 		{DF4883E6-2CF6-4201-9EFE-27117C3A33F6} = {34C21B87-402C-45B9-9895-36AC32E41686}
 		{97ED607B-6318-4A22-9D4E-11BE2CB81296} = {34C21B87-402C-45B9-9895-36AC32E41686}
-		{ECF7229C-8219-4B67-9584-ADEB2B6B5318} = {34C21B87-402C-45B9-9895-36AC32E41686}
 		{81ED69C8-08B3-4529-A65D-98C988ECF479} = {C1954230-0F2C-45CA-9A23-B3D8176971A6}
+		{02EA681E-C7D8-13C7-8484-4AC65E1B71E8} = {1D4F32F0-5F9B-4B85-A75B-A9E407FB91E9}
+		{A0D30AA1-FCE4-4AD9-8454-0F706006C39E} = {1D4F32F0-5F9B-4B85-A75B-A9E407FB91E9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {61F7FB11-1E47-470C-91E2-47F8143E1572}

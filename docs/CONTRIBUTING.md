@@ -1,16 +1,20 @@
 # Contributing
 
-When contributing to this repository, please first discuss the change you wish to make via issue,
-email, or any other method with the owners of this repository before making a change. 
+Thank you for considering contributing to this project! Please follow these steps:
 
-Please note we have a code of conduct, please follow it in all your interactions with the project.
+## Getting Started
+
+1. Discuss your proposed changes via issue, email, or other methods with the repository owners.
+2. Ensure you adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) in all interactions.
 
 ## Pull Request Process
 
-1. Only create pull requests to the [development branch](https://github.com/jihadkhawaja/MobileChat/tree/development-maui).
-2. Wait for a maintainer to check and approve it.
-3. Your pull request may be included in a future version.
+1. Fork the repository and create your branch from `main`.
+2. Make your changes and ensure they follow the project style guidelines.
+3. Update documentation as needed.
+4. Submit your pull request to the `main` branch.
+5. Wait for a maintainer to review and approve your pull request.
 
 ## Code of Conduct
 
-[Read](CODE_OF_CONDUCT.md)
+Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
