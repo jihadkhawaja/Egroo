@@ -39,18 +39,17 @@ Comprehensive guides and setup instructions are available in the [Wiki](https://
 ## 📸 Screenshots
 
 ### Friends List
-![Friends](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg)
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" style="max-width: 100%; max-height: 600px; height: auto;"/>
 
 ### Channels
-![Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg)
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" style="max-width: 100%; max-height: 600px; height: auto;"/>
 
 ### Conversations
-![Conversations](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg)
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" style="max-width: 100%; max-height: 600px; height: auto;"/>
 
 ### Responsive
-![Small Screen Channels](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg)
-![Small Screen Channel](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg)
-![Small Screen About](https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_about.jpg)
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" style="max-width: 100%; max-height: 600px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" style="max-width: 100%; max-height: 600px; height: auto;"/>
 
 ## 🤝 Contribution
 
@@ -66,3 +65,4 @@ Join the discussion on our **[Discord Server](https://discord.gg/9KMAM2RKVC)** t
 ## 📄 License
 
 This project is licensed under the [**MIT License**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
+
