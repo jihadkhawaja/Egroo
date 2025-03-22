@@ -1,8 +1,7 @@
 ﻿# [Egroo](https://www.egroo.org/)
 
-<div align="center">
-  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="150"/>
-</div>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="128"/>
+<br /><br />
 
 A **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET**.
 
@@ -39,17 +38,17 @@ Comprehensive guides and setup instructions are available in the [Wiki](https://
 ## 📸 Screenshots
 
 ### Friends List
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" style="max-width: 100%; max-height: 600px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" style="max-width: 100%; max-height: 300px; height: auto;"/>
 
 ### Channels
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" style="max-width: 100%; max-height: 600px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" style="max-width: 100%; max-height: 300px; height: auto;"/>
 
 ### Conversations
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" style="max-width: 100%; max-height: 600px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" style="max-width: 100%; max-height: 300px; height: auto;"/>
 
 ### Responsive
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" style="max-width: 100%; max-height: 600px; height: auto;"/>
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" style="max-width: 100%; max-height: 600px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" style="max-width: 100%; max-height: 300px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" style="max-width: 100%; max-height: 300px; height: auto;"/>
 
 ## 🤝 Contribution
 
@@ -65,4 +64,3 @@ Join the discussion on our **[Discord Server](https://discord.gg/9KMAM2RKVC)** t
 ## 📄 License
 
 This project is licensed under the [**MIT License**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
-
