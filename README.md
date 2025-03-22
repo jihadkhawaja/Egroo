@@ -1,7 +1,6 @@
 ﻿# [Egroo](https://www.egroo.org/)
 
 <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="128"/>
-<br /><br />
 
 A **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET**.
 
@@ -38,17 +37,19 @@ Comprehensive guides and setup instructions are available in the [Wiki](https://
 ## 📸 Screenshots
 
 ### Friends List
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" style="max-width: 100%; max-height: 300px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" height="300" />
 
 ### Channels
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" style="max-width: 100%; max-height: 300px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" height="300" />
 
 ### Conversations
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" style="max-width: 100%; max-height: 300px; height: auto;"/>
+<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" height="300" />
 
 ### Responsive
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" style="max-width: 100%; max-height: 300px; height: auto;"/>
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" style="max-width: 100%; max-height: 300px; height: auto;"/>
+<div>
+  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" height="300" />
+  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" height="300" />
+</div>
 
 ## 🤝 Contribution
 
