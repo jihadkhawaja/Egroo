@@ -116,7 +116,7 @@ jobs:
     environment:
       name: 'Release WEB'
       url: "https://www.egroo.org"
-    needs: dotnet-build-wasm
+    needs: [dotnet-build-wasm, docker-build-api]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
