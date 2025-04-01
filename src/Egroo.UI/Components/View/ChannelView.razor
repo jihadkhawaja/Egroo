@@ -86,7 +86,7 @@
                 InputMode="InputMode.text" InputType="InputType.Text"
                 AutoFocus="false"
                 Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
-                Lines="1" MaxLength="MaxMessageLength" ReadOnly="InputDisabled"
+                Lines="1" MaxLength="MaxMessageLength" Disabled="InputDisabled"
                 Counter="MaxMessageLength" AutoGrow />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
                 Class="mt-1 mb-6"
@@ -204,7 +204,8 @@
 
     public async Task EnterPressed(KeyboardEventArgs e)
     {
-        if ((e.Code == "Enter" || e.Code == "NumpadEnter") && !e.ShiftKey)
+        if ((e.Code == "Enter" || e.Code == "NumpadEnter") 
+        && !e.ShiftKey && !InputDisabled)
         {
             await SendMessage();
         }
