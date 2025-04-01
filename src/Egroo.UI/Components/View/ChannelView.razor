@@ -84,10 +84,10 @@
                 Value="InputContent"
                 ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
                 InputMode="InputMode.text" InputType="InputType.Text"
-                AutoFocus="false"
+                AutoFocus="false" 
                 Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
-                Lines="1" MaxLength="MaxMessageLength" Disabled="InputDisabled"
-                Counter="MaxMessageLength" AutoGrow />
+                Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
+                Counter="MaxMessageLength" AutoGrow="true" KeyDownPreventDefault="_preventDefault" />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
                 Class="mt-1 mb-6"
                 OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
@@ -144,6 +144,8 @@
     private int MaxMessageLength { get; set; } = 300;
     private bool InputDisabled { get; set; }
     private EgrooDB CacheDB { get; set; } = null!;
+
+    bool _preventDefault;
 
     // Call-related state
     private bool IsCalling { get; set; } = false;
@@ -204,8 +206,9 @@
 
     public async Task EnterPressed(KeyboardEventArgs e)
     {
-        if ((e.Code == "Enter" || e.Code == "NumpadEnter") 
-        && !e.ShiftKey && !InputDisabled)
+        bool isSending = (e.Key == "Enter" || e.Key == "NumpadEnter") && !e.ShiftKey;
+        _preventDefault = isSending;
+        if (isSending && !InputDisabled)
         {
             await SendMessage();
         }
