@@ -55,5 +55,6 @@ namespace jihadkhawaja.chat.server.Database
         public DbSet<ChannelUser> ChannelUsers { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserPendingMessage> UsersPendingMessages { get; set; }
+        public DbSet<UserNotificationSettings> UserNotificationSettings { get; set; }
     }
 }
