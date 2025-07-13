@@ -21,6 +21,7 @@ namespace jihadkhawaja.chat.shared.Models
         public DateTimeOffset? LastLoginDate { get; set; }
         public UserDetail? UserDetail { get; set; }
         public UserStorage? UserStorage { get; set; }
+        public UserNotificationSettings? NotificationSettings { get; set; }
         public ICollection<UserFeedback> UserFeedbacks { get; } = new List<UserFeedback>();
 
         public UserDetail? GetPublicDetail()
@@ -150,6 +151,15 @@ namespace jihadkhawaja.chat.shared.Models
         [Base64String]
         public string? CoverImageBase64 { get; set; }
         public string? CoverContentType { get; set; }
+    }
+
+    public class UserNotificationSettings
+    {
+        [Key]
+        public Guid UserId { get; set; }
+        public bool EmailNotificationsEnabled { get; set; } = true;
+        public int EmailNotificationDelayMinutes { get; set; } = 15;
+        public DateTimeOffset? LastEmailNotificationSent { get; set; }
     }
     [Index(nameof(UserId), IsUnique = false)]
     public class UserFeedback : EntityChildBase

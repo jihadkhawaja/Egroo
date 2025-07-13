@@ -3,6 +3,7 @@ using jihadkhawaja.chat.server.Database;
 using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.server.Repository;
 using jihadkhawaja.chat.server.Security;
+using jihadkhawaja.chat.server.Services;
 using jihadkhawaja.chat.server.SIP;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
@@ -156,6 +157,10 @@ public class ChatServiceBuilder
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        
+        // Email notification services
+        services.AddScoped<IEmailService, EmailService>();
+        services.AddHostedService<EmailNotificationBackgroundService>();
 
         services.AddRateLimiter(options =>
         {
