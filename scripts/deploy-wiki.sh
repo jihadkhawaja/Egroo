@@ -2,6 +2,12 @@
 
 # Egroo Wiki Deployment Script
 # This script helps deploy the wiki documentation to GitHub Wiki
+# 
+# NOTE: This is now automated via GitHub Actions!
+# The workflow in .github/workflows/deploy-wiki.yml automatically
+# deploys wiki changes when they are pushed to the main branch.
+# 
+# Use this script only for manual deployments when needed.
 
 set -e
 

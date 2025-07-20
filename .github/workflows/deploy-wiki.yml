@@ -1,0 +1,124 @@
+name: Deploy Wiki Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wiki/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'wiki/**'
+    types: [ closed ]
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  deploy-wiki:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: 🚀 Starting Wiki Deployment
+      run: |
+        echo "🚀 Deploying Egroo Wiki Documentation"
+        echo "======================================="
+    
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: 📁 Check Wiki Files
+      run: |
+        if [ ! -d "wiki" ]; then
+          echo "❌ Error: Wiki files directory not found"
+          echo "   Make sure wiki directory exists in the repository root."
+          exit 1
+        fi
+        echo "✅ Wiki files directory found"
+        ls -la wiki/
+    
+    - name: 📥 Clone Wiki Repository
+      run: |
+        echo "📥 Cloning wiki repository..."
+        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
+    
+    - name: 📋 Copy Wiki Files
+      run: |
+        echo "📋 Copying wiki files..."
+        cp -r wiki/* wiki-repo/
+        
+        echo "📁 Wiki repository contents:"
+        ls -la wiki-repo/
+    
+    - name: 💾 Commit and Push Changes
+      run: |
+        cd wiki-repo
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Check if there are changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "ℹ️  No changes to deploy."
+          exit 0
+        fi
+        
+        # Stage all changes
+        git add .
+        
+        # Create commit message with details
+        COMMIT_MSG="Update wiki documentation
+
+        - Update comprehensive documentation
+        - Add Getting Started guide
+        - Add Installation instructions
+        - Add Configuration guide
+        - Add Development Setup guide
+        - Add Deployment guide
+        - Add API documentation
+        - Add Architecture overview
+        - Add Troubleshooting guide
+
+        Auto-deployed from commit ${{ github.sha }}
+        Triggered by: ${{ github.event_name }}
+        Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        
+        echo "💾 Committing changes..."
+        git commit -m "$COMMIT_MSG"
+        
+        echo "📤 Pushing to GitHub Wiki..."
+        git push origin master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: ✅ Deployment Success
+      if: success()
+      run: |
+        echo ""
+        echo "✅ Wiki documentation deployed successfully!"
+        echo "🌐 View at: https://github.com/${{ github.repository }}/wiki"
+        echo ""
+        echo "📖 Available pages:"
+        echo "   • Home (overview and quick links)"
+        echo "   • Getting Started (quick setup)"
+        echo "   • Installation (detailed setup)"
+        echo "   • Configuration (settings and options)"
+        echo "   • Development Setup (contributor guide)"
+        echo "   • Deployment (production scenarios)"
+        echo "   • API Documentation (REST API + SignalR)"
+        echo "   • Architecture (technical overview)"
+        echo "   • Troubleshooting (common issues)"
+    
+    - name: ❌ Deployment Failed
+      if: failure()
+      run: |
+        echo ""
+        echo "❌ Wiki deployment failed!"
+        echo "Please check the logs above for details."
+        echo ""
+        echo "Common issues:"
+        echo "   • Wiki repository doesn't exist (create it first)"
+        echo "   • Permissions issue (check repository settings)"
+        echo "   • Wiki files directory missing or empty"

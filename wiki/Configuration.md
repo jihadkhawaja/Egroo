@@ -19,14 +19,14 @@ Egroo uses standard ASP.NET Core configuration patterns with `appsettings.json` 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=egroo;Username=egroo_user;Password=your_password;Port=5432"
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;"
   }
 }
 ```
 
 #### Environment Variable Override
 ```bash
-export ConnectionStrings__DefaultConnection="Host=localhost;Database=egroo;Username=egroo_user;Password=your_password"
+export ConnectionStrings__DefaultConnection="Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;"
 ```
 
 ### JWT Authentication
@@ -34,15 +34,39 @@ export ConnectionStrings__DefaultConnection="Host=localhost;Database=egroo;Usern
 ```json
 {
   "Secrets": {
-    "Jwt": "your-256-bit-secret-key-here-make-it-very-long-and-secure"
+    "Jwt": "your-secret-key-here-not-less-than-32-characters"
   }
 }
 ```
 
-**Important**: Generate a secure JWT secret:
+**Important**: The JWT secret must be at least 32 characters long for security.
+
+### Encryption Configuration
+
+```json
+{
+  "Encryption": {
+    "Key": "Your32CharLongEncryptionKeyHere1",
+    "IV": "Your16CharLongIV"
+  }
+}
+```
+
+**Important**: 
+- Encryption Key must be exactly 32 characters
+- IV (Initialization Vector) must be exactly 16 characters
+- Use strong, random values in production
+
+**Generate secure keys**:
 ```bash
-# Generate a secure random key
-openssl rand -base64 64
+# Generate 32-character encryption key
+openssl rand -hex 16
+
+# Generate 16-character IV
+openssl rand -hex 8
+
+# Generate JWT secret (32+ characters)
+openssl rand -base64 32
 ```
 
 ### CORS Configuration
@@ -72,19 +96,20 @@ For development (allows all origins):
 
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
+  "Logging": {
+    "LogLevel": {
       "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "Microsoft.Hosting.Lifetime": "Information"
-      }
-    },
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
+  },
+  "Serilog": {
     "WriteTo": [
       {
         "Name": "Console",
         "Args": {
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
+          "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
         }
       },
       {
@@ -93,7 +118,7 @@ For development (allows all origins):
           "path": "logs/egroo-.log",
           "rollingInterval": "Day",
           "retainedFileCountLimit": 30,
-          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
+          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
         }
       }
     ]
@@ -106,37 +131,46 @@ For development (allows all origins):
 `src/Egroo.Server/appsettings.Production.json`:
 ```json
 {
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=egroo;Username=egroo_user;Password=secure_password"
-  },
-  "Secrets": {
-    "Jwt": "your-very-long-and-secure-jwt-secret-key-here"
-  },
-  "Api": {
-    "AllowedOrigins": [
-      "https://yourchat.example.com"
-    ]
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
+    }
   },
   "Serilog": {
-    "MinimumLevel": {
-      "Default": "Information",
-      "Override": {
-        "Microsoft": "Warning",
-        "Microsoft.Hosting.Lifetime": "Information"
-      }
-    },
     "WriteTo": [
       {
-        "Name": "Console"
+        "Name": "Console",
+        "Args": {
+          "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
+        }
       },
       {
         "Name": "File",
         "Args": {
           "path": "logs/egroo-server-.log",
           "rollingInterval": "Day",
-          "retainedFileCountLimit": 30
+          "retainedFileCountLimit": 30,
+          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
         }
       }
+    ]
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=secure_password;Database=egroodb;"
+  },
+  "Secrets": {
+    "Jwt": "your-secret-key-here-not-less-than-32-characters"
+  },
+  "Encryption": {
+    "Key": "Your32CharLongEncryptionKeyHere1",
+    "IV": "Your16CharLongIV"
+  },
+  "Api": {
+    "AllowedOrigins": [
+      "https://yourchat.example.com"
     ]
   }
 }
@@ -193,14 +227,18 @@ PWA settings are configured in `src/Egroo/Egroo/wwwroot/manifest.json`:
 Create a `.env` file for Docker Compose:
 ```bash
 # Database
-POSTGRES_DB=egroo
-POSTGRES_USER=egroo_user
+POSTGRES_DB=egroodb
+POSTGRES_USER=postgres
 POSTGRES_PASSWORD=secure_password_here
 POSTGRES_HOST=egroo-db
 POSTGRES_PORT=5432
 
 # JWT Configuration
-JWT_SECRET=your-very-long-and-secure-jwt-secret-key-here
+JWT_SECRET=your-secret-key-here-not-less-than-32-characters
+
+# Encryption Configuration
+ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
+ENCRYPTION_IV=Your16CharLongIV
 
 # API Configuration
 API_ALLOWED_ORIGINS=https://yourchat.example.com,https://app.yourdomain.com
@@ -240,10 +278,12 @@ services:
       - egroo-db
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=${POSTGRES_HOST:-egroo-db};Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Port=${POSTGRES_PORT:-5432}
+      - ConnectionStrings__DefaultConnection=Server=${POSTGRES_HOST:-egroo-db};Port=${POSTGRES_PORT:-5432};User Id=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Database=${POSTGRES_DB};
       - Secrets__Jwt=${JWT_SECRET}
+      - Encryption__Key=${ENCRYPTION_KEY}
+      - Encryption__IV=${ENCRYPTION_IV}
       - Api__AllowedOrigins__0=${API_ALLOWED_ORIGINS}
-      - Serilog__MinimumLevel__Default=${LOG_LEVEL:-Information}
+      - Logging__LogLevel__Default=${LOG_LEVEL:-Information}
     ports:
       - "5175:8080"
     volumes:
@@ -327,7 +367,7 @@ For production, always use HTTPS. Configure SSL certificates:
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=egroo;Username=egroo_user;Password=your_password;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=300"
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=your_password;Database=egroodb;Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;Connection Idle Lifetime=300;"
   }
 }
 ```
@@ -349,9 +389,11 @@ For production, consider adding Redis for SignalR backplane:
 ### Development
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Debug"
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
     }
   },
   "Api": {
@@ -363,9 +405,11 @@ For production, consider adding Redis for SignalR backplane:
 ### Staging
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Information"
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
     }
   },
   "Api": {
@@ -379,9 +423,11 @@ For production, consider adding Redis for SignalR backplane:
 ### Production
 ```json
 {
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Warning"
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "Microsoft": "Warning",
+      "Microsoft.Hosting.Lifetime": "Information"
     }
   },
   "Api": {
