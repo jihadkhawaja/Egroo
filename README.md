@@ -32,7 +32,16 @@ A **self-hosted**, **real-time** chat web application built using **Blazor** and
 
 ## 📚 Documentation
 
-Comprehensive guides and setup instructions are available in the [Wiki](https://github.com/jihadkhawaja/Egroo/wiki).
+Comprehensive guides and setup instructions are available in our [Wiki](https://github.com/jihadkhawaja/Egroo/wiki):
+
+- **[Getting Started](https://github.com/jihadkhawaja/Egroo/wiki/Getting-Started)** - Quick setup guide
+- **[Installation Guide](https://github.com/jihadkhawaja/Egroo/wiki/Installation)** - Detailed installation instructions
+- **[Configuration](https://github.com/jihadkhawaja/Egroo/wiki/Configuration)** - Configuration options and settings
+- **[Development Setup](https://github.com/jihadkhawaja/Egroo/wiki/Development-Setup)** - Setup for contributors
+- **[Deployment Guide](https://github.com/jihadkhawaja/Egroo/wiki/Deployment)** - Production deployment scenarios
+- **[API Documentation](https://github.com/jihadkhawaja/Egroo/wiki/API-Documentation)** - REST API and SignalR reference
+- **[Architecture Overview](https://github.com/jihadkhawaja/Egroo/wiki/Architecture)** - Technical architecture details
+- **[Troubleshooting](https://github.com/jihadkhawaja/Egroo/wiki/Troubleshooting)** - Common issues and solutions
 
 ## 📸 Screenshots
 
