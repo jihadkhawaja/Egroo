@@ -41,7 +41,24 @@ jobs:
     - name: 📥 Clone Wiki Repository
       run: |
         echo "📥 Cloning wiki repository..."
-        git clone https://github.com/${{ github.repository }}.wiki.git wiki-repo
+        if git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo; then
+          echo "✅ Wiki repository cloned successfully"
+        else
+          echo "⚠️  Wiki repository doesn't exist yet. Creating initial structure..."
+          mkdir wiki-repo
+          cd wiki-repo
+          git init
+          git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          echo "# Wiki" > Home.md
+          git add Home.md
+          git commit -m "Initialize wiki"
+          git push -u origin master
+          cd ..
+          rm -rf wiki-repo
+          git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git wiki-repo
+        fi
     
     - name: 📋 Copy Wiki Files
       run: |
@@ -58,6 +75,9 @@ jobs:
         # Configure git
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Set up authentication for push
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git
         
         # Check if there are changes
         if git diff --quiet && git diff --cached --quiet; then
@@ -119,6 +139,13 @@ jobs:
         echo "Please check the logs above for details."
         echo ""
         echo "Common issues:"
-        echo "   • Wiki repository doesn't exist (create it first)"
-        echo "   • Permissions issue (check repository settings)"
+        echo "   • Wiki repository doesn't exist (create it first by visiting the wiki page)"
+        echo "   • Permissions issue (check repository settings and GitHub token permissions)"
         echo "   • Wiki files directory missing or empty"
+        echo "   • Network connectivity issues"
+        echo ""
+        echo "🔧 Troubleshooting steps:"
+        echo "   1. Visit https://github.com/${{ github.repository }}/wiki to initialize the wiki"
+        echo "   2. Check repository settings > Actions > General > Workflow permissions"
+        echo "   3. Ensure 'Read and write permissions' is enabled for GITHUB_TOKEN"
+        echo "   4. Verify the wiki/ directory exists and contains .md files"
