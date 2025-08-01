@@ -19,7 +19,7 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import NavMenu from './NavMenu';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../services/AuthProvider';
 
 const drawerWidth = 240;
 
