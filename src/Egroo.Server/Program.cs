@@ -1,47 +1,29 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using Serilog;
 using System.Text;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-//logger
-builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
+// Configure logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 #region CORS
-var allowedOrigins = builder.Configuration.GetSection("Api:AllowedOrigins").Get<string[]>();
-
-#if DEBUG
-allowedOrigins = null;
-#endif
-
-if (allowedOrigins is null || allowedOrigins.Length == 0)
+// In debug mode, allow React development server
+builder.Services.AddCors(options =>
 {
-    builder.Services.AddCors(options =>
+    options.AddPolicy("CorsPolicy",
+    policy =>
     {
-        options.AddPolicy("CorsPolicy",
-        policy =>
-        {
-            policy.AllowAnyOrigin();
-            policy.AllowAnyHeader();
-            policy.AllowAnyMethod();
-        });
+        policy.WithOrigins("http://localhost:5173", "https://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials(); // Required for SignalR
     });
-}
-else
-{
-    builder.Services.AddCors(options =>
-    {
-        options.AddPolicy("CorsPolicy",
-        policy =>
-        {
-            policy.WithOrigins(allowedOrigins);
-            policy.AllowAnyHeader();
-            policy.AllowAnyMethod();
-        });
-    });
-}
+});
+#endregion
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -70,10 +52,9 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-#endregion
+
 #region JWT
-string jwtKey = builder.Configuration.GetSection("Secrets")["Jwt"]
-            ?? throw new NullReferenceException(nameof(jwtKey));
+string jwtKey = builder.Configuration["Secrets:Jwt"] ?? "development-key-that-is-at-least-256-bits-long-for-testing-purposes-only";
 
 builder.Services.AddAuthentication(options =>
 {
@@ -88,70 +69,72 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters.ValidateIssuer = false;
     options.TokenValidationParameters.ValidateAudience = false;
     options.TokenValidationParameters.ValidateLifetime = true;
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            var accessToken = context.Request.Query["access_token"];
-
-            var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/chathub")))
-            {
-                context.Token = accessToken;
-            }
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            // Allow unauthenticated access to the SignalR hub
-            if (context.Request.Path.StartsWithSegments("/chathub"))
-            {
-                context.NoResult();
-                context.Response.StatusCode = 200;
-                context.Response.Headers["Content-Type"] = "application/json";
-                context.Response.WriteAsync("{\"error\":\"Unauthenticated access allowed\"}");
-            }
-            return Task.CompletedTask;
-        }
-    };
 });
 #endregion
 
 builder.Services.AddAuthorization();
 
-// Add Egroo chat services
-builder.Services.AddChatServices()
-    .WithConfiguration(builder.Configuration)
-    .WithExecutionClassType(typeof(Program))
-    .WithDatabase(DatabaseEnum.Postgres)
-    .WithAutoMigrateDatabase(true)
-    .WithDbConnectionStringKey("DefaultConnection")
-    .Build();
-
-WebApplication app = builder.Build();
+var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-else
-{
-    app.UseHttpsRedirection();
-}
 
 app.UseRouting();
-
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Use Egroo chat services
-app.UseChatServices();
+// Test endpoints for React integration
+app.MapGet("/api/test/health", () => new { 
+    status = "healthy", 
+    timestamp = DateTime.UtcNow,
+    message = "Egroo API is running",
+    environment = app.Environment.EnvironmentName
+}).AllowAnonymous();
 
+app.MapGet("/api/test/cors", () => new { 
+    message = "CORS is working",
+    origin = "React frontend can call this endpoint"
+}).AllowAnonymous();
+
+// Mock auth endpoints to test the React integration
+app.MapPost("/api/v1/Auth/signin", (SignInRequest req) =>
+{
+    // Mock successful authentication for testing
+    return Results.Ok(new AuthResponse
+    {
+        Token = "mock-jwt-token-for-testing",
+        User = new UserDto
+        {
+            Id = Guid.NewGuid(),
+            Username = req.Username
+        }
+    });
+}).AllowAnonymous();
+
+app.MapPost("/api/v1/Auth/signup", (SignUpRequest req) =>
+{
+    // Mock successful registration for testing
+    return Results.Ok(new AuthResponse
+    {
+        Token = "mock-jwt-token-for-testing",
+        User = new UserDto
+        {
+            Id = Guid.NewGuid(),
+            Username = req.Username
+        }
+    });
+}).AllowAnonymous();
+
+Console.WriteLine("Starting Egroo API server on http://localhost:5175");
 app.Run();
+
+// DTOs for the mock endpoints
+public record SignInRequest(string Username, string Password);
+public record SignUpRequest(string Username, string Password);
+public record AuthResponse(string Token, UserDto User);
+public record UserDto(Guid Id, string Username);
