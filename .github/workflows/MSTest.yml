@@ -56,7 +56,7 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
+                  "DefaultConnection": "Server=postgres;Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"
@@ -79,7 +79,7 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server.tar"
-          target: "/home/ubuntu/images"
+          target: "/home/ubuntu/configurations/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
@@ -87,8 +87,8 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker load -i /home/ubuntu/images/mobilechat-server.tar
-            rm /home/ubuntu/images/mobilechat-server.tar
+            docker load -i /home/ubuntu/configurations/images/mobilechat-server.tar
+            rm /home/ubuntu/configurations/images/mobilechat-server.tar
 
   docker-compose:
     name: Docker Compose
@@ -103,8 +103,8 @@ jobs:
             username: ${{ secrets.REMOTE_USER }}
             key: ${{ secrets.KEY }}
             port: 22
-            source: "src/docker-compose-egroo-test.yml"
-            target: "/home/ubuntu/Configurations/"
+            source: "docker-compose-egroo-test.yml"
+            target: "/home/ubuntu/configurations/docker_compose_configs/"
         - name: executing remote ssh commands
           uses: appleboy/ssh-action@master
           with:
@@ -112,7 +112,7 @@ jobs:
             username: ${{ secrets.REMOTE_USER }}
             key: ${{ secrets.KEY }}
             script: |
-                docker compose -f Configurations/src/docker-compose-egroo-test.yml up -d
+                docker compose -f configurations/docker_compose_configs/docker-compose-egroo-test.yml up -d
 
   uni-test:
     runs-on: ubuntu-latest
@@ -152,7 +152,7 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-              docker compose -f Configurations/src/docker-compose-egroo-test.yml down
+              docker compose -f configurations/docker_compose_configs/docker-compose-egroo-test.yml down
               docker image prune -f
   database-drop:
     name: Database drop

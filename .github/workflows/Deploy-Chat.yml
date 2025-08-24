@@ -60,7 +60,7 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
+                  "DefaultConnection": "Server=postgres;Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
                 },
                 "Api": {
                   "AllowedOrigins": [ "https://egroo.org", "https://www.egroo.org"]
@@ -86,7 +86,7 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-server-prod.tar"
-          target: "/home/ubuntu/images"
+          target: "/home/ubuntu/configurations/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
@@ -94,8 +94,8 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker load -i /home/ubuntu/images/mobilechat-server-prod.tar
-            rm /home/ubuntu/images/mobilechat-server-prod.tar
+            docker load -i /home/ubuntu/configurations/images/mobilechat-server-prod.tar
+            rm /home/ubuntu/configurations/images/mobilechat-server-prod.tar
   dotnet-build-wasm:
     name: Dotnet Build wasm
     runs-on: ubuntu-latest
@@ -133,7 +133,7 @@ jobs:
           key: ${{ secrets.KEY }}
           port: 22
           source: "mobilechat-wasm-prod.tar"
-          target: "/home/ubuntu/images"
+          target: "/home/ubuntu/configurations/images"
       - name: executing remote ssh commands
         uses: appleboy/ssh-action@master
         with:
@@ -141,8 +141,8 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.KEY }}
           script: |
-            docker load -i /home/ubuntu/images/mobilechat-wasm-prod.tar
-            rm /home/ubuntu/images/mobilechat-wasm-prod.tar
+            docker load -i /home/ubuntu/configurations/images/mobilechat-wasm-prod.tar
+            rm /home/ubuntu/configurations/images/mobilechat-wasm-prod.tar
   docker-compose:
     name: Docker Compose
     needs: [docker-build-wasm,docker-build-api]
@@ -156,8 +156,8 @@ jobs:
             username: ${{ secrets.REMOTE_USER }}
             key: ${{ secrets.KEY }}
             port: 22
-            source: "src/docker-compose-egroo.yml"
-            target: "/home/ubuntu/Configurations/"
+            source: "docker-compose-egroo.yml"
+            target: "/home/ubuntu/configurations/docker_compose_configs"
         - name: executing remote ssh commands
           uses: appleboy/ssh-action@master
           with:
@@ -165,5 +165,5 @@ jobs:
             username: ${{ secrets.REMOTE_USER }}
             key: ${{ secrets.KEY }}
             script: |
-                docker compose -f Configurations/src/docker-compose-egroo.yml up -d --force-recreate
+                docker compose -f configurations/docker_compose_configs/docker-compose-egroo.yml up -d --force-recreate
                 docker image prune -f
