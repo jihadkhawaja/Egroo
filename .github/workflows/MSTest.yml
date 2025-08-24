@@ -56,7 +56,7 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
+                  "DefaultConnection": "Server=postgres;Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=\"egroo-dev-test\";"
                 },
                 "Secrets": {
                   "Jwt": "${{ secrets.JWT_UAT }}"

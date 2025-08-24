@@ -60,7 +60,7 @@ jobs:
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {
-                  "DefaultConnection": "Server='${{ secrets.REMOTE_HOST_DB }}';Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
+                  "DefaultConnection": "Server=postgres;Port=5432;User Id='${{ secrets.REMOTE_USER_DB }}';Password='${{ secrets.REMOTE_PASSWORD }}';Database=egroo-prod;"
                 },
                 "Api": {
                   "AllowedOrigins": [ "https://egroo.org", "https://www.egroo.org"]
