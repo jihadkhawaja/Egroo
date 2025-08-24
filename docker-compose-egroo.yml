@@ -8,9 +8,9 @@ services:
     hostname: egroo-api
     restart: unless-stopped
     networks:
-      - configurations_CN
-    ports:
-      - "49117:8080"
+      - internal
+    # ports:
+    #   - "8080"
 
   egroo-web:
     image: jihadkhawaja/mobilechat-wasm-prod:latest
@@ -19,10 +19,10 @@ services:
     hostname: egroo-web
     restart: unless-stopped
     networks:
-      - configurations_CN
-    ports:
-      - "49168:8080"
+      - internal
+    # ports:
+    #   - "8080"
 
 networks:
-  configurations_CN:
+  internal:
     external: true

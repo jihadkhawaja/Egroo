@@ -8,10 +8,10 @@ services:
     hostname: egroo-api-test
     restart: unless-stopped
     networks:
-      - configurations_CN
-    ports:
-      - "43222:8080"
+      - internal
+    # ports:
+    #   - "8080"
 
 networks:
-  configurations_CN:
+  internal:
     external: true
