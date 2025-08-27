@@ -7,6 +7,11 @@ services:
     container_name: egroo-api-test
     hostname: egroo-api-test
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
     networks:
       - internal
     # ports:
