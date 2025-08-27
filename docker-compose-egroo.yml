@@ -7,6 +7,11 @@ services:
     container_name: egroo-api
     hostname: egroo-api
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
     networks:
       - internal
     # ports:
@@ -18,6 +23,11 @@ services:
     container_name: egroo-web
     hostname: egroo-web
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.3"
     networks:
       - internal
     # ports:
