@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net8.0</TargetFramework>
+	<TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -22,7 +22,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.3" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.0" />
 	</ItemGroup>
 
 </Project>

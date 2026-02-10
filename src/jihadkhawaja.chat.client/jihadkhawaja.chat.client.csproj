@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net8.0</TargetFramework>
+	<TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
@@ -18,8 +18,8 @@
 
   <ItemGroup>
 	  <PackageReference Include="BlazorDexie" Version="1.6.4" />
-	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.14" />
-	  <PackageReference Include="Microsoft.JSInterop.WebAssembly" Version="8.0.14" />
+	  <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.0" />
+	  <PackageReference Include="Microsoft.JSInterop.WebAssembly" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup>
