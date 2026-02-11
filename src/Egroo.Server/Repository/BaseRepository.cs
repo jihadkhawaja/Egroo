@@ -1,6 +1,7 @@
-﻿using jihadkhawaja.chat.server.Database;
-using jihadkhawaja.chat.server.Models;
-using jihadkhawaja.chat.server.Security;
+using Egroo.Server.Database;
+using Egroo.Server.Models;
+using Egroo.Server.Security;
+using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -9,26 +10,26 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq.Expressions;
 using System.Security.Claims;
 
-namespace jihadkhawaja.chat.server.Repository
+namespace Egroo.Server.Repository
 {
     public abstract class BaseRepository
     {
         protected readonly DataContext _dbContext;
         protected readonly IConfiguration _configuration;
-        protected readonly EncryptionService _encryptionService;
         protected readonly IHttpContextAccessor _httpContextAccessor;
+        protected readonly IConnectionTracker _connectionTracker;
         protected readonly ILogger<BaseRepository> _logger;
 
         protected BaseRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService,
+            IConnectionTracker connectionTracker,
             ILogger<BaseRepository> logger)
         {
             _dbContext = dbContext;
             _httpContextAccessor = httpContextAccessor;
             _configuration = configuration;
-            _encryptionService = encryptionService;
+            _connectionTracker = connectionTracker;
             _logger = logger;
         }
 
@@ -65,16 +66,13 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            // Start with a query on Users
             var query = asTracking ? _dbContext.Users.AsTracking() : _dbContext.Users.AsNoTracking();
 
-            // Apply each include expression
             foreach (var includeExpression in includeExpressions)
             {
                 query = query.Include(includeExpression);
             }
 
-            // Execute the query
             return await query.FirstOrDefaultAsync(x => x.Id == userId);
         }
 

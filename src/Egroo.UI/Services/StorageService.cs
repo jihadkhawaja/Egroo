@@ -1,8 +1,8 @@
-﻿using Microsoft.JSInterop;
+using Microsoft.JSInterop;
 using System.Text;
 using System.Text.Json;
 
-namespace jihadkhawaja.chat.client.Services
+namespace Egroo.UI.Services
 {
     public class StorageService
     {

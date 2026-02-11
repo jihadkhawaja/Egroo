@@ -1,8 +1,7 @@
-using jihadkhawaja.chat.server.Authorization;
-using jihadkhawaja.chat.server.Database;
-using jihadkhawaja.chat.server.Helpers;
-using jihadkhawaja.chat.server.Models;
-using jihadkhawaja.chat.server.Security;
+using Egroo.Server.Authorization;
+using Egroo.Server.Database;
+using Egroo.Server.Helpers;
+using Egroo.Server.Models;
 using jihadkhawaja.chat.shared.Helpers;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
@@ -13,16 +12,16 @@ using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace jihadkhawaja.chat.server.Repository
+namespace Egroo.Server.Repository
 {
     public class AuthRepository : BaseRepository, IAuth
     {
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService,
+            IConnectionTracker connectionTracker,
             ILogger<AuthRepository> logger)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
+            : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
         }
 
@@ -194,7 +193,6 @@ namespace jihadkhawaja.chat.server.Repository
 
         public async Task<Operation.Response> RefreshSession()
         {
-            // Extract the Authorization header from the current HTTP request
             var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
             if (string.IsNullOrEmpty(authHeader))
             {
@@ -205,7 +203,6 @@ namespace jihadkhawaja.chat.server.Repository
                 };
             }
 
-            // Expecting the header to be in the format "Bearer <token>"
             var parts = authHeader.Split(' ');
             if (parts.Length != 2 || !parts[0].Equals("Bearer", StringComparison.OrdinalIgnoreCase))
             {

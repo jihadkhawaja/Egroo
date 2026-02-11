@@ -1,10 +1,10 @@
-﻿using BlazorDexie.Database;
-using BlazorDexie.JsModule;
+using BlazorDexie.Database;
+using BlazorDexie.Options;
 using jihadkhawaja.chat.shared.Models;
 
-namespace jihadkhawaja.chat.client.CacheDB
+namespace Egroo.UI.CacheDB
 {
-    public class EgrooDB : Db
+    public class EgrooDB : Db<EgrooDB>
     {
         public Store<Message, Guid> Messages { get; set; } =
             new(
@@ -20,8 +20,8 @@ namespace jihadkhawaja.chat.client.CacheDB
                 nameof(Message.Content)
             );
 
-        public EgrooDB(IModuleFactory moduleFactory)
-            : base("EgrooDatabase", 1, new DbVersion[] { }, moduleFactory)
+        public EgrooDB(BlazorDexieOptions blazorDexieOptions)
+            : base("EgrooDatabase", 1, new IDbVersion[] { }, blazorDexieOptions)
         {
         }
     }

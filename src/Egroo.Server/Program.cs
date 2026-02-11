@@ -1,8 +1,18 @@
+using Egroo.Server.API;
+using Egroo.Server.Database;
+using Egroo.Server.Repository;
+using Egroo.Server.Security;
+using Egroo.Server.Services;
+using jihadkhawaja.chat.server;
+using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Serilog;
 using System.Text;
+using System.Threading.RateLimiting;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
@@ -50,22 +60,14 @@ builder.Services.AddSwaggerGen(options =>
         Name = "Authorization",
         Description = "Enter the Bearer Authorization string as following: `Bearer Generated-JWT-Token`",
         In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
     });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    options.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Name = "Bearer",
-                In = ParameterLocation.Header,
-                Reference = new OpenApiReference
-                {
-                    Id = "Bearer",
-                    Type = ReferenceType.SecurityScheme
-                }
-            },
+            new OpenApiSecuritySchemeReference("Bearer", null, null),
             new List<string>()
         }
     });
@@ -118,17 +120,52 @@ builder.Services.AddAuthentication(options =>
 #endregion
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 
-// Add Egroo chat services
-builder.Services.AddChatServices()
-    .WithConfiguration(builder.Configuration)
-    .WithExecutionClassType(typeof(Program))
-    .WithDatabase(DatabaseEnum.Postgres)
-    .WithAutoMigrateDatabase(true)
-    .WithDbConnectionStringKey("DefaultConnection")
-    .Build();
+#region Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("Api", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 10;
+    });
+});
+#endregion
+
+#region Database
+string connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new NullReferenceException("DefaultConnection not found");
+
+builder.Services.AddDbContext<DataContext>(options =>
+    options.UseNpgsql(connectionString));
+#endregion
+
+#region Egroo Services
+// Infrastructure
+builder.Services.AddSingleton<EncryptionService>();
+builder.Services.AddSingleton<IConnectionTracker, InMemoryConnectionTracker>();
+
+// Repositories (implement shared interfaces)
+builder.Services.AddScoped<IAuth, AuthRepository>();
+builder.Services.AddScoped<IUser, UserRepository>();
+builder.Services.AddScoped<IChannel, ChannelRepository>();
+builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+
+// SignalR hub (from the chat server package)
+builder.Services.AddChatHub();
+#endregion
 
 WebApplication app = builder.Build();
+
+// Auto-migrate database
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+    await db.Database.MigrateAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -146,12 +183,14 @@ else
 }
 
 app.UseRouting();
+app.UseRateLimiter();
 
 app.UseCors("CorsPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Use Egroo chat services
-app.UseChatServices();
+// Map endpoints
+app.MapChatHub();
+app.MapAuthentication();
 
 app.Run();

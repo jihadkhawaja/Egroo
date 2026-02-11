@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace jihadkhawaja.chat.shared.Models
@@ -151,7 +150,6 @@ namespace jihadkhawaja.chat.shared.Models
         public string? CoverImageBase64 { get; set; }
         public string? CoverContentType { get; set; }
     }
-    [Index(nameof(UserId), IsUnique = false)]
     public class UserFeedback : EntityChildBase
     {
         public Guid UserId { get; set; }

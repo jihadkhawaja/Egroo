@@ -3,9 +3,10 @@
 @using Microsoft.AspNetCore.SignalR.Client
 @using MudBlazor
 @using jihadkhawaja.chat.client
-@using jihadkhawaja.chat.client.CacheDB
-@using jihadkhawaja.chat.client.Core
 @using jihadkhawaja.chat.client.Services
+@using Egroo.UI.CacheDB
+@using jihadkhawaja.chat.client.Core
+
 @using jihadkhawaja.chat.shared.Models
 @using System.Net.Http.Json
 
@@ -20,6 +21,7 @@
 @inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
+@inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <!-- Header with Back, Title, Edit (shown only if admin), and Call Button -->
@@ -163,8 +165,7 @@
         IsBusy = true;
         RegisterMessagingEvents();
         RegisterCallEvents();
-        var moduleFactory = new EsModuleFactory(JSRuntime);
-        CacheDB = new EgrooDB(moduleFactory);
+        CacheDB = new EgrooDB(BlazorDexieOptions);
         Messages = new();
 
         // Register SendIceCandidateToPeer DotNetObjectReference

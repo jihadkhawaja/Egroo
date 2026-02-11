@@ -1,8 +1,6 @@
-﻿using ImageMagick;
-using jihadkhawaja.chat.server.Database;
-using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Models;
-using jihadkhawaja.chat.server.Security;
+using Egroo.Server.Database;
+using Egroo.Server.Models;
+using ImageMagick;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
@@ -10,16 +8,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace jihadkhawaja.chat.server.Repository
+namespace Egroo.Server.Repository
 {
     public class UserRepository : BaseRepository, IUser
     {
         public UserRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService,
+            IConnectionTracker connectionTracker,
             ILogger<UserRepository> logger)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
+            : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
         }
 
@@ -40,7 +38,6 @@ namespace jihadkhawaja.chat.server.Repository
                     }
                     catch
                     {
-                        // Ignored
                     }
                 }
             }
@@ -61,7 +58,7 @@ namespace jihadkhawaja.chat.server.Repository
             {
                 UserDetail = user.GetPublicDetail(),
                 Username = user.Username,
-                IsOnline = ChatHub.IsUserOnline(user.Id),
+                IsOnline = _connectionTracker.IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
                 DateCreated = user.DateCreated,
             };
@@ -85,7 +82,7 @@ namespace jihadkhawaja.chat.server.Repository
                 Id = user.Id,
                 UserDetail = user.GetPrivateDetail(),
                 Username = user.Username,
-                IsOnline = ChatHub.IsUserOnline(user.Id),
+                IsOnline = _connectionTracker.IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
                 DateCreated = user.DateCreated,
             };
@@ -130,7 +127,6 @@ namespace jihadkhawaja.chat.server.Repository
 
             friendusername = friendusername.ToLower();
 
-            // Get friend id from username
             User? friendUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == friendusername);
             if (friendUser == null || currentUser.Id == friendUser.Id)
             {
@@ -172,13 +168,11 @@ namespace jihadkhawaja.chat.server.Repository
             }
             friendusername = friendusername.ToLower();
 
-            // Get user id from username
             User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
             if (user == null)
             {
                 return false;
             }
-            // Get friend id from username
             User? friendUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Username == friendusername);
             if (friendUser == null)
             {
@@ -316,20 +310,17 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            // Get the friend records for the current user.
             UserFriend[]? friendRecords = await GetUserFriends(connectorUserId.Value);
             if (friendRecords == null || friendRecords.Length == 0)
             {
                 return new List<UserDto>();
             }
 
-            // Extract the friend IDs.
             var friendIds = friendRecords
                 .Select(fr => fr.UserId == connectorUserId ? fr.FriendUserId : fr.UserId)
                 .Distinct()
                 .ToList();
 
-            // Query for friends whose username matches the query.
             User[]? friends = await _dbContext.Users.Where(x =>
                  friendIds.Contains(x.Id) &&
                  x.Username.ToLower().Contains(query.ToLower()))
@@ -374,14 +365,12 @@ namespace jihadkhawaja.chat.server.Repository
 
             try
             {
-                // Delete user
                 var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
                 if (user != null)
                 {
                     _dbContext.Users.Remove(user);
                 }
 
-                // Delete user friends
                 var userFriends = await _dbContext.UsersFriends
                     .Where(x => x.UserId == connectorUserId || x.FriendUserId == connectorUserId)
                     .ToListAsync();
@@ -390,7 +379,6 @@ namespace jihadkhawaja.chat.server.Repository
                     _dbContext.UsersFriends.RemoveRange(userFriends);
                 }
 
-                // Delete messages sent by the user
                 var messages = await _dbContext.Messages
                     .Where(x => x.SenderId == connectorUserId)
                     .ToListAsync();
@@ -399,7 +387,6 @@ namespace jihadkhawaja.chat.server.Repository
                     _dbContext.Messages.RemoveRange(messages);
                 }
 
-                // Delete pending messages for the user
                 var pendingMessages = await _dbContext.UsersPendingMessages
                     .Where(x => x.UserId == connectorUserId)
                     .ToListAsync();
@@ -408,13 +395,11 @@ namespace jihadkhawaja.chat.server.Repository
                     _dbContext.UsersPendingMessages.RemoveRange(pendingMessages);
                 }
 
-                // Retrieve channel user records for the user
                 var userChannelUsers = await _dbContext.ChannelUsers
                     .Where(x => x.UserId == connectorUserId)
                     .ToListAsync();
                 if (userChannelUsers.Any())
                 {
-                    // For each channel, check if the current user is the only participant.
                     foreach (var cu in userChannelUsers)
                     {
                         int channelUserCount = await _dbContext.ChannelUsers
@@ -538,18 +523,13 @@ namespace jihadkhawaja.chat.server.Repository
 
             try
             {
-                // Convert Base64 to byte array
                 byte[] imageBytes = Convert.FromBase64String(avatarBase64);
 
                 using (var image = new MagickImage(imageBytes))
                 {
-                    // Resize while maintaining aspect ratio, fitting within 128x128
                     image.Resize(new MagickGeometry(128, 128) { IgnoreAspectRatio = false });
-
-                    // Reduce quality to compress the image
                     image.Quality = 75;
 
-                    // Convert back to Base64
                     user.UserStorage.AvatarImageBase64 = Convert.ToBase64String(image.ToByteArray());
                     user.UserStorage.AvatarContentType = image.Format.ToString();
                 }
@@ -585,18 +565,13 @@ namespace jihadkhawaja.chat.server.Repository
 
             try
             {
-                // Convert Base64 to byte array
                 byte[] imageBytes = Convert.FromBase64String(coverBase64);
 
                 using (var image = new MagickImage(imageBytes))
                 {
-                    // Resize while maintaining aspect ratio, fitting within 128x128
                     image.Resize(new MagickGeometry(2000, 600) { IgnoreAspectRatio = false });
-
-                    // Reduce quality to compress the image
                     image.Quality = 75;
 
-                    // Convert back to Base64
                     user.UserStorage.CoverImageBase64 = Convert.ToBase64String(image.ToByteArray());
                     user.UserStorage.CoverContentType = image.Format.ToString();
                 }

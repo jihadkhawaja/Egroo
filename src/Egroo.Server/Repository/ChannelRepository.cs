@@ -1,6 +1,4 @@
-﻿using jihadkhawaja.chat.server.Database;
-using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Security;
+using Egroo.Server.Database;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
@@ -8,16 +6,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace jihadkhawaja.chat.server.Repository
+namespace Egroo.Server.Repository
 {
     public class ChannelRepository : BaseRepository, IChannel
     {
         public ChannelRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
-            EncryptionService encryptionService,
+            IConnectionTracker connectionTracker,
             ILogger<ChannelRepository> logger)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
+            : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
         }
 
@@ -45,7 +43,6 @@ namespace jihadkhawaja.chat.server.Repository
                 return null;
             }
 
-            // Note: Adding users is delegated to AddChannelUsers (notification will be handled in the hub).
             await AddChannelUsers(channel.Id, usernames);
 
             return channel;
@@ -97,12 +94,10 @@ namespace jihadkhawaja.chat.server.Repository
                         DateCreated = DateTime.UtcNow
                     };
 
-                    // For public channels, assign the first joining user as admin if channel is empty.
                     if (isPublic && !existingChannelUsers.Any() && !channelUsersToAdd.Any())
                     {
                         channelUser.IsAdmin = true;
                     }
-                    // For non-public channels, if the sender is being added, assign admin.
                     else if (!isPublic && connectedUser.Id == userToAdd.Id)
                     {
                         channelUser.IsAdmin = true;
@@ -179,13 +174,12 @@ namespace jihadkhawaja.chat.server.Repository
                 }
             }
 
-            // Only include basic user info
             var users = channelUsers.Select(user => new UserDto
             {
                 Id = user.Id,
                 Username = user.Username,
                 ConnectionId = user.ConnectionId,
-                IsOnline = ChatHub.IsUserOnline(user.Id),
+                IsOnline = _connectionTracker.IsUserOnline(user.Id),
             }).ToArray();
 
             return users;

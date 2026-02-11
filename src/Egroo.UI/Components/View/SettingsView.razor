@@ -1,7 +1,7 @@
 ﻿@using BlazorDexie.JsModule
 @using Egroo.UI.Models;
-@using jihadkhawaja.chat.client.CacheDB
-@using jihadkhawaja.chat.client.Services;
+@using Egroo.UI.CacheDB
+
 @using jihadkhawaja.chat.shared.Models;
 @using Microsoft.AspNetCore.Components.Forms
 @inherits ProtectedViewBase
@@ -12,6 +12,7 @@
 @inject IDialogService DialogService
 @inject IUser ChatUserService
 @inject IJSRuntime JSRuntime
+@inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <!-- Page Header -->
@@ -131,8 +132,7 @@
     protected override async Task OnAccessAsync()
     {
         IsBusy = true;
-        var moduleFactory = new EsModuleFactory(JSRuntime);
-        CacheDB = new EgrooDB(moduleFactory);
+        CacheDB = new EgrooDB(BlazorDexieOptions);
 
         // Retrieve and initialize the current user
         currentUser = SessionStorage.User ?? new UserDto();

@@ -1,7 +1,7 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using System.Text;
 
-namespace jihadkhawaja.chat.server.Security
+namespace Egroo.Server.Security
 {
     public class EncryptionService
     {

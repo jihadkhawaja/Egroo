@@ -1,9 +1,9 @@
-﻿using jihadkhawaja.chat.shared.Interfaces;
+using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace jihadkhawaja.chat.server.API
+namespace Egroo.Server.API
 {
     public static class AuthEndpoint
     {
@@ -36,8 +36,6 @@ namespace jihadkhawaja.chat.server.API
     }
 
     public record SignUpRequest(string Username, string Password);
-
     public record SignInRequest(string Username, string Password);
-
     public record ChangePasswordRequest(string OldPassword, string NewPassword);
 }

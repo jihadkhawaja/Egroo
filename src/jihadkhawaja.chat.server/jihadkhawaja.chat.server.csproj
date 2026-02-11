@@ -17,18 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-	  <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.5.0" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
-	  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
-	  <PackageReference Include="SIPSorcery" Version="8.0.11" />
-	  <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
-	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.6.1" />
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
-		  <PrivateAssets>all</PrivateAssets>
-		  <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-	  </PackageReference>
+	  <!-- No heavy dependencies — the host app provides EF, auth, encryption, etc. -->
   </ItemGroup>
 	
   <ItemGroup>

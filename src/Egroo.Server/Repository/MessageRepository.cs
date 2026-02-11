@@ -1,5 +1,5 @@
-﻿using jihadkhawaja.chat.server.Database;
-using jihadkhawaja.chat.server.Security;
+using Egroo.Server.Database;
+using Egroo.Server.Security;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http;
@@ -7,17 +7,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace jihadkhawaja.chat.server.Repository
+namespace Egroo.Server.Repository
 {
     public class MessageRepository : BaseRepository, IMessageRepository
     {
+        private readonly EncryptionService _encryptionService;
+
         public MessageRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
+            IConnectionTracker connectionTracker,
             EncryptionService encryptionService,
             ILogger<MessageRepository> logger)
-            : base(dbContext, httpContextAccessor, configuration, encryptionService, logger)
+            : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
+            _encryptionService = encryptionService;
         }
 
         public async Task<bool> SendMessage(Message message)
@@ -25,11 +29,10 @@ namespace jihadkhawaja.chat.server.Repository
             if (message == null || string.IsNullOrWhiteSpace(message.Content))
                 return false;
 
-            // Encrypt and set properties.
+            // Encrypt message content before storing
             message.Content = _encryptionService.Encrypt(message.Content);
             message.Id = Guid.NewGuid();
             message.DateSent = DateTime.UtcNow;
-            message.IsEncrypted = true;
 
             try
             {
@@ -89,6 +92,7 @@ namespace jihadkhawaja.chat.server.Repository
                 _logger.LogError(ex, "Error updating pending message");
             }
         }
+
         #region helper methods
         public async Task<Message?> GetMessageByReferenceId(Guid referenceId)
         {

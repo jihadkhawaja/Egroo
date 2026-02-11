@@ -1,10 +1,10 @@
-﻿using jihadkhawaja.chat.server.Models;
+using Egroo.Server.Models;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace jihadkhawaja.chat.server.Authorization
+namespace Egroo.Server.Authorization
 {
     internal static class TokenGenerator
     {
