@@ -141,12 +141,6 @@ cd src/Egroo/Egroo
 dotnet watch run
 ```
 
-### Option 3: Using Docker Compose (Development)
-
-```bash
-docker-compose -f docker-compose-egroo-test.yml up --build
-```
-
 ## 🧪 Running Tests
 
 ### Unit Tests

@@ -1,61 +1,133 @@
-using jihadkhawaja.chat.client.Core;
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using Microsoft.AspNetCore.SignalR.Client;
+using jihadkhawaja.chat.shared.Helpers;
 
 namespace Egroo.Server.Test
 {
+    /// <summary>
+    /// Tests the auth flow (sign-up / sign-in / change password) using the
+    /// <c>jihadkhawaja.chat.server</c> hub backed by an in-memory EF Core database.
+    /// These tests exercise <c>AuthRepository</c> which implements the
+    /// <see cref="IAuth"/> interface defined in <c>jihadkhawaja.chat.shared</c>.
+    /// </summary>
     [TestClass]
     public class AuthTest
     {
-        private IAuth ChatAuthService { get; set; } = null!;
+        // Unique DB per class so auth tests are fully isolated.
+        private const string DbName = "AuthTestDb";
+        private IServiceProvider _services = null!;
 
         [TestInitialize]
-        public async Task Initialize()
+        public void Initialize()
         {
-            // Create a new HttpClient with a BaseAddress. Ensure TestConfig.ApiBaseUrl is set appropriately.
-            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
-            ChatAuthService = new AuthService(httpClient);
-
-            ChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-            await ChatSignalR.HubConnection.StartAsync();
+            _services = TestServiceProvider.Build(dbName: DbName);
         }
 
-        [TestMethod, Priority(0)]
-        public async Task ConnectTest()
+        // ── Sign-up ─────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task SignUp_WithValidCredentials_Succeeds()
         {
-            Assert.IsNotNull(ChatSignalR.HubConnection, "SignalR connection is null.");
-            Assert.AreEqual(HubConnectionState.Connected, ChatSignalR.HubConnection.State, "Failed to connect to SignalR hub.");
+            using var scope = _services.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<IAuth>();
+
+            var result = await auth.SignUp("authuser1", "ValidP@ss1!");
+
+            Assert.IsTrue(result.Success, $"SignUp failed: {result.Message}");
+            Assert.IsNotNull(result.UserId, "Expected a UserId in the response.");
+            Assert.IsNotNull(result.Token,  "Expected a JWT token in the response.");
         }
 
-        [TestMethod, Priority(1)]
-        public async Task SignUpThenSignInTest()
+        [TestMethod]
+        public async Task SignUp_DuplicateUsername_Fails()
         {
-            // Try signing up
-            var signUpResponse = await ChatAuthService.SignUp("test", "HvrnS4Q4zJ$xaW!3");
+            using var scope1 = _services.CreateScope();
+            var auth1 = scope1.ServiceProvider.GetRequiredService<IAuth>();
+            await auth1.SignUp("dupuser", "ValidP@ss1!");
 
-            // Check if the sign-up failed for a reason OTHER than "username exists"
-            if (!signUpResponse.Success && !(signUpResponse.Message?.ToLower().Contains("exist") ?? false))
-            {
-                Assert.Fail($"Sign-up failed: {signUpResponse.Message}");
-            }
+            using var scope2 = _services.CreateScope();
+            var auth2 = scope2.ServiceProvider.GetRequiredService<IAuth>();
+            var result = await auth2.SignUp("dupuser", "ValidP@ss1!");
 
-            // Now sign in
-            var signInResponse = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
-
-            Assert.IsNotNull(signInResponse, "Sign-in response is null.");
-            Assert.IsTrue(signInResponse.Success, $"Sign-in failed: {signInResponse.Message}");
-            Assert.IsNotNull(signInResponse.Token, "Sign-in did not return a token.");
-            Assert.IsNotNull(signInResponse.UserId, "Sign-in did not return a user ID.");
+            Assert.IsFalse(result.Success, "Expected failure for duplicate username.");
+            StringAssert.Contains(result.Message!.ToLower(), "exist");
         }
 
-        [TestCleanup]
-        public async Task Cleanup()
+        [TestMethod]
+        public async Task SignUp_InvalidUsername_Fails()
         {
-            if (ChatSignalR.HubConnection.State == HubConnectionState.Connected)
-            {
-                await ChatSignalR.HubConnection.StopAsync();
-            }
+            using var scope = _services.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<IAuth>();
+
+            // PatternMatchHelper rejects empty / invalid usernames
+            var result = await auth.SignUp("", "ValidP@ss1!");
+
+            Assert.IsFalse(result.Success, "Expected failure for empty username.");
         }
+
+        [TestMethod]
+        public async Task SignUp_WeakPassword_Fails()
+        {
+            using var scope = _services.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<IAuth>();
+
+            var result = await auth.SignUp("authuser_weak", "123");
+
+            Assert.IsFalse(result.Success, "Expected failure for weak password.");
+        }
+
+        // ── Sign-in ─────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task SignIn_WithCorrectCredentials_Succeeds()
+        {
+            using var scopeUp = _services.CreateScope();
+            await scopeUp.ServiceProvider.GetRequiredService<IAuth>()
+                         .SignUp("signinuser", "ValidP@ss1!");
+
+            using var scopeIn = _services.CreateScope();
+            var result = await scopeIn.ServiceProvider.GetRequiredService<IAuth>()
+                                       .SignIn("signinuser", "ValidP@ss1!");
+
+            Assert.IsTrue(result.Success, $"SignIn failed: {result.Message}");
+            Assert.IsNotNull(result.Token,  "Expected a JWT token.");
+            Assert.IsNotNull(result.UserId, "Expected a UserId.");
+        }
+
+        [TestMethod]
+        public async Task SignIn_WithWrongPassword_Fails()
+        {
+            using var scopeUp = _services.CreateScope();
+            await scopeUp.ServiceProvider.GetRequiredService<IAuth>()
+                         .SignUp("wrongpassuser", "ValidP@ss1!");
+
+            using var scopeIn = _services.CreateScope();
+            var result = await scopeIn.ServiceProvider.GetRequiredService<IAuth>()
+                                       .SignIn("wrongpassuser", "WrongPassword!");
+
+            Assert.IsFalse(result.Success, "Expected failure for wrong password.");
+        }
+
+        [TestMethod]
+        public async Task SignIn_NonExistentUser_Fails()
+        {
+            using var scope = _services.CreateScope();
+            var result = await scope.ServiceProvider.GetRequiredService<IAuth>()
+                                    .SignIn("ghost_user", "ValidP@ss1!");
+
+            Assert.IsFalse(result.Success, "Expected failure for non-existent user.");
+        }
+
+        // ── PatternMatchHelper (jihadkhawaja.chat.shared) ───────────────────────────
+
+        [TestMethod]
+        public void PatternMatch_ValidUsername_ReturnsTrue()
+            => Assert.IsTrue(PatternMatchHelper.IsValidUsername("validuser"));
+
+        [TestMethod]
+        public void PatternMatch_ValidPassword_ReturnsTrue()
+            => Assert.IsTrue(PatternMatchHelper.IsValidPassword("ValidP@ss1!"));
+
+        [TestMethod]
+        public void PatternMatch_ShortPassword_ReturnsFalse()
+            => Assert.IsFalse(PatternMatchHelper.IsValidPassword("ab1!"));
     }
 }
