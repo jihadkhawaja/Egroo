@@ -36,8 +36,11 @@
             }
         </MudStack>
         <!-- Call Button -->
-        <MudTooltip Text="Call (WIP)">
-            <MudIconButton Disabled Icon="@Icons.Material.Filled.Call" Size="Size.Large" Color="Color.Primary" OnClick="OnCallButtonClicked" />
+        <MudTooltip Text="Join Voice Call">
+            <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
+                           Size="Size.Large"
+                           Color="@(IsInCall ? Color.Error : Color.Primary)"
+                           OnClick="OnCallButtonClicked" />
         </MudTooltip>
     </MudStack>
 
@@ -103,36 +106,39 @@
         </div>
     }
 
-    <!-- Call Overlay UI -->
-    <MudOverlay DarkBackground Visible="@IsCalling" />
-    <MudPopover Open="@IsCalling" AnchorOrigin="Origin.CenterCenter"
-    TransformOrigin="Origin.CenterCenter"
-    OverflowBehavior="OverflowBehavior.FlipOnOpen"
-    Fixed Paper>
-        <MudItem Class="pa-4">
-            <MudText Class="pb-2" Typo="Typo.h6">@CallStatusMessage</MudText>
-            @if (IsIncomingCall)
-            {
-                <MudStack Row Spacing="3" Justify="Justify.Center">
-                    <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="AcceptCall">Accept</MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="DeclineCall">Decline</MudButton>
+    <!-- Voice Call Bar (shown when in call) -->
+    @if (IsInCall)
+    {
+        <MudPaper Elevation="4" Class="pa-3 mt-2" Style="border-radius: 12px;">
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" />
+                    <MudText Typo="Typo.body1" Color="Color.Success">
+                        Voice Connected &mdash; @CallParticipantIds.Count participant@(CallParticipantIds.Count != 1 ? "s" : "")
+                    </MudText>
+                    @if (CallDuration is not null)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Default">@CallDuration</MudText>
+                    }
                 </MudStack>
-            }
-            else
-            {
-                <MudStack Justify="Justify.Center" Spacing="3">
-                    <MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="ToggleLocalMonitor">
-                        @(LocalMonitorEnabled ? "Turn Off Local Monitor" : "Turn On Local Monitor")
-                    </MudButton>
-                    <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="HangUpCall">Hang Up</MudButton>
+                <MudStack Row Spacing="2">
+                    <MudTooltip Text="@(IsMuted ? "Unmute" : "Mute")">
+                        <MudIconButton Icon="@(IsMuted ? Icons.Material.Filled.MicOff : Icons.Material.Filled.Mic)"
+                                       Color="@(IsMuted ? Color.Error : Color.Default)"
+                                       OnClick="ToggleMute" />
+                    </MudTooltip>
+                    <MudTooltip Text="Leave Call">
+                        <MudIconButton Icon="@Icons.Material.Filled.CallEnd"
+                                       Color="Color.Error"
+                                       OnClick="LeaveCall" />
+                    </MudTooltip>
                 </MudStack>
-            }
-        </MudItem>
-    </MudPopover>
+            </MudStack>
+        </MudPaper>
+    }
 
-    <!-- Audio Elements -->
-    <audio id="localAudio" autoplay playsinline style="display:none;"></audio>
-    <audio id="remoteAudio" autoplay playsinline style="display:none;"></audio>
+    <!-- Hidden container for dynamically created remote audio elements -->
+    <div id="remote-audio-container" style="display:none;"></div>
 </MudContainer>
 
 @code {
@@ -149,16 +155,14 @@
 
     bool _preventDefault;
 
-    // Call-related state
-    private bool IsCalling { get; set; } = false;
-    private bool IsIncomingCall { get; set; } = false;
-    private string CallStatusMessage { get; set; } = string.Empty;
-    private UserDto? ActiveCallUser { get; set; }
-    private UserDto? TargetUser { get; set; }
-    private bool LocalMonitorEnabled { get; set; } = false;
-
-    // Store the remote SDP offer when receiving an incoming call.
-    private string? incomingOfferSdp;
+    // Voice call state
+    private bool IsInCall { get; set; } = false;
+    private bool IsMuted { get; set; } = false;
+    private HashSet<Guid> CallParticipantIds { get; set; } = new();
+    private DotNetObjectReference<ChannelView>? dotNetRef;
+    private System.Timers.Timer? callTimer;
+    private DateTime? callStartTime;
+    private string? CallDuration { get; set; }
 
     protected override async Task OnAccessAsync()
     {
@@ -168,8 +172,12 @@
         CacheDB = new EgrooDB(BlazorDexieOptions);
         Messages = new();
 
-        // Register SendIceCandidateToPeer DotNetObjectReference
-        await JSRuntime.InvokeVoidAsync("webrtcInterop.registerSendIceCandidateToPeer", DotNetObjectReference.Create(this));
+        // Register DotNet object reference for JS interop callbacks
+        dotNetRef = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.registerDotNetObject", dotNetRef);
+
+        // Check if there's an existing call in this channel and show participant count
+        await RefreshCallParticipants();
     }
 
     protected override async Task OnParametersSetAsync()
@@ -309,162 +317,216 @@
         });
     }
 
-    #region Call UI & Behavior
+    #region Channel Voice Call
 
-    // Caller: Initiate the call.
     private async Task OnCallButtonClicked()
     {
-        var target = await GetTargetUser();
-        if (target is null || string.IsNullOrEmpty(target.ConnectionId))
-            return;
-
-        // Request microphone permission and create caller RTCPeerConnection.
-        string offerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.startCall");
-        TargetUser = target;
-        // Send the offer SDP via SignalR.
-        await ChatCallService.CallUser(target, offerSdp);
-        IsCalling = true;
-        IsIncomingCall = false;
-        ActiveCallUser = target;
-        CallStatusMessage = $"Calling {target.Username}...";
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ToggleLocalMonitor()
-    {
-        await JSRuntime.InvokeVoidAsync("webrtcInterop.toggleLocalAudio");
-        LocalMonitorEnabled = !LocalMonitorEnabled;
-    }
-
-    // Called when an incoming call arrives.
-    private async Task OnIncomingCall(UserDto callingUser, string sdpOffer)
-    {
-        // Store the received SDP offer for later use.
-        incomingOfferSdp = sdpOffer;
-        IsCalling = true;
-        IsIncomingCall = true;
-        ActiveCallUser = callingUser;
-        CallStatusMessage = $"Incoming call from {callingUser.Username}";
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task<UserDto?> GetTargetUser()
-    {
-        var channelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
-        if (channelUsers == null || channelUsers.Length == 0 || SessionStorage.User is null)
+        if (IsInCall)
         {
-            Snackbar.Add("No users in this channel.", Severity.Warning);
-            return null;
+            await LeaveCall();
         }
-
-        var availableUsers = channelUsers
-            .Where(u => u.Id != SessionStorage.User!.Id && u.IsOnline)
-            .ToList();
-
-        if (!availableUsers.Any())
+        else
         {
-            Snackbar.Add("No online users available to call.", Severity.Warning);
-            return null;
+            await JoinCall();
         }
-
-        return availableUsers.First();
     }
 
-    // Callee: Accept the incoming call.
-    private async Task AcceptCall()
+    private async Task JoinCall()
     {
-        if (ActiveCallUser is not null && incomingOfferSdp != null)
+        var channelId = GetChannelId();
+        if (channelId == Guid.Empty) return;
+
+        try
         {
-            // Use the stored offer to answer.
-            string answerSdp = await JSRuntime.InvokeAsync<string>("webrtcInterop.answerCall", incomingOfferSdp);
-            await ChatCallService.AnswerCall(true, ActiveCallUser, answerSdp);
-            IsIncomingCall = false;
-            CallStatusMessage = $"In call with {ActiveCallUser.Username}";
+            // Acquire microphone and initialize WebRTC
+            bool acquired = await JSRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString());
+            if (!acquired)
+            {
+                Snackbar.Add("Could not access microphone. Please check permissions.", Severity.Error);
+                return;
+            }
+
+            // Join the channel call via SignalR
+            await ChatCallService.JoinChannelCall(channelId);
+
+            IsInCall = true;
+            CallParticipantIds.Add(SessionStorage.User!.Id);
+            StartCallTimer();
+            Snackbar.Add("Joined voice call", Severity.Success);
             await InvokeAsync(StateHasChanged);
         }
-    }
-
-    private async Task DeclineCall()
-    {
-        if (ActiveCallUser is not null)
+        catch (Exception ex)
         {
-            await ChatCallService.AnswerCall(false, ActiveCallUser, "");
-            IsCalling = false;
-            IsIncomingCall = false;
-            ActiveCallUser = null;
-            CallStatusMessage = "Call declined";
-            await InvokeAsync(StateHasChanged);
+            Snackbar.Add($"Failed to join call: {ex.Message}", Severity.Error);
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
         }
     }
 
-    private async Task HangUpCall()
+    private async Task LeaveCall()
     {
-        await ChatCallService.HangUp();
-        // Stop the local audio stream (microphone) by calling closePeer.
-        await JSRuntime.InvokeVoidAsync("webrtcInterop.closePeer");
-        IsCalling = false;
-        ActiveCallUser = null;
-        CallStatusMessage = "Call ended";
+        var channelId = GetChannelId();
+        try
+        {
+            await ChatCallService.LeaveChannelCall(channelId);
+        }
+        catch { /* ignore signalr errors during cleanup */ }
+
+        await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
+
+        IsInCall = false;
+        IsMuted = false;
+        CallParticipantIds.Clear();
+        StopCallTimer();
+        Snackbar.Add("Left voice call", Severity.Info);
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task ToggleMute()
+    {
+        IsMuted = await JSRuntime.InvokeAsync<bool>("webrtcInterop.toggleMute");
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshCallParticipants()
+    {
+        try
+        {
+            var participants = await ChatCallService.GetChannelCallParticipants(GetChannelId());
+            if (participants != null && participants.Length > 0)
+            {
+                CallParticipantIds = new HashSet<Guid>(participants);
+            }
+        }
+        catch { /* ignore */ }
+    }
+
+    // JS Interop callbacks
+
+    /// <summary>Called from JS when a local ICE candidate is generated for a specific peer.</summary>
     [JSInvokable]
-    public async Task SendIceCandidate(string candidateJson)
+    public async Task OnIceCandidateGenerated(string peerId, string candidateJson)
     {
-        Console.WriteLine($"Received ICE Candidate: {candidateJson}");
-        // Forward the candidate via SignalR only (not SDP)
-        await ChatCallService.SendIceCandidateToPeer(candidateJson);
+        if (Guid.TryParse(peerId, out Guid targetUserId))
+        {
+            await ChatCallService.SendIceCandidateToUser(GetChannelId(), targetUserId, candidateJson);
+        }
+    }
+
+    /// <summary>Called from JS when a peer connection is lost.</summary>
+    [JSInvokable]
+    public async Task OnPeerDisconnected(string peerId)
+    {
+        if (Guid.TryParse(peerId, out Guid userId))
+        {
+            CallParticipantIds.Remove(userId);
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", peerId);
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void RegisterCallEvents()
     {
-        // Register the incoming call event.
-        ChatCallService.OnIncomingCall += async (callingUser, sdpOffer) =>
+        // When we join a call, receive the list of existing participants to create offers for
+        ChatCallService.OnExistingCallParticipants += async (channelId, participantIds) =>
         {
-            await OnIncomingCall(callingUser, sdpOffer);
-        };
+            if (channelId != GetChannelId()) return;
 
-        ChatCallService.OnCallAccepted += async (acceptingUser, sdpAnswer) =>
-        {
-            // For the caller: set remote description using the SDP answer.
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.setRemoteDescription", sdpAnswer);
-            IsCalling = true;
-            IsIncomingCall = false;
-            ActiveCallUser = acceptingUser;
-            CallStatusMessage = $"Call accepted by {acceptingUser.Username}";
+            foreach (var participantId in participantIds)
+            {
+                CallParticipantIds.Add(participantId);
+
+                // Create a WebRTC offer for each existing participant
+                string? offerSdp = await JSRuntime.InvokeAsync<string?>(
+                    "webrtcInterop.createOfferForPeer", participantId.ToString());
+
+                if (!string.IsNullOrEmpty(offerSdp))
+                {
+                    await ChatCallService.SendOfferToUser(channelId, participantId, offerSdp);
+                }
+            }
             await InvokeAsync(StateHasChanged);
         };
 
-        ChatCallService.OnCallDeclined += async (decliningUser, reason) =>
+        // When a new user joins the call (they will send us an offer)
+        ChatCallService.OnUserJoinedCall += async (channelId, userId) =>
         {
-            IsCalling = false;
-            ActiveCallUser = null;
-            CallStatusMessage = $"Call declined: {reason}";
+            if (channelId != GetChannelId()) return;
+
+            CallParticipantIds.Add(userId);
             await InvokeAsync(StateHasChanged);
         };
 
-        ChatCallService.OnCallEnded += async (endedUser, message) =>
+        // When a user leaves the call
+        ChatCallService.OnUserLeftCall += async (channelId, userId) =>
         {
-            // Ensure both sides close their local media streams.
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.closePeer");
-            IsCalling = false;
-            ActiveCallUser = null;
-            CallStatusMessage = $"Call ended: {message}";
+            if (channelId != GetChannelId()) return;
+
+            CallParticipantIds.Remove(userId);
+            await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", userId.ToString());
             await InvokeAsync(StateHasChanged);
         };
 
-        ChatCallService.OnReceiveSignal += async (signalingUser, signal) =>
+        // When receiving an SDP offer from a peer (we need to create an answer)
+        ChatCallService.OnReceiveOffer += async (channelId, fromUserId, offerSdp) =>
         {
-            // If the signal is an ICE candidate, add it.
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.addIceCandidate", signal);
-            await InvokeAsync(StateHasChanged);
+            if (channelId != GetChannelId() || !IsInCall) return;
+
+            string? answerSdp = await JSRuntime.InvokeAsync<string?>(
+                "webrtcInterop.handleOfferFromPeer", fromUserId.ToString(), offerSdp);
+
+            if (!string.IsNullOrEmpty(answerSdp))
+            {
+                await ChatCallService.SendAnswerToUser(channelId, fromUserId, answerSdp);
+            }
         };
 
-        ChatCallService.OnUpdateUserList += async (users) =>
+        // When receiving an SDP answer from a peer
+        ChatCallService.OnReceiveAnswer += async (channelId, fromUserId, answerSdp) =>
         {
-            await InvokeAsync(StateHasChanged);
+            if (channelId != GetChannelId() || !IsInCall) return;
+
+            await JSRuntime.InvokeVoidAsync(
+                "webrtcInterop.handleAnswerFromPeer", fromUserId.ToString(), answerSdp);
+        };
+
+        // When receiving an ICE candidate from a peer
+        ChatCallService.OnReceiveIceCandidate += async (channelId, fromUserId, candidateJson) =>
+        {
+            if (channelId != GetChannelId() || !IsInCall) return;
+
+            await JSRuntime.InvokeVoidAsync(
+                "webrtcInterop.addIceCandidateForPeer", fromUserId.ToString(), candidateJson);
         };
     }
+
+    private void StartCallTimer()
+    {
+        callStartTime = DateTime.UtcNow;
+        CallDuration = "00:00";
+        callTimer = new System.Timers.Timer(1000);
+        callTimer.Elapsed += (_, _) =>
+        {
+            if (callStartTime.HasValue)
+            {
+                var elapsed = DateTime.UtcNow - callStartTime.Value;
+                CallDuration = elapsed.TotalHours >= 1
+                    ? elapsed.ToString(@"hh\:mm\:ss")
+                    : elapsed.ToString(@"mm\:ss");
+                InvokeAsync(StateHasChanged);
+            }
+        };
+        callTimer.Start();
+    }
+
+    private void StopCallTimer()
+    {
+        callTimer?.Stop();
+        callTimer?.Dispose();
+        callTimer = null;
+        callStartTime = null;
+        CallDuration = null;
+    }
+
     #endregion
 
     private void EditChannel()
