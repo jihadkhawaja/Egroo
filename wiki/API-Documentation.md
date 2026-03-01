@@ -1,33 +1,40 @@
 # API Documentation
 
-This guide provides comprehensive documentation for the Egroo API, including authentication, endpoints, and usage examples.
+This guide provides accurate documentation for the Egroo API, including the REST authentication endpoints and the SignalR real-time hub.
 
-## 🔗 API Overview
+## ?? API Overview
 
-The Egroo API is a RESTful service built with ASP.NET Core that provides:
-- **Authentication & Authorization** (JWT-based)
-- **Real-time Communication** (SignalR hubs)
-- **User Management**
-- **Channel Management** 
-- **Message Handling**
-- **Friend System**
+The Egroo server exposes:
+- **4 REST endpoints** for authentication (`/api/v1/Auth`)
+- **1 SignalR Hub** at `/chathub` for all real-time functionality (user, channel, message, and call management)
+- **Swagger UI** (development only): `http://localhost:5175/swagger`
 
-**Base URL**: `http://localhost:5175` (development) or `https://api.yourdomain.com` (production)
+All real-time features � user management, friends, channels, messages, and WebRTC calls � are handled exclusively over SignalR using WebSockets.
 
-## 🔐 Authentication
+**Base URL (development)**: `http://localhost:5175`  
+**Base URL (production)**: `https://api.egroo.org` (or your own hosted URL)
 
-### JWT Token Authentication
+## ?? Authentication (REST)
 
-Egroo uses JWT (JSON Web Tokens) for authentication. Include the token in the `Authorization` header:
+### JWT Authentication
+
+Egroo uses JWT (JSON Web Tokens) for authentication. After signing in, include the token in the `Authorization` header for protected endpoints:
 
 ```
 Authorization: Bearer <your-jwt-token>
 ```
 
-### Login Endpoint
+For SignalR, pass the token via the `access_token` query string parameter (handled automatically by the client library).
 
-**POST** `/api/auth/login`
+---
 
+### Sign Up
+
+**POST** `/api/v1/Auth/signup`  
+Access: **Anonymous**  
+Rate limit: 100 requests / minute
+
+**Request body:**
 ```json
 {
   "username": "your_username",
@@ -35,684 +42,359 @@ Authorization: Bearer <your-jwt-token>
 }
 ```
 
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "user-guid",
-    "username": "your_username",
-    "email": "user@example.com"
-  }
-}
-```
-
-### Registration Endpoint
-
-**POST** `/api/auth/register`
-
-```json
-{
-  "username": "new_username",
-  "email": "user@example.com",
-  "password": "secure_password"
-}
-```
-
-**Response:**
+**Response** (`Operation.Response`):
 ```json
 {
   "success": true,
-  "message": "User registered successfully",
-  "userId": "user-guid"
+  "message": "Account created successfully",
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "token": null
 }
 ```
 
-## 👤 User Management
+---
 
-### Get Current User
+### Sign In
 
-**GET** `/api/users/me`
+**POST** `/api/v1/Auth/signin`  
+Access: **Anonymous**
 
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
+**Request body:**
 ```json
 {
-  "id": "user-guid",
   "username": "your_username",
-  "email": "user@example.com",
-  "createdAt": "2024-01-01T00:00:00Z",
-  "isOnline": true
+  "password": "your_password"
 }
 ```
 
-### Update User Profile
-
-**PUT** `/api/users/me`
-
-**Headers:** `Authorization: Bearer <token>`
-
+**Response** (`Operation.Response`):
 ```json
 {
-  "email": "newemail@example.com",
-  "displayName": "New Display Name"
+  "success": true,
+  "message": null,
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-### Search Users
+---
 
-**GET** `/api/users/search?query=username`
+### Refresh Session
 
-**Headers:** `Authorization: Bearer <token>`
+**GET** `/api/v1/Auth/refreshsession`  
+Access: **Requires JWT**
 
-**Response:**
-```json
-[
-  {
-    "id": "user-guid",
-    "username": "found_user",
-    "displayName": "Display Name",
-    "isOnline": false
-  }
-]
-```
+Returns a new token to extend the session.
 
-## 👥 Friend System
-
-### Get Friends List
-
-**GET** `/api/friends`
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-```json
-[
-  {
-    "id": "friend-guid",
-    "username": "friend_username",
-    "displayName": "Friend Name",
-    "isOnline": true,
-    "lastSeen": "2024-01-01T12:00:00Z"
-  }
-]
-```
-
-### Send Friend Request
-
-**POST** `/api/friends/request`
-
-**Headers:** `Authorization: Bearer <token>`
-
+**Response** (`Operation.Response`):
 ```json
 {
-  "targetUsername": "username_to_add"
+  "success": true,
+  "message": null,
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
-### Accept Friend Request
+---
 
-**POST** `/api/friends/accept/{requestId}`
+### Change Password
 
-**Headers:** `Authorization: Bearer <token>`
+**PUT** `/api/v1/Auth/changepassword`  
+Access: **Requires JWT**
 
-### Decline Friend Request
-
-**POST** `/api/friends/decline/{requestId}`
-
-**Headers:** `Authorization: Bearer <token>`
-
-## 📢 Channel Management
-
-### Get User Channels
-
-**GET** `/api/channels`
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-```json
-[
-  {
-    "id": "channel-guid",
-    "name": "Channel Name",
-    "description": "Channel description",
-    "isPrivate": false,
-    "memberCount": 5,
-    "lastActivity": "2024-01-01T12:00:00Z",
-    "unreadCount": 2
-  }
-]
-```
-
-### Create Channel
-
-**POST** `/api/channels`
-
-**Headers:** `Authorization: Bearer <token>`
-
+**Request body:**
 ```json
 {
-  "name": "New Channel",
-  "description": "Channel description",
-  "isPrivate": true,
-  "initialMembers": ["username1", "username2"]
+  "oldPassword": "current_password",
+  "newPassword": "new_secure_password"
 }
 ```
 
-### Get Channel Details
-
-**GET** `/api/channels/{channelId}`
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
+**Response** (`Operation.Result`):
 ```json
 {
-  "id": "channel-guid",
-  "name": "Channel Name",
-  "description": "Channel description",
-  "isPrivate": false,
-  "createdAt": "2024-01-01T00:00:00Z",
-  "members": [
-    {
-      "id": "user-guid",
-      "username": "member1",
-      "role": "admin",
-      "joinedAt": "2024-01-01T00:00:00Z"
-    }
-  ]
+  "success": true,
+  "message": "Password updated successfully"
 }
 ```
 
-### Join Channel
+---
 
-**POST** `/api/channels/{channelId}/join`
-
-**Headers:** `Authorization: Bearer <token>`
-
-### Leave Channel
-
-**POST** `/api/channels/{channelId}/leave`
-
-**Headers:** `Authorization: Bearer <token>`
-
-### Add Members to Channel
-
-**POST** `/api/channels/{channelId}/members`
-
-**Headers:** `Authorization: Bearer <token>`
-
-```json
-{
-  "usernames": ["user1", "user2"]
-}
-```
-
-## 💬 Message Handling
-
-### Get Channel Messages
-
-**GET** `/api/channels/{channelId}/messages?page=1&limit=50`
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response:**
-```json
-{
-  "messages": [
-    {
-      "id": "message-guid",
-      "content": "Hello, world!",
-      "senderId": "user-guid",
-      "senderUsername": "sender_name",
-      "timestamp": "2024-01-01T12:00:00Z",
-      "messageType": "text",
-      "isEdited": false
-    }
-  ],
-  "hasMore": true,
-  "totalCount": 150
-}
-```
-
-### Send Message
-
-**POST** `/api/channels/{channelId}/messages`
-
-**Headers:** `Authorization: Bearer <token>`
-
-```json
-{
-  "content": "Hello, everyone!",
-  "messageType": "text"
-}
-```
-
-### Edit Message
-
-**PUT** `/api/messages/{messageId}`
-
-**Headers:** `Authorization: Bearer <token>`
-
-```json
-{
-  "content": "Updated message content"
-}
-```
-
-### Delete Message
-
-**DELETE** `/api/messages/{messageId}`
-
-**Headers:** `Authorization: Bearer <token>`
-
-## 🔄 Real-time Communication (SignalR)
+## ? Real-time Hub (SignalR)
 
 ### Connection
 
-Connect to the SignalR hub at `/chathub` with the JWT token:
+The hub endpoint is `/chathub`. It accepts **WebSockets only** (no HTTP fallback transports).
 
-```javascript
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/chathub", {
-        accessTokenFactory: () => localStorage.getItem("authToken")
+Connect with the JWT token:
+
+```csharp
+var connection = new HubConnectionBuilder()
+    .WithUrl("http://localhost:5175/chathub", options =>
+    {
+        options.AccessTokenProvider = () => Task.FromResult<string?>(jwtToken);
     })
-    .build();
+    .Build();
+
+await connection.StartAsync();
 ```
 
-### Hub Methods (Client → Server)
+> After connecting, call `SendPendingMessages` to receive any messages that arrived while offline.
 
-#### Join Channel
-```javascript
-await connection.invoke("JoinChannel", "channel-guid");
-```
+The SignalR hub supports a maximum message size of **10 MB**.
 
-#### Leave Channel
-```javascript
-await connection.invoke("LeaveChannel", "channel-guid");
-```
+---
 
-#### Send Message
-```javascript
-await connection.invoke("SendMessage", "channel-guid", "Hello, world!");
-```
+### ?? User Methods
 
-#### Start Typing
-```javascript
-await connection.invoke("StartTyping", "channel-guid");
-```
+| Method | Auth | Returns | Description |
+|--------|------|---------|-------------|
+| `GetUserPublicDetails(Guid userId)` | Anonymous | `UserDto?` | Public profile for any user |
+| `GetUserPrivateDetails()` | Required | `UserDto?` | Full private profile for self |
+| `GetCurrentUserUsername()` | Required | `string?` | Current user's username |
+| `IsUsernameAvailable(string username)` | Anonymous | `bool` | Check username availability |
+| `UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)` | Required | `bool` | Update profile fields |
+| `UpdateAvatar(string? avatarBase64)` | Required | `bool` | Update avatar image |
+| `UpdateCover(string? coverBase64)` | Required | `bool` | Update cover image |
+| `GetAvatar(Guid userId)` | Anonymous | `MediaResult?` | Get avatar for any user |
+| `GetCover(Guid userId)` | Anonymous | `MediaResult?` | Get cover for any user |
+| `SearchUser(string query, int maxResult)` | Required | `IEnumerable<UserDto>?` | Search all users |
+| `SearchUserFriends(string query, int maxResult)` | Required | `IEnumerable<UserDto>?` | Search own friends |
+| `DeleteUser()` | Required | `bool` | Delete the authenticated account |
+| `SendFeedback(string text)` | Required | `bool` | Submit feedback |
+| `CloseUserSession()` | Required | void | End session and disconnect |
 
-#### Stop Typing
-```javascript
-await connection.invoke("StopTyping", "channel-guid");
-```
+---
 
-### Hub Events (Server → Client)
+### ?? Friend Methods
 
-#### Receive Message
-```javascript
-connection.on("ReceiveMessage", (channelId, message) => {
-    console.log("New message:", message);
-});
-```
+| Method | Auth | Returns | Description |
+|--------|------|---------|-------------|
+| `AddFriend(string friendusername)` | Required | `bool` | Send friend request |
+| `RemoveFriend(string friendusername)` | Required | `bool` | Remove a friend |
+| `GetUserFriends(Guid userId)` | Required | `UserFriend[]?` | List all friends |
+| `GetUserFriendRequests(Guid userId)` | Required | `UserFriend[]?` | List pending requests |
+| `GetUserIsFriend(Guid userId, Guid friendId)` | Required | `bool` | Check friendship status |
+| `AcceptFriend(Guid friendId)` | Required | `bool` | Accept a friend request |
+| `DenyFriend(Guid friendId)` | Required | `bool` | Deny a friend request |
 
-#### User Joined Channel
-```javascript
-connection.on("UserJoinedChannel", (channelId, user) => {
-    console.log("User joined:", user);
-});
-```
+---
 
-#### User Left Channel
-```javascript
-connection.on("UserLeftChannel", (channelId, userId) => {
-    console.log("User left:", userId);
-});
-```
+### ?? Channel Methods
 
-#### User Typing
-```javascript
-connection.on("UserTyping", (channelId, username) => {
-    console.log(`${username} is typing...`);
-});
-```
+| Method | Auth | Returns | Description |
+|--------|------|---------|-------------|
+| `CreateChannel(params string[] usernames)` | Required | `Channel?` | Create a new channel |
+| `GetUserChannels()` | Required | `Channel[]?` | List joined channels |
+| `GetChannel(Guid channelId)` | Required | `Channel?` | Get channel details |
+| `GetChannelUsers(Guid channelId)` | Required | `UserDto[]?` | List channel members |
+| `AddChannelUsers(Guid channelId, params string[] usernames)` | Required | `bool` | Add members |
+| `RemoveChannelUser(Guid channelId, Guid userId)` | Required | `bool` | Remove a member |
+| `LeaveChannel(Guid channelId)` | Required | `bool` | Leave a channel |
+| `DeleteChannel(Guid channelId)` | Required | `bool` | Delete a channel |
+| `ChannelContainUser(Guid channelId, Guid userId)` | Required | `bool` | Check membership |
+| `IsChannelAdmin(Guid channelId, Guid userId)` | Required | `bool` | Check admin status |
+| `SearchPublicChannels(string searchTerm)` | Required | `Channel[]?` | Search public channels |
 
-#### User Online Status
-```javascript
-connection.on("UserOnlineStatusChanged", (userId, isOnline) => {
-    console.log(`User ${userId} is ${isOnline ? 'online' : 'offline'}`);
-});
-```
+---
 
-## 📁 File Upload
+### ?? Message Methods
 
-### Upload File
+Messages are **end-to-end encrypted at rest**. The `content` field is not stored in the `Messages` table � it lives only in `UserPendingMessages` (encrypted) until delivered.
 
-**POST** `/api/files/upload`
+| Method | Auth | Returns | Description |
+|--------|------|---------|-------------|
+| `SendMessage(Message message)` | Required | `bool` | Send a message to a channel |
+| `UpdateMessage(Message message)` | Required | `bool` | Edit an existing message |
+| `SendPendingMessages()` | Required | void | Deliver queued offline messages |
+| `UpdatePendingMessage(Guid messageid)` | Required | void | Mark a pending message as received |
 
-**Headers:** 
-- `Authorization: Bearer <token>`
-- `Content-Type: multipart/form-data`
-
-**Body:** Form data with file
-
-**Response:**
-```json
-{
-  "fileId": "file-guid",
-  "fileName": "document.pdf",
-  "fileSize": 1024000,
-  "fileType": "application/pdf",
-  "downloadUrl": "/api/files/download/file-guid"
-}
-```
-
-### Download File
-
-**GET** `/api/files/download/{fileId}`
-
-**Headers:** `Authorization: Bearer <token>`
-
-## 🔍 Search
-
-### Global Search
-
-**GET** `/api/search?query=search_term&type=all`
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Query Parameters:**
-- `query`: Search term
-- `type`: `users`, `channels`, `messages`, or `all`
-- `limit`: Maximum results (default: 20)
-
-**Response:**
-```json
-{
-  "users": [
-    {
-      "id": "user-guid",
-      "username": "found_user",
-      "displayName": "Display Name"
-    }
-  ],
-  "channels": [
-    {
-      "id": "channel-guid",
-      "name": "Found Channel",
-      "description": "Channel description"
-    }
-  ],
-  "messages": [
-    {
-      "id": "message-guid",
-      "content": "Message containing search term",
-      "channelId": "channel-guid",
-      "channelName": "Channel Name"
-    }
-  ]
-}
-```
-
-## 📊 System Information
-
-### Health Check
-
-**GET** `/health`
-
-**Response:**
-```json
-{
-  "status": "Healthy",
-  "totalDuration": "00:00:00.0123456",
-  "entries": {
-    "database": {
-      "status": "Healthy",
-      "duration": "00:00:00.0089123"
-    },
-    "signalr": {
-      "status": "Healthy",
-      "duration": "00:00:00.0001234"
-    }
-  }
-}
-```
-
-### API Information
-
-**GET** `/api/system/info`
-
-**Response:**
-```json
-{
-  "version": "1.0.0",
-  "environment": "Production",
-  "uptime": "2.15:30:25",
-  "connections": {
-    "signalr": 45,
-    "database": 12
-  }
-}
-```
-
-## 📝 Error Handling
-
-### Error Response Format
-
-All API errors follow this format:
-
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input data",
-    "details": [
-      {
-        "field": "username",
-        "message": "Username is required"
-      }
-    ]
-  },
-  "timestamp": "2024-01-01T12:00:00Z",
-  "traceId": "trace-guid"
-}
-```
-
-### Common Error Codes
-
-| Code | Status | Description |
-|------|--------|-------------|
-| `UNAUTHORIZED` | 401 | Invalid or missing authentication token |
-| `FORBIDDEN` | 403 | Insufficient permissions |
-| `NOT_FOUND` | 404 | Resource not found |
-| `VALIDATION_ERROR` | 400 | Invalid input data |
-| `CONFLICT` | 409 | Resource already exists |
-| `RATE_LIMITED` | 429 | Too many requests |
-| `INTERNAL_ERROR` | 500 | Server error |
-
-## 🚀 Rate Limiting
-
-API endpoints are rate-limited to prevent abuse:
-
-| Endpoint Category | Limit | Window |
-|------------------|-------|--------|
-| Authentication | 5 requests | 1 minute |
-| General API | 100 requests | 1 minute |
-| File Upload | 10 requests | 1 minute |
-| Search | 20 requests | 1 minute |
-
-Rate limit headers are included in responses:
-```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1609459200
-```
-
-## 📖 OpenAPI/Swagger Documentation
-
-Interactive API documentation is available at:
-- Development: `http://localhost:5175/swagger`
-- Production: `https://api.yourdomain.com/swagger`
-
-## 🧪 Testing the API
-
-### Using cURL
-
-```bash
-# Login
-curl -X POST http://localhost:5175/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "testuser", "password": "password123"}'
-
-# Get channels (with token)
-curl -X GET http://localhost:5175/api/channels \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-### Using JavaScript/Fetch
-
-```javascript
-// Login
-const loginResponse = await fetch('/api/auth/login', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({
-    username: 'testuser',
-    password: 'password123'
-  })
-});
-
-const loginData = await loginResponse.json();
-const token = loginData.token;
-
-// Get channels
-const channelsResponse = await fetch('/api/channels', {
-  headers: {
-    'Authorization': `Bearer ${token}`
-  }
-});
-
-const channels = await channelsResponse.json();
-```
-
-### Using C# HttpClient
-
+**Example � send a message:**
 ```csharp
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-
-var httpClient = new HttpClient();
-httpClient.BaseAddress = new Uri("http://localhost:5175");
-
-// Login
-var loginData = new { username = "testuser", password = "password123" };
-var loginJson = JsonSerializer.Serialize(loginData);
-var loginContent = new StringContent(loginJson, Encoding.UTF8, "application/json");
-
-var loginResponse = await httpClient.PostAsync("/api/auth/login", loginContent);
-var loginResult = await loginResponse.Content.ReadAsStringAsync();
-var token = JsonDocument.Parse(loginResult).RootElement.GetProperty("token").GetString();
-
-// Set authorization header
-httpClient.DefaultRequestHeaders.Authorization = 
-    new AuthenticationHeaderValue("Bearer", token);
-
-// Get channels
-var channelsResponse = await httpClient.GetAsync("/api/channels");
-var channels = await channelsResponse.Content.ReadAsStringAsync();
-```
-
-## 🔧 SDK and Client Libraries
-
-### JavaScript/TypeScript SDK
-
-```typescript
-class EgrooApiClient {
-  private baseUrl: string;
-  private token?: string;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-
-  async login(username: string, password: string): Promise<LoginResponse> {
-    const response = await fetch(`${this.baseUrl}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    
-    const data = await response.json();
-    this.token = data.token;
-    return data;
-  }
-
-  async getChannels(): Promise<Channel[]> {
-    const response = await fetch(`${this.baseUrl}/api/channels`, {
-      headers: { 'Authorization': `Bearer ${this.token}` }
-    });
-    
-    return response.json();
-  }
-}
-```
-
-### C# SDK
-
-```csharp
-public class EgrooApiClient
+var message = new Message
 {
-    private readonly HttpClient _httpClient;
-    private string? _token;
+    SenderId = currentUserId,
+    ChannelId = channelId,
+    ReferenceId = Guid.NewGuid(),
+    Content = "Hello!"
+};
+bool ok = await connection.InvokeAsync<bool>("SendMessage", message);
+```
 
-    public EgrooApiClient(string baseUrl)
-    {
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
-    }
+---
 
-    public async Task<LoginResponse> LoginAsync(string username, string password)
-    {
-        var loginData = new { username, password };
-        var json = JsonSerializer.Serialize(loginData);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+### ?? Call Methods (WebRTC)
 
-        var response = await _httpClient.PostAsync("/api/auth/login", content);
-        var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        
-        _token = result.Token;
-        _httpClient.DefaultRequestHeaders.Authorization = 
-            new AuthenticationHeaderValue("Bearer", _token);
-            
-        return result;
-    }
+The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video calls.
 
-    public async Task<List<Channel>> GetChannelsAsync()
-    {
-        var response = await _httpClient.GetAsync("/api/channels");
-        return await response.Content.ReadFromJsonAsync<List<Channel>>();
-    }
+| Method | Auth | Description |
+|--------|------|-------------|
+| `CallUser(UserDto targetUser, string sdpOffer)` | Required | Initiate a call with SDP offer |
+| `AnswerCall(bool acceptCall, UserDto caller, string sdpAnswer)` | Required | Accept or decline a call |
+| `HangUp()` | Required | End the active call |
+| `SendSignal(string signal, string targetConnectionId)` | Required | Forward a WebRTC signal |
+| `SendIceCandidateToPeer(string candidateJson)` | Required | Forward an ICE candidate |
+
+---
+
+### ?? Server ? Client Events
+
+These events are pushed from the server to connected clients.
+
+| Event | Parameters | Description |
+|-------|-----------|-------------|
+| `FriendStatusChanged` | `Guid userId, bool isOnline` | A friend came online or went offline |
+| `ChannelChange` | `Guid channelId` | Channel was created, modified, or deleted |
+| `ReceiveMessage` | `Message message` | A new message was delivered |
+| `UpdateMessage` | `Message message` | A message was edited |
+| `IncomingCall` | `UserDto caller, string sdpOffer` | Incoming WebRTC call offer |
+| `CallDeclined` | `UserDto user, string reason` | Called user declined |
+| `CallAccepted` | `UserDto callee, string sdpAnswer` | Called user accepted with SDP answer |
+| `CallEnded` | `Guid userId, string reason` | Other party ended the call |
+| `ReceiveSignal` | `Guid senderId, string signal` | WebRTC signal forwarded from peer |
+| `ReceiveIceCandidate` | `string candidateJson` | ICE candidate forwarded from peer |
+
+**Example listeners (C#):**
+```csharp
+connection.On<Message>("ReceiveMessage", (message) =>
+{
+    Console.WriteLine($"New message: {message.Content}");
+});
+
+connection.On<Guid, bool>("FriendStatusChanged", (userId, isOnline) =>
+{
+    Console.WriteLine($"User {userId} is now {(isOnline ? "online" : "offline")}");
+});
+
+connection.On<Guid>("ChannelChange", (channelId) =>
+{
+    // Refresh channel list or details
+});
+```
+
+---
+
+## ?? Data Models
+
+### `Operation.Response`
+Returned by REST authentication endpoints.
+```json
+{
+  "success": true,
+  "message": "string or null",
+  "userId": "guid or null",
+  "token": "jwt-string or null"
 }
 ```
 
-## 🆘 API Troubleshooting
+### `Operation.Result`
+Returned by the change password endpoint.
+```json
+{
+  "success": true,
+  "message": "string or null"
+}
+```
 
-Common API issues and solutions:
+### `Channel`
+```json
+{
+  "id": "guid",
+  "title": "string or null",
+  "isPublic": false,
+  "dateCreated": "2024-01-01T00:00:00Z",
+  "dateUpdated": "2024-01-01T00:00:00Z or null"
+}
+```
 
-### Authentication Issues
-- **401 Unauthorized**: Check if JWT token is valid and not expired
-- **403 Forbidden**: Verify user has required permissions
+### `Message`
+> `content` and `displayName` are transport-only fields � they are **not stored** in the Messages table.
 
-### Connection Issues
-- **CORS errors**: Ensure client origin is in allowed origins configuration
-- **SignalR connection failures**: Check WebSocket support and authentication
+```json
+{
+  "id": "guid",
+  "senderId": "guid",
+  "channelId": "guid",
+  "referenceId": "guid",
+  "dateSent": "2024-01-01T00:00:00Z or null",
+  "dateSeen": "2024-01-01T00:00:00Z or null",
+  "displayName": "sender display name (not persisted)",
+  "content": "message text (not persisted)"
+}
+```
 
-### Performance Issues
-- **Slow responses**: Check database connection and query performance
-- **Rate limiting**: Implement client-side rate limiting and retry logic
+### `UserDto`
+```json
+{
+  "id": "guid",
+  "username": "string",
+  "role": "string",
+  "lastLoginDate": "2024-01-01T00:00:00Z or null",
+  "isOnline": false,
+  "connectionId": "string or null",
+  "avatarPreview": "data:image/png;base64,... or null",
+  "userDetail": {
+    "displayName": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string"
+  }
+}
+```
 
-For more troubleshooting help, see the [Troubleshooting Guide](Troubleshooting#api-issues).
+### `UserFriend`
+```json
+{
+  "id": "guid",
+  "userId": "guid",
+  "friendUserId": "guid",
+  "dateAcceptedOn": "2024-01-01T00:00:00Z or null"
+}
+```
+
+### `MediaResult`
+```json
+{
+  "contentType": "png",
+  "imageBase64": "base64-encoded image string"
+}
+```
+
+---
+
+## ?? Rate Limiting
+
+All REST endpoints use the `Api` fixed-window rate limiter:
+
+| Limit | Window | Queue Limit |
+|-------|--------|-------------|
+| 100 requests | 1 minute | 10 requests |
+
+Exceeding the limit returns `429 Too Many Requests`.
+
+---
+
+## ?? Swagger / OpenAPI
+
+Interactive API documentation is available **in development only** at:
+
+```
+http://localhost:5175/swagger
+```
+
+Bearer authentication is supported in the Swagger UI � paste your JWT token to test protected endpoints.
+
+---
+
+## ?? API Troubleshooting
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `401 Unauthorized` on REST | Missing or expired JWT | Re-sign-in for a fresh token |
+| SignalR connection fails | WebSockets blocked or wrong URL | Verify hub URL and WebSocket support |
+| `ReceiveMessage` not firing | Offline when message was sent | Call `SendPendingMessages` after reconnect |
+| CORS error | Origin not in allowed list | Add origin to `Api.AllowedOrigins` in appsettings |
+| `429 Too Many Requests` | Rate limit exceeded | Back off and retry after 1 minute |
+
+For more help, see the [Troubleshooting Guide](Troubleshooting).

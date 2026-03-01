@@ -1,78 +1,228 @@
-﻿using jihadkhawaja.chat.client.Core;
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
-using Microsoft.AspNetCore.SignalR.Client;
-
 namespace Egroo.Server.Test
 {
+    /// <summary>
+    /// Tests the message send / update / pending flow using the
+    /// <c>jihadkhawaja.chat.server</c> hub backed by an in-memory EF Core database.
+    /// These tests exercise <c>MessageRepository</c> which implements
+    /// <see cref="IMessageRepository"/> defined in <c>jihadkhawaja.chat.shared</c>.
+    /// </summary>
     [TestClass]
     public class MessageTest
     {
-        private IAuth ChatAuthService { get; set; } = null!;
-        private IChannel ChatChannelService { get; set; } = null!;
-        private IMessage ChatMessageService { get; set; } = null!;
+        private const string DbName = "MessageTestDb";
 
-        private static Channel? Channel { get; set; }
-        private static UserDto? User { get; set; }
+        private Guid _userId;
+        private Guid _channelId;
+        private IServiceProvider _authenticatedServices = null!;
 
         [TestInitialize]
         public async Task Initialize()
         {
-            // Create a new HttpClient with a BaseAddress for AuthService only.
-            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
-            ChatAuthService = new AuthService(httpClient);
-            ChatChannelService = new ChatChannelService();
-            ChatMessageService = new ChatMessageService();
+            // 1. Sign up & sign in.
+            var anonServices = TestServiceProvider.Build(dbName: DbName);
+            using var signUpScope = anonServices.CreateScope();
+            var auth = signUpScope.ServiceProvider.GetRequiredService<IAuth>();
 
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            var signUp = await auth.SignUp("msgtester", "ValidP@ss1!");
+            if (!signUp.Success && !(signUp.Message?.Contains("exist", StringComparison.OrdinalIgnoreCase) ?? false))
+                Assert.Fail($"Sign-up failed unexpectedly: {signUp.Message}");
 
-            var signInResponse = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
-            Assert.IsNotNull(signInResponse, "Sign-in response is null.");
-            Assert.IsTrue(signInResponse.Success, $"Sign-in failed: {signInResponse.Message}");
-            Assert.IsNotNull(signInResponse.Token, "Sign-in did not return a token.");
-            Assert.IsNotNull(signInResponse.UserId, "Sign-in did not return a user ID.");
+            using var signInScope = anonServices.CreateScope();
+            var signIn = await signInScope.ServiceProvider.GetRequiredService<IAuth>()
+                                          .SignIn("msgtester", "ValidP@ss1!");
+            Assert.IsTrue(signIn.Success, $"Sign-in failed: {signIn.Message}");
+            _userId = signIn.UserId!.Value;
 
-            // Create User instance
-            User = new UserDto
-            {
-                Id = signInResponse.UserId.Value
-            };
+            // 2. Build authenticated services.
+            _authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: _userId);
 
-            // Reinitialize SignalR with authentication token
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, signInResponse.Token);
-            await MobileChatSignalR.HubConnection.StartAsync();
-
-            // Create channel
-            Channel = await ChatChannelService.CreateChannel("test");
-            Assert.IsNotNull(Channel, "Failed to create channel.");
+            // 3. Create a channel to use in message tests.
+            using var channelScope = _authenticatedServices.CreateScope();
+            var channel = await channelScope.ServiceProvider.GetRequiredService<IChannel>()
+                                            .CreateChannel("msgtester");
+            Assert.IsNotNull(channel, "Failed to create test channel.");
+            _channelId = channel.Id;
         }
 
-        [TestMethod, Priority(1)]
-        public async Task SendMessageTest()
-        {
-            Assert.IsNotNull(Channel, "Channel is null. Ensure initialization succeeded.");
-            Assert.IsNotNull(User, "User is null. Ensure authentication succeeded.");
+        // ── Send ────────────────────────────────────────────────────────────────────
 
-            Message message = new()
+        [TestMethod]
+        public async Task SendMessage_WithValidContent_Succeeds()
+        {
+            var message = new Message
             {
-                ChannelId = Channel.Id,
-                Content = "This is a test.",
-                SenderId = User.Id,
+                ChannelId = _channelId,
+                SenderId  = _userId,
+                Content   = "Hello from the in-memory test!",
             };
 
-            bool sendMessageResult = await ChatMessageService.SendMessage(message);
-            Assert.IsTrue(sendMessageResult, "Failed to send message.");
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .SendMessage(message);
+
+            Assert.IsTrue(result, "SendMessage should return true for a valid message.");
+            Assert.AreNotEqual(Guid.Empty, message.Id, "SendMessage should assign an Id.");
         }
 
-        [TestCleanup]
-        public async Task Cleanup()
+        [TestMethod]
+        public async Task SendMessage_EmptyContent_Fails()
         {
-            if (MobileChatSignalR.HubConnection.State == HubConnectionState.Connected)
+            var message = new Message
             {
-                await MobileChatSignalR.HubConnection.StopAsync();
-            }
+                ChannelId = _channelId,
+                SenderId  = _userId,
+                Content   = "",
+            };
+
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .SendMessage(message);
+
+            Assert.IsFalse(result, "SendMessage should reject empty content.");
+        }
+
+        [TestMethod]
+        public async Task SendMessage_NullContent_Fails()
+        {
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId  = _userId,
+                Content   = null,
+            };
+
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .SendMessage(message);
+
+            Assert.IsFalse(result, "SendMessage should reject null content.");
+        }
+
+        // ── Read / query ─────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task GetMessageById_AfterSend_ReturnsMessage()
+        {
+            // Note: Message.Content is [NotMapped], so it is checked before saving but is
+            // NOT stored as a DB column. We verify the row round-trips correctly by Id.
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId  = _userId,
+                Content   = "Persisted message",
+            };
+
+            using var sendScope = _authenticatedServices.CreateScope();
+            bool sent = await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                       .SendMessage(message);
+            Assert.IsTrue(sent, "SendMessage must succeed before we can fetch by Id.");
+
+            using var readScope = _authenticatedServices.CreateScope();
+            var fetched = await readScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                         .GetMessageById(message.Id);
+
+            Assert.IsNotNull(fetched, "GetMessageById should return the persisted message row.");
+            Assert.AreEqual(message.Id,        fetched.Id);
+            Assert.AreEqual(message.ChannelId, fetched.ChannelId);
+            Assert.AreEqual(message.SenderId,  fetched.SenderId);
+        }
+
+        [TestMethod]
+        public async Task GetMessageById_NonExistentId_ReturnsNull()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var fetched = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .GetMessageById(Guid.NewGuid());
+
+            Assert.IsNull(fetched, "Expected null for an unknown message Id.");
+        }
+
+        // ── Update ──────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task UpdateMessage_ExistingMessage_Succeeds()
+        {
+            var original = new Message
+            {
+                ChannelId   = _channelId,
+                SenderId    = _userId,
+                Content     = "Original content",
+                ReferenceId = Guid.NewGuid(),
+            };
+
+            using var sendScope = _authenticatedServices.CreateScope();
+            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                           .SendMessage(original);
+
+            var updated = new Message
+            {
+                Id          = original.Id,
+                ReferenceId = original.ReferenceId,
+                Content     = "Updated content",
+            };
+
+            using var updateScope = _authenticatedServices.CreateScope();
+            bool result = await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                           .UpdateMessage(updated);
+
+            Assert.IsTrue(result, "UpdateMessage should return true for an existing message.");
+        }
+
+        // ── Pending messages ─────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task AddPendingMessage_ThenRetrieve_ReturnsPending()
+        {
+            // First send a real message so its Id exists in the DB.
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId  = _userId,
+                Content   = "Pending test message",
+            };
+
+            using var sendScope = _authenticatedServices.CreateScope();
+            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                           .SendMessage(message);
+
+            var pending = new UserPendingMessage
+            {
+                Id        = Guid.NewGuid(),
+                UserId    = _userId,
+                MessageId = message.Id,
+                Content   = message.Content,
+            };
+
+            using var addScope = _authenticatedServices.CreateScope();
+            bool added = await addScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                       .AddPendingMessage(pending);
+            Assert.IsTrue(added, "AddPendingMessage should succeed.");
+
+            using var queryScope = _authenticatedServices.CreateScope();
+            var pendingList = await queryScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                              .GetPendingMessagesForUser(_userId);
+            Assert.IsNotNull(pendingList);
+            Assert.IsTrue(pendingList.Any(), "At least one pending message should exist.");
+        }
+
+        // ── Encryption / decryption (MessageRepository delegates to EncryptionService) ─
+
+        [TestMethod]
+        public void DecryptContent_RoundTrip_ReturnsOriginal()
+        {
+            // Encrypt via EncryptionService directly (same key/IV used by the repo).
+            var encSvc = new Egroo.Server.Security.EncryptionService(
+                TestServiceProvider.EncryptionKey,
+                TestServiceProvider.EncryptionIV);
+
+            const string plain = "Hello encryption!";
+            string cipher = encSvc.Encrypt(plain);
+
+            using var scope = _authenticatedServices.CreateScope();
+            var msgRepo = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
+            string decrypted = msgRepo.DecryptContent(cipher);
+
+            Assert.AreEqual(plain, decrypted);
         }
     }
 }

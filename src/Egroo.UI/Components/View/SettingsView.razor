@@ -1,7 +1,7 @@
 ﻿@using BlazorDexie.JsModule
 @using Egroo.UI.Models;
-@using jihadkhawaja.chat.client.CacheDB
-@using jihadkhawaja.chat.client.Services;
+@using Egroo.UI.CacheDB
+
 @using jihadkhawaja.chat.shared.Models;
 @using Microsoft.AspNetCore.Components.Forms
 @inherits ProtectedViewBase
@@ -12,6 +12,7 @@
 @inject IDialogService DialogService
 @inject IUser ChatUserService
 @inject IJSRuntime JSRuntime
+@inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
     <!-- Page Header -->
@@ -55,11 +56,11 @@
             Accept="image/*"
             MaximumFileCount="1"
             FilesChanged="OnAvatarFilesChanged">
-                <ActivatorContent>
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth>
+                <CustomContent>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth OnClick="@context.OpenFilePickerAsync">
                         Select Avatar
                     </MudButton>
-                </ActivatorContent>
+                </CustomContent>
             </MudFileUpload>
             <MudText Typo="Typo.caption" Color="Color.Secondary">
                 Max file size: 10 MB
@@ -131,8 +132,7 @@
     protected override async Task OnAccessAsync()
     {
         IsBusy = true;
-        var moduleFactory = new EsModuleFactory(JSRuntime);
-        CacheDB = new EgrooDB(moduleFactory);
+        CacheDB = new EgrooDB(BlazorDexieOptions);
 
         // Retrieve and initialize the current user
         currentUser = SessionStorage.User ?? new UserDto();
@@ -153,7 +153,7 @@
     {
         if (hasDialog)
         {
-            bool? result = await DialogService.ShowMessageBox(
+            bool? result = await DialogService.ShowMessageBoxAsync(
                 "Warning",
                 "Are you sure you want to logout? All your locally saved messages will be deleted.",
                 yesText: "Logout", cancelText: "Cancel");
@@ -187,7 +187,7 @@
 
     private async Task DeleteUser()
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Confirm Delete Account",
             "Are you sure you want to permanently delete your account and all associated data? This action cannot be undone.",
             yesText: "Delete", cancelText: "Cancel");
@@ -205,18 +205,18 @@
     {
         if (string.IsNullOrWhiteSpace(FeedbackText))
         {
-            await DialogService.ShowMessageBox("Feedback", "Please enter your feedback before submitting.");
+            await DialogService.ShowMessageBoxAsync("Feedback", "Please enter your feedback before submitting.");
             return;
         }
 
         bool success = await ChatUserService.SendFeedback(FeedbackText);
         if (!success)
         {
-            await DialogService.ShowMessageBox("Error", "Failed to submit feedback. Please try again.");
+            await DialogService.ShowMessageBoxAsync("Error", "Failed to submit feedback. Please try again.");
             return;
         }
 
-        bool? confirmationResult = await DialogService.ShowMessageBox(
+        bool? confirmationResult = await DialogService.ShowMessageBoxAsync(
             "Feedback Submitted",
             "Thank you for your feedback!",
             yesText: "OK");
@@ -232,7 +232,7 @@
         await userForm.Validate();
         if (!userForm.IsValid)
         {
-            await DialogService.ShowMessageBox("Error", "Please correct the validation errors and try again.");
+            await DialogService.ShowMessageBoxAsync("Error", "Please correct the validation errors and try again.");
             return;
         }
 
@@ -244,11 +244,11 @@
 
         if (!isSuccess)
         {
-            await DialogService.ShowMessageBox("Error", "Couldn't update user details.");
+            await DialogService.ShowMessageBoxAsync("Error", "Couldn't update user details.");
             return;
         }
 
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "User Details Updated",
             "Your user details and security settings have been saved.",
             yesText: "OK");
@@ -269,7 +269,7 @@
             {
                 newAvatarBase64 = null;
                 newAvatarPreview = null;
-                await DialogService.ShowMessageBox("Error", "File size exceeds the 10 MB limit.");
+                await DialogService.ShowMessageBoxAsync("Error", "File size exceeds the 10 MB limit.");
                 return;
             }
             var buffer = new byte[file.Size];
@@ -289,14 +289,14 @@
         bool success = await ChatUserService.UpdateAvatar(newAvatarBase64);
         if (success)
         {
-            await DialogService.ShowMessageBox("Success", "Avatar updated successfully.");
+            await DialogService.ShowMessageBoxAsync("Success", "Avatar updated successfully.");
             // Clear the temporary values
             newAvatarBase64 = null;
             _ = FetchAvatar();
         }
         else
         {
-            await DialogService.ShowMessageBox("Error", "Failed to update avatar. Please try again.");
+            await DialogService.ShowMessageBoxAsync("Error", "Failed to update avatar. Please try again.");
         }
     }
 

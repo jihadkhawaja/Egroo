@@ -18,10 +18,6 @@ namespace jihadkhawaja.chat.shared.Models
         public Guid Id { get; set; } = Guid.NewGuid();
 
     }
-    public class EntityCryptographyBase : EntityBase
-    {
-        public bool IsEncrypted { get; set; }
-    }
     public abstract class EntityChildBase : EntityAudit
     {
         [Key]

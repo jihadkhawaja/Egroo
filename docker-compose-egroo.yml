@@ -2,7 +2,7 @@
 services:
 
   egroo-api:
-    image: jihadkhawaja/mobilechat-server-prod:latest
+    image: jihadkhawaja/egroo-server-prod:latest
     entrypoint: ["dotnet", "Egroo.Server.dll"]
     container_name: egroo-api
     hostname: egroo-api
@@ -14,11 +14,9 @@ services:
           cpus: "1.0"
     networks:
       - internal
-    # ports:
-    #   - "8080"
 
   egroo-web:
-    image: jihadkhawaja/mobilechat-wasm-prod:latest
+    image: jihadkhawaja/egroo-client-prod:latest
     entrypoint: ["dotnet", "Egroo.dll"]
     container_name: egroo-web
     hostname: egroo-web
@@ -30,8 +28,6 @@ services:
           cpus: "0.3"
     networks:
       - internal
-    # ports:
-    #   - "8080"
 
 networks:
   internal:

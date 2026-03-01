@@ -25,7 +25,7 @@ else
         {
             // Filter your existing friends based on the search query
             var filteredFriends = UserFriends
-            .Where(f => f.Username.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+            .Where(f => f.Username != null && f.Username.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
             // From the search results, show users who are not already your friends
@@ -55,7 +55,7 @@ else
                                 <MudItem>
                                     <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
                                                    Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                   OnClick="@(async () => await RemoveFriend(friend.Username))" />
+                                                   OnClick="@(async () => await RemoveFriend(friend.Username!))" />
                                 </MudItem>
                             </MudGrid>
                         </MudPaper>
@@ -85,7 +85,7 @@ else
                                 <MudItem>
                                     <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
                                                    Icon="@Icons.Material.Filled.Add" Color="Color.Success"
-                                                   OnClick="@(async () => await AddFriend(user.Username))" />
+                                                   OnClick="@(async () => await AddFriend(user.Username!))" />
                                 </MudItem>
                             </MudGrid>
                         </MudPaper>
@@ -143,7 +143,7 @@ else
                                 <MudItem>
                                     <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
                                                    Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                   OnClick="@(async () => await RemoveFriend(friend.Username))" />
+                                                   OnClick="@(async () => await RemoveFriend(friend.Username!))" />
                                 </MudItem>
                             </MudGrid>
                         </MudPaper>
@@ -255,7 +255,7 @@ else
             return;
         }
 
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Add Friend",
             $"Are you sure you want to add {usernameToAdd} as a friend?",
             yesText: "Add", cancelText: "Cancel");
@@ -280,7 +280,7 @@ else
 
     private async Task RemoveFriend(string friendUsername)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Remove Friend",
             $"Are you sure you want to remove {friendUsername} from friends?",
             yesText: "Remove", cancelText: "Cancel");
@@ -303,7 +303,7 @@ else
 
     private async Task AcceptFriendRequest(Guid friendId)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Accept Friend Request",
             "Are you sure you want to accept this friend request?",
             yesText: "Accept Request", cancelText: "Cancel");
@@ -325,7 +325,7 @@ else
 
     private async Task DenyFriendRequest(Guid friendId)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Deny Friend Request",
             "Are you sure you want to deny this friend request?",
             yesText: "Deny Request", cancelText: "Cancel");
@@ -360,7 +360,7 @@ else
 
     private void RegisterFriendsEvents()
     {
-        MobileChatSignalR.HubConnection?.On<Guid, bool>("FriendStatusChanged", async (userId, isOnline) =>
+        ChatSignalR.HubConnection?.On<Guid, bool>("FriendStatusChanged", async (userId, isOnline) =>
         {
             var friend = UserFriends.FirstOrDefault(f => f.Id == userId);
             if (friend != null)

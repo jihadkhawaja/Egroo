@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.shared.Models
 {
-    public class UserPendingMessage : EntityCryptographyBase
+    public class UserPendingMessage : EntityBase
     {
         [Required]
         public Guid UserId { get; set; }

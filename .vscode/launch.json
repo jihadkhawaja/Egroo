@@ -1,0 +1,55 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Egroo (Blazor)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: Egroo (Blazor)",
+            "program": "${workspaceFolder}/src/Egroo/Egroo/bin/Debug/net10.0/Egroo.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Egroo/Egroo",
+            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo/Egroo/Properties/launchSettings.json",
+            "launchSettingsProfile": "https",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Launch Egroo.Server (API)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: Egroo.Server (API)",
+            "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Egroo.Server",
+            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo.Server/Properties/launchSettings.json",
+            "launchSettingsProfile": "Server",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development"
+            }
+        },
+        {
+            "name": "Attach to Egroo (Blazor)",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
+        },
+        {
+            "name": "Attach to Egroo.Server (API)",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Launch All (Blazor + API)",
+            "configurations": [
+                "Launch Egroo.Server (API)",
+                "Launch Egroo (Blazor)"
+            ],
+            "stopAll": true
+        }
+    ]
+}

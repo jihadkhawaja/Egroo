@@ -56,6 +56,8 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - ConnectionStrings__DefaultConnection=Host=egroo-db;Database=${POSTGRES_DB:-egroo};Username=${POSTGRES_USER:-egroo_user};Password=${POSTGRES_PASSWORD};Port=5432;SSL Mode=Prefer;Trust Server Certificate=true
       - Secrets__Jwt=${JWT_SECRET}
+      - Encryption__Key=${ENCRYPTION_KEY}
+      - Encryption__IV=${ENCRYPTION_IV}
       - Api__AllowedOrigins__0=${FRONTEND_URL}
       - Serilog__MinimumLevel__Default=Warning
       - Serilog__WriteTo__0__Name=Console
@@ -139,6 +141,10 @@ JWT_SECRET=your_super_secure_jwt_secret_key_minimum_256_bits
 # Application URLs
 FRONTEND_URL=https://chat.yourdomain.com
 API_URL=https://api.yourdomain.com
+
+# Encryption Configuration (Key = 32 chars, IV = 16 chars)
+ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
+ENCRYPTION_IV=Your16CharLongIV
 
 # SSL Certificate paths (if using custom certificates)
 SSL_CERT_PATH=./ssl/fullchain.pem
@@ -234,7 +240,7 @@ http {
         add_header X-XSS-Protection "1; mode=block";
         
         # Rate limiting for auth endpoints
-        location /api/auth {
+        location /api/v1/Auth {
             limit_req zone=auth burst=10 nodelay;
             proxy_pass http://egroo_api;
             proxy_set_header Host $host;
@@ -625,14 +631,15 @@ openssl pkcs12 -export -out certificate.pfx -inkey privkey.pem -in fullchain.pem
 
 ### Health Checks
 
-Add health check endpoints to `Program.cs`:
+Health check endpoints are not included in the default build. To add them, register in `Program.cs`:
 ```csharp
 builder.Services.AddHealthChecks()
-    .AddNpgSql(connectionString)
-    .AddCheck("signalr", () => HealthCheckResult.Healthy());
+    .AddNpgSql(connectionString);
 
 app.MapHealthChecks("/health");
 ```
+
+Then update the Kubernetes liveness/readiness probes or Docker health checks to point to `GET /health`.
 
 ### Logging with Serilog
 
@@ -713,11 +720,7 @@ docker-compose -f docker-compose.prod.yml up -d --no-deps egroo-web
 
 ### Database Migrations
 
-```bash
-# Run migrations in production
-docker-compose -f docker-compose.prod.yml exec egroo-api \
-  dotnet ef database update --connection "your-connection-string"
-```
+Database migrations run **automatically on server startup** — no manual migration step is needed in production. The API container will apply any pending migrations before accepting requests.
 
 ## 🆘 Troubleshooting Deployment
 

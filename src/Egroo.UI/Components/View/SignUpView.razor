@@ -6,7 +6,7 @@
 @using Egroo.UI.Models
 @using jihadkhawaja.chat.client
 @using jihadkhawaja.chat.client.Core
-@using jihadkhawaja.chat.client.Services
+
 @using jihadkhawaja.chat.shared.Models
 
 @inject StorageService StorageService
@@ -88,7 +88,7 @@
             {
                 _password = value;
                 // Force revalidation of the confirm password field when password changes
-                confirmPasswordField?.Validate();
+                _ = confirmPasswordField?.ValidateAsync();
             }
         }
     }
@@ -162,8 +162,8 @@
                 SessionStorage.Token = token;
                 SessionStorage.User = user;
 
-                MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-                await MobileChatSignalR.HubConnection.StartAsync();
+                ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+                await ChatSignalR.HubConnection.StartAsync();
 
                 NavigationManager.NavigateTo("/channels", true);
             }

@@ -18,5 +18,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId);
         Task<Message?> GetMessageById(Guid messageId);
         Task<bool> AddPendingMessage(UserPendingMessage pendingMessage);
+        string DecryptContent(string content);
     }
 }

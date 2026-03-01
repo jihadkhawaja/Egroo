@@ -1,13 +1,13 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	<TargetFramework>net8.0</TargetFramework>
+	<TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   	<PackageReadmeFile>README.md</PackageReadmeFile>
 	<Authors>jihadkhawaja</Authors>
 	<Description>Shared code dependancy package for jihadkhawaja.chat.client and jihadkhawaja.chat.server NuGet packages (Not intended for direct referencing)</Description>
-	<Copyright>Copyright © 2025 jihadkhawaja</Copyright>
+	<Copyright>Copyright © 2026 jihadkhawaja</Copyright>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<RepositoryUrl>https://github.com/jihadkhawaja/Egroo</RepositoryUrl>
 	<PackageProjectUrl>https://github.com/jihadkhawaja/Egroo</PackageProjectUrl>
@@ -21,8 +21,5 @@
 		<None Include="..\..\README.md" Pack="true" PackagePath="" />
 	</ItemGroup>
 
-	<ItemGroup>
-	  <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="9.0.3" />
-	</ItemGroup>
 
 </Project>

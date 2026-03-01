@@ -1,26 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.0" />
-    <PackageReference Include="MSTest.TestAdapter" Version="3.8.2" />
-    <PackageReference Include="MSTest.TestFramework" Version="3.8.2" />
-    <PackageReference Include="coverlet.collector" Version="6.0.4">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.1.0" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
+    <PackageReference Include="coverlet.collector" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Concrete repository implementations + DataContext live here -->
+    <ProjectReference Include="..\Egroo.Server\Egroo.Server.csproj" />
+    <!-- NuGet library: client services -->
     <ProjectReference Include="..\jihadkhawaja.chat.client\jihadkhawaja.chat.client.csproj" />
+    <!-- NuGet library: server hub + InMemoryConnectionTracker -->
+    <ProjectReference Include="..\jihadkhawaja.chat.server\jihadkhawaja.chat.server.csproj" />
+    <!-- NuGet library: shared models, interfaces, helpers -->
+    <ProjectReference Include="..\jihadkhawaja.chat.shared\jihadkhawaja.chat.shared.csproj" />
   </ItemGroup>
 
 </Project>

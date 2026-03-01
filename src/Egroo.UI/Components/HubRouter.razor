@@ -4,9 +4,10 @@
 @using System.Net.Http.Headers
 @using jihadkhawaja.chat.shared.Interfaces
 @using jihadkhawaja.chat.client.Core
+@using jihadkhawaja.chat.client.Services
 @using Egroo.UI.Constants
 @using System.Text.Json
-@using jihadkhawaja.chat.client.Services
+
 @using jihadkhawaja.chat.shared.Models
 
 @inject SessionStorage SessionStorage
@@ -44,7 +45,7 @@ else
         try
         {
             // If the connection is already established, update UI and exit.
-            if (MobileChatSignalR.HubConnection is not null)
+            if (ChatSignalR.HubConnection is not null)
             {
                 IsBusy = false;
                 await InvokeAsync(StateHasChanged);
@@ -100,9 +101,9 @@ else
     private async Task EstablishSessionAsync()
     {
         // Initialize and start the SignalR connection using the current token.
-        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
         await SetAppStateAsync(AppState.ESTABLISHING_CONNECTION);
-        await MobileChatSignalR.HubConnection!.StartAsync();
+        await ChatSignalR.HubConnection!.StartAsync();
 
         // If a token exists, update HttpClient with the cached token and refresh the session.
         if (!string.IsNullOrEmpty(SessionStorage.Token))
@@ -135,7 +136,7 @@ else
             {
                 Id = refreshResponse.UserId ?? Guid.Empty,
                 Username = await ChatUserService.GetCurrentUserUsername() ?? string.Empty,
-                ConnectionId = MobileChatSignalR.HubConnection.ConnectionId
+                ConnectionId = ChatSignalR.HubConnection.ConnectionId
             };
         }
     }
@@ -145,13 +146,16 @@ else
     /// </summary>
     private async Task RestartSignalRConnectionAsync()
     {
-        await MobileChatSignalR.HubConnection.StopAsync();
-        await MobileChatSignalR.HubConnection.DisposeAsync();
+        if (ChatSignalR.HubConnection is not null)
+        {
+            await ChatSignalR.HubConnection.StopAsync();
+            await ChatSignalR.HubConnection.DisposeAsync();
+        }
 
-        MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
         SessionStorage.AppState = AppState.CREATING_SESSION;
         await InvokeAsync(StateHasChanged);
-        await MobileChatSignalR.HubConnection.StartAsync();
+        await ChatSignalR.HubConnection.StartAsync();
     }
 
     /// <summary>

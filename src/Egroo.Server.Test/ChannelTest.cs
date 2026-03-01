@@ -1,70 +1,169 @@
-﻿using jihadkhawaja.chat.client.Core;
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
-using Microsoft.AspNetCore.SignalR.Client;
-
 namespace Egroo.Server.Test
 {
+    /// <summary>
+    /// Tests the channel CRUD flow using the <c>jihadkhawaja.chat.server</c> hub
+    /// backed by an in-memory EF Core database.
+    /// These tests exercise <c>ChannelRepository</c> which implements
+    /// <see cref="IChannel"/> defined in <c>jihadkhawaja.chat.shared</c>.
+    /// </summary>
     [TestClass]
     public class ChannelTest
     {
-        private IAuth ChatAuthService { get; set; } = null!;
-        private IChannel ChatChannelService { get; set; } = null!;
-        private static Channel? Channel { get; set; }
+        private const string DbName = "ChannelTestDb";
+
+        // The signed-up user that acts as the authenticated caller throughout all tests.
+        private Guid _userId;
+        private IServiceProvider _authenticatedServices = null!;
 
         [TestInitialize]
         public async Task Initialize()
         {
-            // Create a new HttpClient with a BaseAddress for AuthService only.
-            var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
+            // 1. Sign up a user (no auth context needed for sign-up).
+            var anonServices = TestServiceProvider.Build(dbName: DbName);
+            using var signUpScope = anonServices.CreateScope();
+            var auth = signUpScope.ServiceProvider.GetRequiredService<IAuth>();
 
-            ChatAuthService = new AuthService(httpClient);
-            ChatChannelService = new ChatChannelService();
+            var signUp = await auth.SignUp("channeltester", "ValidP@ss1!");
 
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            // Allow re-running the same in-memory DB (duplicate user is acceptable).
+            if (!signUp.Success && !(signUp.Message?.Contains("exist", StringComparison.OrdinalIgnoreCase) ?? false))
+                Assert.Fail($"Sign-up failed unexpectedly: {signUp.Message}");
 
-            // Ensure user exists before signing in
-            await ChatAuthService.SignUp("test", "HvrnS4Q4zJ$xaW!3");
-            var signInResponse = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
+            // 2. Sign in to get the real user ID.
+            using var signInScope = anonServices.CreateScope();
+            var signIn = await signInScope.ServiceProvider.GetRequiredService<IAuth>()
+                                          .SignIn("channeltester", "ValidP@ss1!");
+            Assert.IsTrue(signIn.Success, $"Sign-in failed: {signIn.Message}");
+            _userId = signIn.UserId!.Value;
 
-            Assert.IsNotNull(signInResponse, "Sign-in response is null.");
-            Assert.IsTrue(signInResponse.Success, $"Sign-in failed: {signInResponse.Message}");
-            Assert.IsNotNull(signInResponse.Token, "Sign-in did not return a token.");
-
-            // Reinitialize SignalR with authentication
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, signInResponse.Token);
-            await MobileChatSignalR.HubConnection.StartAsync();
-
-            // Ensure a channel is created
-            Channel = await ChatChannelService.CreateChannel("test");
-            Assert.IsNotNull(Channel, "Failed to create channel.");
+            // 3. Build a service provider that impersonates this user.
+            _authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: _userId);
         }
 
-        [TestMethod, Priority(1)]
-        public async Task CreateChannelTest()
+        // ── Create ──────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task CreateChannel_WithValidUsername_ReturnsChannel()
         {
-            // This test is redundant since channel is created in Initialize, but we verify creation
-            Assert.IsNotNull(Channel, "CreateChannelTest failed. Channel is null.");
+            using var scope = _authenticatedServices.CreateScope();
+            var channel = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                     .CreateChannel("channeltester");
+
+            Assert.IsNotNull(channel, "CreateChannel returned null.");
+            Assert.AreNotEqual(Guid.Empty, channel.Id);
         }
 
-        [TestMethod, Priority(2)]
-        public async Task DeleteChannelTest()
+        [TestMethod]
+        public async Task CreateChannel_EmptyUsernames_ReturnsNull()
         {
-            Assert.IsNotNull(Channel, "DeleteChannelTest failed. No channel exists.");
+            using var scope = _authenticatedServices.CreateScope();
+            var channel = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                     .CreateChannel();  // no usernames
 
-            bool isDeleted = await ChatChannelService.DeleteChannel(Channel.Id);
-            Assert.IsTrue(isDeleted, "Failed to delete channel.");
+            Assert.IsNull(channel, "Expected null when no usernames are supplied.");
         }
 
-        [TestCleanup]
-        public async Task Cleanup()
+        // ── Read ────────────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task GetChannel_ExistingChannel_ReturnsChannel()
         {
-            if (MobileChatSignalR.HubConnection.State == HubConnectionState.Connected)
-            {
-                await MobileChatSignalR.HubConnection.StopAsync();
-            }
+            using var createScope = _authenticatedServices.CreateScope();
+            var channelSvc = createScope.ServiceProvider.GetRequiredService<IChannel>();
+            var created = await channelSvc.CreateChannel("channeltester");
+            Assert.IsNotNull(created);
+
+            using var readScope = _authenticatedServices.CreateScope();
+            var fetched = await readScope.ServiceProvider.GetRequiredService<IChannel>()
+                                         .GetChannel(created.Id);
+
+            Assert.IsNotNull(fetched);
+            Assert.AreEqual(created.Id, fetched.Id);
+        }
+
+        [TestMethod]
+        public async Task GetChannel_NonExistentId_ReturnsNull()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var fetched = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                     .GetChannel(Guid.NewGuid());
+
+            Assert.IsNull(fetched);
+        }
+
+        [TestMethod]
+        public async Task GetUserChannels_ReturnsAtLeastOneChannel()
+        {
+            // Ensure at least one channel exists for this user.
+            using var createScope = _authenticatedServices.CreateScope();
+            await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                             .CreateChannel("channeltester");
+
+            using var readScope = _authenticatedServices.CreateScope();
+            var channels = await readScope.ServiceProvider.GetRequiredService<IChannel>()
+                                          .GetUserChannels();
+
+            Assert.IsNotNull(channels);
+            Assert.IsTrue(channels.Length > 0, "Expected at least one user channel.");
+        }
+
+        // ── Membership ──────────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task ChannelContainUser_AfterCreate_ReturnsTrue()
+        {
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var checkScope = _authenticatedServices.CreateScope();
+            bool contains = await checkScope.ServiceProvider.GetRequiredService<IChannel>()
+                                            .ChannelContainUser(channel.Id, _userId);
+
+            Assert.IsTrue(contains, "User should be a member of the channel they created.");
+        }
+
+        [TestMethod]
+        public async Task IsChannelAdmin_AfterCreate_ReturnsTrue()
+        {
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var checkScope = _authenticatedServices.CreateScope();
+            bool isAdmin = await checkScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .IsChannelAdmin(channel.Id, _userId);
+
+            Assert.IsTrue(isAdmin, "Channel creator should be the admin.");
+        }
+
+        // ── Delete / Leave ──────────────────────────────────────────────────────────
+
+        [TestMethod]
+        public async Task DeleteChannel_ExistingChannel_Succeeds()
+        {
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var deleteScope = _authenticatedServices.CreateScope();
+            bool deleted = await deleteScope.ServiceProvider.GetRequiredService<IChannel>()
+                                            .DeleteChannel(channel.Id);
+
+            Assert.IsTrue(deleted, "DeleteChannel should return true for an existing channel.");
+        }
+
+        [TestMethod]
+        public async Task DeleteChannel_NonExistentId_ReturnsFalse()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            bool deleted = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                      .DeleteChannel(Guid.NewGuid());
+
+            Assert.IsFalse(deleted, "DeleteChannel should return false for a non-existent channel.");
         }
     }
 }

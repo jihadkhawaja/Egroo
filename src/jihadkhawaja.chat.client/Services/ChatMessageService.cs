@@ -7,7 +7,7 @@ namespace jihadkhawaja.chat.client.Services
 {
     public class ChatMessageService : IMessageHub
     {
-        private HubConnection HubConnection => MobileChatSignalR.HubConnection
+        private HubConnection HubConnection => ChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
 
         public async Task<bool> SendMessage(Message message)

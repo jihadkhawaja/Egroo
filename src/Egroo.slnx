@@ -1,0 +1,35 @@
+<Solution>
+  <Folder Name="/Client/">
+    <Project Path="Egroo/Egroo.Client/Egroo.Client.csproj" />
+    <Project Path="Egroo/Egroo/Egroo.csproj" />
+  </Folder>
+  <Folder Name="/Github/">
+    <File Path="../LICENSE" />
+    <File Path="../README.md" />
+  </Folder>
+  <Folder Name="/Github/docs/">
+    <File Path="../docs/CODE_OF_CONDUCT.md" />
+    <File Path="../docs/CONTRIBUTING.md" />
+    <File Path="../docs/pull_request_template.md" />
+  </Folder>
+  <Folder Name="/Github/workflow/">
+    <File Path="../.github/workflows/Deploy-Chat.yml" />
+    <File Path="../.github/workflows/Docker.yml" />
+    <File Path="../.github/workflows/MSTest.yml" />
+    <File Path="../.github/workflows/Nuget.yml" />
+  </Folder>
+  <Folder Name="/Libs (NuGet Package)/">
+    <Project Path="jihadkhawaja.chat.client/jihadkhawaja.chat.client.csproj" />
+    <Project Path="jihadkhawaja.chat.server/jihadkhawaja.chat.server.csproj" />
+    <Project Path="jihadkhawaja.chat.shared/jihadkhawaja.chat.shared.csproj" />
+  </Folder>
+  <Folder Name="/Server/">
+    <Project Path="Egroo.Server/Egroo.Server.csproj" />
+  </Folder>
+  <Folder Name="/Shared/">
+    <Project Path="Egroo.UI/Egroo.UI.csproj" />
+  </Folder>
+  <Folder Name="/Test/">
+    <Project Path="Egroo.Server.Test/Egroo.Server.Test.csproj" />
+  </Folder>
+</Solution>

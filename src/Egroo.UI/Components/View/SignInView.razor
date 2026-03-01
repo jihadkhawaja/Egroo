@@ -5,7 +5,7 @@
 @using Egroo.UI.Models
 @using jihadkhawaja.chat.client
 @using jihadkhawaja.chat.client.Core
-@using jihadkhawaja.chat.client.Services
+
 @using jihadkhawaja.chat.shared.Models
 
 @inject StorageService StorageService
@@ -127,8 +127,8 @@
                 };
 
             // Initialize and start the SignalR connection.
-            MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+            await ChatSignalR.HubConnection.StartAsync();
 
             // Navigate to the channels page.
             NavigationManager.NavigateTo("/channels", true);

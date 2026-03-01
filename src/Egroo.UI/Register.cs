@@ -1,7 +1,8 @@
-﻿using Egroo.UI.Models;
+﻿using BlazorDexie.Extensions;
+using Egroo.UI.CacheDB;
+using Egroo.UI.Models;
 using Egroo.UI.Services;
 using jihadkhawaja.chat.client;
-using jihadkhawaja.chat.client.Services;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor.Services;
 
@@ -25,6 +26,9 @@ namespace Egroo.UI
                 services.AddSingleton<SessionStorage>();
                 services.AddSingleton<StorageService>();
             }
+
+            services.AddBlazorDexie();
+            services.AddScoped<EgrooDB>();
 
             services.AddMudServices();
             services.AddChatServices();

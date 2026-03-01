@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace jihadkhawaja.chat.shared.Models
 {
-    public class Message : EntityCryptographyBase
+    public class Message : EntityBase
     {
         [Required]
         public Guid SenderId { get; set; }

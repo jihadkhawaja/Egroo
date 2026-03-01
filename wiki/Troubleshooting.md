@@ -59,13 +59,13 @@ Verify your connection string format:
 
 ### .NET Runtime Issues
 
-#### .NET 8 Not Found
-**Error:** `The framework 'Microsoft.NETCore.App', version '8.0.0' was not found`
+#### .NET 10 Not Found
+**Error:** `The framework 'Microsoft.NETCore.App', version '10.0.0' was not found`
 
 **Solution:**
-1. **Install .NET 8 SDK:**
+1. **Install .NET 10 SDK:**
    ```bash
-   # Download from https://dotnet.microsoft.com/download/dotnet/8.0
+   # Download from https://dotnet.microsoft.com/download/dotnet/10.0
    
    # Verify installation
    dotnet --version
@@ -75,7 +75,7 @@ Verify your connection string format:
    ```json
    {
      "sdk": {
-       "version": "8.0.0",
+       "version": "10.0.0",
        "rollForward": "latestFeature"
      }
    }
@@ -128,16 +128,17 @@ Verify your connection string format:
 **Error:** `No database provider has been configured for this DbContext`
 
 **Solutions:**
-1. **Check connection string in appsettings.json**
-2. **Apply migrations:**
+1. **Check connection string in appsettings.json** — ensure the format matches:
+   ```json
+   "ConnectionStrings": {
+     "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;"
+   }
+   ```
+2. Migrations are applied **automatically** when `Egroo.Server` starts. If the server starts without error, migrations have been applied.
+3. **Create a new migration** (for development when you change the data model):
    ```bash
    cd src/Egroo.Server
-   dotnet ef database update
-   ```
-
-3. **Create migration if needed:**
-   ```bash
-   dotnet ef migrations add InitialCreate
+   dotnet ef migrations add MigrationName
    ```
 
 #### Migration Conflicts

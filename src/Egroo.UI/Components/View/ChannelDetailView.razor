@@ -27,7 +27,7 @@ else
                             </MudItem>
                             <MudItem>
                                 <MudStack Row Style="height:100%;">
-                                    @if (SessionStorage.User.Id == user.Id)
+                                    @if (SessionStorage.User?.Id == user.Id)
                                     {
                                         <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined" Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
                                         Disabled />
@@ -50,11 +50,11 @@ else
 
 @code {
     [Parameter]
-    public string Title { get; set; }
+    public string? Title { get; set; }
     [Parameter]
-    public string ChannelId { get; set; }
+    public string? ChannelId { get; set; }
 
-    [Inject] IDialogService DialogService { get; set; }
+    [Inject] IDialogService DialogService { get; set; } = null!;
 
     private IEnumerable<UserDto> ChannelUsers { get; set; } = null!;
 
@@ -67,7 +67,7 @@ else
 
     private async Task RefetchData()
     {
-        ChannelUsers = await ChatChannelService.GetChannelUsers(GetChannelId());
+        ChannelUsers = await ChatChannelService.GetChannelUsers(GetChannelId()) ?? Array.Empty<UserDto>();
 
         await InvokeAsync(StateHasChanged);
     }
@@ -85,7 +85,7 @@ else
 
     private async Task RemoveChannelUser(Guid channelId, Guid userId)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Warning",
             "Are you sure you want to remove this user?",
             yesText: "Remove", cancelText: "Cancel");
