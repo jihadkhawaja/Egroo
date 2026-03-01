@@ -45,7 +45,7 @@ services:
       start_period: 30s
 
   egroo-api:
-    image: jihadkhawaja/mobilechat-server-prod:latest
+    image: jihadkhawaja/egroo-server-prod:latest
     container_name: egroo-server
     restart: unless-stopped
     depends_on:
@@ -80,7 +80,7 @@ services:
       start_period: 30s
 
   egroo-web:
-    image: jihadkhawaja/mobilechat-wasm-prod:latest
+    image: jihadkhawaja/egroo-client-prod:latest
     container_name: egroo-client
     restart: unless-stopped
     depends_on:
@@ -414,7 +414,7 @@ spec:
     spec:
       containers:
       - name: egroo-api
-        image: jihadkhawaja/mobilechat-server-prod:latest
+        image: jihadkhawaja/egroo-server-prod:latest
         env:
         - name: ConnectionStrings__DefaultConnection
           value: "Host=postgres-service;Database=egroo;Username=egroo_user;Password=$(POSTGRES_PASSWORD)"
@@ -469,7 +469,7 @@ az group create --name egroo-rg --location eastus
 az container create \
   --resource-group egroo-rg \
   --name egroo-app \
-  --image jihadkhawaja/mobilechat-server-prod:latest \
+  --image jihadkhawaja/egroo-server-prod:latest \
   --dns-name-label egroo-app \
   --ports 80 \
   --environment-variables \
@@ -492,7 +492,7 @@ az container create \
   "containerDefinitions": [
     {
       "name": "egroo-api",
-      "image": "jihadkhawaja/mobilechat-server-prod:latest",
+      "image": "jihadkhawaja/egroo-server-prod:latest",
       "portMappings": [
         {
           "containerPort": 8080,

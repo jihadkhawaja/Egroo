@@ -203,8 +203,8 @@ The database uses **Entity Framework Core** with **Npgsql** (PostgreSQL provider
 ### Container Images
 | Image | Purpose |
 |-------|---------|
-| `jihadkhawaja/mobilechat-server-prod:latest` | Egroo.Server API |
-| `jihadkhawaja/mobilechat-wasm-prod:latest` | Egroo Blazor host |
+| `jihadkhawaja/egroo-server-prod:latest` | Egroo.Server API |
+| `jihadkhawaja/egroo-client-prod:latest` | Egroo Blazor host |
 
 ### `docker-compose-egroo.yml`
 The production compose file places both containers on an **external** Docker network (`internal`) — PostgreSQL is expected to be provisioned separately (e.g., a managed database or a separate compose stack).

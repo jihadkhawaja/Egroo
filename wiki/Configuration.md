@@ -271,7 +271,7 @@ services:
       - egroo-network
 
   egroo-api:
-    image: jihadkhawaja/mobilechat-server-prod:latest
+    image: jihadkhawaja/egroo-server-prod:latest
     container_name: egroo-server
     restart: unless-stopped
     depends_on:
@@ -292,7 +292,7 @@ services:
       - egroo-network
 
   egroo-web:
-    image: jihadkhawaja/mobilechat-wasm-prod:latest
+    image: jihadkhawaja/egroo-client-prod:latest
     container_name: egroo-client
     restart: unless-stopped
     depends_on:

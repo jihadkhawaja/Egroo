@@ -163,8 +163,8 @@ Use the official Docker images for production deployment.
 
 1. **Pull the images**:
    ```bash
-   docker pull jihadkhawaja/mobilechat-server-prod:latest
-   docker pull jihadkhawaja/mobilechat-wasm-prod:latest
+   docker pull jihadkhawaja/egroo-server-prod:latest
+   docker pull jihadkhawaja/egroo-client-prod:latest
    ```
 
 2. **Create docker-compose.yml**:
@@ -183,7 +183,7 @@ Use the official Docker images for production deployment.
          - "5432:5432"
    
      egroo-api:
-       image: jihadkhawaja/mobilechat-server-prod:latest
+       image: jihadkhawaja/egroo-server-prod:latest
        depends_on:
          - egroo-db
        environment:
@@ -193,7 +193,7 @@ Use the official Docker images for production deployment.
          - "5175:8080"
    
      egroo-web:
-       image: jihadkhawaja/mobilechat-wasm-prod:latest
+       image: jihadkhawaja/egroo-client-prod:latest
        depends_on:
          - egroo-api
        ports:
