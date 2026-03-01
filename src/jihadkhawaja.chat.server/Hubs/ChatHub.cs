@@ -1,5 +1,4 @@
 using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 

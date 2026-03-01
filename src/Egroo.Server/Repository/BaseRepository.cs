@@ -1,11 +1,7 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
-using Egroo.Server.Security;
 using jihadkhawaja.chat.shared.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq.Expressions;
 using System.Security.Claims;

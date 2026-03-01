@@ -1,7 +1,4 @@
 using jihadkhawaja.chat.shared.Interfaces;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 
 namespace Egroo.Server.API
 {
