@@ -96,11 +96,11 @@ jobs:
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
-      - name: Push shared package to GitHub packages
-        run: dotnet nuget push nugetPackageShared/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
-
       - name: Publish nuget shared package
-        run: dotnet nuget push nugetPackageShared/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push nugetPackageShared/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push shared package to GitHub packages
+        run: dotnet nuget push nugetPackageShared/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github" --skip-duplicate
 
   PublishClient:
     runs-on: ubuntu-latest
@@ -115,11 +115,11 @@ jobs:
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
-      - name: Push client package to GitHub packages
-        run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
-
       - name: Publish nuget client package
-        run: dotnet nuget push nugetPackageClient/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push nugetPackageClient/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push client package to GitHub packages
+        run: dotnet nuget push nugetPackageClient/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github" --skip-duplicate
 
   PublishServer:
     runs-on: ubuntu-latest
@@ -134,15 +134,15 @@ jobs:
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
-      - name: Push package to GitHub packages
-        run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github"
-
       - name: Publish nuget package
-        run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+        run: dotnet nuget push nugetPackageServer/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push package to GitHub packages
+        run: dotnet nuget push nugetPackageServer/*.nupkg --api-key ${{ secrets.Egroo_GITHUB_PACKAGE }}  --source "github" --skip-duplicate
 
   Release:
     runs-on: ubuntu-latest
-    needs: build
+    needs: [PublishShared, PublishClient, PublishServer]
     steps:
       - name: Download nuget package shared artifact
         uses: actions/download-artifact@v4
