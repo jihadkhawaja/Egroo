@@ -1,14 +1,22 @@
 name: chat-deploy
 
 on:
-  push:
-    branches: [ "main"]
-
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Select what to deploy'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - api
+          - client
+          - both
 
 jobs:
   dotnet-build-api:
     name: Dotnet Build api
+    if: ${{ inputs.deploy_target == 'api' || inputs.deploy_target == 'both' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -24,6 +32,7 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/Egroo.Server/Egroo.Server.csproj
   docker-build-api:
     name: Docker Build api
+    if: ${{ inputs.deploy_target == 'api' || inputs.deploy_target == 'both' }}
     environment:
       name: 'Release API'
       url: "https://api.egroo.org"
@@ -98,6 +107,7 @@ jobs:
             rm /home/ubuntu/configurations/images/mobilechat-server-prod.tar
   dotnet-build-wasm:
     name: Dotnet Build wasm
+    if: ${{ inputs.deploy_target == 'client' || inputs.deploy_target == 'both' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -113,10 +123,11 @@ jobs:
       run: dotnet test --no-build --verbosity normal src/Egroo/Egroo/Egroo.csproj
   docker-build-wasm:
     name: Docker Build wasm
+    if: ${{ inputs.deploy_target == 'client' || inputs.deploy_target == 'both' }}
     environment:
       name: 'Release WEB'
       url: "https://www.egroo.org"
-    needs: [dotnet-build-wasm, docker-build-api]
+    needs: [dotnet-build-wasm]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +156,8 @@ jobs:
             rm /home/ubuntu/configurations/images/mobilechat-wasm-prod.tar
   docker-compose:
     name: Docker Compose
-    needs: [docker-build-wasm,docker-build-api]
+    needs: [docker-build-wasm, docker-build-api]
+    if: always() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && (needs.docker-build-api.result == 'success' || needs.docker-build-wasm.result == 'success')
     runs-on: ubuntu-latest
     steps:
         - uses: actions/checkout@v4
