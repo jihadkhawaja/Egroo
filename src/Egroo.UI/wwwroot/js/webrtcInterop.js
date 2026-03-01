@@ -1,260 +1,363 @@
-﻿window.webrtcInterop = {
-    pc: null,
+﻿/**
+ * WebRTC Interop for Channel-Based Multi-Peer Voice Calling.
+ * Manages one RTCPeerConnection per remote peer (mesh topology).
+ */
+window.webrtcInterop = {
+    // Map of peerId (GUID string) -> { pc: RTCPeerConnection, iceCandidateQueue: [] }
+    peers: new Map(),
     localStream: null,
-    iceCandidatesQueue: [], // To store ICE candidates until DotNetObjectReference is registered
-    statsInterval: null,    // Interval ID for polling stats
     dotNetObject: null,
+    channelId: null,
+    statsInterval: null,
+    isMuted: false,
 
-    // Registers the DotNetObjectReference for sending ICE candidates via SignalR.
-    registerSendIceCandidateToPeer: function (dotNetObject) {
+    config: {
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+        ]
+    },
+
+    /**
+     * Register the DotNet object reference for callbacks into Blazor.
+     */
+    registerDotNetObject: function (dotNetObject) {
         this.dotNetObject = dotNetObject;
-        console.log("📡 DotNetObjectReference registered for SendIceCandidateToPeer");
-        this.iceCandidatesQueue.forEach(candidate => {
-            this.dotNetObject.invokeMethodAsync('SendIceCandidate', JSON.stringify(candidate));
+        console.log("[WebRTC] DotNetObjectReference registered.");
+    },
+
+    /**
+     * Acquire local audio stream (microphone).
+     * Returns true on success.
+     */
+    acquireLocalStream: async function () {
+        if (this.localStream) return true;
+        try {
+            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            console.log("[WebRTC] Local audio stream acquired:", this.localStream.getAudioTracks().length, "audio tracks");
+            return true;
+        } catch (err) {
+            console.error("[WebRTC] Error acquiring microphone:", err);
+            return false;
+        }
+    },
+
+    /**
+     * Start participating in a channel call. Acquires mic and sets channel context.
+     * Returns true if microphone was successfully acquired.
+     */
+    joinCall: async function (channelId) {
+        this.channelId = channelId;
+        const acquired = await this.acquireLocalStream();
+        if (!acquired) return false;
+
+        // Start stats polling
+        if (this.statsInterval) clearInterval(this.statsInterval);
+        this.statsInterval = setInterval(() => this.pollAudioStats(), 10000);
+
+        return true;
+    },
+
+    /**
+     * Create an RTCPeerConnection for a specific peer, create an SDP offer, and return it.
+     * The caller side initiates the offer.
+     */
+    createOfferForPeer: async function (peerId) {
+        if (!this.localStream) {
+            console.error("[WebRTC] No local stream. Call joinCall first.");
+            return null;
+        }
+
+        const peerData = this._getOrCreatePeer(peerId);
+        const pc = peerData.pc;
+
+        // Add local audio tracks
+        this.localStream.getAudioTracks().forEach(track => {
+            // Avoid duplicate tracks
+            const senders = pc.getSenders();
+            if (!senders.find(s => s.track === track)) {
+                pc.addTrack(track, this.localStream);
+            }
         });
-        this.iceCandidatesQueue = []; // Clear the queue
-    },
 
-    // Polls and logs audio RTP stats.
-    pollAudioStats: function () {
-        if (!this.pc) return;
-        this.pc.getStats(null)
-            .then(stats => {
-                stats.forEach(report => {
-                    if (report.type === "outbound-rtp" && report.kind === "audio") {
-                        console.log("Audio Outbound Stats:", report);
-                    } else if (report.type === "inbound-rtp" && report.kind === "audio") {
-                        console.log("Audio Inbound Stats:", report);
-                    }
-                });
-            })
-            .catch(err => console.error("❌ Error getting stats:", err));
-    },
-
-    // Toggle local audio (monitoring) on/off.
-    toggleLocalAudio: function () {
-        const localAudio = document.getElementById("localAudio");
-        if (localAudio) {
-            localAudio.muted = !localAudio.muted;
-            console.log("Local audio muted:", localAudio.muted);
-        } else {
-            console.warn("Local audio element not found.");
-        }
-    },
-
-    // Start a call as the caller: returns the SDP offer string.
-    startCall: async function () {
-        if (this.pc) {
-            this.pc.close();
-        }
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            console.log("🎙️ Local stream acquired", this.localStream);
-            console.log("Audio tracks:", this.localStream.getAudioTracks());
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            console.log("[WebRTC] Created offer for peer", peerId);
+            return offer.sdp;
         } catch (err) {
-            console.error("❌ Error getting local stream:", err);
+            console.error("[WebRTC] Error creating offer for peer", peerId, err);
+            return null;
+        }
+    },
+
+    /**
+     * Handle an incoming SDP offer from a peer. Creates answer SDP and returns it.
+     */
+    handleOfferFromPeer: async function (peerId, sdpOffer) {
+        if (!this.localStream) {
+            console.error("[WebRTC] No local stream. Call joinCall first.");
+            return null;
+        }
+
+        const peerData = this._getOrCreatePeer(peerId);
+        const pc = peerData.pc;
+
+        // Add local audio tracks
+        this.localStream.getAudioTracks().forEach(track => {
+            const senders = pc.getSenders();
+            if (!senders.find(s => s.track === track)) {
+                pc.addTrack(track, this.localStream);
+            }
+        });
+
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
+
+            // Flush queued ICE candidates
+            await this._flushIceCandidates(peerId);
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            console.log("[WebRTC] Created answer for peer", peerId);
+            return answer.sdp;
+        } catch (err) {
+            console.error("[WebRTC] Error handling offer from peer", peerId, err);
+            return null;
+        }
+    },
+
+    /**
+     * Handle an incoming SDP answer from a peer.
+     */
+    handleAnswerFromPeer: async function (peerId, sdpAnswer) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData) {
+            console.warn("[WebRTC] No peer connection for", peerId, "to set answer on.");
             return;
         }
-        // For debugging, attach the local stream to a local audio element (muted by default).
-        const localAudio = document.getElementById("localAudio");
-        if (localAudio) {
-            localAudio.srcObject = this.localStream;
-            localAudio.muted = true; // start local monitor as off
-            localAudio.play().catch(err => console.error("Error playing local audio:", err));
+
+        try {
+            await peerData.pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdpAnswer }));
+            console.log("[WebRTC] Set remote answer for peer", peerId);
+            // Flush queued ICE candidates
+            await this._flushIceCandidates(peerId);
+        } catch (err) {
+            console.error("[WebRTC] Error setting answer for peer", peerId, err);
         }
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-        this.pc = new RTCPeerConnection(config);
-        if (this.localStream && this.localStream.getAudioTracks().length > 0) {
-            let audioTrack = this.localStream.getAudioTracks()[0];
-            console.log("Audio track details:", {
-                enabled: audioTrack.enabled,
-                readyState: audioTrack.readyState,
-                label: audioTrack.label
-            });
-            audioTrack.enabled = true;
-            this.pc.addTrack(audioTrack, this.localStream);
-            console.log("✅ Added local audio track via addTrack.");
-        } else {
-            console.warn("⚠️ No local audio track available to add.");
-        }
-        this.pc.onsignalingstatechange = () => {
-            console.log("Signaling state:", this.pc.signalingState);
-        };
-        this.pc.oniceconnectionstatechange = () => {
-            console.log("ICE connection state:", this.pc.iceConnectionState);
-        };
-        this.pc.onicecandidate = event => {
-            if (event.candidate) {
-                console.log("📡 Local ICE candidate:", event.candidate.candidate);
-                if (this.dotNetObject) {
-                    this.dotNetObject.invokeMethodAsync('SendIceCandidate', JSON.stringify(event.candidate));
-                } else {
-                    console.log("❌ DotNetObjectReference not registered, queuing ICE candidate");
-                    this.iceCandidatesQueue.push(event.candidate);
-                }
-            }
-        };
-        this.pc.ontrack = event => {
-            console.log("🎧 Remote track received:", event);
-            const remoteAudio = document.getElementById("remoteAudio");
-            if (!remoteAudio) {
-                console.error("Remote audio element not found.");
-                return;
-            }
-            let stream = (event.streams && event.streams.length > 0)
-                ? event.streams[0]
-                : new MediaStream([event.track]);
-            remoteAudio.srcObject = stream;
-            remoteAudio.muted = false;
-            remoteAudio.volume = 1.0;
-            remoteAudio.play()
-                .then(() => console.log("✅ Remote audio playing"))
-                .catch(err => console.error("❌ Error playing remote audio:", err));
-        };
-        const offer = await this.pc.createOffer();
-        await this.pc.setLocalDescription(offer);
-        console.log("📞 Created offer:", offer.sdp);
-        if (this.statsInterval) clearInterval(this.statsInterval);
-        this.statsInterval = setInterval(() => this.pollAudioStats(), 5000);
-        return offer.sdp;
     },
 
-    // Answer an incoming call: returns the SDP answer string.
-    answerCall: async function (sdpOffer) {
-        if (this.pc) {
-            this.pc.close();
-        }
+    /**
+     * Add an ICE candidate received from a specific peer.
+     */
+    addIceCandidateForPeer: async function (peerId, candidateJson) {
+        const peerData = this.peers.get(peerId);
+
+        let candidate;
         try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            console.log("🎙️ Local stream acquired for answering", this.localStream);
-            console.log("Audio tracks (answer):", this.localStream.getAudioTracks());
+            const parsed = JSON.parse(candidateJson);
+            candidate = new RTCIceCandidate(parsed);
         } catch (err) {
-            console.error("❌ Error getting local stream:", err);
+            console.warn("[WebRTC] Error parsing ICE candidate:", err);
             return;
         }
-        // For debugging, attach the local stream.
-        const localAudio = document.getElementById("localAudio");
-        if (localAudio) {
-            localAudio.srcObject = this.localStream;
-            localAudio.muted = true; // start local monitor as off
-            localAudio.play().catch(err => console.error("Error playing local audio (answer):", err));
-        }
-        const config = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
-        this.pc = new RTCPeerConnection(config);
-        if (this.localStream && this.localStream.getAudioTracks().length > 0) {
-            let audioTrack = this.localStream.getAudioTracks()[0];
-            console.log("Audio track (answer) details:", {
-                enabled: audioTrack.enabled,
-                readyState: audioTrack.readyState,
-                label: audioTrack.label
-            });
-            audioTrack.enabled = true;
-            this.pc.addTrack(audioTrack, this.localStream);
-            console.log("✅ Added local audio track via addTrack (answer).");
-        } else {
-            console.warn("⚠️ No local audio track available to add (answer).");
-        }
-        this.pc.onsignalingstatechange = () => {
-            console.log("Signaling state (answer):", this.pc.signalingState);
-        };
-        this.pc.oniceconnectionstatechange = () => {
-            console.log("ICE connection state (answer):", this.pc.iceConnectionState);
-        };
-        this.pc.onicecandidate = event => {
-            if (event.candidate) {
-                console.log("📡 Local ICE candidate (answer):", event.candidate.candidate);
-                if (this.dotNetObject) {
-                    this.dotNetObject.invokeMethodAsync('SendIceCandidate', JSON.stringify(event.candidate));
-                } else {
-                    console.log("❌ DotNetObjectReference not registered, queuing ICE candidate");
-                    this.iceCandidatesQueue.push(event.candidate);
-                }
-            }
-        };
-        this.pc.ontrack = event => {
-            console.log("🎧 Remote track received (answer):", event);
-            const remoteAudio = document.getElementById("remoteAudio");
-            if (!remoteAudio) {
-                console.error("Remote audio element not found.");
-                return;
-            }
-            let stream = (event.streams && event.streams.length > 0)
-                ? event.streams[0]
-                : new MediaStream([event.track]);
-            remoteAudio.srcObject = stream;
-            remoteAudio.muted = false;
-            remoteAudio.volume = 1.0;
-            remoteAudio.play()
-                .then(() => console.log("✅ Remote audio playing (answer)"))
-                .catch(err => console.error("❌ Error playing remote audio (answer):", err));
-        };
-        await this.pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
-        const answer = await this.pc.createAnswer();
-        await this.pc.setLocalDescription(answer);
-        console.log("📞 Created answer:", answer.sdp);
-        if (this.statsInterval) clearInterval(this.statsInterval);
-        this.statsInterval = setInterval(() => this.pollAudioStats(), 5000);
-        return answer.sdp;
-    },
 
-    // Add an ICE candidate received from the server.
-    addIceCandidate: async function (candidateJson) {
+        if (!peerData) {
+            // Peer connection doesn't exist yet, queue the candidate
+            console.log("[WebRTC] Queuing ICE candidate for peer", peerId);
+            const newPeerData = this._getOrCreatePeer(peerId);
+            newPeerData.iceCandidateQueue.push(candidate);
+            return;
+        }
+
+        if (!peerData.pc.remoteDescription) {
+            // Remote description not set yet, queue
+            peerData.iceCandidateQueue.push(candidate);
+            return;
+        }
+
         try {
-            if (!this.pc) {
-                console.warn("⚠️ No active RTCPeerConnection. Cannot add ICE candidate.");
-                return;
-            }
-            let candidate;
-            try {
-                candidate = JSON.parse(candidateJson);
-                if (typeof candidate === "object" && candidate.candidate) {
-                    candidate = new RTCIceCandidate(candidate);
-                    console.log("📡 Adding ICE candidate (from JSON):", candidate);
-                } else {
-                    throw new Error("Parsed candidate does not have expected properties.");
-                }
-            } catch (err) {
-                console.warn("❌ Error parsing candidate JSON. Assuming candidateJson is an SDP string:", err);
-                candidate = new RTCIceCandidate({ candidate: candidateJson });
-                console.log("📡 Adding ICE candidate (from SDP string):", candidate);
-            }
-            await this.pc.addIceCandidate(candidate);
+            await peerData.pc.addIceCandidate(candidate);
         } catch (err) {
-            console.error("❌ Error adding ICE candidate:", err);
+            console.error("[WebRTC] Error adding ICE candidate for peer", peerId, err);
         }
     },
 
-    // Close and clean up the connection.
-    closePeer: function () {
-        if (this.pc) {
-            this.pc.onicecandidate = null;
-            this.pc.ontrack = null;
-            this.pc.close();
-            console.log("🔴 RTCPeerConnection closed.");
-            this.pc = null;
+    /**
+     * Remove a specific peer connection (when a user leaves the call).
+     */
+    removePeer: function (peerId) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData) return;
+
+        peerData.pc.onicecandidate = null;
+        peerData.pc.ontrack = null;
+        peerData.pc.oniceconnectionstatechange = null;
+        peerData.pc.onsignalingstatechange = null;
+        peerData.pc.close();
+        this.peers.delete(peerId);
+
+        // Remove the audio element for this peer
+        const audioEl = document.getElementById("remoteAudio-" + peerId);
+        if (audioEl) {
+            audioEl.srcObject = null;
+            audioEl.remove();
         }
+
+        console.log("[WebRTC] Removed peer", peerId, "| Remaining peers:", this.peers.size);
+    },
+
+    /**
+     * Leave the call entirely: close all peer connections and release microphone.
+     */
+    leaveCall: function () {
+        // Close all peer connections
+        for (const [peerId] of this.peers) {
+            this.removePeer(peerId);
+        }
+        this.peers.clear();
+
+        // Stop local stream
+        if (this.localStream) {
+            this.localStream.getTracks().forEach(track => track.stop());
+            this.localStream = null;
+            console.log("[WebRTC] Local stream stopped.");
+        }
+
+        // Clear stats interval
         if (this.statsInterval) {
             clearInterval(this.statsInterval);
             this.statsInterval = null;
         }
-        if (this.localStream) {
-            this.localStream.getTracks().forEach(track => track.stop());
-            console.log("🔇 Local stream (microphone) stopped.");
-            this.localStream = null;
+
+        // Remove all dynamically created remote audio elements
+        const container = document.getElementById("remote-audio-container");
+        if (container) {
+            container.innerHTML = "";
+        }
+
+        this.channelId = null;
+        this.isMuted = false;
+        console.log("[WebRTC] Left call.");
+    },
+
+    /**
+     * Toggle microphone mute state.
+     * Returns true if now muted, false if now unmuted.
+     */
+    toggleMute: function () {
+        if (!this.localStream) return this.isMuted;
+        this.localStream.getAudioTracks().forEach(track => {
+            track.enabled = !track.enabled;
+        });
+        this.isMuted = !this.isMuted;
+        console.log("[WebRTC] Muted:", this.isMuted);
+        return this.isMuted;
+    },
+
+    /**
+     * Get the number of active peer connections.
+     */
+    getPeerCount: function () {
+        return this.peers.size;
+    },
+
+    // ---- Internal Helpers ----
+
+    _getOrCreatePeer: function (peerId) {
+        if (this.peers.has(peerId)) {
+            return this.peers.get(peerId);
+        }
+
+        const pc = new RTCPeerConnection(this.config);
+        const peerData = { pc: pc, iceCandidateQueue: [] };
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate && this.dotNetObject && this.channelId) {
+                this.dotNetObject.invokeMethodAsync(
+                    'OnIceCandidateGenerated',
+                    peerId,
+                    JSON.stringify(event.candidate)
+                );
+            }
+        };
+
+        pc.ontrack = (event) => {
+            console.log("[WebRTC] Remote track received from peer", peerId);
+            let container = document.getElementById("remote-audio-container");
+            if (!container) {
+                container = document.createElement("div");
+                container.id = "remote-audio-container";
+                container.style.display = "none";
+                document.body.appendChild(container);
+            }
+
+            let audioEl = document.getElementById("remoteAudio-" + peerId);
+            if (!audioEl) {
+                audioEl = document.createElement("audio");
+                audioEl.id = "remoteAudio-" + peerId;
+                audioEl.autoplay = true;
+                audioEl.playsInline = true;
+                container.appendChild(audioEl);
+            }
+
+            const stream = (event.streams && event.streams.length > 0)
+                ? event.streams[0]
+                : new MediaStream([event.track]);
+            audioEl.srcObject = stream;
+            audioEl.muted = false;
+            audioEl.volume = 1.0;
+            audioEl.play().catch(err => console.error("[WebRTC] Error playing remote audio from peer", peerId, err));
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log("[WebRTC] Peer", peerId, "ICE state:", pc.iceConnectionState);
+            if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
+                console.warn("[WebRTC] Peer", peerId, "connection lost.");
+                if (this.dotNetObject) {
+                    this.dotNetObject.invokeMethodAsync('OnPeerDisconnected', peerId);
+                }
+            }
+        };
+
+        pc.onsignalingstatechange = () => {
+            console.log("[WebRTC] Peer", peerId, "signaling state:", pc.signalingState);
+        };
+
+        this.peers.set(peerId, peerData);
+        console.log("[WebRTC] Created peer connection for", peerId, "| Total peers:", this.peers.size);
+        return peerData;
+    },
+
+    _flushIceCandidates: async function (peerId) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData || !peerData.pc.remoteDescription) return;
+
+        while (peerData.iceCandidateQueue.length > 0) {
+            const candidate = peerData.iceCandidateQueue.shift();
+            try {
+                await peerData.pc.addIceCandidate(candidate);
+            } catch (err) {
+                console.error("[WebRTC] Error flushing ICE candidate for peer", peerId, err);
+            }
         }
     },
 
-    // Set remote description with an SDP answer.
-    setRemoteDescription: async function (sdp) {
-        if (!this.pc) {
-            console.error("No active RTCPeerConnection to set remote description.");
-            return;
-        }
-        try {
-            await this.pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdp }));
-            console.log("✅ Remote description set with SDP answer.");
-        } catch (err) {
-            console.error("❌ Error setting remote description:", err);
+    pollAudioStats: function () {
+        for (const [peerId, peerData] of this.peers) {
+            peerData.pc.getStats(null)
+                .then(stats => {
+                    stats.forEach(report => {
+                        if (report.type === "inbound-rtp" && report.kind === "audio") {
+                            console.log("[WebRTC] Inbound audio stats from peer", peerId, ":", {
+                                packetsReceived: report.packetsReceived,
+                                bytesReceived: report.bytesReceived,
+                                packetsLost: report.packetsLost
+                            });
+                        }
+                    });
+                })
+                .catch(err => console.error("[WebRTC] Error getting stats for peer", peerId, err));
         }
     }
 };

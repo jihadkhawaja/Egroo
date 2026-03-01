@@ -58,6 +58,9 @@ namespace jihadkhawaja.chat.server.Hubs
             var userId = GetUserIdFromContext();
             if (userId.HasValue)
             {
+                // Clean up any active voice calls for this user
+                await RemoveUserFromAllCalls(userId.Value);
+
                 _connectionTracker.UntrackConnection(userId.Value, Context.ConnectionId);
 
                 if (!_connectionTracker.IsUserOnline(userId.Value))

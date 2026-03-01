@@ -7,14 +7,27 @@ namespace jihadkhawaja.chat.client.Services
 {
     public class ChatCallService : ICall
     {
-        // Client-side events that UI components can subscribe to.
-        // Updated events to include an SDP string where applicable.
-        public event Func<UserDto, string, Task>? OnIncomingCall;
-        public event Func<UserDto, string, Task>? OnCallAccepted;
-        public event Func<UserDto, string, Task>? OnCallDeclined;
-        public event Func<UserDto, string, Task>? OnCallEnded;
-        public event Func<UserDto, string, Task>? OnReceiveSignal;
-        public event Func<List<UserDto>, Task>? OnUpdateUserList;
+        // Channel voice call events
+        /// <summary>Fired when receiving the list of existing participants upon joining a call.</summary>
+        public event Func<Guid, Guid[], Task>? OnExistingCallParticipants;
+
+        /// <summary>Fired when a new user joins the channel call.</summary>
+        public event Func<Guid, Guid, Task>? OnUserJoinedCall;
+
+        /// <summary>Fired when a user leaves the channel call.</summary>
+        public event Func<Guid, Guid, Task>? OnUserLeftCall;
+
+        /// <summary>Fired when receiving a WebRTC SDP offer from a peer.</summary>
+        public event Func<Guid, Guid, string, Task>? OnReceiveOffer;
+
+        /// <summary>Fired when receiving a WebRTC SDP answer from a peer.</summary>
+        public event Func<Guid, Guid, string, Task>? OnReceiveAnswer;
+
+        /// <summary>Fired when receiving an ICE candidate from a peer.</summary>
+        public event Func<Guid, Guid, string, Task>? OnReceiveIceCandidate;
+
+        /// <summary>Fired when the call participant list changes (broadcast to all channel members).</summary>
+        public event Func<Guid, Guid[], Task>? OnChannelCallParticipantsChanged;
 
         private HubConnection HubConnection => ChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
@@ -23,58 +36,66 @@ namespace jihadkhawaja.chat.client.Services
         {
             if (ChatSignalR.HubConnection is not null)
             {
-                // Register hub event handlers.
-                ChatSignalR.HubConnection.On<UserDto, string>("IncomingCall", async (callingUser, sdpOffer) =>
+                ChatSignalR.HubConnection.On<Guid, Guid[]>("ExistingCallParticipants", async (channelId, participantIds) =>
                 {
-                    if (OnIncomingCall != null)
-                        await OnIncomingCall.Invoke(callingUser, sdpOffer);
+                    if (OnExistingCallParticipants != null)
+                        await OnExistingCallParticipants.Invoke(channelId, participantIds);
                 });
 
-                ChatSignalR.HubConnection.On<UserDto, string>("CallAccepted", async (acceptingUser, sdpAnswer) =>
+                ChatSignalR.HubConnection.On<Guid, Guid>("UserJoinedCall", async (channelId, userId) =>
                 {
-                    if (OnCallAccepted != null)
-                        await OnCallAccepted.Invoke(acceptingUser, sdpAnswer);
+                    if (OnUserJoinedCall != null)
+                        await OnUserJoinedCall.Invoke(channelId, userId);
                 });
 
-                ChatSignalR.HubConnection.On<UserDto, string>("CallDeclined", async (decliningUser, reason) =>
+                ChatSignalR.HubConnection.On<Guid, Guid>("UserLeftCall", async (channelId, userId) =>
                 {
-                    if (OnCallDeclined != null)
-                        await OnCallDeclined.Invoke(decliningUser, reason);
+                    if (OnUserLeftCall != null)
+                        await OnUserLeftCall.Invoke(channelId, userId);
                 });
 
-                ChatSignalR.HubConnection.On<UserDto, string>("CallEnded", async (endedUser, message) =>
+                ChatSignalR.HubConnection.On<Guid, Guid, string>("ReceiveOffer", async (channelId, fromUserId, offerSdp) =>
                 {
-                    if (OnCallEnded != null)
-                        await OnCallEnded.Invoke(endedUser, message);
+                    if (OnReceiveOffer != null)
+                        await OnReceiveOffer.Invoke(channelId, fromUserId, offerSdp);
                 });
 
-                ChatSignalR.HubConnection.On<UserDto, string>("ReceiveSignal", async (signalingUser, signal) =>
+                ChatSignalR.HubConnection.On<Guid, Guid, string>("ReceiveAnswer", async (channelId, fromUserId, answerSdp) =>
                 {
-                    if (OnReceiveSignal != null)
-                        await OnReceiveSignal.Invoke(signalingUser, signal);
+                    if (OnReceiveAnswer != null)
+                        await OnReceiveAnswer.Invoke(channelId, fromUserId, answerSdp);
                 });
 
-                ChatSignalR.HubConnection.On<List<UserDto>>("UpdateUserList", async (userList) =>
+                ChatSignalR.HubConnection.On<Guid, Guid, string>("ReceiveIceCandidate", async (channelId, fromUserId, candidateJson) =>
                 {
-                    if (OnUpdateUserList != null)
-                        await OnUpdateUserList.Invoke(userList);
+                    if (OnReceiveIceCandidate != null)
+                        await OnReceiveIceCandidate.Invoke(channelId, fromUserId, candidateJson);
+                });
+
+                ChatSignalR.HubConnection.On<Guid, Guid[]>("ChannelCallParticipantsChanged", async (channelId, participantIds) =>
+                {
+                    if (OnChannelCallParticipantsChanged != null)
+                        await OnChannelCallParticipantsChanged.Invoke(channelId, participantIds);
                 });
             }
         }
 
-        public async Task CallUser(UserDto targetUser, string offerSdp)
-            => await HubConnection.InvokeAsync(nameof(CallUser), targetUser, offerSdp);
+        public async Task JoinChannelCall(Guid channelId)
+            => await HubConnection.InvokeAsync(nameof(JoinChannelCall), channelId);
 
-        public async Task AnswerCall(bool acceptCall, UserDto caller, string answerSdp)
-            => await HubConnection.InvokeAsync(nameof(AnswerCall), acceptCall, caller, answerSdp);
+        public async Task LeaveChannelCall(Guid channelId)
+            => await HubConnection.InvokeAsync(nameof(LeaveChannelCall), channelId);
 
-        public async Task HangUp()
-            => await HubConnection.InvokeAsync(nameof(HangUp));
+        public async Task<Guid[]?> GetChannelCallParticipants(Guid channelId)
+            => await HubConnection.InvokeAsync<Guid[]?>(nameof(GetChannelCallParticipants), channelId);
 
-        public async Task SendSignal(string signal, string targetConnectionId)
-            => await HubConnection.InvokeAsync(nameof(SendSignal), signal, targetConnectionId);
+        public async Task SendOfferToUser(Guid channelId, Guid targetUserId, string offerSdp)
+            => await HubConnection.InvokeAsync(nameof(SendOfferToUser), channelId, targetUserId, offerSdp);
 
-        public async Task SendIceCandidateToPeer(string candidateJson)
-            => await HubConnection.InvokeAsync("SendIceCandidateToPeer", candidateJson);
+        public async Task SendAnswerToUser(Guid channelId, Guid targetUserId, string answerSdp)
+            => await HubConnection.InvokeAsync(nameof(SendAnswerToUser), channelId, targetUserId, answerSdp);
+
+        public async Task SendIceCandidateToUser(Guid channelId, Guid targetUserId, string candidateJson)
+            => await HubConnection.InvokeAsync(nameof(SendIceCandidateToUser), channelId, targetUserId, candidateJson);
     }
 }
