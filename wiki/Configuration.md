@@ -180,18 +180,18 @@ For development (allows all origins):
 
 ### API Connection
 
-`src/Egroo/Egroo/appsettings.json`:
-```json
-{
-  "ApiUrl": "https://api.yourchat.example.com",
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  }
-}
+The API connection URL is configured in `src/Egroo.UI/Constants/Source.cs`:
+```csharp
+#if DEBUG
+// Development: points to the local API server
+public const string ConnectionURL = "http://localhost:5175/";
+#else
+// Production: update this URL to match your deployed API
+public const string ConnectionURL = "https://api.egroo.org/";
+#endif
 ```
+
+For a custom production deployment, update the `ConnectionURL` constant to point to your hosted API server before building.
 
 ### PWA Configuration
 
@@ -442,20 +442,25 @@ For production, consider adding Redis for SignalR backplane:
 
 Validate your configuration:
 
-1. **Test database connection**:
+1. **Start the API Server** (database migrations run automatically on startup):
    ```bash
-   dotnet ef database update --project src/Egroo.Server
+   cd src/Egroo.Server
+   dotnet run
    ```
 
-2. **Verify JWT configuration**:
-   ```bash
-   curl -X POST http://localhost:5175/api/auth/test
+2. **Verify the API is running** (Swagger UI available in development):
+   ```
+   http://localhost:5175/swagger
    ```
 
-3. **Check CORS settings**:
+3. **Test authentication**:
    ```bash
-   curl -H "Origin: https://yourchat.example.com" http://localhost:5175/api/health
+   curl -X POST http://localhost:5175/api/v1/Auth/signup \
+     -H "Content-Type: application/json" \
+     -d '{"username":"testuser","password":"TestPass123!"}'
    ```
+
+4. **Check CORS settings** (verify allowed origins accept requests from your client origin).
 
 ## 🆘 Troubleshooting Configuration
 

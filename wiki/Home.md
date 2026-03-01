@@ -1,6 +1,6 @@
 # Egroo Wiki
 
-Welcome to the Egroo documentation! Egroo is a **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET**.
+Welcome to the Egroo documentation! Egroo is a **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET Core** on **.NET 10**.
 
 ## 🚀 Quick Links
 
@@ -23,7 +23,7 @@ Welcome to the Egroo documentation! Egroo is a **self-hosted**, **real-time** ch
 
 ## 📋 Prerequisites
 
-- **.NET 8** (recommended) for the latest features and optimizations
+- **.NET 10** for the latest features and optimizations
 - **PostgreSQL** database (default configuration)
 - **Docker** (optional, for containerized deployment)
 - **Modern Browser** with WebAssembly support

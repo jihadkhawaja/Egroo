@@ -5,7 +5,7 @@ This guide will help you set up a development environment for contributing to Eg
 ## 🎯 Prerequisites
 
 ### Required Software
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL 12+](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/vs/) or [Visual Studio Code](https://code.visualstudio.com/)
@@ -73,13 +73,14 @@ Create development configuration files:
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=egroo_dev;Username=egroo_dev_user;Password=dev_password"
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
   "Secrets": {
     "Jwt": "development-jwt-secret-key-not-for-production-use-only-for-dev"
   },
-  "Api": {
-    "AllowedOrigins": null
+  "Encryption": {
+    "Key": "DevEncryptionKey12345678901234",
+    "IV": "DevIV12345678901"
   },
   "Serilog": {
     "MinimumLevel": {
@@ -103,18 +104,7 @@ Create development configuration files:
 ```
 
 #### Client Configuration
-`src/Egroo/Egroo/appsettings.Development.json`:
-```json
-{
-  "ApiUrl": "http://localhost:5175",
-  "Logging": {
-    "LogLevel": {
-      "Default": "Debug",
-      "Microsoft.AspNetCore": "Information"
-    }
-  }
-}
-```
+The client API URL is configured at build time in `src/Egroo.UI/Constants/Source.cs`. In `DEBUG` builds it already points to `http://localhost:5175/` by default — no additional configuration file is needed for development.
 
 ### 4. Restore Dependencies and Build
 
@@ -124,23 +114,14 @@ dotnet restore
 dotnet build
 ```
 
-### 5. Run Database Migrations
-
-```bash
-cd Egroo.Server
-dotnet ef database update
-```
-
-If you get an error about Entity Framework tools:
-```bash
-dotnet tool install --global dotnet-ef
-```
+> **Note**: Database migrations are applied automatically when the server starts — no manual `dotnet ef database update` is needed for development. EF tools are still useful for creating new migrations:  
+> `dotnet tool install --global dotnet-ef`
 
 ## 🚀 Running the Application
 
 ### Option 1: Using Visual Studio
 
-1. Open `src/Egroo.sln` in Visual Studio
+1. Open `src/Egroo.slnx` in Visual Studio 2022 (17.9+)
 2. Set multiple startup projects:
    - Right-click solution → Properties
    - Set `Egroo.Server` and `Egroo` as startup projects
@@ -163,7 +144,6 @@ dotnet watch run
 ### Option 3: Using Docker Compose (Development)
 
 ```bash
-cd src
 docker-compose -f docker-compose-egroo-test.yml up --build
 ```
 
@@ -218,7 +198,7 @@ Create `.vscode/launch.json`:
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net8.0/Egroo.Server.dll",
+      "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
       "args": [],
       "cwd": "${workspaceFolder}/src/Egroo.Server",
       "stopAtEntry": false,
@@ -235,7 +215,7 @@ Create `.vscode/launch.json`:
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Egroo/Egroo/bin/Debug/net8.0/Egroo.dll",
+      "program": "${workspaceFolder}/src/Egroo/Egroo/bin/Debug/net10.0/Egroo.dll",
       "args": [],
       "cwd": "${workspaceFolder}/src/Egroo/Egroo",
       "stopAtEntry": false,
@@ -262,7 +242,7 @@ Create `.vscode/tasks.json`:
       "type": "process",
       "args": [
         "build",
-        "${workspaceFolder}/src/Egroo.sln",
+        "${workspaceFolder}/src/Egroo.slnx",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -274,7 +254,7 @@ Create `.vscode/tasks.json`:
       "type": "process",
       "args": [
         "publish",
-        "${workspaceFolder}/src/Egroo.sln",
+        "${workspaceFolder}/src/Egroo.slnx",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -306,7 +286,7 @@ Set up pre-commit hooks for code quality:
 echo "Running pre-commit checks..."
 
 # Format code
-dotnet format src/Egroo.sln --verify-no-changes
+dotnet format src/Egroo.slnx --verify-no-changes
 if [ $? -ne 0 ]; then
     echo "Code formatting issues found. Run 'dotnet format' to fix."
     exit 1
@@ -345,11 +325,12 @@ src/
 
 ### Key Components
 
-- **SignalR Hubs**: Real-time communication (`Hubs/`)
-- **Entity Framework Models**: Database entities (`Models/`)
-- **API Controllers**: REST endpoints (`Controllers/`)
-- **Blazor Components**: UI components (`Components/`)
-- **Services**: Business logic (`Services/`)
+- **SignalR Hub**: Real-time communication (`jihadkhawaja.chat.server/Hubs/`)
+- **Minimal API Endpoints**: REST auth routes (`Egroo.Server/API/`)
+- **Repositories**: Data access implementations (`Egroo.Server/Repository/`)
+- **Shared Models**: Database entities and interfaces (`jihadkhawaja.chat.shared/`)
+- **Blazor Components**: UI components (`Egroo.UI/Components/`)
+- **Client Services**: SignalR-backed service layer (`jihadkhawaja.chat.client/Services/`)
 
 ## 🔍 Debugging
 

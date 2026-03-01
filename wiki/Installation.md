@@ -29,11 +29,15 @@ Docker Compose provides the easiest way to deploy Egroo with all dependencies.
    POSTGRES_USER=egroo_user
    POSTGRES_PASSWORD=secure_password_here
    
-   # JWT Secret (generate a secure random string)
-   JWT_SECRET=your_jwt_secret_key_here
+   # JWT Secret (minimum 32 characters)
+   JWT_SECRET=your_jwt_secret_key_here_minimum_32_chars
    
-   # API Configuration
-   API_ALLOWED_ORIGINS=http://localhost:49168,https://yourdomain.com
+   # Encryption (Key = 32 chars, IV = 16 chars)
+   ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
+   ENCRYPTION_IV=Your16CharLongIV
+   
+   # API CORS allowed origins (your web client URL)
+   API_ALLOWED_ORIGINS=https://yourchat.example.com
    EOF
    ```
 
@@ -56,7 +60,7 @@ Docker Compose provides the easiest way to deploy Egroo with all dependencies.
 For development or custom deployments, you can install Egroo manually.
 
 #### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL 12+](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
@@ -132,26 +136,14 @@ For development or custom deployments, you can install Egroo manually.
 
 3. **Configure the web client**:
    
-   Create `src/Egroo/Egroo/appsettings.Production.json`:
-   ```json
-   {
-     "ApiUrl": "http://localhost:5175",
-     "Logging": {
-       "LogLevel": {
-         "Default": "Information",
-         "Microsoft.AspNetCore": "Warning"
-       }
-     }
-   }
+   The API URL is configured at build time in `src/Egroo.UI/Constants/Source.cs`. For a custom deployment, update the `ConnectionURL` constant to your production API URL before building:
+   ```csharp
+   #else
+   public const string ConnectionURL = "https://your-api-domain.com/";
+   #endif
    ```
 
-4. **Run database migrations**:
-   ```bash
-   cd src/Egroo.Server
-   dotnet ef database update
-   ```
-
-5. **Start the services**:
+4. **Start the services** (database migrations run automatically on API startup):
    
    Terminal 1 (API Server):
    ```bash

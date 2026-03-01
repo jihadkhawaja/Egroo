@@ -25,9 +25,43 @@ A **self-hosted**, **real-time** chat web application built using **Blazor** and
 - **Self-hosted Infrastructure**: 
   - Full control over your data with a customizable backend.
 
+## 💬 How Messaging Works
+
+The three NuGet packages (`jihadkhawaja.chat.client`, `jihadkhawaja.chat.server`, `jihadkhawaja.chat.shared`) work together every time a message is sent:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Egroo.UI<br/>(Razor Component)
+    participant Client as jihadkhawaja.chat.client<br/>(NuGet)
+    participant Hub as jihadkhawaja.chat.server<br/>(NuGet · ChatHub)
+    participant Repo as Egroo.Server<br/>(Repository / DB)
+    participant RecipientClient as jihadkhawaja.chat.client<br/>(Recipient · NuGet)
+    participant RecipientUI as Egroo.UI<br/>(Recipient)
+
+    User->>UI: Types message and hits Send
+    UI->>Client: SendMessage(message)
+    Note over Client: ChatMessageService<br/>wraps HubConnection.InvokeAsync
+    Client-->>Hub: SignalR · SendMessage(message)<br/>over WebSocket
+    Hub->>Hub: Validate sender & channel membership
+    Hub->>Repo: Save message metadata (no content)
+    Hub->>Repo: Encrypt & store content in UserPendingMessages<br/>for each recipient
+    Repo-->>Hub: Saved ✓
+
+    loop For each online recipient
+        Hub-->>RecipientClient: SignalR · ReceiveMessage(message)
+        RecipientClient->>RecipientUI: Trigger OnMessageReceived event
+        RecipientUI->>User: Message displayed in chat
+        RecipientClient-->>Hub: UpdatePendingMessage(messageId)
+        Hub->>Repo: Delete UserPendingMessage record
+    end
+
+    Note over Repo: Content is never stored<br/>permanently — only until delivered
+```
+
 ## 📋 Prerequisites
 
-- **.NET 8** (recommended) for the latest features and optimizations.
+- **.NET 10** (required) for the latest features and optimizations.
 - **Browser**: Any modern browser with WebAssembly support.
 
 ## 📚 Documentation

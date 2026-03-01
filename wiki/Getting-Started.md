@@ -25,23 +25,21 @@ The fastest way to get started with Egroo is using Docker Compose:
 
 3. **Start the services**:
    ```bash
-   cd src
    docker-compose -f docker-compose-egroo.yml up -d
    ```
 
 4. **Access the application**:
-   - Web Interface: http://localhost:49168
-   - API Server: http://localhost:49117
-   - Swagger Documentation: http://localhost:49117/swagger
+   - The containers join an **external Docker network** called `internal` — exposed ports depend on your reverse proxy (e.g., Nginx) configuration.
+   - For development without a proxy, see the [Manual Setup](#manual-setup) section below, where the API runs on `http://localhost:5175` and the web client on `http://localhost:5068`.
+   - Swagger UI (development builds only): `http://localhost:5175/swagger`
 
 ## 🔧 Manual Setup
 
 If you prefer to run Egroo without Docker:
 
 ### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL](https://www.postgresql.org/download/) (version 12 or higher)
-- [Node.js](https://nodejs.org/) (for client-side development)
 
 ### Database Setup
 1. **Install PostgreSQL** and create a database:
@@ -61,7 +59,7 @@ If you prefer to run Egroo without Docker:
    ```
 
 ### Running the Application
-1. **Start the API Server**:
+1. **Start the API Server** (database migrations run automatically on startup):
    ```bash
    cd src/Egroo.Server
    dotnet run
