@@ -9,7 +9,9 @@
 
 @using jihadkhawaja.chat.shared.Models
 @using System.Net.Http.Json
+@using Microsoft.JSInterop
 
+@implements IAsyncDisposable
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
@@ -35,13 +37,46 @@
                 OnClick="EditChannel" Class="ml-2" />
             }
         </MudStack>
-        <!-- Call Button -->
-        <MudTooltip Text="Join Voice Call">
-            <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
-                           Size="Size.Large"
-                           Color="@(IsInCall ? Color.Error : Color.Primary)"
-                           OnClick="OnCallButtonClicked" />
-        </MudTooltip>
+        <!-- Call Participants & Button -->
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+            @if (CallParticipantIds.Count > 0)
+            {
+                <MudAvatarGroup Max="3" Spacing="2" MaxColor="Color.Primary"
+                                MaxSize="Size.Small">
+                    @foreach (var participant in CallParticipantUsers.Values.Take(3))
+                    {
+                        @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
+                        {
+                            <MudTooltip Text="@participant.Username">
+                                <MudAvatar Size="Size.Small">
+                                    <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
+                                </MudAvatar>
+                            </MudTooltip>
+                        }
+                        else
+                        {
+                            <MudTooltip Text="@participant.Username">
+                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                    @participant.Username?.ToUpper()[0]
+                                </MudAvatar>
+                            </MudTooltip>
+                        }
+                    }
+                </MudAvatarGroup>
+                @if (CallParticipantIds.Count > 3)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Primary" Class="ml-1">
+                        +@(CallParticipantIds.Count - 3)
+                    </MudText>
+                }
+            }
+            <MudTooltip Text="@(IsInCall ? "Leave Voice Call" : "Join Voice Call")">
+                <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
+                               Size="Size.Large"
+                               Color="@(IsInCall ? Color.Error : Color.Primary)"
+                               OnClick="OnCallButtonClicked" />
+            </MudTooltip>
+        </MudStack>
     </MudStack>
 
     <!-- Messages Container -->
@@ -159,10 +194,23 @@
     private bool IsInCall { get; set; } = false;
     private bool IsMuted { get; set; } = false;
     private HashSet<Guid> CallParticipantIds { get; set; } = new();
+    private Dictionary<Guid, UserDto> CallParticipantUsers { get; set; } = new();
     private DotNetObjectReference<ChannelView>? dotNetRef;
     private System.Timers.Timer? callTimer;
     private DateTime? callStartTime;
     private string? CallDuration { get; set; }
+
+    // Disposal tracking
+    private bool _disposed;
+
+    // Stored event delegates for unsubscription
+    private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
+    private Func<Guid, Guid, Task>? _onUserJoinedCall;
+    private Func<Guid, Guid, Task>? _onUserLeftCall;
+    private Func<Guid, Guid, string, Task>? _onReceiveOffer;
+    private Func<Guid, Guid, string, Task>? _onReceiveAnswer;
+    private Func<Guid, Guid, string, Task>? _onReceiveIceCandidate;
+    private Func<Guid, Guid[], Task>? _onChannelCallParticipantsChanged;
 
     protected override async Task OnAccessAsync()
     {
@@ -351,6 +399,7 @@
 
             IsInCall = true;
             CallParticipantIds.Add(SessionStorage.User!.Id);
+            await FetchAndCacheParticipant(SessionStorage.User.Id);
             StartCallTimer();
             Snackbar.Add("Joined voice call", Severity.Success);
             await InvokeAsync(StateHasChanged);
@@ -376,6 +425,7 @@
         IsInCall = false;
         IsMuted = false;
         CallParticipantIds.Clear();
+        CallParticipantUsers.Clear();
         StopCallTimer();
         Snackbar.Add("Left voice call", Severity.Info);
         await InvokeAsync(StateHasChanged);
@@ -395,9 +445,47 @@
             if (participants != null && participants.Length > 0)
             {
                 CallParticipantIds = new HashSet<Guid>(participants);
+                await FetchParticipantUsers(participants);
             }
         }
         catch { /* ignore */ }
+    }
+
+    private async Task FetchParticipantUsers(IEnumerable<Guid> userIds)
+    {
+        foreach (var userId in userIds)
+        {
+            if (!CallParticipantUsers.ContainsKey(userId))
+            {
+                await FetchAndCacheParticipant(userId);
+            }
+        }
+
+        // Remove stale entries
+        var staleIds = CallParticipantUsers.Keys.Except(CallParticipantIds).ToList();
+        foreach (var id in staleIds)
+        {
+            CallParticipantUsers.Remove(id);
+        }
+    }
+
+    private async Task FetchAndCacheParticipant(Guid userId)
+    {
+        try
+        {
+            var user = await ChatUserService.GetUserPublicDetails(userId);
+            if (user != null)
+            {
+                // Fetch avatar for preview
+                var avatar = await ChatUserService.GetAvatar(userId);
+                if (avatar != null)
+                {
+                    user.AvatarPreview = user.CombineAvatarForPreview(avatar);
+                }
+                CallParticipantUsers[userId] = user;
+            }
+        }
+        catch { /* ignore fetch errors */ }
     }
 
     // JS Interop callbacks
@@ -419,6 +507,7 @@
         if (Guid.TryParse(peerId, out Guid userId))
         {
             CallParticipantIds.Remove(userId);
+            CallParticipantUsers.Remove(userId);
             await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", peerId);
             await InvokeAsync(StateHasChanged);
         }
@@ -427,76 +516,138 @@
     private void RegisterCallEvents()
     {
         // When we join a call, receive the list of existing participants to create offers for
-        ChatCallService.OnExistingCallParticipants += async (channelId, participantIds) =>
+        _onExistingCallParticipants = async (channelId, participantIds) =>
         {
-            if (channelId != GetChannelId()) return;
+            if (_disposed || channelId != GetChannelId()) return;
 
-            foreach (var participantId in participantIds)
+            try
             {
-                CallParticipantIds.Add(participantId);
-
-                // Create a WebRTC offer for each existing participant
-                string? offerSdp = await JSRuntime.InvokeAsync<string?>(
-                    "webrtcInterop.createOfferForPeer", participantId.ToString());
-
-                if (!string.IsNullOrEmpty(offerSdp))
+                foreach (var participantId in participantIds)
                 {
-                    await ChatCallService.SendOfferToUser(channelId, participantId, offerSdp);
+                    if (_disposed) return;
+                    CallParticipantIds.Add(participantId);
+                    await FetchAndCacheParticipant(participantId);
+
+                    // Create a WebRTC offer for each existing participant
+                    string? offerSdp = await JSRuntime.InvokeAsync<string?>(
+                        "webrtcInterop.createOfferForPeer", participantId.ToString());
+
+                    if (!string.IsNullOrEmpty(offerSdp) && !_disposed)
+                    {
+                        await ChatCallService.SendOfferToUser(channelId, participantId, offerSdp);
+                    }
                 }
+                if (!_disposed) await InvokeAsync(StateHasChanged);
             }
-            await InvokeAsync(StateHasChanged);
+            catch (JSDisconnectedException) { }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnExistingCallParticipants += _onExistingCallParticipants;
 
         // When a new user joins the call (they will send us an offer)
-        ChatCallService.OnUserJoinedCall += async (channelId, userId) =>
+        _onUserJoinedCall = async (channelId, userId) =>
         {
-            if (channelId != GetChannelId()) return;
+            if (_disposed || channelId != GetChannelId()) return;
 
             CallParticipantIds.Add(userId);
-            await InvokeAsync(StateHasChanged);
+            await FetchAndCacheParticipant(userId);
+            try { if (!_disposed) await InvokeAsync(StateHasChanged); }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnUserJoinedCall += _onUserJoinedCall;
 
         // When a user leaves the call
-        ChatCallService.OnUserLeftCall += async (channelId, userId) =>
+        _onUserLeftCall = async (channelId, userId) =>
         {
-            if (channelId != GetChannelId()) return;
+            if (_disposed || channelId != GetChannelId()) return;
 
             CallParticipantIds.Remove(userId);
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", userId.ToString());
-            await InvokeAsync(StateHasChanged);
+            CallParticipantUsers.Remove(userId);
+            try
+            {
+                if (!_disposed)
+                {
+                    await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", userId.ToString());
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (JSDisconnectedException) { }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnUserLeftCall += _onUserLeftCall;
 
         // When receiving an SDP offer from a peer (we need to create an answer)
-        ChatCallService.OnReceiveOffer += async (channelId, fromUserId, offerSdp) =>
+        _onReceiveOffer = async (channelId, fromUserId, offerSdp) =>
         {
-            if (channelId != GetChannelId() || !IsInCall) return;
+            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
 
-            string? answerSdp = await JSRuntime.InvokeAsync<string?>(
-                "webrtcInterop.handleOfferFromPeer", fromUserId.ToString(), offerSdp);
-
-            if (!string.IsNullOrEmpty(answerSdp))
+            try
             {
-                await ChatCallService.SendAnswerToUser(channelId, fromUserId, answerSdp);
+                string? answerSdp = await JSRuntime.InvokeAsync<string?>(
+                    "webrtcInterop.handleOfferFromPeer", fromUserId.ToString(), offerSdp);
+
+                if (!string.IsNullOrEmpty(answerSdp) && !_disposed)
+                {
+                    await ChatCallService.SendAnswerToUser(channelId, fromUserId, answerSdp);
+                }
             }
+            catch (JSDisconnectedException) { }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnReceiveOffer += _onReceiveOffer;
 
         // When receiving an SDP answer from a peer
-        ChatCallService.OnReceiveAnswer += async (channelId, fromUserId, answerSdp) =>
+        _onReceiveAnswer = async (channelId, fromUserId, answerSdp) =>
         {
-            if (channelId != GetChannelId() || !IsInCall) return;
+            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
 
-            await JSRuntime.InvokeVoidAsync(
-                "webrtcInterop.handleAnswerFromPeer", fromUserId.ToString(), answerSdp);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "webrtcInterop.handleAnswerFromPeer", fromUserId.ToString(), answerSdp);
+            }
+            catch (JSDisconnectedException) { }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnReceiveAnswer += _onReceiveAnswer;
 
         // When receiving an ICE candidate from a peer
-        ChatCallService.OnReceiveIceCandidate += async (channelId, fromUserId, candidateJson) =>
+        _onReceiveIceCandidate = async (channelId, fromUserId, candidateJson) =>
         {
-            if (channelId != GetChannelId() || !IsInCall) return;
+            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
 
-            await JSRuntime.InvokeVoidAsync(
-                "webrtcInterop.addIceCandidateForPeer", fromUserId.ToString(), candidateJson);
+            try
+            {
+                await JSRuntime.InvokeVoidAsync(
+                    "webrtcInterop.addIceCandidateForPeer", fromUserId.ToString(), candidateJson);
+            }
+            catch (JSDisconnectedException) { }
+            catch (ObjectDisposedException) { }
         };
+        ChatCallService.OnReceiveIceCandidate += _onReceiveIceCandidate;
+
+        // When the full participant list changes (broadcast to all channel members, not just call participants)
+        _onChannelCallParticipantsChanged = async (channelId, participantIds) =>
+        {
+            if (_disposed || channelId != GetChannelId()) return;
+
+            // Only update the UI avatar list; do NOT touch WebRTC connections here
+            CallParticipantIds = new HashSet<Guid>(participantIds);
+
+            // Sync the user cache: add new, remove gone
+            var currentSet = new HashSet<Guid>(participantIds);
+            var staleKeys = CallParticipantUsers.Keys.Where(k => !currentSet.Contains(k)).ToList();
+            foreach (var key in staleKeys) CallParticipantUsers.Remove(key);
+            foreach (var pid in participantIds)
+            {
+                if (_disposed) return;
+                await FetchAndCacheParticipant(pid);
+            }
+
+            try { if (!_disposed) await InvokeAsync(StateHasChanged); }
+            catch (ObjectDisposedException) { }
+        };
+        ChatCallService.OnChannelCallParticipantsChanged += _onChannelCallParticipantsChanged;
     }
 
     private void StartCallTimer()
@@ -532,5 +683,41 @@
     private void EditChannel()
     {
         NavigationManager.NavigateTo($"/channeldetail/{ChannelId}/{Title}");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+
+        // Unsubscribe all event handlers
+        if (_onExistingCallParticipants is not null)
+            ChatCallService.OnExistingCallParticipants -= _onExistingCallParticipants;
+        if (_onUserJoinedCall is not null)
+            ChatCallService.OnUserJoinedCall -= _onUserJoinedCall;
+        if (_onUserLeftCall is not null)
+            ChatCallService.OnUserLeftCall -= _onUserLeftCall;
+        if (_onReceiveOffer is not null)
+            ChatCallService.OnReceiveOffer -= _onReceiveOffer;
+        if (_onReceiveAnswer is not null)
+            ChatCallService.OnReceiveAnswer -= _onReceiveAnswer;
+        if (_onReceiveIceCandidate is not null)
+            ChatCallService.OnReceiveIceCandidate -= _onReceiveIceCandidate;
+        if (_onChannelCallParticipantsChanged is not null)
+            ChatCallService.OnChannelCallParticipantsChanged -= _onChannelCallParticipantsChanged;
+
+        // Clean up call resources
+        StopCallTimer();
+
+        try
+        {
+            if (IsInCall)
+            {
+                await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
+            }
+        }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+
+        dotNetRef?.Dispose();
     }
 }

@@ -32,7 +32,7 @@ namespace jihadkhawaja.chat.server.Hubs
             // Get existing participant IDs (excluding the new joiner)
             var existingParticipantIds = participants.Keys.Where(id => id != userId.Value).ToList();
 
-            // Notify existing participants that a new user joined
+            // Notify existing call participants that a new user joined (for WebRTC signaling)
             foreach (var participantId in existingParticipantIds)
             {
                 var participantConns = _connectionTracker.GetUserConnectionIds(participantId);
@@ -50,6 +50,9 @@ namespace jihadkhawaja.chat.server.Hubs
                 await Clients.Clients(callerConns)
                     .SendAsync("ExistingCallParticipants", channelId, existingParticipantIds.ToArray());
             }
+
+            // Broadcast updated participant list to ALL channel members (for UI avatars)
+            await NotifyChannelCallChanged(channelId);
         }
 
         [Authorize]
@@ -137,6 +140,35 @@ namespace jihadkhawaja.chat.server.Hubs
                 && participants.ContainsKey(userId);
         }
 
+        /// <summary>
+        /// Broadcasts the current call participant list to ALL online members of the channel,
+        /// so non-participants can see who is in the call in real time.
+        /// </summary>
+        private async Task NotifyChannelCallChanged(Guid channelId)
+        {
+            var channelUsers = await _channelRepository.GetChannelUsers(channelId);
+            if (channelUsers == null) return;
+
+            Guid[] currentParticipants = Array.Empty<Guid>();
+            if (_activeChannelCalls.TryGetValue(channelId, out var participants))
+            {
+                currentParticipants = participants.Keys.ToArray();
+            }
+
+            foreach (var user in channelUsers)
+            {
+                if (_connectionTracker.IsUserOnline(user.Id))
+                {
+                    var conns = _connectionTracker.GetUserConnectionIds(user.Id);
+                    if (conns.Count > 0)
+                    {
+                        await Clients.Clients(conns)
+                            .SendAsync("ChannelCallParticipantsChanged", channelId, currentParticipants);
+                    }
+                }
+            }
+        }
+
         private async Task RemoveUserFromChannelCall(Guid channelId, Guid userId)
         {
             if (!_activeChannelCalls.TryGetValue(channelId, out var participants))
@@ -145,7 +177,7 @@ namespace jihadkhawaja.chat.server.Hubs
             if (!participants.TryRemove(userId, out _))
                 return;
 
-            // Notify remaining participants
+            // Notify remaining call participants (for WebRTC teardown)
             foreach (var participantId in participants.Keys)
             {
                 var participantConns = _connectionTracker.GetUserConnectionIds(participantId);
@@ -161,6 +193,9 @@ namespace jihadkhawaja.chat.server.Hubs
             {
                 _activeChannelCalls.TryRemove(channelId, out _);
             }
+
+            // Broadcast updated participant list to ALL channel members (for UI avatars)
+            await NotifyChannelCallChanged(channelId);
         }
 
         /// <summary>

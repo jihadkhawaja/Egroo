@@ -26,6 +26,9 @@ namespace jihadkhawaja.chat.client.Services
         /// <summary>Fired when receiving an ICE candidate from a peer.</summary>
         public event Func<Guid, Guid, string, Task>? OnReceiveIceCandidate;
 
+        /// <summary>Fired when the call participant list changes (broadcast to all channel members).</summary>
+        public event Func<Guid, Guid[], Task>? OnChannelCallParticipantsChanged;
+
         private HubConnection HubConnection => ChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
 
@@ -67,6 +70,12 @@ namespace jihadkhawaja.chat.client.Services
                 {
                     if (OnReceiveIceCandidate != null)
                         await OnReceiveIceCandidate.Invoke(channelId, fromUserId, candidateJson);
+                });
+
+                ChatSignalR.HubConnection.On<Guid, Guid[]>("ChannelCallParticipantsChanged", async (channelId, participantIds) =>
+                {
+                    if (OnChannelCallParticipantsChanged != null)
+                        await OnChannelCallParticipantsChanged.Invoke(channelId, participantIds);
                 });
             }
         }
