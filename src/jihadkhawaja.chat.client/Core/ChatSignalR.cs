@@ -2,7 +2,7 @@
 
 namespace jihadkhawaja.chat.client.Core
 {
-    public static class MobileChatSignalR
+    public static class ChatSignalR
     {
         public static HubConnection? HubConnection { get; private set; }
 

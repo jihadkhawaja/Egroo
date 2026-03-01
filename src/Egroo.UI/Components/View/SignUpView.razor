@@ -162,8 +162,8 @@
                 SessionStorage.Token = token;
                 SessionStorage.User = user;
 
-                MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-                await MobileChatSignalR.HubConnection.StartAsync();
+                ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+                await ChatSignalR.HubConnection.StartAsync();
 
                 NavigationManager.NavigateTo("/channels", true);
             }

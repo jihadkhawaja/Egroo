@@ -266,7 +266,7 @@
 
     private void RegisterMessagingEvents()
     {
-        MobileChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
+        ChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;
@@ -290,7 +290,7 @@
             ScrollToMessagesEnd();
         });
 
-        MobileChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
+        ChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;

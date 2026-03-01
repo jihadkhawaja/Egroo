@@ -360,7 +360,7 @@ else
 
     private void RegisterFriendsEvents()
     {
-        MobileChatSignalR.HubConnection?.On<Guid, bool>("FriendStatusChanged", async (userId, isOnline) =>
+        ChatSignalR.HubConnection?.On<Guid, bool>("FriendStatusChanged", async (userId, isOnline) =>
         {
             var friend = UserFriends.FirstOrDefault(f => f.Id == userId);
             if (friend != null)

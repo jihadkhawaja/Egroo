@@ -7,7 +7,7 @@ namespace jihadkhawaja.chat.client.Services
 {
     public class ChatUserService : IUser
     {
-        private HubConnection HubConnection => MobileChatSignalR.HubConnection
+        private HubConnection HubConnection => ChatSignalR.HubConnection
             ?? throw new NullReferenceException("SignalR not initialized");
 
         public async Task<bool> AddFriend(string friendEmailorusername)
@@ -51,7 +51,7 @@ namespace jihadkhawaja.chat.client.Services
 
         public async Task<bool> IsUsernameAvailable(string username)
         {
-            if (MobileChatSignalR.HubConnection?.State != HubConnectionState.Connected)
+            if (ChatSignalR.HubConnection?.State != HubConnectionState.Connected)
                 return true;
 
             return await HubConnection.InvokeAsync<bool>(nameof(IsUsernameAvailable), username);

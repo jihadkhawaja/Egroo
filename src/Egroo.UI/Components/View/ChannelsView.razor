@@ -408,7 +408,7 @@ else
 
     private void RegisterHubEvents()
     {
-        MobileChatSignalR.HubConnection?.On<Guid>("ChannelChange", async (channelId) =>
+        ChatSignalR.HubConnection?.On<Guid>("ChannelChange", async (channelId) =>
         {
             CurrentUserChannels = await GetChannels();
             await InvokeAsync(StateHasChanged);

@@ -17,15 +17,15 @@ namespace Egroo.Server.Test
             var httpClient = new HttpClient { BaseAddress = new Uri(TestConfig.ApiBaseUrl) };
             ChatAuthService = new AuthService(httpClient);
 
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            ChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+            await ChatSignalR.HubConnection.StartAsync();
         }
 
         [TestMethod, Priority(0)]
         public async Task ConnectTest()
         {
-            Assert.IsNotNull(MobileChatSignalR.HubConnection, "SignalR connection is null.");
-            Assert.AreEqual(HubConnectionState.Connected, MobileChatSignalR.HubConnection.State, "Failed to connect to SignalR hub.");
+            Assert.IsNotNull(ChatSignalR.HubConnection, "SignalR connection is null.");
+            Assert.AreEqual(HubConnectionState.Connected, ChatSignalR.HubConnection.State, "Failed to connect to SignalR hub.");
         }
 
         [TestMethod, Priority(1)]
@@ -52,9 +52,9 @@ namespace Egroo.Server.Test
         [TestCleanup]
         public async Task Cleanup()
         {
-            if (MobileChatSignalR.HubConnection.State == HubConnectionState.Connected)
+            if (ChatSignalR.HubConnection.State == HubConnectionState.Connected)
             {
-                await MobileChatSignalR.HubConnection.StopAsync();
+                await ChatSignalR.HubConnection.StopAsync();
             }
         }
     }

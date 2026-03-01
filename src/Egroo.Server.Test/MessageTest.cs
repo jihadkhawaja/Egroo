@@ -25,8 +25,8 @@ namespace Egroo.Server.Test
             ChatChannelService = new ChatChannelService();
             ChatMessageService = new ChatMessageService();
 
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            ChatSignalR.Initialize(TestConfig.HubConnectionUrl);
+            await ChatSignalR.HubConnection.StartAsync();
 
             var signInResponse = await ChatAuthService.SignIn("test", "HvrnS4Q4zJ$xaW!3");
             Assert.IsNotNull(signInResponse, "Sign-in response is null.");
@@ -41,8 +41,8 @@ namespace Egroo.Server.Test
             };
 
             // Reinitialize SignalR with authentication token
-            MobileChatSignalR.Initialize(TestConfig.HubConnectionUrl, signInResponse.Token);
-            await MobileChatSignalR.HubConnection.StartAsync();
+            ChatSignalR.Initialize(TestConfig.HubConnectionUrl, signInResponse.Token);
+            await ChatSignalR.HubConnection.StartAsync();
 
             // Create channel
             Channel = await ChatChannelService.CreateChannel("test");
@@ -69,9 +69,9 @@ namespace Egroo.Server.Test
         [TestCleanup]
         public async Task Cleanup()
         {
-            if (MobileChatSignalR.HubConnection.State == HubConnectionState.Connected)
+            if (ChatSignalR.HubConnection.State == HubConnectionState.Connected)
             {
-                await MobileChatSignalR.HubConnection.StopAsync();
+                await ChatSignalR.HubConnection.StopAsync();
             }
         }
     }
