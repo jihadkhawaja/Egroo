@@ -1,8 +1,14 @@
 using jihadkhawaja.chat.shared.Interfaces;
 using System.Collections.Concurrent;
 
-namespace Egroo.Server.Services
+namespace jihadkhawaja.chat.server.Services
 {
+    /// <summary>
+    /// Default in-memory implementation of <see cref="IConnectionTracker"/>.
+    /// Registered automatically by <see cref="Register.AddChatHub"/>.
+    /// Replace it by registering your own <see cref="IConnectionTracker"/> before calling AddChatHub
+    /// (e.g. a Redis-backed tracker for distributed deployments).
+    /// </summary>
     public class InMemoryConnectionTracker : IConnectionTracker
     {
         private static readonly ConcurrentDictionary<Guid, HashSet<string>> _userConnections = new();

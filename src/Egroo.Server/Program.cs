@@ -2,7 +2,6 @@ using Egroo.Server.API;
 using Egroo.Server.Database;
 using Egroo.Server.Repository;
 using Egroo.Server.Security;
-using Egroo.Server.Services;
 using jihadkhawaja.chat.server;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -152,8 +151,6 @@ builder.Services.AddSingleton<EncryptionService>(sp =>
     var iv = configuration.GetSection("Encryption")["IV"];
     return new EncryptionService(key, iv);
 });
-builder.Services.AddSingleton<IConnectionTracker, InMemoryConnectionTracker>();
-
 // Repositories (implement shared interfaces)
 builder.Services.AddScoped<IAuth, AuthRepository>();
 builder.Services.AddScoped<IUser, UserRepository>();
