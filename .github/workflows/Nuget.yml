@@ -142,7 +142,7 @@ jobs:
 
   Release:
     runs-on: ubuntu-latest
-    needs: [PublishShared, PublishClient, PublishServer]
+    needs: [build, PublishShared, PublishClient, PublishServer]
     steps:
       - name: Download nuget package shared artifact
         uses: actions/download-artifact@v4

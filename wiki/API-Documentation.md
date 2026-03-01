@@ -228,6 +228,7 @@ bool ok = await connection.InvokeAsync<bool>("SendMessage", message);
 
 The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video calls.
 
+**Direct Calling Methods:**
 | Method | Auth | Description |
 |--------|------|-------------|
 | `CallUser(UserDto targetUser, string sdpOffer)` | Required | Initiate a call with SDP offer |
@@ -235,6 +236,16 @@ The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video c
 | `HangUp()` | Required | End the active call |
 | `SendSignal(string signal, string targetConnectionId)` | Required | Forward a WebRTC signal |
 | `SendIceCandidateToPeer(string candidateJson)` | Required | Forward an ICE candidate |
+
+**Channel Voice Call Methods:**
+| Method | Auth | Description |
+|--------|------|-------------|
+| `JoinChannelCall(Guid channelId)` | Required | Join an active voice call in a channel |
+| `LeaveChannelCall(Guid channelId)` | Required | Leave the current channel voice call |
+| `GetChannelCallParticipants(Guid channelId)` | Required | Get current participants in a channel voice call |
+| `SendOfferToUser(Guid channelId, Guid targetUserId, string offerSdp)` | Required | Send SDP offer to a specific user in a channel call |
+| `SendAnswerToUser(Guid channelId, Guid targetUserId, string answerSdp)` | Required | Send SDP answer to a specific user in a channel call |
+| `SendIceCandidateToUser(Guid channelId, Guid targetUserId, string candidateJson)` | Required | Forward an ICE candidate in a channel call |
 
 ---
 
@@ -248,12 +259,15 @@ These events are pushed from the server to connected clients.
 | `ChannelChange` | `Guid channelId` | Channel was created, modified, or deleted |
 | `ReceiveMessage` | `Message message` | A new message was delivered |
 | `UpdateMessage` | `Message message` | A message was edited |
-| `IncomingCall` | `UserDto caller, string sdpOffer` | Incoming WebRTC call offer |
-| `CallDeclined` | `UserDto user, string reason` | Called user declined |
+| `IncomingCall` | `UserDto caller, string sdpOffer` | Incoming WebRTC P2P call offer |
+| `CallDeclined` | `UserDto user, string reason` | Called user declined P2P call |
 | `CallAccepted` | `UserDto callee, string sdpAnswer` | Called user accepted with SDP answer |
-| `CallEnded` | `Guid userId, string reason` | Other party ended the call |
+| `CallEnded` | `Guid userId, string reason` | Other party ended the P2P call |
 | `ReceiveSignal` | `Guid senderId, string signal` | WebRTC signal forwarded from peer |
-| `ReceiveIceCandidate` | `string candidateJson` | ICE candidate forwarded from peer |
+| `ChannelCallParticipantsChanged` | `Guid channelId, Guid[] currentParticipants` | The list of participants in a channel call updated |
+| `ReceiveOffer` | `Guid channelId, Guid senderId, string offerSdp` | Received WebRTC SDP offer from a peer in a channel call |
+| `ReceiveAnswer` | `Guid channelId, Guid senderId, string answerSdp` | Received WebRTC SDP answer from a peer in a channel call |
+| `ReceiveIceCandidate` | `Guid channelId, Guid senderId, string candidateJson` | Received ICE candidate from a peer in a channel call |
 
 **Example listeners (C#):**
 ```csharp

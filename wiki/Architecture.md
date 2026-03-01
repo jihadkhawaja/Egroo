@@ -61,6 +61,40 @@ sequenceDiagram
 
 ---
 
+## WebRTC Channel Voice Calls
+
+Channel voice calls are implemented via a WebRTC Mesh Network. The server orchestrates room membership via SignalR and relays WebRTC signaling, but all voice traffic travels peer-to-peer avoiding the server bottleneck.
+
+```mermaid
+sequenceDiagram
+    actor A as Participant A
+    participant H as SignalR Hub
+    actor B as Participant B
+
+    A->>H: JoinChannelCall(channelId)
+    H-->>A: ChannelCallParticipantsChanged([A])
+    
+    B->>H: JoinChannelCall(channelId)
+    H-->>A: ChannelCallParticipantsChanged([A, B])
+    H-->>B: ChannelCallParticipantsChanged([A, B])
+
+    Note over B: New joiner creates WebRTC offers for existing participants
+    B->>H: SendOfferToUser(A, offerSdp)
+    H-->>A: ReceiveOffer(B, offerSdp)
+
+    A->>H: SendAnswerToUser(B, answerSdp)
+    H-->>B: ReceiveAnswer(A, answerSdp)
+
+    Note over A,B: Exchange ICE Candidates via Hub
+
+    B->>H: SendIceCandidateToUser(A, candidate)
+    H-->>A: ReceiveIceCandidate(B, candidate)
+
+    Note over A,B: P2P Encrypted Audio Stream Established
+```
+
+---
+
 ## Project Structure
 
 The solution contains multiple projects in `src/`:

@@ -17,7 +17,8 @@ Welcome to the Egroo documentation! Egroo is a **self-hosted**, **real-time** ch
 
 - **Blazor Auto Mode**: Loads server-side for faster initial page load, then seamlessly switches to WebAssembly (WASM) when cached
 - **Progressive Web App (PWA)**: Installable on devices for an app-like experience
-- **Real-time Communication**: Built with SignalR and WebRTC for fast, responsive messaging
+- **Real-time Communication**: Built with SignalR for fast, responsive messaging
+- **Channel Voice Calls**: Secure, peer-to-peer mesh network WebRTC voice calls within channels
 - **Message Privacy**: Messages are automatically deleted after delivery, ensuring confidentiality
 - **Self-hosted Infrastructure**: Full control over your data with a customizable backend
 

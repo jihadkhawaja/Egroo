@@ -19,7 +19,9 @@ A **self-hosted**, **real-time** chat web application built using **Blazor** and
 - **Progressive Web App (PWA)**: 
   - Installable on devices for an app-like experience.
 - **Real-time Communication**: 
-  - Built with SignalR and WebRTC for fast, responsive messaging.
+  - Built with SignalR for fast, responsive messaging.
+- **Channel Voice Calls**: 
+  - Secure, peer-to-peer mesh network WebRTC voice calls within channels.
 - **Message Privacy**: 
   - Messages are automatically deleted after delivery, ensuring confidentiality.
 - **Self-hosted Infrastructure**: 
@@ -57,6 +59,38 @@ sequenceDiagram
     end
 
     Note over Repo: Content is never stored<br/>permanently — only until delivered
+```
+
+## 📞 How Channel Voice Calls Work
+
+Voice calls in channels are powered by a **WebRTC Mesh Network**, where every participant establishes a secure peer-to-peer connection with everyone else in the call.
+
+```mermaid
+sequenceDiagram
+  actor A as Participant A
+  participant H as SignalR Hub
+  actor B as Participant B
+
+  A->>H: JoinChannelCall(channelId)
+  H-->>A: ChannelCallParticipantsChanged([A])
+    
+  B->>H: JoinChannelCall(channelId)
+  H-->>A: ChannelCallParticipantsChanged([A, B])
+  H-->>B: ChannelCallParticipantsChanged([A, B])
+
+  Note over B: New joiner creates WebRTC offers<br/>for existing participants
+  B->>H: SendOfferToUser(A, offerSdp)
+  H-->>A: ReceiveOffer(B, offerSdp)
+
+  A->>H: SendAnswerToUser(B, answerSdp)
+  H-->>B: ReceiveAnswer(A, answerSdp)
+
+  Note over A,B: Exchange ICE Candidates via Hub
+
+  B->>H: SendIceCandidateToUser(A, candidate)
+  H-->>A: ReceiveIceCandidate(B, candidate)
+
+  Note over A,B: P2P Encrypted Audio Stream Established
 ```
 
 ## 📋 Prerequisites
