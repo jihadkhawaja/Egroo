@@ -48,6 +48,7 @@ jobs:
             6.0.x
             7.0.x
             8.0.x
+            10.0.x
       - name: Nuget add source
         run: dotnet nuget add source --username jihadkhawaja --password ${{ secrets.Egroo_GITHUB_PACKAGE }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/jihadkhawaja/index.json"
 
