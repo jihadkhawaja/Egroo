@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <!-- Egroo submodule manages its own package versions inline. -->
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
