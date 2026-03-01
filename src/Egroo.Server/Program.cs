@@ -145,7 +145,13 @@ builder.Services.AddDbContext<DataContext>(options =>
 
 #region Egroo Services
 // Infrastructure
-builder.Services.AddSingleton<EncryptionService>();
+builder.Services.AddSingleton<EncryptionService>(sp =>
+{
+    var configuration = sp.GetRequiredService<IConfiguration>();
+    var key = configuration.GetSection("Encryption")["Key"];
+    var iv = configuration.GetSection("Encryption")["IV"];
+    return new EncryptionService(key, iv);
+});
 builder.Services.AddSingleton<IConnectionTracker, InMemoryConnectionTracker>();
 
 // Repositories (implement shared interfaces)

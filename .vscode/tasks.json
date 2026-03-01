@@ -1,0 +1,173 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build: Egroo (Blazor)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj",
+                "--configuration",
+                "Debug"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "build: Egroo.Server (API)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "${workspaceFolder}/src/Egroo.Server/Egroo.Server.csproj",
+                "--configuration",
+                "Debug"
+            ],
+            "group": "build",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "silent"
+            }
+        },
+        {
+            "label": "build: All Projects",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "build",
+                "${workspaceFolder}/src/Egroo.slnx",
+                "--configuration",
+                "Debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "publish: Egroo (Blazor)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "publish",
+                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj",
+                "--configuration",
+                "Release",
+                "--output",
+                "${workspaceFolder}/publish/Egroo"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "publish: Egroo.Server (API)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "publish",
+                "${workspaceFolder}/src/Egroo.Server/Egroo.Server.csproj",
+                "--configuration",
+                "Release",
+                "--output",
+                "${workspaceFolder}/publish/Egroo.Server"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "test: Egroo.Server.Test",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "test",
+                "${workspaceFolder}/src/Egroo.Server.Test/Egroo.Server.Test.csproj",
+                "--verbosity",
+                "normal"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "watch: Egroo (Blazor)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "watch",
+                "--project",
+                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj"
+            ],
+            "group": "none",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "dotnet-watch",
+                "pattern": "$msCompile",
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "dotnet watch",
+                    "endsPattern": "Application started"
+                }
+            },
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "watch: Egroo.Server (API)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "watch",
+                "--project",
+                "${workspaceFolder}/src/Egroo.Server/Egroo.Server.csproj"
+            ],
+            "group": "none",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "dotnet-watch",
+                "pattern": "$msCompile",
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "dotnet watch",
+                    "endsPattern": "Application started"
+                }
+            },
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "clean: All Projects",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "clean",
+                "${workspaceFolder}/src/Egroo.slnx"
+            ],
+            "group": "none",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        }
+    ]
+}

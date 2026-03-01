@@ -28,9 +28,14 @@ namespace Egroo.Server.Database
                 .HasIndex(x => x.UserId)
                 .IsUnique(false);
 
-            // UserSecurity is an owned entity
+            // UserSecurity is an owned entity stored in its own table
             modelBuilder.Entity<User>()
-                .OwnsOne(u => u.UserSecuriy);
+                .OwnsOne(u => u.UserSecuriy, b =>
+                {
+                    b.ToTable("usersecurity");
+                    b.WithOwner().HasForeignKey("UserId");
+                    b.HasKey("UserId");
+                });
         }
 
         public DbSet<User> Users { get; set; }

@@ -24,13 +24,13 @@ namespace Egroo.Server.Repository
             _encryptionService = encryptionService;
         }
 
+        public string DecryptContent(string content) => _encryptionService.Decrypt(content);
+
         public async Task<bool> SendMessage(Message message)
         {
             if (message == null || string.IsNullOrWhiteSpace(message.Content))
                 return false;
 
-            // Encrypt message content before storing
-            message.Content = _encryptionService.Encrypt(message.Content);
             message.Id = Guid.NewGuid();
             message.DateSent = DateTime.UtcNow;
 

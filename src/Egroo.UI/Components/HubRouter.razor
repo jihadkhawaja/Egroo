@@ -146,8 +146,11 @@ else
     /// </summary>
     private async Task RestartSignalRConnectionAsync()
     {
-        await MobileChatSignalR.HubConnection.StopAsync();
-        await MobileChatSignalR.HubConnection.DisposeAsync();
+        if (MobileChatSignalR.HubConnection is not null)
+        {
+            await MobileChatSignalR.HubConnection.StopAsync();
+            await MobileChatSignalR.HubConnection.DisposeAsync();
+        }
 
         MobileChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
         SessionStorage.AppState = AppState.CREATING_SESSION;

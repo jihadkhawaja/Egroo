@@ -56,14 +56,14 @@
                     <MudStack>
                         @foreach (var message in Messages)
                         {
-                            if (message.DateCreated.Value.ToLocalTime().Date == DateTime.Today)
+                            if (message.DateCreated?.ToLocalTime().Date == DateTime.Today)
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
                                 IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
                                 SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
-                            else if (message.DateCreated.Value.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
+                            else if (message.DateCreated?.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
                                 Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
@@ -73,7 +73,7 @@
                             else
                             {
                                 <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                                Date="@message.DateCreated?.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
                                 IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
                                 SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                             }
@@ -89,7 +89,7 @@
                 AutoFocus="false" 
                 Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
                 Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
-                Counter="MaxMessageLength" AutoGrow="true" KeyDownPreventDefault="_preventDefault" />
+                Counter="MaxMessageLength" Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault" />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
                 Class="mt-1 mb-6"
                 OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
@@ -227,12 +227,12 @@
             ChannelId = GetChannelId(),
             DisplayName = SessionStorage?.User?.Username,
             Content = InputContent.Trim(),
-            SenderId = SessionStorage.User.Id,
+            SenderId = SessionStorage.User!.Id,
         };
 
         if (await ChatMessageService.SendMessage(message))
         {
-            await inputMudTextField.Clear();
+            await inputMudTextField.ClearAsync();
         }
         else
         {

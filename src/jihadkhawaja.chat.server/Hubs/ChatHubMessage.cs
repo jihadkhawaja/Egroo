@@ -117,7 +117,9 @@ namespace jihadkhawaja.chat.server.Hubs
                 var message = await _messageRepository.GetMessageById(pending.MessageId);
                 if (message == null)
                     continue;
-                message.Content = pending.Content;
+                // Decrypt content if it was previously stored encrypted
+                try { message.Content = _messageRepository.DecryptContent(pending.Content!); }
+                catch { message.Content = pending.Content; }
                 var userDto = new UserDto { Id = userId.Value };
                 await SendClientMessage(userDto, message, ignorePendingMessages: true);
             }

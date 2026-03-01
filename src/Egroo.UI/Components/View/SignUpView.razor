@@ -88,7 +88,7 @@
             {
                 _password = value;
                 // Force revalidation of the confirm password field when password changes
-                confirmPasswordField?.Validate();
+                _ = confirmPasswordField?.ValidateAsync();
             }
         }
     }

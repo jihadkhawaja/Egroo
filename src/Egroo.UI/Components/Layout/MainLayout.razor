@@ -20,16 +20,18 @@
             <MudText Class="mr-4">@SessionStorage?.User?.Username</MudText>
             <MudMenu>
                 <ActivatorContent>
-                    @if (string.IsNullOrWhiteSpace(avatarData))
-                    {
-                        <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
-                    }
-                    else
-                    {
-                        <MudAvatar>
-                            <MudImage Src="@avatarData" Alt="Profile picture image"></MudImage>
-                        </MudAvatar>
-                    }
+                    <div @onclick="@context.ToggleAsync" style="cursor: pointer">
+                        @if (string.IsNullOrWhiteSpace(avatarData))
+                        {
+                            <MudAvatar Color="Color.Primary">@SessionStorage?.User?.Username?.ToUpper()[0]</MudAvatar>
+                        }
+                        else
+                        {
+                            <MudAvatar>
+                                <MudImage Src="@avatarData" Alt="Profile picture image"></MudImage>
+                            </MudAvatar>
+                        }
+                    </div>
                 </ActivatorContent>
                 <ChildContent>
                     <MudMenuItem Icon="@Icons.Material.Outlined.Settings" IconColor="Color.Default"

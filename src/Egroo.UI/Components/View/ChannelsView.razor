@@ -81,7 +81,7 @@ else
                         @foreach (var channel in PublicChannels)
                         {
                             <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                                <MudGrid Justify="Justify.SpaceBetween" AlignItems="Center">
+                                <MudGrid Justify="Justify.SpaceBetween">
                                     <MudItem xs="8">
                                         <ScopeView Title="@channel.Title" Subtitle="@string.Format("Created {0}", channel.DateCreated?.Date.ToShortDateString())" />
                                     </MudItem>
@@ -127,7 +127,7 @@ else
                                             <MudStack Row Style="height:100%;">
                                                 <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
                                                                Icon="@Icons.Material.Filled.Add" Color="Color.Success"
-                                                               OnClick="@(async () => await AddUserToChannel(friend.Username))" />
+                                                               OnClick="@(async () => await AddUserToChannel(friend.Username!))" />
                                             </MudStack>
                                         </MudItem>
                                     </MudGrid>
@@ -274,6 +274,7 @@ else
             UserDto[]? friends = await ChatChannelService.GetChannelUsers(channels[i].Id);
 
             channels[i].DefaultTitle = string.Empty;
+            if (friends is null) { continue; }
             foreach (UserDto friend in friends)
             {
                 UserDto? user = await ChatUserService.GetUserPublicDetails(friend.Id);
@@ -303,7 +304,7 @@ else
 
     private async Task CreateChannel()
     {
-        await ChatChannelService.CreateChannel(SessionStorage.User.Username);
+        await ChatChannelService.CreateChannel(SessionStorage.User!.Username!);
 
         CurrentUserChannels = await GetChannels();
 
@@ -312,7 +313,7 @@ else
 
     private async Task DeleteChannel(Guid channelId)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Warning",
             "Are you sure you want to delete channel?",
             yesText: "Delete", cancelText: "Cancel");
@@ -369,7 +370,7 @@ else
 
     private async Task LeaveChannel(Guid channelId)
     {
-        bool? result = await DialogService.ShowMessageBox(
+        bool? result = await DialogService.ShowMessageBoxAsync(
             "Warning",
             "Are you sure you want to leave channel?",
             yesText: "Leave", cancelText: "Cancel");
@@ -393,7 +394,7 @@ else
 
     private async Task JoinChannel(Channel channel)
     {
-        bool result = await ChatChannelService.AddChannelUsers(channel.Id, SessionStorage.User.Username);
+        bool result = await ChatChannelService.AddChannelUsers(channel.Id, SessionStorage.User!.Username!);
         if (result)
         {
             Snackbar.Add("Joined channel", Severity.Success);

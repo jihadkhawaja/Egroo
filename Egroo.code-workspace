@@ -5,6 +5,6 @@
 		}
 	],
 	"settings": {
-		"dotnet.defaultSolution": "MobileChat.sln"
-	}
+		"dotnet.defaultSolution": "src/Egroo.slnx"
+	},
 }
