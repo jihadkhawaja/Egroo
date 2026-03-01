@@ -2,19 +2,19 @@
 
 This guide provides accurate documentation for the Egroo API, including the REST authentication endpoints and the SignalR real-time hub.
 
-## ?? API Overview
+## 📖 API Overview
 
 The Egroo server exposes:
 - **4 REST endpoints** for authentication (`/api/v1/Auth`)
 - **1 SignalR Hub** at `/chathub` for all real-time functionality (user, channel, message, and call management)
 - **Swagger UI** (development only): `http://localhost:5175/swagger`
 
-All real-time features � user management, friends, channels, messages, and WebRTC calls � are handled exclusively over SignalR using WebSockets.
+All real-time features — user management, friends, channels, messages, and WebRTC calls — are handled exclusively over SignalR using WebSockets.
 
 **Base URL (development)**: `http://localhost:5175`  
 **Base URL (production)**: `https://api.egroo.org` (or your own hosted URL)
 
-## ?? Authentication (REST)
+## 🔐 Authentication (REST)
 
 ### JWT Authentication
 
@@ -121,7 +121,7 @@ Access: **Requires JWT**
 
 ---
 
-## ? Real-time Hub (SignalR)
+## ⚡ Real-time Hub (SignalR)
 
 ### Connection
 
@@ -146,7 +146,7 @@ The SignalR hub supports a maximum message size of **10 MB**.
 
 ---
 
-### ?? User Methods
+### 👤 User Methods
 
 | Method | Auth | Returns | Description |
 |--------|------|---------|-------------|
@@ -167,7 +167,7 @@ The SignalR hub supports a maximum message size of **10 MB**.
 
 ---
 
-### ?? Friend Methods
+### 🤝 Friend Methods
 
 | Method | Auth | Returns | Description |
 |--------|------|---------|-------------|
@@ -181,7 +181,7 @@ The SignalR hub supports a maximum message size of **10 MB**.
 
 ---
 
-### ?? Channel Methods
+### 📢 Channel Methods
 
 | Method | Auth | Returns | Description |
 |--------|------|---------|-------------|
@@ -199,9 +199,9 @@ The SignalR hub supports a maximum message size of **10 MB**.
 
 ---
 
-### ?? Message Methods
+### 💬 Message Methods
 
-Messages are **end-to-end encrypted at rest**. The `content` field is not stored in the `Messages` table � it lives only in `UserPendingMessages` (encrypted) until delivered.
+Messages are **end-to-end encrypted at rest**. The `content` field is not stored in the `Messages` table — it lives only in `UserPendingMessages` (encrypted) until delivered.
 
 | Method | Auth | Returns | Description |
 |--------|------|---------|-------------|
@@ -210,7 +210,7 @@ Messages are **end-to-end encrypted at rest**. The `content` field is not stored
 | `SendPendingMessages()` | Required | void | Deliver queued offline messages |
 | `UpdatePendingMessage(Guid messageid)` | Required | void | Mark a pending message as received |
 
-**Example � send a message:**
+**Example — send a message:**
 ```csharp
 var message = new Message
 {
@@ -224,7 +224,7 @@ bool ok = await connection.InvokeAsync<bool>("SendMessage", message);
 
 ---
 
-### ?? Call Methods (WebRTC)
+### 📞 Call Methods (WebRTC)
 
 The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video calls.
 
@@ -238,7 +238,7 @@ The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video c
 
 ---
 
-### ?? Server ? Client Events
+### 📡 Server → Client Events
 
 These events are pushed from the server to connected clients.
 
@@ -275,7 +275,7 @@ connection.On<Guid>("ChannelChange", (channelId) =>
 
 ---
 
-## ?? Data Models
+## 📦 Data Models
 
 ### `Operation.Response`
 Returned by REST authentication endpoints.
@@ -309,7 +309,7 @@ Returned by the change password endpoint.
 ```
 
 ### `Message`
-> `content` and `displayName` are transport-only fields � they are **not stored** in the Messages table.
+> `content` and `displayName` are transport-only fields — they are **not stored** in the Messages table.
 
 ```json
 {
@@ -363,7 +363,7 @@ Returned by the change password endpoint.
 
 ---
 
-## ?? Rate Limiting
+## 🚦 Rate Limiting
 
 All REST endpoints use the `Api` fixed-window rate limiter:
 
@@ -375,7 +375,7 @@ Exceeding the limit returns `429 Too Many Requests`.
 
 ---
 
-## ?? Swagger / OpenAPI
+## 📘 Swagger / OpenAPI
 
 Interactive API documentation is available **in development only** at:
 
@@ -383,11 +383,11 @@ Interactive API documentation is available **in development only** at:
 http://localhost:5175/swagger
 ```
 
-Bearer authentication is supported in the Swagger UI � paste your JWT token to test protected endpoints.
+Bearer authentication is supported in the Swagger UI — paste your JWT token to test protected endpoints.
 
 ---
 
-## ?? API Troubleshooting
+## 🔧 API Troubleshooting
 
 | Problem | Cause | Solution |
 |---------|-------|----------|
