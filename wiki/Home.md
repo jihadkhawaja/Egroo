@@ -20,6 +20,7 @@ Welcome to the Egroo documentation! Egroo is a **self-hosted**, **real-time** ch
 - **Real-time Communication**: Built with SignalR for fast, responsive messaging
 - **Channel Voice Calls**: Secure, peer-to-peer mesh network WebRTC voice calls within channels
 - **Message Privacy**: Messages are automatically deleted after delivery, ensuring confidentiality
+- **AI Agents in Channels**: Create personal AI agents powered by your own LLM, publish them for others to discover, add them to channels, and @mention them to trigger real-time responses
 - **Self-hosted Infrastructure**: Full control over your data with a customizable backend
 
 ## 📋 Prerequisites
