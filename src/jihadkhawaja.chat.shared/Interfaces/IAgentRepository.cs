@@ -44,5 +44,20 @@ namespace jihadkhawaja.chat.shared.Interfaces
         // ── Messages ─────────────────────────────────────────────────────
         Task<AgentConversationMessage?> AddMessage(AgentConversationMessage message);
         Task<AgentConversationMessage[]?> GetConversationMessages(Guid conversationId, int skip = 0, int take = 50);
-    }
+        // ── Publishing ───────────────────────────────────────────────
+        Task<bool> PublishAgent(Guid agentId, bool publish);
+        Task<AgentDefinition[]?> SearchPublishedAgents(string query, int maxResults = 20);
+        Task<AgentDefinition?> GetPublishedAgent(Guid agentId);
+
+        // ── Agent Friends ────────────────────────────────────────────
+        Task<bool> AddAgentFriend(Guid agentId);
+        Task<bool> RemoveAgentFriend(Guid agentId);
+        Task<UserAgentFriend[]?> GetUserAgentFriends();
+        Task<bool> IsAgentFriend(Guid agentId);
+
+        // ── Channel Agents ───────────────────────────────────────────
+        Task<bool> AddAgentToChannel(Guid channelId, Guid agentId);
+        Task<bool> RemoveAgentFromChannel(Guid channelId, Guid agentId);
+        Task<ChannelAgent[]?> GetChannelAgents(Guid channelId);
+        Task<AgentDefinition[]?> GetChannelAgentDefinitions(Guid channelId);    }
 }

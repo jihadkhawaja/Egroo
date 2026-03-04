@@ -914,5 +914,313 @@ namespace Egroo.Server.Repository
                 return null;
             }
         }
+
+        // ── Publishing ───────────────────────────────────────────────────
+
+        public async Task<bool> PublishAgent(Guid agentId, bool publish)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            var existing = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == agentId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            if (existing is null)
+            {
+                return false;
+            }
+
+            existing.IsPublished = publish;
+            existing.DateUpdated = DateTimeOffset.UtcNow;
+            existing.UpdatedBy = userId.Value;
+
+            try
+            {
+                _dbContext.AgentDefinitions.Update(existing);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to publish/unpublish agent {AgentId}", agentId);
+                return false;
+            }
+        }
+
+        public async Task<AgentDefinition[]?> SearchPublishedAgents(string query, int maxResults = 20)
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                return Array.Empty<AgentDefinition>();
+            }
+
+            var lowerQuery = query.ToLower();
+
+            return await _dbContext.AgentDefinitions
+                .Where(x => x.IsPublished && x.IsActive && x.DateDeleted == null
+                    && (x.Name.ToLower().Contains(lowerQuery)
+                        || (x.Description != null && x.Description.ToLower().Contains(lowerQuery))))
+                .OrderByDescending(x => x.DateCreated)
+                .Take(maxResults)
+                .ToArrayAsync();
+        }
+
+        public async Task<AgentDefinition?> GetPublishedAgent(Guid agentId)
+        {
+            return await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == agentId && x.IsPublished && x.IsActive && x.DateDeleted == null);
+        }
+
+        // ── Agent Friends ────────────────────────────────────────────────
+
+        public async Task<bool> AddAgentFriend(Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            // Verify agent is published
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == agentId && x.IsPublished && x.IsActive && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return false;
+            }
+
+            // Check if already a friend
+            var existing = await _dbContext.UserAgentFriends
+                .FirstOrDefaultAsync(x => x.UserId == userId.Value && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is not null)
+            {
+                return true; // Already friends
+            }
+
+            var friendship = new UserAgentFriend
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId.Value,
+                AgentDefinitionId = agentId,
+                DateCreated = DateTimeOffset.UtcNow,
+                CreatedBy = userId.Value
+            };
+
+            try
+            {
+                await _dbContext.UserAgentFriends.AddAsync(friendship);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add agent friend");
+                return false;
+            }
+        }
+
+        public async Task<bool> RemoveAgentFriend(Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            var existing = await _dbContext.UserAgentFriends
+                .FirstOrDefaultAsync(x => x.UserId == userId.Value && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is null)
+            {
+                return false;
+            }
+
+            existing.DateDeleted = DateTimeOffset.UtcNow;
+            existing.DeletedBy = userId.Value;
+
+            try
+            {
+                _dbContext.UserAgentFriends.Update(existing);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove agent friend");
+                return false;
+            }
+        }
+
+        public async Task<UserAgentFriend[]?> GetUserAgentFriends()
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return null;
+            }
+
+            return await _dbContext.UserAgentFriends
+                .Where(x => x.UserId == userId.Value && x.DateDeleted == null)
+                .OrderByDescending(x => x.DateCreated)
+                .ToArrayAsync();
+        }
+
+        public async Task<bool> IsAgentFriend(Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            return await _dbContext.UserAgentFriends
+                .AnyAsync(x => x.UserId == userId.Value && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+        }
+
+        // ── Channel Agents ───────────────────────────────────────────────
+
+        public async Task<bool> AddAgentToChannel(Guid channelId, Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            // Verify the user is an admin of the channel
+            var isAdmin = await _dbContext.ChannelUsers
+                .AnyAsync(x => x.ChannelId == channelId && x.UserId == userId.Value && x.IsAdmin);
+
+            if (!isAdmin)
+            {
+                return false;
+            }
+
+            // Verify agent exists and is active
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == agentId && x.IsActive && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return false;
+            }
+
+            // Agent must be owned by the user OR published (and user is a friend)
+            if (agent.UserId != userId.Value)
+            {
+                if (!agent.IsPublished)
+                {
+                    return false;
+                }
+
+                var isFriend = await _dbContext.UserAgentFriends
+                    .AnyAsync(x => x.UserId == userId.Value && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+                if (!isFriend)
+                {
+                    return false;
+                }
+            }
+
+            // Check if already in channel
+            var existing = await _dbContext.ChannelAgents
+                .FirstOrDefaultAsync(x => x.ChannelId == channelId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is not null)
+            {
+                return true;
+            }
+
+            var channelAgent = new ChannelAgent
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channelId,
+                AgentDefinitionId = agentId,
+                AddedByUserId = userId.Value,
+                DateCreated = DateTimeOffset.UtcNow,
+                CreatedBy = userId.Value
+            };
+
+            try
+            {
+                await _dbContext.ChannelAgents.AddAsync(channelAgent);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add agent to channel");
+                return false;
+            }
+        }
+
+        public async Task<bool> RemoveAgentFromChannel(Guid channelId, Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            var isAdmin = await _dbContext.ChannelUsers
+                .AnyAsync(x => x.ChannelId == channelId && x.UserId == userId.Value && x.IsAdmin);
+
+            if (!isAdmin)
+            {
+                return false;
+            }
+
+            var existing = await _dbContext.ChannelAgents
+                .FirstOrDefaultAsync(x => x.ChannelId == channelId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is null)
+            {
+                return false;
+            }
+
+            existing.DateDeleted = DateTimeOffset.UtcNow;
+            existing.DeletedBy = userId.Value;
+
+            try
+            {
+                _dbContext.ChannelAgents.Update(existing);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove agent from channel");
+                return false;
+            }
+        }
+
+        public async Task<ChannelAgent[]?> GetChannelAgents(Guid channelId)
+        {
+            return await _dbContext.ChannelAgents
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .ToArrayAsync();
+        }
+
+        public async Task<AgentDefinition[]?> GetChannelAgentDefinitions(Guid channelId)
+        {
+            var channelAgents = await _dbContext.ChannelAgents
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .Select(x => x.AgentDefinitionId)
+                .ToListAsync();
+
+            if (channelAgents.Count == 0)
+            {
+                return Array.Empty<AgentDefinition>();
+            }
+
+            return await _dbContext.AgentDefinitions
+                .Where(x => channelAgents.Contains(x.Id) && x.IsActive && x.DateDeleted == null)
+                .ToArrayAsync();
+        }
     }
 }

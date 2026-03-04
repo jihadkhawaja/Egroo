@@ -9,132 +9,146 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JSRuntime
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
     <!-- Header -->
-    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
-        <MudStack Row AlignItems="AlignItems.Center">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Href="/agents" />
-            <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2">
-                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
-            </MudAvatar>
-            <MudStack Spacing="0" Class="ml-2">
-                <MudText Typo="Typo.h6">@Title</MudText>
-                @if (isStreaming)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Primary">Thinking...</MudText>
-                }
+    <MudPaper Elevation="0" Class="px-4 py-2"
+              Style="border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; background: var(--mud-palette-surface);">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Medium" Href="/agents" />
+                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                </MudAvatar>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@Title</MudText>
+                    @if (isStreaming)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Primary">Thinking...</MudText>
+                    }
+                </MudStack>
+            </MudStack>
+            <MudStack Row Spacing="1">
+                <MudMenu Icon="@Icons.Material.Filled.History" Size="Size.Medium" AnchorOrigin="Origin.BottomRight">
+                    @if (conversations is not null && conversations.Length > 0)
+                    {
+                        @foreach (var conv in conversations)
+                        {
+                            <MudMenuItem OnClick="@(() => SwitchConversation(conv))">
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.ChatBubble" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">
+                                        @(conv.Title ?? conv.DateCreated?.ToLocalTime().ToString("MMM dd, HH:mm") ?? "Chat")
+                                    </MudText>
+                                </MudStack>
+                            </MudMenuItem>
+                        }
+                        <MudDivider />
+                    }
+                    <MudMenuItem OnClick="CreateNewConversation">
+                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2" Color="Color.Primary">New Conversation</MudText>
+                        </MudStack>
+                    </MudMenuItem>
+                </MudMenu>
             </MudStack>
         </MudStack>
-        <MudStack Row Spacing="1">
-            <MudMenu Icon="@Icons.Material.Filled.History" Size="Size.Medium" AnchorOrigin="Origin.BottomRight">
-                @if (conversations is not null && conversations.Length > 0)
-                {
-                    @foreach (var conv in conversations)
-                    {
-                        <MudMenuItem OnClick="@(() => SwitchConversation(conv))">
-                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.ChatBubble" Size="Size.Small" />
-                                <MudText Typo="Typo.body2">
-                                    @(conv.Title ?? conv.DateCreated?.ToLocalTime().ToString("MMM dd, HH:mm") ?? "Chat")
-                                </MudText>
-                            </MudStack>
-                        </MudMenuItem>
-                    }
-                    <MudDivider />
-                }
-                <MudMenuItem OnClick="CreateNewConversation">
-                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" />
-                        <MudText Typo="Typo.body2" Color="Color.Primary">New Conversation</MudText>
-                    </MudStack>
-                </MudMenuItem>
-            </MudMenu>
-        </MudStack>
-    </MudStack>
+    </MudPaper>
 
     <!-- Messages -->
     @if (IsBusy)
     {
-        <MudProgressLinear Indeterminate Color="Color.Default" />
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="flex: 1;">
+            <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Medium" />
+        </MudStack>
     }
     else
     {
-        <MudPaper id="agent-messages-container" Elevation="0" Class="pa-4"
-                  Style="height: calc(100vh - 280px); overflow-x: hidden; overflow-y: auto;">
+        <div id="agent-messages-container" class="chat-messages-scroll"
+             style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: 16px 24px;">
             @if (messages.Count == 0 && !isStreaming)
             {
                 <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
-                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Default" />
-                    <MudText Typo="Typo.h6" Color="Color.Default">Start a conversation</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large"
+                             Style="color: rgba(255,255,255,0.15); font-size: 4rem;" />
+                    <MudText Typo="Typo.h6" Style="color: rgba(255,255,255,0.3);">Start a conversation</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.2);">
                         Send a message to chat with your agent.
                     </MudText>
                 </MudStack>
             }
             else
             {
-                <MudStack Spacing="3">
-                    @foreach (var msg in messages)
+                @foreach (var msg in messages)
+                {
+                    @if (msg.Role == "user")
                     {
-                        @if (msg.Role == "user")
-                        {
-                            <MudStack Row Justify="Justify.FlexEnd">
-                                <MudPaper Class="pa-3 rounded-lg" Elevation="2"
-                                          Style="max-width: 75%; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
-                                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
-                                </MudPaper>
-                            </MudStack>
-                        }
-                        else
-                        {
-                            <MudStack Row Justify="Justify.FlexStart" Spacing="2">
-                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
-                                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
-                                </MudAvatar>
-                                <MudPaper Class="pa-3 rounded-lg" Elevation="1" Style="max-width: 75%;">
-                                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
-                                </MudPaper>
-                            </MudStack>
-                        }
-                    }
-
-                    @* Streaming response in progress *@
-                    @if (isStreaming && streamingContent.Length > 0)
-                    {
-                        <MudStack Row Justify="Justify.FlexStart" Spacing="2">
-                            <MudAvatar Color="Color.Secondary" Size="Size.Small">
-                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
-                            </MudAvatar>
-                            <MudPaper Class="pa-3 rounded-lg" Elevation="1" Style="max-width: 75%;">
-                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@streamingContent.ToString()</MudText>
+                        <MudStack Row Justify="Justify.FlexEnd" Class="mb-2">
+                            <MudPaper Class="pa-3" Elevation="0"
+                                      Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
+                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
                             </MudPaper>
                         </MudStack>
                     }
-                    else if (isStreaming)
+                    else
                     {
-                        <MudStack Row Justify="Justify.FlexStart" Spacing="2">
-                            <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                        <MudStack Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
+                            <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
                                 <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
                             </MudAvatar>
-                            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate />
+                            <MudPaper Class="pa-3" Elevation="0"
+                                      Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
+                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
+                            </MudPaper>
                         </MudStack>
                     }
-                </MudStack>
+                }
+
+                @* Streaming response in progress *@
+                @if (isStreaming && streamingContent.Length > 0)
+                {
+                    <MudStack Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
+                        <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
+                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudPaper Class="pa-3" Elevation="0"
+                                  Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
+                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@streamingContent.ToString()</MudText>
+                        </MudPaper>
+                    </MudStack>
+                }
+                else if (isStreaming)
+                {
+                    <MudStack Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
+                        <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
+                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                        </MudAvatar>
+                        <MudPaper Class="pa-3" Elevation="0"
+                                  Style="border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
+                            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate />
+                        </MudPaper>
+                    </MudStack>
+                }
             }
-        </MudPaper>
+        </div>
 
         <!-- Input Area -->
-        <MudStack Row AlignItems="AlignItems.Center" Class="mt-2" Spacing="2">
-            <MudTextField @bind-Value="inputMessage" Label="Message" Variant="Variant.Outlined"
-                          Placeholder="Type a message..."
-                          Disabled="@isStreaming"
-                          Immediate
-                          OnKeyDown="OnInputKeyDown"
-                          Class="flex-grow-1" />
-            <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" Size="Size.Large"
-                           OnClick="SendMessage"
-                           Disabled="@(isStreaming || string.IsNullOrWhiteSpace(inputMessage))" />
-        </MudStack>
+        <div style="flex-shrink: 0; padding: 12px 16px 16px; background: var(--mud-palette-background);">
+            <div style="display: flex; align-items: flex-end; gap: 10px; background: var(--mud-palette-surface); border-radius: 24px; padding: 6px 6px 6px 18px; border: 1px solid rgba(255,255,255,0.08); transition: border-color 0.2s;">
+                <MudTextField @bind-Value="inputMessage" Variant="Variant.Text"
+                              Placeholder="Type a message..."
+                              Disabled="@isStreaming"
+                              Immediate
+                              OnKeyDown="OnInputKeyDown"
+                              Lines="1" MaxLines="5"
+                              Style="flex: 1; margin: 0;" />
+                <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" Size="Size.Medium"
+                               Variant="Variant.Filled"
+                               Style="border-radius: 50%; width: 40px; height: 40px; min-width: 40px;"
+                               OnClick="SendMessage"
+                               Disabled="@(isStreaming || string.IsNullOrWhiteSpace(inputMessage))" />
+            </div>
+        </div>
     }
 </MudContainer>
 
@@ -192,6 +206,18 @@
         }
     }
 
+    private bool _needsScrollToBottom;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_needsScrollToBottom)
+        {
+            _needsScrollToBottom = false;
+            await ScrollToBottom();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
     private async Task LoadMessages()
     {
         if (currentConversation is null) return;
@@ -211,8 +237,8 @@
             }
         }
 
+        _needsScrollToBottom = true;
         StateHasChanged();
-        await ScrollToBottom();
     }
 
     private async Task CreateNewConversation()
@@ -262,8 +288,8 @@
 
         // Add user message to display
         messages.Add(new ChatMessageDisplay { Role = "user", Content = userMessage });
+        _needsScrollToBottom = true;
         StateHasChanged();
-        await ScrollToBottom();
 
         // Stream the response
         isStreaming = true;
@@ -285,7 +311,7 @@
 
                 streamingContent.Append(chunk);
                 StateHasChanged();
-                await ScrollToBottom();
+                await ScrollToBottomIfNearBottom();
             }
 
             // Move streaming content to messages list
@@ -308,8 +334,8 @@
             streamingContent.Clear();
             streamCts?.Dispose();
             streamCts = null;
+            _needsScrollToBottom = true;
             StateHasChanged();
-            await ScrollToBottom();
         }
     }
 
@@ -317,8 +343,19 @@
     {
         try
         {
-            await JSRuntime.InvokeVoidAsync("eval",
-                "document.getElementById('agent-messages-container')?.scrollTo(0, document.getElementById('agent-messages-container')?.scrollHeight)");
+            await JSRuntime.InvokeVoidAsync("scrollToEnd", "agent-messages-container");
+        }
+        catch
+        {
+            // JS interop may fail during prerender
+        }
+    }
+
+    private async Task ScrollToBottomIfNearBottom()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToEndIfNearBottom", "agent-messages-container", 150);
         }
         catch
         {

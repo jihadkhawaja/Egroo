@@ -269,6 +269,84 @@ namespace jihadkhawaja.chat.client.Services
                 yield return data;
             }
         }
+
+        // ── Publishing ───────────────────────────────────────────────
+
+        public async Task<bool> PublishAgent(Guid agentId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/{agentId}/publish", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> UnpublishAgent(Guid agentId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/{agentId}/unpublish", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<AgentDefinition[]?> SearchPublishedAgents(string? query = null)
+        {
+            var url = $"{BasePath}/published/search";
+            if (!string.IsNullOrWhiteSpace(query))
+                url += $"?query={Uri.EscapeDataString(query)}";
+            return await HttpClient.GetFromJsonAsync<AgentDefinition[]>(url, JsonOptions);
+        }
+
+        public async Task<AgentDefinition?> GetPublishedAgent(Guid agentId)
+        {
+            return await HttpClient.GetFromJsonAsync<AgentDefinition>($"{BasePath}/published/{agentId}", JsonOptions);
+        }
+
+        // ── Agent Friends ────────────────────────────────────────────
+
+        public async Task<bool> AddAgentFriend(Guid agentId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/friends/{agentId}", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> RemoveAgentFriend(Guid agentId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/friends/{agentId}");
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<UserAgentFriend[]?> GetAgentFriends()
+        {
+            return await HttpClient.GetFromJsonAsync<UserAgentFriend[]>($"{BasePath}/friends", JsonOptions);
+        }
+
+        public async Task<bool> IsAgentFriend(Guid agentId)
+        {
+            try
+            {
+                var result = await HttpClient.GetFromJsonAsync<bool>($"{BasePath}/friends/{agentId}/check", JsonOptions);
+                return result;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // ── Channel Agents ───────────────────────────────────────────
+
+        public async Task<bool> AddAgentToChannel(Guid channelId, Guid agentId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/channel/{channelId}/agents/{agentId}", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> RemoveAgentFromChannel(Guid channelId, Guid agentId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/channel/{channelId}/agents/{agentId}");
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<AgentDefinition[]?> GetChannelAgents(Guid channelId)
+        {
+            return await HttpClient.GetFromJsonAsync<AgentDefinition[]>($"{BasePath}/channel/{channelId}/agents", JsonOptions);
+        }
     }
 
     /// <summary>

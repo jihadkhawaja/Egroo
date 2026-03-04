@@ -419,6 +419,88 @@ namespace Egroo.Server.API
                 await httpContext.Response.WriteAsync("data: [DONE]\n\n");
                 await httpContext.Response.Body.FlushAsync();
             });
+
+            // ── Publishing ───────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/publish", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var success = await repo.PublishAgent(agentId, true);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to publish agent." });
+            });
+
+            group.MapPost("/{agentId:guid}/unpublish", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var success = await repo.PublishAgent(agentId, false);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to unpublish agent." });
+            });
+
+            group.MapGet("/published/search", async (IAgentRepository repo, string query, int? maxResults) =>
+            {
+                var agents = await repo.SearchPublishedAgents(query, maxResults ?? 20);
+                if (agents is not null)
+                {
+                    foreach (var a in agents) a.ApiKey = null;
+                }
+                return Results.Ok(agents);
+            }).AllowAnonymous();
+
+            group.MapGet("/published/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var agent = await repo.GetPublishedAgent(agentId);
+                if (agent is null) return Results.NotFound();
+                agent.ApiKey = null;
+                return Results.Ok(agent);
+            }).AllowAnonymous();
+
+            // ── Agent Friends ────────────────────────────────────────────
+
+            group.MapPost("/friends/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var success = await repo.AddAgentFriend(agentId);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to add agent as friend." });
+            });
+
+            group.MapDelete("/friends/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var success = await repo.RemoveAgentFriend(agentId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            group.MapGet("/friends", async (IAgentRepository repo) =>
+            {
+                var friends = await repo.GetUserAgentFriends();
+                return Results.Ok(friends);
+            });
+
+            group.MapGet("/friends/{agentId:guid}/check", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var isFriend = await repo.IsAgentFriend(agentId);
+                return Results.Ok(new { isFriend });
+            });
+
+            // ── Channel Agents ───────────────────────────────────────────
+
+            group.MapPost("/channel/{channelId:guid}/agents/{agentId:guid}", async (IAgentRepository repo, Guid channelId, Guid agentId) =>
+            {
+                var success = await repo.AddAgentToChannel(channelId, agentId);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to add agent to channel." });
+            });
+
+            group.MapDelete("/channel/{channelId:guid}/agents/{agentId:guid}", async (IAgentRepository repo, Guid channelId, Guid agentId) =>
+            {
+                var success = await repo.RemoveAgentFromChannel(channelId, agentId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            group.MapGet("/channel/{channelId:guid}/agents", async (IAgentRepository repo, Guid channelId) =>
+            {
+                var agents = await repo.GetChannelAgentDefinitions(channelId);
+                if (agents is not null)
+                {
+                    foreach (var a in agents) a.ApiKey = null;
+                }
+                return Results.Ok(agents);
+            });
         }
     }
 

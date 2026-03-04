@@ -1,44 +1,60 @@
 ﻿@if (IsCurrentUser)
 {
-    <MudPaper Class="pa-2" Elevation="0" Outlined Style="position:relative;">
-        <MudStack Spacing="0">
-            <MudText Class="text-single-line" Typo="Typo.subtitle1" Color="Color.Primary">@DisplayName</MudText>
-            <MudText Class="text-single-line" Typo="Typo.subtitle2" Color="Color.Default">@Date</MudText>
-        </MudStack>
-        <MudText Class="mt-2 pr-12" Typo="Typo.body1" Style="white-space: initial;overflow-wrap: break-word;">@Content</MudText>
-        <MudStack Row Style="position:absolute;bottom:0;right:0;" Class="pa-2" Spacing="0">
-            @if (SentOnDate is not null && SeenOnDate is not null)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
-                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
-            }
-            else if (SentOnDate is not null)
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Default" />
-            }
-        </MudStack>
-    </MudPaper>
+    <MudStack Row Justify="Justify.FlexEnd" Class="mb-1">
+        <MudPaper Class="pa-3 msg-bubble msg-bubble-current" Elevation="0"
+                  Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
+            <MudText Typo="Typo.body1" Style="white-space: pre-wrap; overflow-wrap: break-word;">@Content</MudText>
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Class="mt-1" Spacing="1">
+                <MudText Typo="Typo.caption" Style="opacity: 0.7; font-size: 0.7rem;">@Date</MudText>
+                @if (SentOnDate is not null && SeenOnDate is not null)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.DoneAll" Size="Size.Small"
+                             Style="font-size: 0.875rem; opacity: 0.7;" />
+                }
+                else if (SentOnDate is not null)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small"
+                             Style="font-size: 0.875rem; opacity: 0.7;" />
+                }
+            </MudStack>
+        </MudPaper>
+    </MudStack>
 }
 else
 {
-    <MudPaper Class="pa-2" Elevation="0" Outlined>
-        <MudStack Spacing="0">
-            <MudText Class="text-single-line" Typo="Typo.subtitle1">@DisplayName</MudText>
-            <MudText Class="text-single-line" Typo="Typo.subtitle2" Color="Color.Default">@Date</MudText>
-        </MudStack>
-        <MudText Class="mt-2" Typo="Typo.body1" Style="white-space: initial;overflow-wrap: break-word;">@Content</MudText>
-    </MudPaper>
+    <MudStack Row Justify="Justify.FlexStart" Class="mb-1" Spacing="2">
+        @if (IsAgent)
+        {
+            <MudAvatar Color="Color.Info" Size="Size.Small" Style="align-self: flex-end;">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+            </MudAvatar>
+        }
+        else
+        {
+            <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
+                @DisplayName?.ToUpper()[0]
+            </MudAvatar>
+        }
+        <MudPaper Class="pa-3 msg-bubble msg-bubble-other" Elevation="0"
+                  Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
+            <MudText Typo="Typo.caption" Color="@(IsAgent ? Color.Info : Color.Primary)" Style="font-weight: 600;">@DisplayName</MudText>
+            <MudText Typo="Typo.body1" Style="white-space: pre-wrap; overflow-wrap: break-word;" Class="mt-1">@Content</MudText>
+            <MudText Typo="Typo.caption" Style="opacity: 0.5; font-size: 0.7rem;" Class="mt-1">@Date</MudText>
+        </MudPaper>
+    </MudStack>
 }
 
 @code {
     [Parameter]
-    public string DisplayName { get; set; }
+    public string? DisplayName { get; set; }
     [Parameter]
-    public string Content { get; set; }
+    public string? Content { get; set; }
     [Parameter]
-    public string Date { get; set; }
+    public string? Date { get; set; }
     [Parameter]
     public bool IsCurrentUser { get; set; }
+    [Parameter]
+    public bool IsAgent { get; set; }
     [Parameter]
     public DateTimeOffset? SentOnDate { get; set; }
     [Parameter]

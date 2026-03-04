@@ -74,6 +74,10 @@ else
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Inactive</MudChip>
                                     }
+                                    @if (agent.IsPublished)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Published</MudChip>
+                                    }
                                 </MudStack>
                             </MudCardContent>
                             <MudCardActions>
@@ -85,6 +89,12 @@ else
                                            StartIcon="@Icons.Material.Filled.Edit"
                                            OnClick="@(() => OpenEditDialog(agent))">Configure</MudButton>
                                 <MudSpacer />
+                                <MudTooltip Text="@(agent.IsPublished ? "Unpublish" : "Publish")">
+                                    <MudIconButton Size="Size.Small"
+                                                   Color="@(agent.IsPublished ? Color.Info : Color.Default)"
+                                                   Icon="@(agent.IsPublished ? Icons.Material.Filled.Public : Icons.Material.Filled.PublicOff)"
+                                                   OnClick="@(() => TogglePublish(agent))" />
+                                </MudTooltip>
                                 <MudIconButton Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Delete"
                                                OnClick="@(() => DeleteAgentConfirm(agent))" />
                             </MudCardActions>
@@ -209,6 +219,30 @@ else
     private void OpenChat(AgentDefinition agent)
     {
         NavigationManager.NavigateTo($"/agent/chat/{agent.Id}/{Uri.EscapeDataString(agent.Name)}");
+    }
+
+    private async Task TogglePublish(AgentDefinition agent)
+    {
+        bool success;
+        if (agent.IsPublished)
+        {
+            success = await AgentService.UnpublishAgent(agent.Id);
+        }
+        else
+        {
+            success = await AgentService.PublishAgent(agent.Id);
+        }
+
+        if (success)
+        {
+            agent.IsPublished = !agent.IsPublished;
+            Snackbar.Add(agent.IsPublished ? "Agent published." : "Agent unpublished.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to update publish status.", Severity.Error);
+        }
+        StateHasChanged();
     }
 
     private static Color GetProviderColor(LlmProvider provider)

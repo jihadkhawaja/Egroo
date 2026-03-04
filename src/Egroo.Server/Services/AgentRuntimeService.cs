@@ -82,7 +82,7 @@ namespace Egroo.Server.Services
             string instructions = await BuildInstructions(dbContext, agentDef);
 
             // Build function tools from agent tool definitions
-            var tools = await BuildTools(dbContext, agentDef.Id);
+            var tools = await BuildTools(dbContext, agentDef.Id, userId);
 
             // Create the AIAgent via Microsoft Agent Framework
             AIAgent agent;
@@ -190,7 +190,7 @@ namespace Egroo.Server.Services
             }
 
             string instructions = await BuildInstructions(dbContext, agentDef);
-            var tools = await BuildTools(dbContext, agentDef.Id);
+            var tools = await BuildTools(dbContext, agentDef.Id, userId);
 
             AIAgent agent;
             string? createError = null;
@@ -317,7 +317,7 @@ namespace Egroo.Server.Services
         /// Built-in tools are real executable functions.
         /// MCP tools proxy calls to their respective MCP server endpoints.
         /// </summary>
-        private async Task<IList<AITool>> BuildTools(DataContext dbContext, Guid agentId)
+        private async Task<IList<AITool>> BuildTools(DataContext dbContext, Guid agentId, Guid callerUserId)
         {
             var tools = new List<AITool>();
 
@@ -381,6 +381,23 @@ namespace Egroo.Server.Services
                 }
             }
 
+            // Add scoped agent interaction tools (search agents, add friend, add to channel)
+            var scopedToolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "search_published_agents", "add_agent_friend", "add_agent_to_channel"
+            };
+
+            var enabledScopedTools = toolDefs
+                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
+                .Select(t => t.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (enabledScopedTools.Count > 0)
+            {
+                var scopedTools = BuiltinTools.CreateScopedTools(_scopeFactory, callerUserId);
+                tools.AddRange(scopedTools.Where(t => t is AIFunction f && enabledScopedTools.Contains(f.Name)));
+            }
+
             return tools;
         }
 
@@ -389,6 +406,14 @@ namespace Egroo.Server.Services
         /// Uses Microsoft Agent Framework extension methods for each provider.
         /// </summary>
         private static AIAgent CreateAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        {
+            return CreateAgentStatic(agentDef, apiKey, instructions, tools);
+        }
+
+        /// <summary>
+        /// Public static factory for creating an AIAgent. Used by AgentChannelService for channel mentions.
+        /// </summary>
+        internal static AIAgent CreateAgentStatic(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
         {
             return agentDef.Provider switch
             {

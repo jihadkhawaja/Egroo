@@ -73,6 +73,12 @@ namespace jihadkhawaja.chat.shared.Models
         public bool IsActive { get; set; } = true;
 
         /// <summary>
+        /// Whether this agent is published and discoverable by other users.
+        /// Published agents can be added as friends and invited to channels.
+        /// </summary>
+        public bool IsPublished { get; set; }
+
+        /// <summary>
         /// Temperature setting for LLM responses (0.0 - 2.0).
         /// </summary>
         public float? Temperature { get; set; }

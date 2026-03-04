@@ -24,131 +24,172 @@
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
+@inject AgentService AgentService
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <!-- Header with Back, Title, Edit (shown only if admin), and Call Button -->
-    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
-        <MudStack Row AlignItems="AlignItems.Center">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Href="/channels" />
-            <MudText Typo="Typo.h6" GutterBottom Class="ml-2">@Title</MudText>
-            @if (IsAdmin)
-            {
-                <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Medium" Color="Color.Primary"
-                OnClick="EditChannel" Class="ml-2" />
-            }
-        </MudStack>
-        <!-- Call Participants & Button -->
-        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-            @if (CallParticipantIds.Count > 0)
-            {
-                <MudAvatarGroup Max="3" Spacing="2" MaxColor="Color.Primary"
-                                MaxSize="Size.Small">
-                    @foreach (var participant in CallParticipantUsers.Values.Take(3))
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
+    <!-- Header -->
+    <MudPaper Elevation="0" Class="px-4 py-2"
+              Style="border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; background: var(--mud-palette-surface);">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Medium" Href="/channels" />
+                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                    @Title?.ToUpper()[0]
+                </MudAvatar>
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.body1" Style="font-weight: 600;">@Title</MudText>
+                    @if (CallParticipantIds.Count > 0)
                     {
-                        @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
-                        {
-                            <MudTooltip Text="@participant.Username">
-                                <MudAvatar Size="Size.Small">
-                                    <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
-                                </MudAvatar>
-                            </MudTooltip>
-                        }
-                        else
-                        {
-                            <MudTooltip Text="@participant.Username">
-                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
-                                    @participant.Username?.ToUpper()[0]
-                                </MudAvatar>
-                            </MudTooltip>
-                        }
+                        <MudText Typo="Typo.caption" Color="Color.Success">
+                            @CallParticipantIds.Count in voice call
+                        </MudText>
                     }
-                </MudAvatarGroup>
-                @if (CallParticipantIds.Count > 3)
+                </MudStack>
+                @if (IsAdmin)
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Primary" Class="ml-1">
-                        +@(CallParticipantIds.Count - 3)
-                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Default"
+                                   OnClick="EditChannel" />
                 }
-            }
-            <MudTooltip Text="@(IsInCall ? "Leave Voice Call" : "Join Voice Call")">
-                <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
-                               Size="Size.Large"
-                               Color="@(IsInCall ? Color.Error : Color.Primary)"
-                               OnClick="OnCallButtonClicked" />
-            </MudTooltip>
+            </MudStack>
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                @if (CallParticipantIds.Count > 0)
+                {
+                    <MudAvatarGroup Max="3" Spacing="2" MaxColor="Color.Primary" MaxSize="Size.Small">
+                        @foreach (var participant in CallParticipantUsers.Values.Take(3))
+                        {
+                            @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
+                            {
+                                <MudTooltip Text="@participant.Username">
+                                    <MudAvatar Size="Size.Small">
+                                        <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
+                                    </MudAvatar>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <MudTooltip Text="@participant.Username">
+                                    <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                        @participant.Username?.ToUpper()[0]
+                                    </MudAvatar>
+                                </MudTooltip>
+                            }
+                        }
+                    </MudAvatarGroup>
+                }
+                <MudTooltip Text="@(IsInCall ? "Leave Voice Call" : "Join Voice Call")">
+                    <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
+                                   Size="Size.Medium"
+                                   Color="@(IsInCall ? Color.Error : Color.Default)"
+                                   OnClick="OnCallButtonClicked" />
+                </MudTooltip>
+            </MudStack>
         </MudStack>
-    </MudStack>
+    </MudPaper>
 
     <!-- Messages Container -->
     @if (!IsBusy)
     {
-        <MudStack>
-            <MudPaper id="messages-container" Elevation="0" Class="pa-4"
-            Style="height: calc(100vh - 280px); overflow-x:hidden; overflow-y:auto;">
+        <MudStack Style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <div id="messages-container" class="chat-messages-scroll"
+                 style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: 16px 24px;">
                 @if (!Messages.Any())
                 {
-                    <MudText>No Messages</MudText>
+                    <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
+                        <MudIcon Icon="@Icons.Material.Filled.ChatBubbleOutline" Size="Size.Large"
+                                 Style="color: rgba(255,255,255,0.15); font-size: 4rem;" />
+                        <MudText Typo="Typo.h6" Style="color: rgba(255,255,255,0.3);">No messages yet</MudText>
+                        <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.2);">
+                            Send a message to start the conversation.
+                        </MudText>
+                    </MudStack>
                 }
                 else
                 {
-                    <MudStack>
-                        @foreach (var message in Messages)
+                    @foreach (var message in Messages)
+                    {
+                        if (message.DateCreated?.ToLocalTime().Date == DateTime.Today)
                         {
-                            if (message.DateCreated?.ToLocalTime().Date == DateTime.Today)
-                            {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
-                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                            }
-                            else if (message.DateCreated?.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
-                            {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
-                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                            }
-                            else
-                            {
-                                <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                                Date="@message.DateCreated?.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
-                                IsCurrentUser="@IsCurrentUserMessage(message.SenderId)"
-                                SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                            }
+                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                            Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
+                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
+                            IsAgent="@IsAgentMessage(message)"
+                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
                         }
-                    </MudStack>
+                        else if (message.DateCreated?.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
+                        {
+                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                            Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
+                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
+                            IsAgent="@IsAgentMessage(message)"
+                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                        }
+                        else
+                        {
+                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
+                            Date="@message.DateCreated?.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
+                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
+                            IsAgent="@IsAgentMessage(message)"
+                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
+                        }
+                    }
                 }
-            </MudPaper>
-            <MudStack Row>
-                <MudTextField @ref="inputMudTextField" Underline="false"
-                Value="InputContent"
-                ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
-                InputMode="InputMode.text" InputType="InputType.Text"
-                AutoFocus="false" 
-                Label="Your message here" Variant="Variant.Filled" OnKeyDown="EnterPressed"
-                Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
-                Counter="MaxMessageLength" Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault" />
-                <MudIconButton Icon="@Icons.Material.Filled.Send" Variant="Variant.Filled"
-                Class="mt-1 mb-6"
-                OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
-            </MudStack>
+            </div>
+            <!-- Input Area -->
+            <div style="flex-shrink: 0; padding: 12px 16px 16px; background: var(--mud-palette-background); position: relative;">
+                @if (showMentionPopup && filteredMentionAgents.Count > 0)
+                {
+                    <MudPaper Class="pa-2 rounded-lg" Elevation="8"
+                              Style="position: absolute; bottom: 100%; left: 16px; right: 16px; max-height: 200px; overflow-y: auto; z-index: 10; background: var(--mud-palette-surface); border: 1px solid rgba(255,255,255,0.12);">
+                        <MudStack Spacing="0">
+                            @foreach (var agent in filteredMentionAgents)
+                            {
+                                <MudButton OnClick="@(() => SelectMentionAgent(agent))"
+                                           Variant="Variant.Text" Color="Color.Default" FullWidth
+                                           Style="justify-content: flex-start; text-transform: none; padding: 6px 12px;">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Color="Color.Info" />
+                                        <MudText Typo="Typo.body2">@agent.Name</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@agent.Provider — @agent.Model</MudText>
+                                    </MudStack>
+                                </MudButton>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                }
+                <div style="display: flex; align-items: flex-end; gap: 10px; background: var(--mud-palette-surface); border-radius: 24px; padding: 6px 6px 6px 18px; border: 1px solid rgba(255,255,255,0.08); transition: border-color 0.2s;">
+                    <MudTextField @ref="inputMudTextField" Underline="false"
+                    Value="InputContent"
+                    ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                    InputMode="InputMode.text" InputType="InputType.Text"
+                    AutoFocus="false"
+                    Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="EnterPressed"
+                    Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
+                    Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault"
+                    Style="flex: 1; margin: 0;" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary"
+                    Size="Size.Medium" Variant="Variant.Filled"
+                    Style="border-radius: 50%; width: 40px; height: 40px; min-width: 40px;"
+                    OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
+                </div>
+            </div>
         </MudStack>
     }
     else
     {
-        <div style="width:100%; height:100%; text-align:center;">
-            <MudProgressCircular Indeterminate Size="Size.Medium" />
-        </div>
+        <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="flex: 1;">
+            <MudProgressCircular Indeterminate Size="Size.Medium" Color="Color.Primary" />
+        </MudStack>
     }
 
     <!-- Voice Call Bar (shown when in call) -->
     @if (IsInCall)
     {
-        <MudPaper Elevation="4" Class="pa-3 mt-2" Style="border-radius: 12px;">
+        <MudPaper Elevation="0" Class="px-4 py-2"
+                  Style="flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(76,175,80,0.08);">
             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
                 <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                    <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" />
-                    <MudText Typo="Typo.body1" Color="Color.Success">
+                    <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Color="Color.Success">
                         Voice Connected &mdash; @CallParticipantIds.Count participant@(CallParticipantIds.Count != 1 ? "s" : "")
                     </MudText>
                     @if (CallDuration is not null)
@@ -190,6 +231,12 @@
 
     bool _preventDefault;
 
+    // Mention autocomplete state
+    private AgentDefinition[]? channelAgentDefs;
+    private bool showMentionPopup;
+    private List<AgentDefinition> filteredMentionAgents = new();
+    private string mentionSearchToken = string.Empty;
+
     // Voice call state
     private bool IsInCall { get; set; } = false;
     private bool IsMuted { get; set; } = false;
@@ -202,6 +249,8 @@
 
     // Disposal tracking
     private bool _disposed;
+    private bool _needsScrollToBottom;
+    private bool _needsScrollToBottomIfNearBottom;
 
     // Stored event delegates for unsubscription
     private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
@@ -226,6 +275,16 @@
 
         // Check if there's an existing call in this channel and show participant count
         await RefreshCallParticipants();
+
+        // Load channel agents for @mention autocomplete
+        try
+        {
+            channelAgentDefs = await AgentService.GetChannelAgents(GetChannelId());
+        }
+        catch
+        {
+            channelAgentDefs = Array.Empty<AgentDefinition>();
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -251,8 +310,21 @@
             _ = UpdateUnseenMessages();
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
+            await Task.Yield();
             ScrollToMessagesEnd();
         }
+
+        if (_needsScrollToBottom)
+        {
+            _needsScrollToBottom = false;
+            ScrollToMessagesEnd();
+        }
+        else if (_needsScrollToBottomIfNearBottom)
+        {
+            _needsScrollToBottomIfNearBottom = false;
+            ScrollToMessagesEndIfNearBottom();
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -305,9 +377,82 @@
         JSRuntime.InvokeVoidAsync("scrollToEnd", "messages-container");
     }
 
-    private bool IsCurrentUserMessage(Guid senderId) => senderId == SessionStorage.User?.Id;
+    private void ScrollToMessagesEndIfNearBottom()
+    {
+        JSRuntime.InvokeVoidAsync("scrollToEndIfNearBottom", "messages-container", 150);
+    }
 
-    private void OnInputContent(string text) => InputContent = text;
+    private bool IsCurrentUserMessage(Guid senderId) => senderId == SessionStorage.User?.Id;
+    private bool IsAgentMessage(Message msg) => msg.AgentDefinitionId.HasValue && msg.AgentDefinitionId != Guid.Empty;
+
+    private void OnInputContent(string text)
+    {
+        InputContent = text;
+        UpdateMentionPopup(text);
+    }
+
+    private void UpdateMentionPopup(string? text)
+    {
+        if (string.IsNullOrEmpty(text) || channelAgentDefs is null || channelAgentDefs.Length == 0)
+        {
+            showMentionPopup = false;
+            filteredMentionAgents.Clear();
+            return;
+        }
+
+        // Find the last '@' that isn't inside @<...>
+        var lastAt = text.LastIndexOf('@');
+        if (lastAt < 0)
+        {
+            showMentionPopup = false;
+            filteredMentionAgents.Clear();
+            return;
+        }
+
+        // Check if there's a closing '>' after a '<' following this '@' — if so, mention is already completed
+        var afterAt = text[(lastAt + 1)..];
+        if (afterAt.Contains('>') && afterAt.IndexOf('<') == 0)
+        {
+            showMentionPopup = false;
+            filteredMentionAgents.Clear();
+            return;
+        }
+
+        // Extract the partial name typed after @  (strip leading '<' if present)
+        mentionSearchToken = afterAt.TrimStart('<');
+
+        // Don't show if there's a space and no bracket syntax started (plain @mention completed)
+        if (!afterAt.StartsWith("<") && mentionSearchToken.Contains(' '))
+        {
+            showMentionPopup = false;
+            filteredMentionAgents.Clear();
+            return;
+        }
+
+        filteredMentionAgents = channelAgentDefs
+            .Where(a => string.IsNullOrEmpty(mentionSearchToken)
+                || a.Name.Contains(mentionSearchToken, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        showMentionPopup = filteredMentionAgents.Count > 0;
+    }
+
+    private void SelectMentionAgent(AgentDefinition agent)
+    {
+        if (string.IsNullOrEmpty(InputContent))
+            return;
+
+        var lastAt = InputContent.LastIndexOf('@');
+        if (lastAt < 0) return;
+
+        var before = InputContent[..lastAt];
+        var mention = agent.Name.Contains(' ') ? $"@<{agent.Name}> " : $"@{agent.Name} ";
+        InputContent = before + mention;
+
+        showMentionPopup = false;
+        filteredMentionAgents.Clear();
+        StateHasChanged();
+    }
 
     private async Task UpdateUnseenMessages()
     {
@@ -334,7 +479,11 @@
             }
 
             var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
-            message.DisplayName = senderUser?.Username;
+            // Preserve agent display name; only override for regular user messages
+            if (message.AgentDefinitionId is null || message.AgentDefinitionId == Guid.Empty)
+            {
+                message.DisplayName = senderUser?.Username;
+            }
             Messages.Add(message);
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
@@ -342,8 +491,11 @@
 
             await CacheDB.Messages.Add(message);
             await ChatMessageService.UpdatePendingMessage(message.Id);
+            if (message.SenderId == SessionStorage.User?.Id)
+                _needsScrollToBottom = true;
+            else
+                _needsScrollToBottomIfNearBottom = true;
             await InvokeAsync(StateHasChanged);
-            ScrollToMessagesEnd();
         });
 
         ChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>

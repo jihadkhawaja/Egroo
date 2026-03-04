@@ -1,7 +1,9 @@
-﻿@inherits ProtectedViewBase
+﻿@using jihadkhawaja.chat.client.Services
+@inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
 @inject IChannel ChatChannelService
+@inject AgentService AgentService
 @inject ISnackbar Snackbar
 
 @if (IsBusy)
@@ -17,6 +19,7 @@ else
         </MudStack>
 
         <MudPaper Elevation="0" Class="pa-4" Style="height: calc(100vh - 200px); overflow:auto;">
+            <MudText Typo="Typo.overline" Class="mb-2" Style="font-weight: 600; letter-spacing: 0.1em;">Members</MudText>
             <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
                 @foreach (var user in ChannelUsers)
                 {
@@ -44,6 +47,85 @@ else
                     </MudPaper>
                 }
             </MudStack>
+
+            <MudDivider Class="my-4" />
+
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+                <MudText Typo="Typo.overline" Style="font-weight: 600; letter-spacing: 0.1em;">AI Agents</MudText>
+                @if (isAdmin)
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.SmartToy"
+                               OnClick="ToggleAddAgentPanel">Add Agent</MudButton>
+                }
+            </MudStack>
+
+            @if (showAddAgentPanel && isAdmin)
+            {
+                <MudPaper Class="pa-4 mb-4 rounded-lg" Outlined>
+                    <MudStack Spacing="2">
+                        <MudTextField T="string" Placeholder="Search published agents..."
+                                      Value="@agentSearchQuery" TextChanged="OnSearchAgents"
+                                      Immediate Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+                        @if (searchedAgents is not null)
+                        {
+                            @foreach (var agent in searchedAgents)
+                            {
+                                <MudPaper Class="pa-2 px-4 rounded-lg" Elevation="0"
+                                          Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Color="Color.Info" />
+                                            <ScopeView Title="@agent.Name" Subtitle="@($"{agent.Provider} — {agent.Model}")" />
+                                        </MudStack>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Success"
+                                                       Size="Size.Small"
+                                                       OnClick="@(async () => await AddAgentToChannel(agent.Id))" />
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                            @if (searchedAgents.Length == 0)
+                            {
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">No published agents found.</MudText>
+                            }
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+
+            @if (channelAgents is not null && channelAgents.Length > 0)
+            {
+                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                    @foreach (var agent in channelAgents)
+                    {
+                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
+                            <MudGrid Justify="Justify.SpaceBetween">
+                                <MudItem>
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Color="Color.Info" />
+                                        <ScopeView Title="@agent.Name" Subtitle="@($"{agent.Provider} — {agent.Model}")" />
+                                    </MudStack>
+                                </MudItem>
+                                <MudItem>
+                                    @if (isAdmin)
+                                    {
+                                        <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
+                                                       Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                                       OnClick="@(async () => await RemoveAgentFromChannel(agent.Id))" />
+                                    }
+                                </MudItem>
+                            </MudGrid>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+            else
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                    No agents in this channel. @(isAdmin ? "Add an agent to enable @mention responses." : "")
+                </MudText>
+            }
         </MudPaper>
     </MudContainer>
 }
@@ -57,6 +139,11 @@ else
     [Inject] IDialogService DialogService { get; set; } = null!;
 
     private IEnumerable<UserDto> ChannelUsers { get; set; } = null!;
+    private AgentDefinition[]? channelAgents;
+    private AgentDefinition[]? searchedAgents;
+    private string? agentSearchQuery;
+    private bool showAddAgentPanel;
+    private bool isAdmin;
 
     protected override async Task OnAccessAsync()
     {
@@ -67,7 +154,18 @@ else
 
     private async Task RefetchData()
     {
-        ChannelUsers = await ChatChannelService.GetChannelUsers(GetChannelId()) ?? Array.Empty<UserDto>();
+        var channelId = GetChannelId();
+        ChannelUsers = await ChatChannelService.GetChannelUsers(channelId) ?? Array.Empty<UserDto>();
+        isAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User!.Id);
+
+        try
+        {
+            channelAgents = await AgentService.GetChannelAgents(channelId);
+        }
+        catch
+        {
+            channelAgents = null;
+        }
 
         await InvokeAsync(StateHasChanged);
     }
@@ -104,6 +202,75 @@ else
         else
         {
             Snackbar.Add("User doesn't exist", Severity.Error);
+        }
+    }
+
+    private void ToggleAddAgentPanel()
+    {
+        showAddAgentPanel = !showAddAgentPanel;
+        if (!showAddAgentPanel)
+        {
+            searchedAgents = null;
+            agentSearchQuery = null;
+        }
+    }
+
+    private async Task OnSearchAgents(string value)
+    {
+        agentSearchQuery = value;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            searchedAgents = null;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            searchedAgents = await AgentService.SearchPublishedAgents(value);
+        }
+        catch
+        {
+            searchedAgents = Array.Empty<AgentDefinition>();
+        }
+        StateHasChanged();
+    }
+
+    private async Task AddAgentToChannel(Guid agentId)
+    {
+        var success = await AgentService.AddAgentToChannel(GetChannelId(), agentId);
+        if (success)
+        {
+            Snackbar.Add("Agent added to channel.", Severity.Success);
+            showAddAgentPanel = false;
+            searchedAgents = null;
+            agentSearchQuery = null;
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add("Failed to add agent. You may need to add it as a friend first.", Severity.Error);
+        }
+    }
+
+    private async Task RemoveAgentFromChannel(Guid agentId)
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync(
+            "Warning",
+            "Remove this agent from the channel?",
+            yesText: "Remove", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value) return;
+
+        var success = await AgentService.RemoveAgentFromChannel(GetChannelId(), agentId);
+        if (success)
+        {
+            Snackbar.Add("Agent removed from channel.", Severity.Success);
+            await RefetchData();
+        }
+        else
+        {
+            Snackbar.Add("Failed to remove agent.", Severity.Error);
         }
     }
 }

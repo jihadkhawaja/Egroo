@@ -10,17 +10,20 @@ namespace jihadkhawaja.chat.server.Hubs
         private readonly IUser _userRepository;
         private readonly IChannel _channelRepository;
         private readonly IMessageRepository _messageRepository;
+        private readonly IAgentChannelResponder? _agentChannelResponder;
 
         public ChatHub(
             IConnectionTracker connectionTracker,
             IUser userRepository,
             IChannel channelRepository,
-            IMessageRepository messageRepository)
+            IMessageRepository messageRepository,
+            IAgentChannelResponder? agentChannelResponder = null)
         {
             _connectionTracker = connectionTracker;
             _userRepository = userRepository;
             _channelRepository = channelRepository;
             _messageRepository = messageRepository;
+            _agentChannelResponder = agentChannelResponder;
         }
 
         /// <summary>

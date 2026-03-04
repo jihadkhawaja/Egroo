@@ -8,18 +8,25 @@
 
 @if (IsBusy)
 {
-    <MudProgressLinear Indeterminate />
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+        <MudStack AlignItems="AlignItems.Center" Class="py-12">
+            <MudProgressCircular Size="Size.Large" Color="Color.Primary" Indeterminate />
+        </MudStack>
+    </MudContainer>
 }
 else
 {
-    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-8">
-            <MudText Typo="Typo.h6">Friends</MudText>
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-8">
+        <MudStack Spacing="1" Class="mb-6">
+            <MudText Typo="Typo.h5" Style="font-weight: 700;">Friends</MudText>
+            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.5);">Manage your connections and find new people</MudText>
         </MudStack>
 
-        <!-- Unified search field for friends and users to add -->
-        <MudTextField T="string" Placeholder="Search friends or users to add" Value="@SearchQuery"
-                      TextChanged="OnSearchUsers" Immediate Class="mb-4" />
+        <!-- Search -->
+        <MudTextField T="string" Placeholder="Search friends or find users..." Value="@SearchQuery"
+                      TextChanged="OnSearchUsers" Immediate Class="mb-6"
+                      Variant="Variant.Outlined"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
 
         @if (!string.IsNullOrWhiteSpace(SearchQuery))
         {
@@ -34,60 +41,54 @@ else
             .ToArray();
 
             <!-- Section for matching existing friends -->
-            <MudText Typo="Typo.h6" Class="mb-2">Your Friends</MudText>
+            <MudText Typo="Typo.overline" Style="color: rgba(255,255,255,0.4); font-weight: 600; letter-spacing: 0.1em;" Class="mb-2">Your Friends</MudText>
             @if (filteredFriends.Length == 0)
             {
-                <MudText Class="mb-4">No friends found.</MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.35);" Class="mb-6">No friends match your search.</MudText>
             }
             else
             {
-                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                <MudStack Spacing="2" Class="mb-6">
                     @foreach (var friend in filteredFriends)
                     {
-                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                            <MudGrid Justify="Justify.SpaceBetween">
-                                <MudItem>
-                                    <MudStack Row AlignItems="AlignItems.Center">
-                                        <AvatarView User="@friend" />
-                                        <ScopeView Title="@friend.Username" Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem>
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                                   Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                   OnClick="@(async () => await RemoveFriend(friend.Username!))" />
-                                </MudItem>
-                            </MudGrid>
+                        <MudPaper Class="pa-3 px-4 rounded-xl" Elevation="0"
+                                  Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
+                                    <AvatarView User="@friend" />
+                                    <ScopeView Title="@friend.Username" Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                                </MudStack>
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error"
+                                               Size="Size.Small" Variant="Variant.Text"
+                                               OnClick="@(async () => await RemoveFriend(friend.Username!))" />
+                            </MudStack>
                         </MudPaper>
                     }
                 </MudStack>
             }
 
             <!-- Section for users you can add -->
-            <MudText Typo="Typo.h6" Class="mb-2">Users You Can Add</MudText>
+            <MudText Typo="Typo.overline" Style="color: rgba(255,255,255,0.4); font-weight: 600; letter-spacing: 0.1em;" Class="mb-2">Add People</MudText>
             @if (addableUsers.Length == 0)
             {
-                <MudText Class="mb-4">No new users found.</MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.35);" Class="mb-4">No new users found.</MudText>
             }
             else
             {
-                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                <MudStack Spacing="2">
                     @foreach (var user in addableUsers)
                     {
-                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                            <MudGrid Justify="Justify.SpaceBetween">
-                                <MudItem>
-                                    <MudStack Row AlignItems="AlignItems.Center">
-                                        <AvatarView User="@user" />
-                                        <ScopeView Title="@user.Username" Subtitle=@string.Format("Last Seen {0}", user.LastLoginDate?.Date.ToShortDateString()) />
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem>
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                                   Icon="@Icons.Material.Filled.Add" Color="Color.Success"
-                                                   OnClick="@(async () => await AddFriend(user.Username!))" />
-                                </MudItem>
-                            </MudGrid>
+                        <MudPaper Class="pa-3 px-4 rounded-xl" Elevation="0"
+                                  Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
+                                    <AvatarView User="@user" />
+                                    <ScopeView Title="@user.Username" Subtitle=@string.Format("Last Seen {0}", user.LastLoginDate?.Date.ToShortDateString()) />
+                                </MudStack>
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Success"
+                                               Size="Size.Small" Variant="Variant.Text"
+                                               OnClick="@(async () => await AddFriend(user.Username!))" />
+                            </MudStack>
                         </MudPaper>
                     }
                 </MudStack>
@@ -95,57 +96,62 @@ else
         }
         else
         {
-            <!-- When no search query, show friend requests and the full friend list -->
-            <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
-                @foreach (var friendRequest in UserFriendRequests ?? Enumerable.Empty<UserDto>())
-                {
-                    <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                        <MudGrid Justify="Justify.SpaceBetween">
-                            <MudItem>
-                                <MudStack Row AlignItems="AlignItems.Center">
+            <!-- Friend Requests -->
+            @if (UserFriendRequests?.Any() == true)
+            {
+                <MudText Typo="Typo.overline" Style="color: rgba(255,255,255,0.4); font-weight: 600; letter-spacing: 0.1em;" Class="mb-2">Pending Requests</MudText>
+                <MudStack Spacing="2" Class="mb-6">
+                    @foreach (var friendRequest in UserFriendRequests)
+                    {
+                        <MudPaper Class="pa-3 px-4 rounded-xl" Elevation="0"
+                                  Style="background: rgba(242,89,34,0.04); border: 1px solid rgba(242,89,34,0.12);">
+                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
                                     <AvatarView User="@friendRequest" />
                                     <ScopeView Title="@friendRequest.Username" Subtitle=@string.Format("Last Seen {0}", friendRequest.LastLoginDate?.Date.ToShortDateString()) />
                                 </MudStack>
-                            </MudItem>
-                            <MudItem>
-                                <MudStack Row Style="height:100%;">
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                                   Icon="@Icons.Material.Filled.Check" Color="Color.Success"
+                                <MudStack Row Spacing="1">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Check" Color="Color.Success"
+                                                   Size="Size.Small" Variant="Variant.Filled"
+                                                   Style="border-radius: 50%;"
                                                    OnClick="@(async () => await AcceptFriendRequest(friendRequest.Id))" />
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                                   Icon="@Icons.Material.Filled.Close" Color="Color.Error"
+                                    <MudIconButton Icon="@Icons.Material.Filled.Close" Color="Color.Error"
+                                                   Size="Size.Small" Variant="Variant.Text"
                                                    OnClick="@(async () => await DenyFriendRequest(friendRequest.Id))" />
                                 </MudStack>
-                            </MudItem>
-                        </MudGrid>
-                    </MudPaper>
-                }
-            </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
 
-            <MudText Typo="Typo.h6" Class="mb-2">Your Friends</MudText>
+            <!-- All Friends -->
+            <MudText Typo="Typo.overline" Style="color: rgba(255,255,255,0.4); font-weight: 600; letter-spacing: 0.1em;" Class="mb-2">Your Friends</MudText>
             @if (UserFriends == null || !UserFriends.Any())
             {
-                <MudText Class="mb-4">No friends yet.</MudText>
+                <MudStack AlignItems="AlignItems.Center" Spacing="3" Class="py-12">
+                    <MudIcon Icon="@Icons.Material.Filled.GroupAdd" Size="Size.Large"
+                             Style="color: rgba(255,255,255,0.12); font-size: 3.5rem;" />
+                    <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.3);">No friends yet</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.2);">Search for users above to add friends</MudText>
+                </MudStack>
             }
             else
             {
-                <MudStack Justify="Justify.Center" AlignItems="AlignItems.Stretch" Spacing="0">
+                <MudStack Spacing="2">
                     @foreach (var friend in UserFriends)
                     {
-                        <MudPaper Class="mb-4 pa-2 pl-6 rounded-lg" Outlined Elevation="2">
-                            <MudGrid Justify="Justify.SpaceBetween">
-                                <MudItem>
-                                    <MudStack Row AlignItems="AlignItems.Center">
-                                        <AvatarView User="@friend" />
-                                        <ScopeView Title="@friend.Username" Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
-                                    </MudStack>
-                                </MudItem>
-                                <MudItem>
-                                    <MudIconButton Class="px-4 rounded-lg" Variant="Variant.Outlined"
-                                                   Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
-                                                   OnClick="@(async () => await RemoveFriend(friend.Username!))" />
-                                </MudItem>
-                            </MudGrid>
+                        <MudPaper Class="pa-3 px-4 rounded-xl" Elevation="0"
+                                  Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
+                                    <AvatarView User="@friend" />
+                                    <ScopeView Title="@friend.Username" Subtitle=@string.Format("Last Seen {0}", friend.LastLoginDate?.Date.ToShortDateString()) />
+                                </MudStack>
+                                <MudIconButton Icon="@Icons.Material.Filled.PersonRemove" Color="Color.Error"
+                                               Size="Size.Small" Variant="Variant.Text"
+                                               OnClick="@(async () => await RemoveFriend(friend.Username!))" />
+                            </MudStack>
                         </MudPaper>
                     }
                 </MudStack>

@@ -163,6 +163,8 @@ builder.Services.AddScoped<IAgentRepository, AgentRepository>();
 builder.Services.AddHttpClient("McpClient");
 builder.Services.AddSingleton<McpClientService>();
 builder.Services.AddSingleton<AgentRuntimeService>();
+builder.Services.AddSingleton<AgentChannelService>();
+builder.Services.AddSingleton<IAgentChannelResponder>(sp => sp.GetRequiredService<AgentChannelService>());
 
 // SignalR hub (from the chat server package)
 builder.Services.AddChatHub();

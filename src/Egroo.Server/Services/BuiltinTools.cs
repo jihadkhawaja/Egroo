@@ -34,6 +34,24 @@ namespace Egroo.Server.Services
                 Name = "list_timezones",
                 Description = "List available timezone names for a given region or search term. Use this to help the user find the correct timezone identifier.",
                 ParametersSchema = """{"type":"object","properties":{"search":{"type":"string","description":"Optional search term to filter timezones (e.g. 'America', 'Europe', 'Pacific')"}},"required":[]}"""
+            },
+            new()
+            {
+                Name = "search_published_agents",
+                Description = "Search for published AI agents on the platform by name or description. Use this to discover agents that can be added as friends and invited to channels.",
+                ParametersSchema = """{"type":"object","properties":{"query":{"type":"string","description":"Search term to find agents by name or description"},"max_results":{"type":"integer","description":"Maximum number of results to return (default: 10)"}},"required":["query"]}"""
+            },
+            new()
+            {
+                Name = "add_agent_friend",
+                Description = "Add a published AI agent as a friend. The agent must be published. Once added as a friend, the agent can be invited to channels.",
+                ParametersSchema = """{"type":"object","properties":{"agent_id":{"type":"string","description":"The unique ID (GUID) of the published agent to add as friend"}},"required":["agent_id"]}"""
+            },
+            new()
+            {
+                Name = "add_agent_to_channel",
+                Description = "Add an AI agent to a channel. The caller must be an admin of the channel. The agent must be owned by the caller or be a published agent that the caller has added as a friend.",
+                ParametersSchema = """{"type":"object","properties":{"channel_id":{"type":"string","description":"The unique ID (GUID) of the channel to add the agent to"},"agent_id":{"type":"string","description":"The unique ID (GUID) of the agent to add"}},"required":["channel_id","agent_id"]}"""
             }
         ];
 
@@ -55,6 +73,36 @@ namespace Egroo.Server.Services
             };
 
             return tools;
+        }
+
+        /// <summary>
+        /// Creates AITool instances that require a service scope (agent interaction tools).
+        /// These tools need DB access and are created per-invocation with a scope factory.
+        /// </summary>
+        public static IList<AITool> CreateScopedTools(IServiceScopeFactory scopeFactory, Guid callerUserId)
+        {
+            return new List<AITool>
+            {
+                AIFunctionFactory.Create(
+                    ([Description("Search term to find agents by name or description")] string query,
+                     [Description("Maximum number of results to return (default: 10)")] int? max_results) =>
+                        SearchPublishedAgentsImpl(scopeFactory, query, max_results ?? 10),
+                    "search_published_agents",
+                    "Search for published AI agents on the platform by name or description."),
+
+                AIFunctionFactory.Create(
+                    ([Description("The unique ID (GUID) of the published agent to add as friend")] string agent_id) =>
+                        AddAgentFriendImpl(scopeFactory, callerUserId, agent_id),
+                    "add_agent_friend",
+                    "Add a published AI agent as a friend."),
+
+                AIFunctionFactory.Create(
+                    ([Description("The unique ID (GUID) of the channel")] string channel_id,
+                     [Description("The unique ID (GUID) of the agent")] string agent_id) =>
+                        AddAgentToChannelImpl(scopeFactory, callerUserId, channel_id, agent_id),
+                    "add_agent_to_channel",
+                    "Add an AI agent to a channel.")
+            };
         }
 
         /// <summary>
@@ -188,6 +236,140 @@ namespace Egroo.Server.Services
             }
 
             return sb.ToString();
+        }
+
+        // ── Agent Platform Interaction Implementations ───────────────
+
+        private static async Task<string> SearchPublishedAgentsImpl(IServiceScopeFactory scopeFactory, string query, int maxResults)
+        {
+            using var scope = scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Database.DataContext>();
+
+            var agents = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+                dbContext.AgentDefinitions
+                    .Where(x => x.IsPublished && x.IsActive && x.DateDeleted == null
+                        && (x.Name.ToLower().Contains(query.ToLower())
+                            || (x.Description != null && x.Description.ToLower().Contains(query.ToLower()))))
+                    .OrderByDescending(x => x.DateCreated)
+                    .Take(maxResults));
+
+            if (agents.Count == 0)
+            {
+                return $"No published agents found matching '{query}'.";
+            }
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Found {agents.Count} published agent(s):");
+            foreach (var a in agents)
+            {
+                sb.AppendLine($"  - {a.Name} (ID: {a.Id})");
+                if (!string.IsNullOrWhiteSpace(a.Description))
+                    sb.AppendLine($"    Description: {a.Description}");
+                sb.AppendLine($"    Provider: {a.Provider}, Model: {a.Model}");
+            }
+            return sb.ToString();
+        }
+
+        private static async Task<string> AddAgentFriendImpl(IServiceScopeFactory scopeFactory, Guid callerUserId, string agentIdStr)
+        {
+            if (!Guid.TryParse(agentIdStr, out var agentId))
+            {
+                return "Invalid agent ID format. Please provide a valid GUID.";
+            }
+
+            using var scope = scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Database.DataContext>();
+
+            var agent = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.AgentDefinitions,
+                x => x.Id == agentId && x.IsPublished && x.IsActive && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return "Agent not found or is not published.";
+            }
+
+            var existing = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.UserAgentFriends,
+                x => x.UserId == callerUserId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is not null)
+            {
+                return $"Already friends with agent '{agent.Name}'.";
+            }
+
+            var friendship = new jihadkhawaja.chat.shared.Models.UserAgentFriend
+            {
+                Id = Guid.NewGuid(),
+                UserId = callerUserId,
+                AgentDefinitionId = agentId,
+                DateCreated = DateTimeOffset.UtcNow,
+                CreatedBy = callerUserId
+            };
+
+            await dbContext.UserAgentFriends.AddAsync(friendship);
+            await dbContext.SaveChangesAsync();
+
+            return $"Successfully added agent '{agent.Name}' as a friend.";
+        }
+
+        private static async Task<string> AddAgentToChannelImpl(IServiceScopeFactory scopeFactory, Guid callerUserId, string channelIdStr, string agentIdStr)
+        {
+            if (!Guid.TryParse(channelIdStr, out var channelId) || !Guid.TryParse(agentIdStr, out var agentId))
+            {
+                return "Invalid ID format. Please provide valid GUIDs.";
+            }
+
+            using var scope = scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<Database.DataContext>();
+
+            // Verify channel admin
+            var isAdmin = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                dbContext.ChannelUsers,
+                x => x.ChannelId == channelId && x.UserId == callerUserId && x.IsAdmin);
+
+            if (!isAdmin)
+            {
+                return "You must be a channel admin to add agents.";
+            }
+
+            var agent = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.AgentDefinitions,
+                x => x.Id == agentId && x.IsActive && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return "Agent not found or is not active.";
+            }
+
+            if (agent.UserId != callerUserId && !agent.IsPublished)
+            {
+                return "Agent is not published and you are not the owner.";
+            }
+
+            var existing = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.ChannelAgents,
+                x => x.ChannelId == channelId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+            if (existing is not null)
+            {
+                return $"Agent '{agent.Name}' is already in the channel.";
+            }
+
+            var channelAgent = new jihadkhawaja.chat.shared.Models.ChannelAgent
+            {
+                Id = Guid.NewGuid(),
+                ChannelId = channelId,
+                AgentDefinitionId = agentId,
+                AddedByUserId = callerUserId,
+                DateCreated = DateTimeOffset.UtcNow,
+                CreatedBy = callerUserId
+            };
+
+            await dbContext.ChannelAgents.AddAsync(channelAgent);
+            await dbContext.SaveChangesAsync();
+
+            return $"Successfully added agent '{agent.Name}' to the channel.";
         }
     }
 
