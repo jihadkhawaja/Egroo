@@ -16,57 +16,74 @@
 @inject IUser ChatUserService
 @inject ISnackbar Snackbar
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-10 pt-8">
-    <MudIconButton Icon="@Icons.Material.Filled.Home" Href="/" Size="Size.Large" Class="mb-4" />
-    <MudText GutterBottom Color="Color.Secondary" Typo="Typo.h6">Sign Up</MudText>
-    <MudText>
-        Already have an account? <span><MudButton Href="signin">SIGNIN</MudButton></span>
-    </MudText>
+<div style="min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px;">
+    <MudStack AlignItems="AlignItems.Center" Spacing="6" Style="width: 100%; max-width: 420px;">
+        <!-- Logo & Branding -->
+        <MudStack AlignItems="AlignItems.Center" Spacing="2">
+            <MudImage Src="_content/Egroo.UI/favicon-32x32.png" Alt="Egroo" Width="40" Height="40" />
+            <MudText Typo="Typo.h5" Style="font-weight: 700; letter-spacing: -0.02em;">Create account</MudText>
+            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.5);">
+                Join Egroo and start chatting
+            </MudText>
+        </MudStack>
 
-    <MudGrid Class="mt-8" Justify="Justify.Center">
-        <MudItem xs="12" sm="8" md="6">
-            <MudCard Elevation="25" Class="rounded-lg pb-4">
-                <MudCardHeader>
-                    <CardHeaderContent>
-                        <MudText Typo="Typo.h5" Align="Align.Center">Create Account</MudText>
-                    </CardHeaderContent>
-                </MudCardHeader>
-                <MudCardContent>
-                    <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
-                        <MudTextField @bind-Value="model.Username"
-                                      For="@(() => model.Username)"
-                                      Immediate="true" Required
-                                      Label="Username" />
+        <!-- Sign Up Card -->
+        <MudPaper Class="pa-6 rounded-xl" Elevation="0" Style="width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+            <MudForm Model="@model" @ref="@form" Validation="@(UserValidator.ValidateValue)" ValidationDelay="0">
+                <MudStack Spacing="4">
+                    <MudTextField @bind-Value="model.Username"
+                                  For="@(() => model.Username)"
+                                  Immediate="true" Required
+                                  Label="Username" Variant="Variant.Outlined" />
 
-                        <MudTextField @bind-Value="Password"
-                                      For="@(() => Password)"
-                                      Immediate="true" Required
-                                      T="string"
-                                      Label="Password"
-                                      HelperText="Choose a strong password"
-                                      @ref="pwField1"
-                                      InputType="InputType.Password"
-                                      Validation="@( (Func<string, string>)(x => PasswordValidator.ValidatePassword(x)) )" />
+                    <MudTextField @bind-Value="Password"
+                                  For="@(() => Password)"
+                                  Immediate="true" Required
+                                  T="string"
+                                  Label="Password"
+                                  HelperText="Min 8 chars, uppercase, lowercase, number, symbol"
+                                  @ref="pwField1"
+                                  InputType="InputType.Password" Variant="Variant.Outlined"
+                                  Validation="@( (Func<string, string>)(x => PasswordValidator.ValidatePassword(x)) )" />
 
-                        <MudTextField @bind-Value="ConfirmPassword"
-                                      T="string"
-                                      Label="Confirm Password"
-                                      HelperText="Repeat the password"
-                                      InputType="InputType.Password"
-                                      @ref="confirmPasswordField"
-                                      Validation="@( (Func<string, string>)(x => PasswordMatch(x)) )"
-                                      Required />
-                    </MudForm>
-                </MudCardContent>
-                <MudCardActions Class="d-flex justify-center">
+                    <MudTextField @bind-Value="ConfirmPassword"
+                                  T="string"
+                                  Label="Confirm Password"
+                                  HelperText="Repeat the password"
+                                  InputType="InputType.Password" Variant="Variant.Outlined"
+                                  @ref="confirmPasswordField"
+                                  Validation="@( (Func<string, string>)(x => PasswordMatch(x)) )"
+                                  Required />
+
                     <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
-                               Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
-                               Style="width:50%;">SUBMIT</MudButton>
-                </MudCardActions>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-</MudContainer>
+                               Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth
+                               Style="border-radius: 12px; height: 48px; font-size: 0.95rem; text-transform: none;">
+                        @if (IsBusy)
+                        {
+                            <MudProgressCircular Size="Size.Small" Color="Color.Inherit" Indeterminate />
+                        }
+                        else
+                        {
+                            <span>Create Account</span>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudForm>
+        </MudPaper>
+
+        <!-- Footer links -->
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.5);">Already have an account?</MudText>
+            <MudButton Variant="Variant.Text" Color="Color.Primary" Href="/signin"
+                       Style="text-transform: none; font-weight: 600;">Sign In</MudButton>
+        </MudStack>
+        <MudButton Variant="Variant.Text" Color="Color.Default" Href="/" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.ArrowBack"
+                   Style="text-transform: none; color: rgba(255,255,255,0.4);">
+            Back to home
+        </MudButton>
+    </MudStack>
+</div>
 
 @code {
     MudForm form;

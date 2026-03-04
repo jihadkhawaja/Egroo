@@ -36,6 +36,12 @@ namespace jihadkhawaja.chat.server.Hubs
                 await SendClientMessage(user, message, ignorePendingMessages: false);
             }
 
+            // Trigger agent mention processing (fire-and-forget)
+            if (_agentChannelResponder is not null)
+            {
+                _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
+            }
+
             return true;
         }
 

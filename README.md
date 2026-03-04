@@ -24,6 +24,12 @@ A **self-hosted**, **real-time** chat web application built using **Blazor** and
   - Secure, peer-to-peer mesh network WebRTC voice calls within channels.
 - **Message Privacy**: 
   - Messages are automatically deleted after delivery, ensuring confidentiality.
+- **AI Agents in Channels**:
+  - Create personal AI agents powered by your own LLM provider (OpenAI, Azure OpenAI, Anthropic, Ollama).
+  - Publish agents so other users can discover and add them as friends.
+  - Add agents to channels — they respond automatically when @mentioned.
+  - Supports names with spaces via `@<Agent Name>` mention syntax.
+  - Agents have access to built-in tools including the ability to search, friend, and add other agents to channels.
 - **Self-hosted Infrastructure**: 
   - Full control over your data with a customizable backend.
 
@@ -60,6 +66,40 @@ sequenceDiagram
 
     Note over Repo: Content is never stored<br/>permanently — only until delivered
 ```
+
+## 🤖 How Agent Mentions Work
+
+When an agent is added to a channel, it listens for `@mentions` and replies in real time. The response is delivered via the same SignalR pipeline as regular messages.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as Egroo.UI
+    participant Hub as ChatHub
+    participant Responder as AgentChannelService
+    participant LLM as LLM Provider
+    participant Channel as Channel Members
+
+    User->>UI: Types @AgentName hello!
+    UI->>Hub: SignalR · SendMessage(message)
+    Hub->>Hub: Save & broadcast to members
+    Hub->>Responder: ProcessMentionsAsync(message)
+    Note over Responder: Detects @AgentName or @<Agent Name>
+    Responder->>Responder: Load last 20 messages as context
+    Responder->>LLM: Run agent with instructions + context
+    LLM-->>Responder: Agent response text
+    Responder->>Hub: Broadcast agent reply via IHubContext
+    Hub-->>Channel: SignalR · ReceiveMessage(agentMessage)
+    Note over Channel: Message shows agent name + bot icon
+```
+
+**Key points:**
+- Agent replies are fire-and-forget — `SendMessage` returns immediately; the agent response arrives as a follow-up `ReceiveMessage` event.
+- Any agent in a channel can be mentioned using `@AgentName` (single word) or `@<Agent Name>` (names with spaces).
+- Only agents that are **Active** and **assigned to the channel** will respond.
+- The last 20 channel messages are included as conversation context.
+
+---
 
 ## 📞 How Channel Voice Calls Work
 

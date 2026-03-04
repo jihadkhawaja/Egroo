@@ -1,6 +1,20 @@
 function scrollToEnd(id) {
-    let scroll_to_bottom = document.getElementById(id);
-    scroll_to_bottom.scrollTop = scroll_to_bottom.scrollHeight + 280;
+    let el = document.getElementById(id);
+    if (el) {
+        el.scrollTop = el.scrollHeight;
+    }
+}
+
+function isNearBottom(id, threshold) {
+    let el = document.getElementById(id);
+    if (!el) return true;
+    return (el.scrollHeight - el.scrollTop - el.clientHeight) <= (threshold || 150);
+}
+
+function scrollToEndIfNearBottom(id, threshold) {
+    if (isNearBottom(id, threshold)) {
+        scrollToEnd(id);
+    }
 }
 
 window.onbeforeunload = function () {

@@ -287,6 +287,83 @@ connection.On<Guid>("ChannelChange", (channelId) =>
 });
 ```
 
+## 🤖 AI Agents (REST)
+
+All agent endpoints are under `/api/v1/Agent` and require a valid JWT unless noted.
+
+### Agent CRUD
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/Agent` | Create a new agent |
+| `GET` | `/api/v1/Agent` | List the authenticated user's agents |
+| `GET` | `/api/v1/Agent/{agentId}` | Get a single agent |
+| `PUT` | `/api/v1/Agent/{agentId}` | Update agent settings |
+| `DELETE` | `/api/v1/Agent/{agentId}` | Delete an agent |
+
+### Publishing
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/v1/Agent/{agentId}/publish` | Required | Make the agent discoverable by all users |
+| `POST` | `/api/v1/Agent/{agentId}/unpublish` | Required | Remove the agent from public discovery |
+| `GET` | `/api/v1/Agent/published/search?query=` | Anonymous | Search published agents by name |
+| `GET` | `/api/v1/Agent/published/{agentId}` | Anonymous | Get a specific published agent's public details |
+
+### Agent Friends
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/Agent/friends/{agentId}` | Add a published agent as a friend |
+| `DELETE` | `/api/v1/Agent/friends/{agentId}` | Remove an agent friend |
+| `GET` | `/api/v1/Agent/friends` | List all agent friends |
+| `GET` | `/api/v1/Agent/friends/{agentId}/check` | Check if an agent is already a friend |
+
+### Channel Agents
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/Agent/channel/{channelId}/agents/{agentId}` | Add an agent to a channel (caller must be channel admin and the agent must be owned by the caller or be a published friend) |
+| `DELETE` | `/api/v1/Agent/channel/{channelId}/agents/{agentId}` | Remove an agent from a channel |
+| `GET` | `/api/v1/Agent/channel/{channelId}/agents` | List all agents in a channel |
+
+### Knowledge, Tools, MCP Servers & Conversations
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/Agent/{agentId}/knowledge` | Add a knowledge item |
+| `GET` | `/api/v1/Agent/{agentId}/knowledge` | List knowledge items |
+| `PUT` | `/api/v1/Agent/knowledge/{knowledgeId}` | Update a knowledge item |
+| `DELETE` | `/api/v1/Agent/knowledge/{knowledgeId}` | Delete a knowledge item |
+| `POST` | `/api/v1/Agent/{agentId}/tools` | Add a tool |
+| `GET` | `/api/v1/Agent/{agentId}/tools` | List tools |
+| `PUT` | `/api/v1/Agent/tools/{toolId}` | Update a tool |
+| `DELETE` | `/api/v1/Agent/tools/{toolId}` | Delete a tool |
+| `GET` | `/api/v1/Agent/builtin-tools` | List available built-in tool definitions |
+| `POST` | `/api/v1/Agent/{agentId}/seed-builtin-tools` | Seed default built-in tools for an agent |
+| `POST` | `/api/v1/Agent/{agentId}/mcp-servers` | Connect an MCP server |
+| `GET` | `/api/v1/Agent/{agentId}/mcp-servers` | List connected MCP servers |
+| `PUT` | `/api/v1/Agent/mcp-servers/{serverId}` | Update an MCP server |
+| `DELETE` | `/api/v1/Agent/mcp-servers/{serverId}` | Remove an MCP server |
+| `POST` | `/api/v1/Agent/mcp-servers/{serverId}/discover` | Discover and sync tools from the MCP server |
+| `POST` | `/api/v1/Agent/{agentId}/conversations` | Create a conversation |
+| `GET` | `/api/v1/Agent/{agentId}/conversations` | List conversations |
+| `DELETE` | `/api/v1/Agent/conversations/{conversationId}` | Delete a conversation |
+| `GET` | `/api/v1/Agent/conversations/{conversationId}/messages` | Get messages in a conversation |
+| `POST` | `/api/v1/Agent/conversations/{conversationId}/chat` | Send a message (non-streaming) |
+| `POST` | `/api/v1/Agent/conversations/{conversationId}/chat/stream` | Send a message (SSE streaming) |
+
+**Example — add an agent to a channel:**
+```http
+POST /api/v1/Agent/channel/{channelId}/agents/{agentId}
+Authorization: Bearer <jwt>
+```
+
+**Example — search published agents:**
+```http
+GET /api/v1/Agent/published/search?query=assistant
+```
+
 ---
 
 ## 📦 Data Models
@@ -324,6 +401,7 @@ Returned by the change password endpoint.
 
 ### `Message`
 > `content` and `displayName` are transport-only fields — they are **not stored** in the Messages table.
+> `agentDefinitionId` is set on messages produced by an AI agent.
 
 ```json
 {
@@ -331,10 +409,37 @@ Returned by the change password endpoint.
   "senderId": "guid",
   "channelId": "guid",
   "referenceId": "guid",
+  "agentDefinitionId": "guid or null",
   "dateSent": "2024-01-01T00:00:00Z or null",
   "dateSeen": "2024-01-01T00:00:00Z or null",
   "displayName": "sender display name (not persisted)",
   "content": "message text (not persisted)"
+}
+```
+
+### `AgentDefinition`
+```json
+{
+  "id": "guid",
+  "userId": "guid",
+  "name": "My Assistant",
+  "description": "string or null",
+  "instructions": "You are a helpful assistant...",
+  "provider": "OpenAI",
+  "model": "gpt-4o",
+  "isActive": true,
+  "isPublished": false,
+  "temperature": 0.7,
+  "maxTokens": 2048
+}
+```
+
+### `UserAgentFriend`
+```json
+{
+  "id": "guid",
+  "userId": "guid",
+  "agentDefinitionId": "guid"
 }
 ```
 

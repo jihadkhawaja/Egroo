@@ -1,0 +1,595 @@
+@using jihadkhawaja.chat.client.Services
+@inject AgentService AgentService
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+            <MudText Typo="Typo.h6">@(IsNew ? "Create Agent" : $"Configure: {Agent.Name}")</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudTabs Elevation="0" Rounded ApplyEffectsToContainer TabPanelClass="pa-4">
+            <!-- General Tab -->
+            <MudTabPanel Text="General" Icon="@Icons.Material.Filled.Settings">
+                <MudForm @ref="generalForm">
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="Agent.Name" Label="Agent Name" Required RequiredError="Name is required"
+                                      MaxLength="200" Counter="200" />
+                        <MudTextField @bind-Value="Agent.Description" Label="Description" Lines="2" MaxLength="2000" />
+                        <MudTextField @bind-Value="Agent.Instructions" Label="System Instructions"
+                                      HelperText="Tell the agent who it is and how it should behave."
+                                      Lines="6" Placeholder="You are a helpful assistant..." />
+                    </MudStack>
+                </MudForm>
+            </MudTabPanel>
+
+            <!-- LLM Provider Tab -->
+            <MudTabPanel Text="Provider" Icon="@Icons.Material.Filled.Cloud">
+                <MudStack Spacing="3">
+                    <MudSelect T="LlmProvider" @bind-Value="Agent.Provider" Label="LLM Provider" Required>
+                        <MudSelectItem Value="LlmProvider.OpenAI">OpenAI</MudSelectItem>
+                        <MudSelectItem Value="LlmProvider.AzureOpenAI">Azure OpenAI</MudSelectItem>
+                        <MudSelectItem Value="LlmProvider.Anthropic">Anthropic (Claude)</MudSelectItem>
+                        <MudSelectItem Value="LlmProvider.Ollama">Ollama (Local)</MudSelectItem>
+                    </MudSelect>
+
+                    <MudTextField @bind-Value="Agent.Model" Label="Model" Required RequiredError="Model is required"
+                                  Placeholder="@GetModelPlaceholder()" HelperText="@GetModelHelper()" />
+
+                    @if (Agent.Provider != LlmProvider.Ollama)
+                    {
+                        <MudTextField @bind-Value="Agent.ApiKey" Label="API Key" Required
+                                      RequiredError="API key is required"
+                                      InputType="@(showApiKey ? InputType.Text : InputType.Password)"
+                                      Adornment="Adornment.End"
+                                      AdornmentIcon="@(showApiKey ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                      OnAdornmentClick="() => showApiKey = !showApiKey"
+                                      HelperText="Your key is encrypted and stored securely." />
+                    }
+
+                    @if (Agent.Provider is LlmProvider.AzureOpenAI or LlmProvider.Ollama)
+                    {
+                        <MudTextField @bind-Value="Agent.Endpoint" Label="Endpoint URL"
+                                      Placeholder="@GetEndpointPlaceholder()"
+                                      HelperText="@GetEndpointHelper()" />
+                    }
+
+                    <MudStack Row Spacing="4">
+                        <MudNumericField @bind-Value="Agent.Temperature" Label="Temperature"
+                                         Min="0f" Max="2f" Step="0.1f"
+                                         HelperText="0 = deterministic, 2 = creative" />
+                        <MudNumericField @bind-Value="Agent.MaxTokens" Label="Max Tokens"
+                                         Min="1" Max="128000"
+                                         HelperText="Maximum response length" />
+                    </MudStack>
+                </MudStack>
+            </MudTabPanel>
+
+            <!-- Knowledge Tab -->
+            <MudTabPanel Text="Knowledge" Icon="@Icons.Material.Filled.MenuBook" BadgeData="@knowledgeItems?.Length" ShowBadge="@(knowledgeItems?.Length > 0)">
+                <MudStack Spacing="3">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">
+                        Add knowledge items your agent can reference when responding. These are injected into the system prompt.
+                    </MudText>
+
+                    @if (!IsNew)
+                    {
+                        @if (knowledgeItems is not null && knowledgeItems.Length > 0)
+                        {
+                            @foreach (var item in knowledgeItems)
+                            {
+                                <MudPaper Class="pa-3" Elevation="2" Outlined>
+                                    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudStack>
+                                            <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary" Style="max-height: 40px; overflow: hidden;">
+                                                @(item.Content.Length > 120 ? item.Content[..120] + "..." : item.Content)
+                                            </MudText>
+                                        </MudStack>
+                                        <MudStack Row Spacing="1">
+                                            <MudSwitch T="bool" Value="@item.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                       ValueChanged="@(val => ToggleKnowledge(item, val))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                                           OnClick="@(() => EditKnowledge(item))" />
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                           OnClick="@(() => DeleteKnowledge(item))" />
+                                        </MudStack>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        }
+
+                        <MudPaper Class="pa-3" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle2">Add Knowledge</MudText>
+                                <MudTextField @bind-Value="newKnowledgeTitle" Label="Title" MaxLength="500" />
+                                <MudTextField @bind-Value="newKnowledgeContent" Label="Content" Lines="4" />
+                                <MudButton OnClick="AddKnowledge" Variant="Variant.Outlined" Color="Color.Primary"
+                                           Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                                           Disabled="@(string.IsNullOrWhiteSpace(newKnowledgeTitle) || string.IsNullOrWhiteSpace(newKnowledgeContent))">
+                                    Add
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">
+                            Save the agent first, then you can add knowledge items.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudTabPanel>
+
+            <!-- Tools Tab -->
+            <MudTabPanel Text="Tools" Icon="@Icons.Material.Filled.Build" BadgeData="@toolItems?.Length" ShowBadge="@(toolItems?.Length > 0)">
+                <MudStack Spacing="3">
+                    @if (!IsNew)
+                    {
+                        <!-- Built-in Tools Section -->
+                        <MudText Typo="Typo.subtitle1" Class="mt-2">
+                            <MudIcon Icon="@Icons.Material.Filled.Extension" Size="Size.Small" Class="mr-1" />
+                            Built-in Tools
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Platform-provided tools your agent can use. Click "Add Built-in Tools" to seed them.
+                        </MudText>
+
+                        @if (GetBuiltinToolItems()?.Length > 0)
+                        {
+                            @foreach (var tool in GetBuiltinToolItems()!)
+                            {
+                                <MudPaper Class="pa-3" Elevation="1" Outlined>
+                                    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <MudStack>
+                                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">builtin</MudChip>
+                                                <MudText Typo="Typo.subtitle2">@tool.Name</MudText>
+                                            </MudStack>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@tool.Description</MudText>
+                                        </MudStack>
+                                        <MudSwitch T="bool" Value="@tool.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                   ValueChanged="@(val => ToggleTool(tool, val))" />
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2" Color="Color.Default" Class="ml-2">No built-in tools added yet.</MudText>
+                        }
+
+                        <MudButton OnClick="SeedBuiltinTools" Variant="Variant.Outlined" Color="Color.Primary"
+                                   Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                                   Disabled="@seedingBuiltins">
+                            @(seedingBuiltins ? "Adding..." : "Add Built-in Tools")
+                        </MudButton>
+
+                        <MudDivider Class="my-2" />
+
+                        <!-- MCP Server Connections Section -->
+                        <MudText Typo="Typo.subtitle1">
+                            <MudIcon Icon="@Icons.Material.Filled.Hub" Size="Size.Small" Class="mr-1" />
+                            MCP Server Connections
+                        </MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Connect to MCP (Model Context Protocol) servers to discover and use their tools.
+                        </MudText>
+
+                        @if (mcpServers is not null && mcpServers.Length > 0)
+                        {
+                            @foreach (var server in mcpServers)
+                            {
+                                <MudPaper Class="pa-3" Elevation="2" Outlined>
+                                    <MudStack Spacing="2">
+                                        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                                <MudIcon Icon="@Icons.Material.Filled.Cloud" Color="@(server.IsActive ? Color.Success : Color.Default)" />
+                                                <MudStack Spacing="0">
+                                                    <MudText Typo="Typo.subtitle2">@server.Name</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">@server.Endpoint</MudText>
+                                                    @if (server.LastDiscoveredAt.HasValue)
+                                                    {
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                                            Last discovered: @server.LastDiscoveredAt.Value.ToLocalTime().ToString("MMM dd, HH:mm")
+                                                        </MudText>
+                                                    }
+                                                </MudStack>
+                                            </MudStack>
+                                            <MudStack Row Spacing="1">
+                                                <MudSwitch T="bool" Value="@server.IsActive" Color="Color.Success" Size="Size.Small"
+                                                           ValueChanged="@(val => ToggleMcpServer(server, val))" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Color="Color.Primary"
+                                                               OnClick="@(() => DiscoverTools(server))"
+                                                               Disabled="@discoveringServer" />
+                                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                               OnClick="@(() => DeleteMcpServer(server))" />
+                                            </MudStack>
+                                        </MudStack>
+
+                                        @* Show tools from this MCP server *@
+                                        @if (GetMcpToolsForServer(server.Id)?.Length > 0)
+                                        {
+                                            <MudDivider />
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">@GetMcpToolsForServer(server.Id)!.Length tool(s) available:</MudText>
+                                            @foreach (var tool in GetMcpToolsForServer(server.Id)!)
+                                            {
+                                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="ml-4">
+                                                    <MudStack Spacing="0">
+                                                        <MudText Typo="Typo.body2">@tool.Name</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @(tool.Description.Length > 80 ? tool.Description[..80] + "..." : tool.Description)
+                                                        </MudText>
+                                                    </MudStack>
+                                                    <MudSwitch T="bool" Value="@tool.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                               ValueChanged="@(val => ToggleTool(tool, val))" />
+                                                </MudStack>
+                                            }
+                                        }
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                        }
+
+                        <!-- Add MCP Server Form -->
+                        <MudPaper Class="pa-3" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle2">Connect MCP Server</MudText>
+                                <MudTextField @bind-Value="newMcpName" Label="Server Name" MaxLength="200"
+                                              Placeholder="e.g. My MCP Server" />
+                                <MudTextField @bind-Value="newMcpEndpoint" Label="Endpoint URL" MaxLength="1000"
+                                              Placeholder="https://mcp-server.example.com/mcp" />
+                                <MudTextField @bind-Value="newMcpApiKey" Label="API Key / Bearer Token (optional)"
+                                              InputType="InputType.Password" />
+                                <MudButton OnClick="AddMcpServer" Variant="Variant.Outlined" Color="Color.Primary"
+                                           Size="Size.Small" StartIcon="@Icons.Material.Filled.Add"
+                                           Disabled="@(string.IsNullOrWhiteSpace(newMcpName) || string.IsNullOrWhiteSpace(newMcpEndpoint) || addingMcpServer)">
+                                    @(addingMcpServer ? "Connecting..." : "Connect & Discover Tools")
+                                </MudButton>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info">
+                            Save the agent first, then you can configure tools and MCP connections.
+                        </MudAlert>
+                    }
+                </MudStack>
+            </MudTabPanel>
+        </MudTabs>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Cancel</MudButton>
+        <MudButton OnClick="Save" Variant="Variant.Filled" Color="Color.Primary"
+                   Disabled="@saving" StartIcon="@(saving ? Icons.Material.Filled.HourglassEmpty : Icons.Material.Filled.Save)">
+            @(IsNew ? "Create" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public AgentDefinition Agent { get; set; } = new();
+
+    [Parameter]
+    public bool IsNew { get; set; }
+
+    private MudForm? generalForm;
+    private bool showApiKey;
+    private bool saving;
+
+    // Knowledge
+    private AgentKnowledge[]? knowledgeItems;
+    private string newKnowledgeTitle = string.Empty;
+    private string newKnowledgeContent = string.Empty;
+
+    // Tools
+    private AgentTool[]? toolItems;
+
+    // MCP Servers
+    private AgentMcpServer[]? mcpServers;
+    private string newMcpName = string.Empty;
+    private string newMcpEndpoint = string.Empty;
+    private string newMcpApiKey = string.Empty;
+    private bool addingMcpServer;
+    private bool discoveringServer;
+    private bool seedingBuiltins;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!IsNew)
+        {
+            await Task.WhenAll(LoadKnowledge(), LoadTools(), LoadMcpServers());
+        }
+    }
+
+    // ── Save / Cancel ────────────────────────────────────────────────
+
+    private async Task Save()
+    {
+        if (generalForm is not null)
+        {
+            await generalForm.Validate();
+            if (!generalForm.IsValid) return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Agent.Name) || string.IsNullOrWhiteSpace(Agent.Model))
+        {
+            Snackbar.Add("Name and Model are required.", Severity.Warning);
+            return;
+        }
+
+        saving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsNew)
+            {
+                var created = await AgentService.CreateAgent(Agent);
+                if (created is not null)
+                {
+                    Snackbar.Add("Agent created!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(created));
+                }
+                else
+                {
+                    Snackbar.Add("Failed to create agent.", Severity.Error);
+                }
+            }
+            else
+            {
+                var success = await AgentService.UpdateAgent(Agent);
+                if (success)
+                {
+                    Snackbar.Add("Agent saved!", Severity.Success);
+                    MudDialog.Close(DialogResult.Ok(Agent));
+                }
+                else
+                {
+                    Snackbar.Add("Failed to save agent.", Severity.Error);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    // ── Knowledge ────────────────────────────────────────────────────
+
+    private async Task LoadKnowledge()
+    {
+        knowledgeItems = await AgentService.GetKnowledge(Agent.Id);
+    }
+
+    private async Task AddKnowledge()
+    {
+        var item = new AgentKnowledge
+        {
+            AgentDefinitionId = Agent.Id,
+            Title = newKnowledgeTitle,
+            Content = newKnowledgeContent,
+            IsEnabled = true
+        };
+
+        var result = await AgentService.AddKnowledge(Agent.Id, item);
+        if (result is not null)
+        {
+            newKnowledgeTitle = string.Empty;
+            newKnowledgeContent = string.Empty;
+            await LoadKnowledge();
+            Snackbar.Add("Knowledge added.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to add knowledge.", Severity.Error);
+        }
+    }
+
+    private async Task EditKnowledge(AgentKnowledge item)
+    {
+        // Inline edit — toggle to edit mode via a simple prompt
+        newKnowledgeTitle = item.Title;
+        newKnowledgeContent = item.Content;
+        await DeleteKnowledge(item);
+    }
+
+    private async Task ToggleKnowledge(AgentKnowledge item, bool enabled)
+    {
+        item.IsEnabled = enabled;
+        await AgentService.UpdateKnowledge(item);
+        StateHasChanged();
+    }
+
+    private async Task DeleteKnowledge(AgentKnowledge item)
+    {
+        await AgentService.DeleteKnowledge(item.Id);
+        await LoadKnowledge();
+    }
+
+    // ── Tools ────────────────────────────────────────────────────────
+
+    private async Task LoadTools()
+    {
+        toolItems = await AgentService.GetTools(Agent.Id);
+    }
+
+    private async Task ToggleTool(AgentTool tool, bool enabled)
+    {
+        tool.IsEnabled = enabled;
+        await AgentService.UpdateTool(tool);
+        StateHasChanged();
+    }
+
+    private async Task SeedBuiltinTools()
+    {
+        seedingBuiltins = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AgentService.SeedBuiltinTools(Agent.Id);
+            if (result is not null && result.Added > 0)
+            {
+                Snackbar.Add($"{result.Added} built-in tool(s) added.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Built-in tools already present.", Severity.Info);
+            }
+            await LoadTools();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            seedingBuiltins = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── MCP Servers ──────────────────────────────────────────────────
+
+    private async Task LoadMcpServers()
+    {
+        mcpServers = await AgentService.GetMcpServers(Agent.Id);
+    }
+
+    private async Task AddMcpServer()
+    {
+        addingMcpServer = true;
+        StateHasChanged();
+
+        try
+        {
+            var server = await AgentService.AddMcpServer(Agent.Id, newMcpName.Trim(), newMcpEndpoint.Trim(),
+                string.IsNullOrWhiteSpace(newMcpApiKey) ? null : newMcpApiKey);
+
+            if (server is not null)
+            {
+                newMcpName = string.Empty;
+                newMcpEndpoint = string.Empty;
+                newMcpApiKey = string.Empty;
+
+                Snackbar.Add("MCP server connected. Discovering tools...", Severity.Success);
+                await LoadMcpServers();
+
+                // Automatically discover tools
+                await DiscoverTools(server);
+            }
+            else
+            {
+                Snackbar.Add("Failed to add MCP server.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            addingMcpServer = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleMcpServer(AgentMcpServer server, bool active)
+    {
+        server.IsActive = active;
+        await AgentService.UpdateMcpServer(server);
+        await LoadMcpServers();
+    }
+
+    private async Task DiscoverTools(AgentMcpServer server)
+    {
+        discoveringServer = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AgentService.DiscoverMcpTools(server.Id);
+            if (result is not null)
+            {
+                Snackbar.Add($"Discovered {result.Discovered} tool(s) from {server.Name}.", Severity.Success);
+                await Task.WhenAll(LoadTools(), LoadMcpServers());
+            }
+            else
+            {
+                Snackbar.Add("Tool discovery failed. Check the endpoint and try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Discovery error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            discoveringServer = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteMcpServer(AgentMcpServer server)
+    {
+        await AgentService.DeleteMcpServer(server.Id);
+        await Task.WhenAll(LoadTools(), LoadMcpServers());
+        Snackbar.Add("MCP server removed.", Severity.Info);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────
+
+    private AgentTool[]? GetBuiltinToolItems() =>
+        toolItems?.Where(t => t.Source == AgentToolSource.Builtin).ToArray();
+
+    private AgentTool[]? GetMcpToolsForServer(Guid serverId) =>
+        toolItems?.Where(t => t.Source == AgentToolSource.Mcp && t.McpServerId == serverId).ToArray();
+
+    private string GetModelPlaceholder() => Agent.Provider switch
+    {
+        LlmProvider.OpenAI => "gpt-4o",
+        LlmProvider.AzureOpenAI => "gpt-4o",
+        LlmProvider.Anthropic => "claude-sonnet-4-20250514",
+        LlmProvider.Ollama => "llama3.1",
+        _ => "model-name"
+    };
+
+    private string GetModelHelper() => Agent.Provider switch
+    {
+        LlmProvider.OpenAI => "OpenAI model name (e.g. gpt-4o, gpt-4o-mini, o1-mini)",
+        LlmProvider.AzureOpenAI => "Your Azure deployment name",
+        LlmProvider.Anthropic => "Claude model (e.g. claude-sonnet-4-20250514, claude-3-haiku-20240307)",
+        LlmProvider.Ollama => "Local Ollama model (e.g. llama3.1, mistral, phi3)",
+        _ => string.Empty
+    };
+
+    private string GetEndpointPlaceholder() => Agent.Provider switch
+    {
+        LlmProvider.AzureOpenAI => "https://your-resource.openai.azure.com/",
+        LlmProvider.Ollama => "http://localhost:11434",
+        _ => string.Empty
+    };
+
+    private string GetEndpointHelper() => Agent.Provider switch
+    {
+        LlmProvider.AzureOpenAI => "Your Azure OpenAI resource endpoint",
+        LlmProvider.Ollama => "Leave blank for default localhost:11434",
+        _ => string.Empty
+    };
+}

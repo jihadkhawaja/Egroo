@@ -80,6 +80,413 @@ namespace Egroo.Server.Migrations
                     b.ToTable("users");
                 });
 
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("SessionState")
+                        .HasColumnType("text")
+                        .HasColumnName("sessionstate");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId", "UserId");
+
+                    b.ToTable("agentconversations");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentConversationMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentconversationid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("role");
+
+                    b.Property<int?>("TokensUsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("tokensused");
+
+                    b.Property<string>("ToolCallId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("toolcallid");
+
+                    b.Property<string>("ToolName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("toolname");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentConversationId");
+
+                    b.ToTable("agentconversationmessages");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ApiKey")
+                        .HasColumnType("text")
+                        .HasColumnName("apikey");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Endpoint")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<string>("Instructions")
+                        .HasColumnType("text")
+                        .HasColumnName("instructions");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean")
+                        .HasColumnName("ispublished");
+
+                    b.Property<int?>("MaxTokens")
+                        .HasColumnType("integer")
+                        .HasColumnName("maxtokens");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("model");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Provider")
+                        .HasColumnType("integer")
+                        .HasColumnName("provider");
+
+                    b.Property<float?>("Temperature")
+                        .HasColumnType("real")
+                        .HasColumnName("temperature");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("agentdefinitions");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentKnowledge", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isenabled");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("title");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId");
+
+                    b.ToTable("agentknowledgeitems");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentMcpServer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<string>("ApiKey")
+                        .HasColumnType("text")
+                        .HasColumnName("apikey");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("Endpoint")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("endpoint");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isactive");
+
+                    b.Property<DateTimeOffset?>("LastDiscoveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastdiscoveredat");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId");
+
+                    b.ToTable("agentmcpservers");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentTool", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isenabled");
+
+                    b.Property<Guid?>("McpServerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("mcpserverid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParametersSchema")
+                        .HasColumnType("text")
+                        .HasColumnName("parametersschema");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId");
+
+                    b.ToTable("agenttools");
+                });
+
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Channel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -122,6 +529,57 @@ namespace Egroo.Server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("channels");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelAgent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("addedbyuserid");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<Guid>("ChannelId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("channelid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChannelId", "AgentDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("channelagents");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelUser", b =>
@@ -179,6 +637,10 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
                     b.Property<Guid>("ChannelId")
                         .HasColumnType("uuid")
                         .HasColumnName("channelid");
@@ -226,6 +688,53 @@ namespace Egroo.Server.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("messages");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserAgentFriend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "AgentDefinitionId")
+                        .IsUnique();
+
+                    b.ToTable("useragentfriends");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserDetail", b =>

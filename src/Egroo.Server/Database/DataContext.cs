@@ -36,6 +36,39 @@ namespace Egroo.Server.Database
                     b.WithOwner().HasForeignKey("UserId");
                     b.HasKey("UserId");
                 });
+
+            // Agent entity indexes
+            modelBuilder.Entity<AgentDefinition>()
+                .HasIndex(x => x.UserId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<AgentKnowledge>()
+                .HasIndex(x => x.AgentDefinitionId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<AgentTool>()
+                .HasIndex(x => x.AgentDefinitionId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<AgentMcpServer>()
+                .HasIndex(x => x.AgentDefinitionId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<AgentConversation>()
+                .HasIndex(x => new { x.AgentDefinitionId, x.UserId })
+                .IsUnique(false);
+
+            modelBuilder.Entity<AgentConversationMessage>()
+                .HasIndex(x => x.AgentConversationId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<ChannelAgent>()
+                .HasIndex(x => new { x.ChannelId, x.AgentDefinitionId })
+                .IsUnique(true);
+
+            modelBuilder.Entity<UserAgentFriend>()
+                .HasIndex(x => new { x.UserId, x.AgentDefinitionId })
+                .IsUnique(true);
         }
 
         public DbSet<User> Users { get; set; }
@@ -44,6 +77,16 @@ namespace Egroo.Server.Database
         public DbSet<ChannelUser> ChannelUsers { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserPendingMessage> UsersPendingMessages { get; set; }
+
+        // Agent entities
+        public DbSet<AgentDefinition> AgentDefinitions { get; set; }
+        public DbSet<AgentKnowledge> AgentKnowledgeItems { get; set; }
+        public DbSet<AgentTool> AgentTools { get; set; }
+        public DbSet<AgentMcpServer> AgentMcpServers { get; set; }
+        public DbSet<AgentConversation> AgentConversations { get; set; }
+        public DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
+        public DbSet<ChannelAgent> ChannelAgents { get; set; }
+        public DbSet<UserAgentFriend> UserAgentFriends { get; set; }
     }
 
     internal class LowerCaseNamingConvention : IModelFinalizingConvention

@@ -1,5 +1,7 @@
 ﻿@using System.Text.Json;
+@using BlazorDexie.JsModule
 @using Egroo.UI.Constants
+@using Egroo.UI.CacheDB
 @using Egroo.UI.Models;
 @using jihadkhawaja.chat.client
 @using jihadkhawaja.chat.client.Core
@@ -8,6 +10,10 @@
 
 @inject SessionStorage SessionStorage
 @inject IUser ChatUserService
+@inject NavigationManager NavigationManager
+@inject StorageService StorageService
+@inject IDialogService DialogService
+@inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 
 <MudItem ChildContent="@ClientModel.MyMudProvider" />
 <MudItem ChildContent="@ClientModel.MyMudThemeProvider" />
@@ -36,6 +42,9 @@
                 <ChildContent>
                     <MudMenuItem Icon="@Icons.Material.Outlined.Settings" IconColor="Color.Default"
                     Label="Settings" Href="settings">Settings</MudMenuItem>
+                    <MudDivider Class="my-1" />
+                    <MudMenuItem Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error"
+                    OnClick="SignOut">Sign Out</MudMenuItem>
                 </ChildContent>
             </MudMenu>
         </MudAppBar>
@@ -56,15 +65,50 @@
 @code {
     bool IsDrawerOpen = true;
     string? avatarData;
+    private EgrooDB CacheDB { get; set; } = null!;
 
     private void HandleRoutingComplete()
     {
+        CacheDB = new EgrooDB(BlazorDexieOptions);
         _ = FetchAvatar();
     }
 
     private void DrawerToggle()
     {
         IsDrawerOpen = !IsDrawerOpen;
+    }
+
+    private async Task SignOut()
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync(
+            "Warning",
+            "Are you sure you want to logout? All your locally saved messages will be deleted.",
+            yesText: "Logout", cancelText: "Cancel");
+
+        if (!result.HasValue || !result.Value)
+        {
+            return;
+        }
+
+        switch (ClientModel.CurrentFrameworkPlatform)
+        {
+            case FrameworkPlatform.MAUI:
+                string path = Path.Combine(ClientModel.AppDataPath);
+                StorageService.DeleteDirectory(path);
+                break;
+            case FrameworkPlatform.WASM:
+            case FrameworkPlatform.SERVER:
+                await StorageService.RemoveFromLocalStorage("token");
+                break;
+            default:
+                throw new Exception("CurrentFrameworkPlatform parameter is undefined.");
+        }
+
+        await CacheDB.Delete();
+
+        SessionStorage.User = null;
+
+        NavigationManager.NavigateTo("/", true);
     }
 
     private async Task FetchAvatar()

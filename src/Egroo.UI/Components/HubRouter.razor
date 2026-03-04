@@ -19,16 +19,16 @@
 
 @if (IsBusy)
 {
-    <div style="width:100vw; height:100vh; background-color:var(--mud-palette-background)">
-        <MudProgressLinear Indeterminate Color="Color.Primary" />
-        <MudText Typo="Typo.h6" Align="Align.Center" Color="Color.Primary" Class="pa-10">
-            @GetAppState()
-        </MudText>
+    <div class="app-init-overlay">
+        <img src="_content/Egroo.UI/icon-128.png" class="app-init-logo" alt="Egroo" />
+        <MudProgressLinear Indeterminate Color="Color.Primary" Style="width:180px;" />
     </div>
 }
 else
 {
-    @ChildContent
+    <div class="app-content-ready">
+        @ChildContent
+    </div>
 }
 
 @code {
@@ -179,27 +179,13 @@ else
     }
 
     /// <summary>
-    /// Sets the current app state and triggers a UI update.
+    /// Updates the current app state without triggering a UI re-render.
     /// </summary>
-    private async Task SetAppStateAsync(AppState appState)
+    private Task SetAppStateAsync(AppState appState)
     {
         SessionStorage.AppState = appState;
-        await InvokeAsync(StateHasChanged);
+        return Task.CompletedTask;
     }
-
-    /// <summary>
-    /// Returns a string representation of the current app state.
-    /// </summary>
-    private string GetAppState() =>
-        SessionStorage.AppState switch
-        {
-            AppState.INITIATING => "Initiating",
-            AppState.LOADING_CACHE => "Loading Cache",
-            AppState.ESTABLISHING_CONNECTION => "Establishing Connection",
-            AppState.CREATING_SESSION => "Creating Session",
-            AppState.CONNECTED => "Connected",
-            _ => "Unknown"
-        };
 
     /// <summary>
     /// Signs the user out by clearing token from storage and navigating to the home page.

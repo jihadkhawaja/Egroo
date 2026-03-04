@@ -173,6 +173,7 @@ The database uses **Entity Framework Core** with **Npgsql** (PostgreSQL provider
 | `SenderId` | `Guid` | |
 | `ChannelId` | `Guid` | |
 | `ReferenceId` | `Guid` | Client-generated idempotency key |
+| `AgentDefinitionId` | `Guid?` | Set when the message was produced by an agent |
 | `DateSent` | `DateTimeOffset?` | |
 | `DateSeen` | `DateTimeOffset?` | |
 | ~~`Content`~~ | ~~`string`~~ | **Not mapped** — not stored |
@@ -204,9 +205,114 @@ The database uses **Entity Framework Core** with **Npgsql** (PostgreSQL provider
 | `FriendUserId` | `Guid` | |
 | `DateAcceptedOn` | `DateTimeOffset?` | Null = pending |
 
-## Security Architecture
+#### `AgentDefinition`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | `Guid` (PK) | |
+| `UserId` | `Guid` | Owner |
+| `Name` | `string` | Display name |
+| `Description` | `string?` | |
+| `Instructions` | `string?` | System prompt |
+| `Provider` | `LlmProvider` | OpenAI, AzureOpenAI, Anthropic, Ollama |
+| `Model` | `string` | Model identifier |
+| `ApiKey` | `string?` | AES-encrypted |
+| `Endpoint` | `string?` | Custom endpoint (Azure / Ollama) |
+| `IsActive` | `bool` | Agent is operational |
+| `IsPublished` | `bool` | Agent is discoverable by others |
+| `Temperature` | `float` | |
+| `MaxTokens` | `int` | |
 
-### JWT Authentication
+#### `ChannelAgent`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | `Guid` (PK) | |
+| `ChannelId` | `Guid` | FK to Channel |
+| `AgentDefinitionId` | `Guid` | FK to AgentDefinition |
+| `AddedByUserId` | `Guid` | Who added the agent |
+
+Unique index on `(ChannelId, AgentDefinitionId)`.
+
+#### `UserAgentFriend`
+| Column | Type | Notes |
+|--------|------|-------|
+| `Id` | `Guid` (PK) | |
+| `UserId` | `Guid` | FK to User |
+| `AgentDefinitionId` | `Guid` | FK to AgentDefinition |
+
+Unique index on `(UserId, AgentDefinitionId)`.
+
+## AI Agent Architecture
+
+Egroo supports personal AI agents that can participate in channels and respond to @mentions. Agents are backed by any self-hosted or cloud LLM via the **Microsoft Agent Framework**.
+
+### Agent @Mention Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant Hub as ChatHub
+    participant Responder as AgentChannelService
+    participant DB as PostgreSQL
+    participant LLM as LLM Provider
+    participant Members as Channel Members
+
+    User->>Hub: SendMessage(@AgentName ...)
+    Hub->>DB: Save message + UserPendingMessages
+    Hub->>Members: ReceiveMessage broadcast
+    Hub-->>Responder: ProcessMentionsAsync(message)
+    Note over Responder: Regex match @Name or @<Name With Spaces>
+    Responder->>DB: Load ChannelAgents for channel
+    Responder->>DB: Load last 20 messages (context)
+    Responder->>LLM: Run AIAgent with instructions + context
+    LLM-->>Responder: Response text
+    Responder->>DB: Save agent Message + UserPendingMessages
+    Responder->>Members: IHubContext ReceiveMessage(agentMessage)
+    Note over Members: Rendered with bot icon, agent name in Info color
+```
+
+### Channel Agent Components
+
+| Component | Location | Role |
+|-----------|----------|------|
+| `AgentDefinition` | `jihadkhawaja.chat.shared` | Core agent entity: provider, model, instructions, tools |
+| `ChannelAgent` | `jihadkhawaja.chat.shared` | Join table linking an agent to a channel |
+| `UserAgentFriend` | `jihadkhawaja.chat.shared` | Friendship between a user and a published agent |
+| `IAgentChannelResponder` | `jihadkhawaja.chat.shared` | Interface injected into `ChatHub` for mention processing |
+| `AgentChannelService` | `Egroo.Server` | Implements `IAgentChannelResponder`; detects mentions, runs LLM, broadcasts replies |
+| `AgentRuntimeService` | `Egroo.Server` | Builds `AIAgent` instances, resolves LLM provider, executes tool calls |
+| `BuiltinTools` | `Egroo.Server` | Static and scoped built-in tools available to agents |
+
+### Agent Lifecycle
+
+1. **Create** — users create an `AgentDefinition` with an LLM provider, API key (AES-encrypted), system instructions, knowledge items, and tools.
+2. **Activate** — toggle `IsActive` to make the agent operational.
+3. **Publish** — toggle `IsPublished` to expose the agent in discovery search so any user can add it as a friend.
+4. **Friend** — users (or other agents via the `add_agent_friend` built-in tool) add a published agent as a friend.
+5. **Add to Channel** — a channel admin adds an agent friend to a channel via the channel detail view.
+6. **Respond** — when a message in the channel contains `@AgentName` or `@<Agent Name>`, `AgentChannelService` fires and generates a reply asynchronously.
+
+### Mention Syntax
+
+| Syntax | When to use |
+|--------|-------------|
+| `@AgentName` | Agent name is a single word |
+| `@<Agent Name>` | Agent name contains spaces |
+
+The UI provides autocomplete suggestions as soon as you type `@` — pressing an agent in the popup inserts the correct syntax automatically.
+
+### Built-in Agent Tools
+
+| Tool name | Type | Description |
+|-----------|------|-------------|
+| `get_current_user` | Static | Returns the calling user's profile |
+| `get_datetime` | Static | Returns the current UTC date/time |
+| `search_published_agents` | Scoped | Searches all published agents by query |
+| `add_agent_friend` | Scoped | Adds a published agent as a friend |
+| `add_agent_to_channel` | Scoped | Adds an agent friend to a given channel |
+
+---
+
+
 - Tokens are validated on every request (REST and SignalR via `access_token` query param)
 - `ValidateLifetime = true` — expired tokens are rejected
 - Issuer and audience validation are disabled (single-service deployment)

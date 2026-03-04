@@ -1,68 +1,164 @@
 ﻿@inject NavigationManager NavigationManager
 @inject SessionStorage SessionStorage
 
-<MudAppBar Elevation="2">
-    <MudImage Src="_content/Egroo.UI/favicon-32x32.png" Alt="Egroo.org" Width="32" Height="32" Class="mr-4" />
-    <MudText Typo="Typo.h6">Egroo</MudText>
+<!-- Transparent top bar -->
+<MudAppBar Elevation="0" Style="background: transparent;">
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+        <MudImage Src="_content/Egroo.UI/favicon-32x32.png" Alt="Egroo" Width="28" Height="28" />
+        <MudText Typo="Typo.h6" Style="font-weight: 700; letter-spacing: -0.02em;">Egroo</MudText>
+    </MudStack>
     <MudSpacer />
-    <MudIconButton Icon="@Icons.Custom.Brands.GitHub"
+    <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Size="Size.Medium"
                    Href="https://github.com/jihadkhawaja/Egroo"
                    Target="_blank" Rel="noopener noreferrer" />
-    <MudIconButton Variant="Variant.Text"
-                   Icon="@Icons.Material.Filled.Login"
-                   Href="/signin" />
+    <MudButton Variant="Variant.Text" Color="Color.Inherit" Href="/signin"
+               EndIcon="@Icons.Material.Filled.ArrowForward">
+        Sign In
+    </MudButton>
 </MudAppBar>
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
-    <MudText Typo="Typo.h3">Welcome to Egroo!</MudText>
-    <MudText Class="mt-4">
-        Egroo is a self-hosted chatting solution with a cross-platform client application.
-        Enjoy secure, private messaging while maintaining control over your data.
-    </MudText>
+<!-- Hero Section -->
+<div style="min-height: calc(100vh - 64px); display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 24px;">
+    <MudStack AlignItems="AlignItems.Center" Spacing="4" Style="max-width: 720px; text-align: center;">
+        <MudAvatar Size="Size.Large" Color="Color.Primary" Style="width: 72px; height: 72px;">
+            <MudIcon Icon="@Icons.Material.Filled.Forum" Style="font-size: 2rem;" />
+        </MudAvatar>
+        <MudText Typo="Typo.h3" Style="font-weight: 800; letter-spacing: -0.03em; line-height: 1.15;">
+            Chat on your terms.
+            <span style="color: var(--mud-palette-primary);">Self-hosted.</span>
+        </MudText>
+        <MudText Typo="Typo.h6" Style="color: rgba(255,255,255,0.55); font-weight: 400; line-height: 1.6; max-width: 560px;">
+            Egroo is an open-source real-time messaging platform you own and control.
+            Private conversations, AI agents, voice calls &mdash; no third-party servers.
+        </MudText>
+        <MudStack Row Spacing="3" Justify="Justify.Center" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                       Href="/signup"
+                       Style="border-radius: 12px; padding: 12px 32px; font-size: 1rem; text-transform: none;">
+                Get Started
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" Size="Size.Large"
+                       StartIcon="@Icons.Custom.Brands.GitHub"
+                       Href="https://github.com/jihadkhawaja/Egroo"
+                       Target="_blank" Rel="noopener noreferrer"
+                       Style="border-radius: 12px; padding: 12px 32px; font-size: 1rem; text-transform: none; border-color: rgba(255,255,255,0.2);">
+                GitHub
+            </MudButton>
+        </MudStack>
+    </MudStack>
+</div>
 
-    <MudGrid Class="mt-8">
-        <MudItem xs="12" md="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h5">🔒 Secure Messaging</MudText>
-                    <MudText>Keep your conversations private with end-to-end encryption.</MudText>
-                </MudCardContent>
-            </MudCard>
+<!-- Features Section -->
+<MudContainer MaxWidth="MaxWidth.Large" Class="pb-16">
+    <MudGrid Spacing="4">
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.Lock" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">End-to-End Encryption</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        Messages are AES-encrypted before storage and deleted once delivered. Your data stays yours.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
         </MudItem>
 
-        <MudItem xs="12" md="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h5">🧑‍🤝‍🧑 Cross-Platform</MudText>
-                    <MudText>Access your chats on any device – desktop, mobile, or web.</MudText>
-                </MudCardContent>
-            </MudCard>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">AI Agents</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        Create personal AI assistants powered by your own LLM providers. Chat, search, and automate.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
         </MudItem>
 
-        <MudItem xs="12" md="4">
-            <MudCard>
-                <MudCardContent>
-                    <MudText Typo="Typo.h5">🚀 Open Source</MudText>
-                    <MudText>Completely open-source – customize and extend as you like.</MudText>
-                </MudCardContent>
-            </MudCard>
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.Call" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">Voice Calls</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        Peer-to-peer WebRTC voice calls with no intermediary. Talk freely with low latency.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.Devices" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">Cross-Platform</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        Web, desktop, and mobile via Blazor and .NET MAUI. One codebase, every screen.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.Storage" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">Self-Hosted</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        Deploy on your own infrastructure. Docker-ready with PostgreSQL. Full data sovereignty.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" sm="6" md="4">
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); height: 100%;">
+                <MudStack Spacing="3">
+                    <MudAvatar Size="Size.Medium" Style="background: rgba(242,89,34,0.12);">
+                        <MudIcon Icon="@Icons.Material.Filled.Code" Color="Color.Primary" Size="Size.Small" />
+                    </MudAvatar>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">Open Source</MudText>
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.55); line-height: 1.6;">
+                        MIT licensed. Inspect, fork, extend. Built with .NET 10, Blazor, SignalR, and MudBlazor.
+                    </MudText>
+                </MudStack>
+            </MudPaper>
         </MudItem>
     </MudGrid>
-
-    <MudStack Row Spacing="5" Class="mt-12">
-        <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                   StartIcon="@Icons.Custom.Brands.GitHub"
-                   Href="https://github.com/jihadkhawaja/Egroo"
-                   Target="_blank" Rel="noopener noreferrer">
-            GitHub Repository
-        </MudButton>
-
-        <MudButton Variant="Variant.Filled" Color="Color.Secondary"
-                   StartIcon="@Icons.Material.Filled.Login" Href="/signin">
-            Sign In
-        </MudButton>
-    </MudStack>
 </MudContainer>
+
+<!-- Footer -->
+<MudPaper Elevation="0" Class="py-6" Style="border-top: 1px solid rgba(255,255,255,0.06); background: transparent;">
+    <MudContainer MaxWidth="MaxWidth.Large">
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.35);">
+                &copy; @DateTime.Now.Year Egroo &mdash; Open Source Chat Platform
+            </MudText>
+            <MudStack Row Spacing="2">
+                <MudIconButton Icon="@Icons.Custom.Brands.GitHub" Size="Size.Small"
+                               Href="https://github.com/jihadkhawaja/Egroo"
+                               Target="_blank" Rel="noopener noreferrer"
+                               Style="color: rgba(255,255,255,0.35);" />
+            </MudStack>
+        </MudStack>
+    </MudContainer>
+</MudPaper>
 
 @code {
     bool ShouldRenderPage { get; set; } = true;
