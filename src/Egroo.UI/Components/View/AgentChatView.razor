@@ -86,7 +86,7 @@
                         <MudStack Row Justify="Justify.FlexEnd" Class="mb-2">
                             <MudPaper Class="pa-3" Elevation="0"
                                       Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
-                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
+                                <MarkdownContent Content="@msg.Content" />
                             </MudPaper>
                         </MudStack>
                     }
@@ -98,7 +98,7 @@
                             </MudAvatar>
                             <MudPaper Class="pa-3" Elevation="0"
                                       Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
-                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
+                                <MarkdownContent Content="@msg.Content" />
                             </MudPaper>
                         </MudStack>
                     }
@@ -113,7 +113,7 @@
                         </MudAvatar>
                         <MudPaper Class="pa-3" Elevation="0"
                                   Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
-                            <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@streamingContent.ToString()</MudText>
+                            <MarkdownContent Content="@streamingContent.ToString()" />
                         </MudPaper>
                     </MudStack>
                 }

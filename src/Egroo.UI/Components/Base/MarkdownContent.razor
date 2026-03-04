@@ -1,0 +1,30 @@
+@using Markdig
+@using Microsoft.AspNetCore.Components
+
+<div class="markdown-content">
+    @renderedHtml
+</div>
+
+@code {
+    private string? _previousContent;
+    private MarkupString renderedHtml;
+
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    [Parameter]
+    public string? Content { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (Content != _previousContent)
+        {
+            _previousContent = Content;
+            renderedHtml = new MarkupString(
+                string.IsNullOrEmpty(Content)
+                    ? string.Empty
+                    : Markdown.ToHtml(Content, Pipeline));
+        }
+    }
+}

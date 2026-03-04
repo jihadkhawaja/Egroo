@@ -3,7 +3,7 @@
     <MudStack Row Justify="Justify.FlexEnd" Class="mb-1">
         <MudPaper Class="pa-3 msg-bubble msg-bubble-current" Elevation="0"
                   Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
-            <MudText Typo="Typo.body1" Style="white-space: pre-wrap; overflow-wrap: break-word;">@Content</MudText>
+            <MarkdownContent Content="@Content" />
             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Class="mt-1" Spacing="1">
                 <MudText Typo="Typo.caption" Style="opacity: 0.7; font-size: 0.7rem;">@Date</MudText>
                 @if (SentOnDate is not null && SeenOnDate is not null)
@@ -38,7 +38,7 @@ else
         <MudPaper Class="pa-3 msg-bubble msg-bubble-other" Elevation="0"
                   Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
             <MudText Typo="Typo.caption" Color="@(IsAgent ? Color.Info : Color.Primary)" Style="font-weight: 600;">@DisplayName</MudText>
-            <MudText Typo="Typo.body1" Style="white-space: pre-wrap; overflow-wrap: break-word;" Class="mt-1">@Content</MudText>
+            <MarkdownContent Content="@Content" />
             <MudText Typo="Typo.caption" Style="opacity: 0.5; font-size: 0.7rem;" Class="mt-1">@Date</MudText>
         </MudPaper>
     </MudStack>
