@@ -2,6 +2,7 @@ using Egroo.Server.API;
 using Egroo.Server.Database;
 using Egroo.Server.Repository;
 using Egroo.Server.Security;
+using Egroo.Server.Services;
 using jihadkhawaja.chat.server;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -157,6 +158,12 @@ builder.Services.AddScoped<IUser, UserRepository>();
 builder.Services.AddScoped<IChannel, ChannelRepository>();
 builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 
+// Agent services (Microsoft Agent Framework)
+builder.Services.AddScoped<IAgentRepository, AgentRepository>();
+builder.Services.AddHttpClient("McpClient");
+builder.Services.AddSingleton<McpClientService>();
+builder.Services.AddSingleton<AgentRuntimeService>();
+
 // SignalR hub (from the chat server package)
 builder.Services.AddChatHub();
 #endregion
@@ -195,5 +202,6 @@ app.UseAuthorization();
 // Map endpoints
 app.MapChatHub();
 app.MapAuthentication();
+app.MapAgents();
 
 app.Run();

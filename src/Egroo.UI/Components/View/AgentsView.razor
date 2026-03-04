@@ -1,0 +1,225 @@
+@using jihadkhawaja.chat.client.Services
+@inherits ProtectedViewBase
+
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject AgentService AgentService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate Color="Color.Default" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+        <MudStack Class="mb-6" Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudText Typo="Typo.h5">AI Agents</MudText>
+            <MudButton OnClick="OpenCreateDialog" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add">New Agent</MudButton>
+        </MudStack>
+
+        @if (agents is null || agents.Length == 0)
+        {
+            <MudPaper Class="pa-8" Elevation="0">
+                <MudStack AlignItems="AlignItems.Center" Spacing="4">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">No agents yet</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Create your first AI agent with your own LLM provider, instructions, knowledge, and tools.
+                    </MudText>
+                    <MudButton OnClick="OpenCreateDialog" Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Add">Create Agent</MudButton>
+                </MudStack>
+            </MudPaper>
+        }
+        else
+        {
+            <MudGrid>
+                @foreach (var agent in agents)
+                {
+                    <MudItem xs="12" sm="6" md="4">
+                        <MudCard Elevation="4" Class="rounded-lg" Style="height: 100%;">
+                            <MudCardHeader>
+                                <CardHeaderAvatar>
+                                    <MudAvatar Color="@GetProviderColor(agent.Provider)" Size="Size.Medium">
+                                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                                    </MudAvatar>
+                                </CardHeaderAvatar>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.h6">@agent.Name</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        @agent.Provider — @agent.Model
+                                    </MudText>
+                                </CardHeaderContent>
+                                <CardHeaderActions>
+                                    <MudSwitch T="bool" Value="@agent.IsActive" Color="Color.Success"
+                                               ValueChanged="@(val => ToggleAgent(agent, val))" />
+                                </CardHeaderActions>
+                            </MudCardHeader>
+                            <MudCardContent>
+                                @if (!string.IsNullOrWhiteSpace(agent.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Class="mb-2" Style="max-height: 60px; overflow: hidden;">
+                                        @agent.Description
+                                    </MudText>
+                                }
+                                <MudStack Row Spacing="1" Class="mt-2">
+                                    @if (agent.IsActive)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Active</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Inactive</MudChip>
+                                    }
+                                </MudStack>
+                            </MudCardContent>
+                            <MudCardActions>
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Text"
+                                           StartIcon="@Icons.Material.Filled.Chat"
+                                           OnClick="@(() => OpenChat(agent))"
+                                           Disabled="@(!agent.IsActive)">Chat</MudButton>
+                                <MudButton Size="Size.Small" Color="Color.Default" Variant="Variant.Text"
+                                           StartIcon="@Icons.Material.Filled.Edit"
+                                           OnClick="@(() => OpenEditDialog(agent))">Configure</MudButton>
+                                <MudSpacer />
+                                <MudIconButton Size="Size.Small" Color="Color.Error" Icon="@Icons.Material.Filled.Delete"
+                                               OnClick="@(() => DeleteAgentConfirm(agent))" />
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudContainer>
+}
+
+@code {
+    private AgentDefinition[]? agents;
+
+    protected override async Task OnAccessAsync()
+    {
+        await LoadAgents();
+    }
+
+    private async Task LoadAgents()
+    {
+        IsBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            agents = await AgentService.GetAgents();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load agents: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var parameters = new DialogParameters<AgentConfigDialog>
+        {
+            { x => x.Agent, new AgentDefinition() },
+            { x => x.IsNew, true }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AgentConfigDialog>("Create Agent", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadAgents();
+        }
+    }
+
+    private async Task OpenEditDialog(AgentDefinition agent)
+    {
+        var parameters = new DialogParameters<AgentConfigDialog>
+        {
+            { x => x.Agent, agent },
+            { x => x.IsNew, false }
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        var dialog = await DialogService.ShowAsync<AgentConfigDialog>("Configure Agent", parameters, options);
+        var result = await dialog.Result;
+
+        if (result is not null && !result.Canceled)
+        {
+            await LoadAgents();
+        }
+    }
+
+    private async Task ToggleAgent(AgentDefinition agent, bool active)
+    {
+        agent.IsActive = active;
+        var success = await AgentService.UpdateAgent(agent);
+        if (!success)
+        {
+            agent.IsActive = !active;
+            Snackbar.Add("Failed to update agent status.", Severity.Error);
+        }
+        StateHasChanged();
+    }
+
+    private async Task DeleteAgentConfirm(AgentDefinition agent)
+    {
+        var result = await DialogService.ShowMessageBoxAsync(
+            "Delete Agent",
+            $"Are you sure you want to delete \"{agent.Name}\"? This will remove all conversations, knowledge, and tools associated with this agent.",
+            yesText: "Delete", cancelText: "Cancel");
+
+        if (result == true)
+        {
+            var success = await AgentService.DeleteAgent(agent.Id);
+            if (success)
+            {
+                Snackbar.Add("Agent deleted.", Severity.Success);
+                await LoadAgents();
+            }
+            else
+            {
+                Snackbar.Add("Failed to delete agent.", Severity.Error);
+            }
+        }
+    }
+
+    private void OpenChat(AgentDefinition agent)
+    {
+        NavigationManager.NavigateTo($"/agent/chat/{agent.Id}/{Uri.EscapeDataString(agent.Name)}");
+    }
+
+    private static Color GetProviderColor(LlmProvider provider)
+    {
+        return provider switch
+        {
+            LlmProvider.OpenAI => Color.Success,
+            LlmProvider.AzureOpenAI => Color.Info,
+            LlmProvider.Anthropic => Color.Warning,
+            LlmProvider.Ollama => Color.Secondary,
+            _ => Color.Default
+        };
+    }
+}

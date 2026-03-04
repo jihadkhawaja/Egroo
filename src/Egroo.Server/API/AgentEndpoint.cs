@@ -1,0 +1,488 @@
+using Egroo.Server.Services;
+using jihadkhawaja.chat.shared.Interfaces;
+using jihadkhawaja.chat.shared.Models;
+using Egroo.Server.Security;
+
+namespace Egroo.Server.API
+{
+    public static class AgentEndpoint
+    {
+        public static void MapAgents(this IEndpointRouteBuilder routes)
+        {
+            var group = routes.MapGroup("/api/v1/Agent")
+                .WithTags("Agent")
+                .RequireRateLimiting("Api")
+                .RequireAuthorization();
+
+            // ── Agent CRUD ───────────────────────────────────────────────
+
+            group.MapPost("/", async (IAgentRepository repo, CreateAgentRequest req) =>
+            {
+                var definition = new AgentDefinition
+                {
+                    Name = req.Name,
+                    Description = req.Description,
+                    Instructions = req.Instructions,
+                    Provider = req.Provider,
+                    Model = req.Model,
+                    ApiKey = req.ApiKey,
+                    Endpoint = req.Endpoint,
+                    Temperature = req.Temperature,
+                    MaxTokens = req.MaxTokens
+                };
+
+                var result = await repo.CreateAgent(definition);
+                if (result is null)
+                {
+                    return Results.BadRequest(new { error = "Failed to create agent." });
+                }
+
+                // Don't return the encrypted API key
+                result.ApiKey = null;
+                return Results.Ok(result);
+            });
+
+            group.MapGet("/", async (IAgentRepository repo) =>
+            {
+                var agents = await repo.GetUserAgents();
+                if (agents is not null)
+                {
+                    // Strip API keys from response
+                    foreach (var a in agents)
+                    {
+                        a.ApiKey = null;
+                    }
+                }
+                return Results.Ok(agents);
+            });
+
+            group.MapGet("/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var agent = await repo.GetAgent(agentId);
+                if (agent is null)
+                {
+                    return Results.NotFound();
+                }
+                agent.ApiKey = null;
+                return Results.Ok(agent);
+            });
+
+            group.MapPut("/{agentId:guid}", async (IAgentRepository repo, Guid agentId, UpdateAgentRequest req) =>
+            {
+                var definition = new AgentDefinition
+                {
+                    Id = agentId,
+                    Name = req.Name,
+                    Description = req.Description,
+                    Instructions = req.Instructions,
+                    Provider = req.Provider,
+                    Model = req.Model,
+                    ApiKey = req.ApiKey,
+                    Endpoint = req.Endpoint,
+                    IsActive = req.IsActive,
+                    Temperature = req.Temperature,
+                    MaxTokens = req.MaxTokens
+                };
+
+                var success = await repo.UpdateAgent(definition);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to update agent." });
+            });
+
+            group.MapDelete("/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var success = await repo.DeleteAgent(agentId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── Knowledge ────────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/knowledge", async (IAgentRepository repo, Guid agentId, CreateKnowledgeRequest req) =>
+            {
+                var knowledge = new AgentKnowledge
+                {
+                    AgentDefinitionId = agentId,
+                    Title = req.Title,
+                    Content = req.Content,
+                    IsEnabled = req.IsEnabled
+                };
+
+                var result = await repo.AddKnowledge(knowledge);
+                return result is not null ? Results.Ok(result) : Results.BadRequest(new { error = "Failed to add knowledge." });
+            });
+
+            group.MapGet("/{agentId:guid}/knowledge", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var items = await repo.GetAgentKnowledge(agentId);
+                return Results.Ok(items);
+            });
+
+            group.MapPut("/knowledge/{knowledgeId:guid}", async (IAgentRepository repo, Guid knowledgeId, UpdateKnowledgeRequest req) =>
+            {
+                var knowledge = new AgentKnowledge
+                {
+                    Id = knowledgeId,
+                    Title = req.Title,
+                    Content = req.Content,
+                    IsEnabled = req.IsEnabled
+                };
+
+                var success = await repo.UpdateKnowledge(knowledge);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to update knowledge." });
+            });
+
+            group.MapDelete("/knowledge/{knowledgeId:guid}", async (IAgentRepository repo, Guid knowledgeId) =>
+            {
+                var success = await repo.DeleteKnowledge(knowledgeId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── Tools ────────────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/tools", async (IAgentRepository repo, Guid agentId, CreateToolRequest req) =>
+            {
+                var tool = new AgentTool
+                {
+                    AgentDefinitionId = agentId,
+                    Name = req.Name,
+                    Description = req.Description,
+                    ParametersSchema = req.ParametersSchema,
+                    IsEnabled = req.IsEnabled,
+                    Source = req.Source,
+                    McpServerId = req.McpServerId
+                };
+
+                var result = await repo.AddTool(tool);
+                return result is not null ? Results.Ok(result) : Results.BadRequest(new { error = "Failed to add tool." });
+            });
+
+            group.MapGet("/{agentId:guid}/tools", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var tools = await repo.GetAgentTools(agentId);
+                return Results.Ok(tools);
+            });
+
+            group.MapPut("/tools/{toolId:guid}", async (IAgentRepository repo, Guid toolId, UpdateToolRequest req) =>
+            {
+                var tool = new AgentTool
+                {
+                    Id = toolId,
+                    Name = req.Name,
+                    Description = req.Description,
+                    ParametersSchema = req.ParametersSchema,
+                    IsEnabled = req.IsEnabled
+                };
+
+                var success = await repo.UpdateTool(tool);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to update tool." });
+            });
+
+            group.MapDelete("/tools/{toolId:guid}", async (IAgentRepository repo, Guid toolId) =>
+            {
+                var success = await repo.DeleteTool(toolId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── Built-in Tools ───────────────────────────────────────────
+
+            group.MapGet("/builtin-tools", () =>
+            {
+                var definitions = BuiltinTools.GetDefinitions();
+                return Results.Ok(definitions);
+            });
+
+            group.MapPost("/{agentId:guid}/seed-builtin-tools", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var existingTools = await repo.GetAgentTools(agentId);
+                var definitions = BuiltinTools.GetDefinitions();
+                var added = 0;
+
+                foreach (var def in definitions)
+                {
+                    // Only add if not already present
+                    if (existingTools is not null && existingTools.Any(t => t.Name == def.Name && t.Source == AgentToolSource.Builtin))
+                    {
+                        continue;
+                    }
+
+                    var tool = new AgentTool
+                    {
+                        AgentDefinitionId = agentId,
+                        Name = def.Name,
+                        Description = def.Description,
+                        ParametersSchema = def.ParametersSchema,
+                        IsEnabled = true,
+                        Source = AgentToolSource.Builtin
+                    };
+
+                    var result = await repo.AddTool(tool);
+                    if (result is not null) added++;
+                }
+
+                return Results.Ok(new { added });
+            });
+
+            // ── MCP Servers ──────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/mcp-servers", async (IAgentRepository repo, Guid agentId, CreateMcpServerRequest req) =>
+            {
+                var server = new AgentMcpServer
+                {
+                    AgentDefinitionId = agentId,
+                    Name = req.Name,
+                    Endpoint = req.Endpoint,
+                    ApiKey = req.ApiKey,
+                    IsActive = true
+                };
+
+                var result = await repo.AddMcpServer(server);
+                if (result is null)
+                {
+                    return Results.BadRequest(new { error = "Failed to add MCP server." });
+                }
+
+                result.ApiKey = null; // Don't return encrypted key
+                return Results.Ok(result);
+            });
+
+            group.MapGet("/{agentId:guid}/mcp-servers", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var servers = await repo.GetAgentMcpServers(agentId);
+                if (servers is not null)
+                {
+                    foreach (var s in servers) s.ApiKey = null;
+                }
+                return Results.Ok(servers);
+            });
+
+            group.MapPut("/mcp-servers/{serverId:guid}", async (IAgentRepository repo, Guid serverId, UpdateMcpServerRequest req) =>
+            {
+                var server = new AgentMcpServer
+                {
+                    Id = serverId,
+                    Name = req.Name,
+                    Endpoint = req.Endpoint,
+                    ApiKey = req.ApiKey,
+                    IsActive = req.IsActive
+                };
+
+                var success = await repo.UpdateMcpServer(server);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to update MCP server." });
+            });
+
+            group.MapDelete("/mcp-servers/{serverId:guid}", async (IAgentRepository repo, Guid serverId) =>
+            {
+                var success = await repo.DeleteMcpServer(serverId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── MCP Tool Discovery ───────────────────────────────────────
+
+            group.MapPost("/mcp-servers/{serverId:guid}/discover", async (
+                IAgentRepository repo,
+                McpClientService mcpClient,
+                EncryptionService encryptionService,
+                Guid serverId) =>
+            {
+                var server = await repo.GetMcpServer(serverId);
+                if (server is null)
+                {
+                    return Results.NotFound(new { error = "MCP server not found." });
+                }
+
+                // Decrypt API key for the MCP call
+                string? apiKey = null;
+                if (!string.IsNullOrWhiteSpace(server.ApiKey))
+                {
+                    try { apiKey = encryptionService.Decrypt(server.ApiKey); }
+                    catch { /* ignore */ }
+                }
+
+                var discovered = await mcpClient.DiscoverToolsAsync(server.Endpoint, apiKey);
+                if (discovered.Count == 0)
+                {
+                    return Results.Ok(new { discovered = 0, tools = Array.Empty<object>() });
+                }
+
+                // Remove old MCP tools for this server, then add fresh ones
+                await repo.DeleteToolsByMcpServer(serverId);
+
+                var addedTools = new List<AgentTool>();
+                foreach (var mcpTool in discovered)
+                {
+                    var tool = new AgentTool
+                    {
+                        AgentDefinitionId = server.AgentDefinitionId,
+                        Name = mcpTool.Name,
+                        Description = mcpTool.Description ?? mcpTool.Name,
+                        ParametersSchema = mcpTool.InputSchema?.ToString(),
+                        IsEnabled = true,
+                        Source = AgentToolSource.Mcp,
+                        McpServerId = serverId
+                    };
+
+                    var result = await repo.AddTool(tool);
+                    if (result is not null) addedTools.Add(result);
+                }
+
+                // Update last discovered timestamp
+                await repo.UpdateMcpServer(new AgentMcpServer
+                {
+                    Id = serverId,
+                    Name = server.Name,
+                    Endpoint = server.Endpoint,
+                    IsActive = server.IsActive,
+                    LastDiscoveredAt = DateTimeOffset.UtcNow
+                });
+
+                return Results.Ok(new { discovered = addedTools.Count, tools = addedTools });
+            });
+
+            // ── Conversations ────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/conversations", async (IAgentRepository repo, Guid agentId, CreateConversationRequest? req) =>
+            {
+                var result = await repo.CreateConversation(agentId, req?.Title);
+                return result is not null ? Results.Ok(result) : Results.BadRequest(new { error = "Failed to create conversation." });
+            });
+
+            group.MapGet("/{agentId:guid}/conversations", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var conversations = await repo.GetUserConversations(agentId);
+                return Results.Ok(conversations);
+            });
+
+            group.MapGet("/conversations/{conversationId:guid}", async (IAgentRepository repo, Guid conversationId) =>
+            {
+                var conversation = await repo.GetConversation(conversationId);
+                return conversation is not null ? Results.Ok(conversation) : Results.NotFound();
+            });
+
+            group.MapDelete("/conversations/{conversationId:guid}", async (IAgentRepository repo, Guid conversationId) =>
+            {
+                var success = await repo.DeleteConversation(conversationId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── Messages ─────────────────────────────────────────────────
+
+            group.MapGet("/conversations/{conversationId:guid}/messages", async (IAgentRepository repo, Guid conversationId, int? skip, int? take) =>
+            {
+                var messages = await repo.GetConversationMessages(conversationId, skip ?? 0, take ?? 50);
+                return Results.Ok(messages);
+            });
+
+            // ── Chat (invoke agent) ──────────────────────────────────────
+
+            group.MapPost("/conversations/{conversationId:guid}/chat", async (
+                IAgentRepository repo,
+                AgentRuntimeService runtime,
+                HttpContext httpContext,
+                Guid conversationId,
+                AgentChatRequest req) =>
+            {
+                // Get user ID from the JWT token
+                var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out Guid userId))
+                {
+                    return Results.Unauthorized();
+                }
+
+                var response = await runtime.ChatAsync(userId, conversationId, req.Message);
+                return response.Success ? Results.Ok(response) : Results.BadRequest(response);
+            });
+
+            // ── Chat Streaming (invoke agent with SSE) ───────────────────
+
+            group.MapPost("/conversations/{conversationId:guid}/chat/stream", async (
+                AgentRuntimeService runtime,
+                HttpContext httpContext,
+                Guid conversationId,
+                AgentChatRequest req) =>
+            {
+                var userIdClaim = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier);
+                if (userIdClaim is null || !Guid.TryParse(userIdClaim.Value, out Guid userId))
+                {
+                    httpContext.Response.StatusCode = 401;
+                    return;
+                }
+
+                httpContext.Response.ContentType = "text/event-stream";
+                httpContext.Response.Headers["Cache-Control"] = "no-cache";
+                httpContext.Response.Headers["Connection"] = "keep-alive";
+
+                await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req.Message))
+                {
+                    await httpContext.Response.WriteAsync($"data: {chunk}\n\n");
+                    await httpContext.Response.Body.FlushAsync();
+                }
+
+                await httpContext.Response.WriteAsync("data: [DONE]\n\n");
+                await httpContext.Response.Body.FlushAsync();
+            });
+        }
+    }
+
+    // ── Request DTOs ─────────────────────────────────────────────────────
+
+    public record CreateAgentRequest(
+        string Name,
+        string? Description,
+        string? Instructions,
+        LlmProvider Provider,
+        string Model,
+        string? ApiKey,
+        string? Endpoint,
+        float? Temperature,
+        int? MaxTokens);
+
+    public record UpdateAgentRequest(
+        string Name,
+        string? Description,
+        string? Instructions,
+        LlmProvider Provider,
+        string Model,
+        string? ApiKey,
+        string? Endpoint,
+        bool IsActive,
+        float? Temperature,
+        int? MaxTokens);
+
+    public record CreateKnowledgeRequest(
+        string Title,
+        string Content,
+        bool IsEnabled = true);
+
+    public record UpdateKnowledgeRequest(
+        string Title,
+        string Content,
+        bool IsEnabled = true);
+
+    public record CreateToolRequest(
+        string Name,
+        string Description,
+        string? ParametersSchema,
+        bool IsEnabled = true,
+        AgentToolSource Source = AgentToolSource.Builtin,
+        Guid? McpServerId = null);
+
+    public record UpdateToolRequest(
+        string Name,
+        string Description,
+        string? ParametersSchema,
+        bool IsEnabled = true);
+
+    public record CreateMcpServerRequest(
+        string Name,
+        string Endpoint,
+        string? ApiKey);
+
+    public record UpdateMcpServerRequest(
+        string Name,
+        string Endpoint,
+        string? ApiKey,
+        bool IsActive = true);
+
+    public record CreateConversationRequest(string? Title);
+
+    public record AgentChatRequest(string Message);
+}

@@ -1,0 +1,340 @@
+@using jihadkhawaja.chat.client.Services
+@using System.Text
+@implements IDisposable
+@inherits ProtectedViewBase
+
+@inject SessionStorage SessionStorage
+@inject NavigationManager NavigationManager
+@inject AgentService AgentService
+@inject ISnackbar Snackbar
+@inject IJSRuntime JSRuntime
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="my-4 pt-4">
+    <!-- Header -->
+    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-2">
+        <MudStack Row AlignItems="AlignItems.Center">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Size="Size.Large" Href="/agents" />
+            <MudAvatar Color="Color.Primary" Size="Size.Small" Class="ml-2">
+                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+            </MudAvatar>
+            <MudStack Spacing="0" Class="ml-2">
+                <MudText Typo="Typo.h6">@Title</MudText>
+                @if (isStreaming)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Primary">Thinking...</MudText>
+                }
+            </MudStack>
+        </MudStack>
+        <MudStack Row Spacing="1">
+            <MudMenu Icon="@Icons.Material.Filled.History" Size="Size.Medium" AnchorOrigin="Origin.BottomRight">
+                @if (conversations is not null && conversations.Length > 0)
+                {
+                    @foreach (var conv in conversations)
+                    {
+                        <MudMenuItem OnClick="@(() => SwitchConversation(conv))">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.ChatBubble" Size="Size.Small" />
+                                <MudText Typo="Typo.body2">
+                                    @(conv.Title ?? conv.DateCreated?.ToLocalTime().ToString("MMM dd, HH:mm") ?? "Chat")
+                                </MudText>
+                            </MudStack>
+                        </MudMenuItem>
+                    }
+                    <MudDivider />
+                }
+                <MudMenuItem OnClick="CreateNewConversation">
+                    <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" Color="Color.Primary" />
+                        <MudText Typo="Typo.body2" Color="Color.Primary">New Conversation</MudText>
+                    </MudStack>
+                </MudMenuItem>
+            </MudMenu>
+        </MudStack>
+    </MudStack>
+
+    <!-- Messages -->
+    @if (IsBusy)
+    {
+        <MudProgressLinear Indeterminate Color="Color.Default" />
+    }
+    else
+    {
+        <MudPaper id="agent-messages-container" Elevation="0" Class="pa-4"
+                  Style="height: calc(100vh - 280px); overflow-x: hidden; overflow-y: auto;">
+            @if (messages.Count == 0 && !isStreaming)
+            {
+                <MudStack AlignItems="AlignItems.Center" Justify="Justify.Center" Style="height: 100%;">
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Default" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Start a conversation</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        Send a message to chat with your agent.
+                    </MudText>
+                </MudStack>
+            }
+            else
+            {
+                <MudStack Spacing="3">
+                    @foreach (var msg in messages)
+                    {
+                        @if (msg.Role == "user")
+                        {
+                            <MudStack Row Justify="Justify.FlexEnd">
+                                <MudPaper Class="pa-3 rounded-lg" Elevation="2"
+                                          Style="max-width: 75%; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
+                                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
+                                </MudPaper>
+                            </MudStack>
+                        }
+                        else
+                        {
+                            <MudStack Row Justify="Justify.FlexStart" Spacing="2">
+                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                                </MudAvatar>
+                                <MudPaper Class="pa-3 rounded-lg" Elevation="1" Style="max-width: 75%;">
+                                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@msg.Content</MudText>
+                                </MudPaper>
+                            </MudStack>
+                        }
+                    }
+
+                    @* Streaming response in progress *@
+                    @if (isStreaming && streamingContent.Length > 0)
+                    {
+                        <MudStack Row Justify="Justify.FlexStart" Spacing="2">
+                            <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                            </MudAvatar>
+                            <MudPaper Class="pa-3 rounded-lg" Elevation="1" Style="max-width: 75%;">
+                                <MudText Typo="Typo.body1" Style="white-space: pre-wrap;">@streamingContent.ToString()</MudText>
+                            </MudPaper>
+                        </MudStack>
+                    }
+                    else if (isStreaming)
+                    {
+                        <MudStack Row Justify="Justify.FlexStart" Spacing="2">
+                            <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                            </MudAvatar>
+                            <MudProgressCircular Size="Size.Small" Color="Color.Primary" Indeterminate />
+                        </MudStack>
+                    }
+                </MudStack>
+            }
+        </MudPaper>
+
+        <!-- Input Area -->
+        <MudStack Row AlignItems="AlignItems.Center" Class="mt-2" Spacing="2">
+            <MudTextField @bind-Value="inputMessage" Label="Message" Variant="Variant.Outlined"
+                          Placeholder="Type a message..."
+                          Disabled="@isStreaming"
+                          Immediate
+                          OnKeyDown="OnInputKeyDown"
+                          Class="flex-grow-1" />
+            <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" Size="Size.Large"
+                           OnClick="SendMessage"
+                           Disabled="@(isStreaming || string.IsNullOrWhiteSpace(inputMessage))" />
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? AgentId { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    private Guid agentGuid;
+    private AgentConversation? currentConversation;
+    private AgentConversation[]? conversations;
+    private List<ChatMessageDisplay> messages = new();
+    private string inputMessage = string.Empty;
+    private bool isStreaming;
+    private StringBuilder streamingContent = new();
+    private CancellationTokenSource? streamCts;
+
+    protected override async Task OnAccessAsync()
+    {
+        if (!Guid.TryParse(AgentId, out agentGuid))
+        {
+            NavigationManager.NavigateTo("/agents");
+            return;
+        }
+
+        IsBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            // Load conversations
+            conversations = await AgentService.GetConversations(agentGuid);
+
+            // Use the most recent conversation or create a new one
+            if (conversations is not null && conversations.Length > 0)
+            {
+                currentConversation = conversations.OrderByDescending(c => c.DateCreated).First();
+                await LoadMessages();
+            }
+            else
+            {
+                await CreateNewConversation();
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Failed to load: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            IsBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadMessages()
+    {
+        if (currentConversation is null) return;
+
+        var dbMessages = await AgentService.GetMessages(currentConversation.Id);
+        messages.Clear();
+
+        if (dbMessages is not null)
+        {
+            foreach (var msg in dbMessages)
+            {
+                messages.Add(new ChatMessageDisplay
+                {
+                    Role = msg.Role,
+                    Content = msg.Content
+                });
+            }
+        }
+
+        StateHasChanged();
+        await ScrollToBottom();
+    }
+
+    private async Task CreateNewConversation()
+    {
+        var conv = await AgentService.CreateConversation(agentGuid);
+        if (conv is not null)
+        {
+            currentConversation = conv;
+            messages.Clear();
+            // Refresh conversation list
+            conversations = await AgentService.GetConversations(agentGuid);
+            StateHasChanged();
+        }
+        else
+        {
+            Snackbar.Add("Failed to create conversation.", Severity.Error);
+        }
+    }
+
+    private async Task SwitchConversation(AgentConversation conv)
+    {
+        currentConversation = conv;
+        IsBusy = true;
+        StateHasChanged();
+
+        await LoadMessages();
+
+        IsBusy = false;
+        StateHasChanged();
+    }
+
+    private async Task OnInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey && !isStreaming && !string.IsNullOrWhiteSpace(inputMessage))
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(inputMessage) || isStreaming || currentConversation is null)
+            return;
+
+        var userMessage = inputMessage.Trim();
+        inputMessage = string.Empty;
+
+        // Add user message to display
+        messages.Add(new ChatMessageDisplay { Role = "user", Content = userMessage });
+        StateHasChanged();
+        await ScrollToBottom();
+
+        // Stream the response
+        isStreaming = true;
+        streamingContent.Clear();
+        streamCts = new CancellationTokenSource();
+        StateHasChanged();
+
+        try
+        {
+            await foreach (var chunk in AgentService.ChatStream(currentConversation.Id, userMessage))
+            {
+                if (streamCts.IsCancellationRequested) break;
+
+                if (chunk.StartsWith("[ERROR]"))
+                {
+                    Snackbar.Add(chunk, Severity.Error);
+                    break;
+                }
+
+                streamingContent.Append(chunk);
+                StateHasChanged();
+                await ScrollToBottom();
+            }
+
+            // Move streaming content to messages list
+            if (streamingContent.Length > 0)
+            {
+                messages.Add(new ChatMessageDisplay
+                {
+                    Role = "assistant",
+                    Content = streamingContent.ToString()
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Stream error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isStreaming = false;
+            streamingContent.Clear();
+            streamCts?.Dispose();
+            streamCts = null;
+            StateHasChanged();
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval",
+                "document.getElementById('agent-messages-container')?.scrollTo(0, document.getElementById('agent-messages-container')?.scrollHeight)");
+        }
+        catch
+        {
+            // JS interop may fail during prerender
+        }
+    }
+
+    public void Dispose()
+    {
+        streamCts?.Cancel();
+        streamCts?.Dispose();
+    }
+
+    private class ChatMessageDisplay
+    {
+        public string Role { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+    }
+}

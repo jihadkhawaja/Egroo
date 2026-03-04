@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Egroo.Server.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Egroo.Server.Migrations
 {
     [DbContext(typeof(DataContext))]
-    partial class DataContextModelSnapshot : ModelSnapshot
+    [Migration("20260304185940_AddAgentEntities")]
+    partial class AddAgentEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -347,72 +350,6 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentknowledgeitems");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentMcpServer", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AgentDefinitionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("agentdefinitionid");
-
-                    b.Property<string>("ApiKey")
-                        .HasColumnType("text")
-                        .HasColumnName("apikey");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("createdby");
-
-                    b.Property<DateTimeOffset>("DateCreated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
-
-                    b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
-
-                    b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deletedby");
-
-                    b.Property<string>("Endpoint")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
-                        .HasColumnName("endpoint");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean")
-                        .HasColumnName("isactive");
-
-                    b.Property<DateTimeOffset?>("LastDiscoveredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lastdiscoveredat");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updatedby");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AgentDefinitionId");
-
-                    b.ToTable("agentmcpservers");
-                });
-
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentTool", b =>
                 {
                     b.Property<Guid>("Id")
@@ -454,10 +391,6 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("isenabled");
 
-                    b.Property<Guid?>("McpServerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("mcpserverid");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -467,10 +400,6 @@ namespace Egroo.Server.Migrations
                     b.Property<string>("ParametersSchema")
                         .HasColumnType("text")
                         .HasColumnName("parametersschema");
-
-                    b.Property<int>("Source")
-                        .HasColumnType("integer")
-                        .HasColumnName("source");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("uuid")

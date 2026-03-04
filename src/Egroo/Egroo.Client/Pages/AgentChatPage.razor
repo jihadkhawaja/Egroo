@@ -1,0 +1,10 @@
+@page "/agent/chat/{AgentId}/{Title}"
+
+<AgentChatView Title="@Title" AgentId="@AgentId" />
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string AgentId { get; set; }
+}
