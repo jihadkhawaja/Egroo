@@ -181,4 +181,4 @@ Join the discussion on our **[Discord Server](https://discord.gg/9KMAM2RKVC)** t
 
 ## 📄 License
 
-This project is licensed under the [**MIT License**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
+This project is licensed under the [**Apache License 2.0**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
