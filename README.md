@@ -2,9 +2,11 @@
 
 <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="128"/>
 
-A **self-hosted**, **real-time** chat web application built using **Blazor** and **ASP.NET**.
+Egroo is a self-hosted real-time chat platform built with Blazor, ASP.NET Core, SignalR, and PostgreSQL. It is designed for teams that want modern chat, voice, and AI-assisted collaboration without giving up control of their infrastructure or data.
 
-## 🚀 Build Status
+It combines a Blazor web experience, a SignalR-first real-time backend, ephemeral encrypted message delivery, channel voice calls over WebRTC, and optional AI agents that can participate in conversations when mentioned.
+
+## Build Status
 
 [![NuGets Push](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml)
 [![MSTest](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
@@ -12,173 +14,207 @@ A **self-hosted**, **real-time** chat web application built using **Blazor** and
 [![Chat Deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml)
 [![CodeQL](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql)
 
-## ✨ Features
+## Why Egroo
 
-- **Blazor Auto Mode**: 
-  - Loads server-side for faster initial page load, then seamlessly switches to WebAssembly (WASM) when cached.
-- **Progressive Web App (PWA)**: 
-  - Installable on devices for an app-like experience.
-- **Real-time Communication**: 
-  - Built with SignalR for fast, responsive messaging.
-- **Channel Voice Calls**: 
-  - Secure, peer-to-peer mesh network WebRTC voice calls within channels.
-- **Message Privacy**: 
-  - Messages are automatically deleted after delivery, ensuring confidentiality.
-- **AI Agents in Channels**:
-  - Create personal AI agents powered by your own LLM provider (OpenAI, Azure OpenAI, Anthropic, Ollama).
-  - Publish agents so other users can discover and add them as friends.
-  - Add agents to channels — they respond automatically when @mentioned.
-  - Supports names with spaces via `@<Agent Name>` mention syntax.
-  - Agents have access to built-in tools including the ability to search, friend, and add other agents to channels.
-- **Self-hosted Infrastructure**: 
-  - Full control over your data with a customizable backend.
+- Self-hosted architecture with PostgreSQL storage and no third-party message relay.
+- Blazor Auto rendering for fast first load with WebAssembly after hydration.
+- SignalR-based real-time messaging and presence.
+- Ephemeral encrypted message delivery for stronger privacy.
+- WebRTC channel voice calls.
+- AI agents that can be created, published, added to channels, and triggered with mentions.
 
-## 💬 How Messaging Works
+## Core Capabilities
 
-The three NuGet packages (`jihadkhawaja.chat.client`, `jihadkhawaja.chat.server`, `jihadkhawaja.chat.shared`) work together every time a message is sent:
+| Capability | What it means |
+|---|---|
+| Real-time chat | Fast message delivery over SignalR WebSockets |
+| Privacy-first delivery | Message content is encrypted and stored only until recipients receive it |
+| Voice channels | Peer-to-peer channel audio using WebRTC signaling through the hub |
+| Blazor UI | Shared Razor components across server and WebAssembly experiences |
+| AI agents | User-owned agents powered by OpenAI, Azure OpenAI, Anthropic, or Ollama |
+| Self-hosting | Full control over deployment, configuration, and data |
+
+## System Overview
+
+At a high level, Egroo separates the web host, the API server, shared UI libraries, chat libraries, and database storage.
+
+```mermaid
+flowchart TD
+  Browser["Browser / PWA"]
+  Host["Egroo Host - Blazor Auto host"]
+  UI["Egroo.UI - Shared Razor components"]
+  Client["Egroo.Client - WASM client project"]
+  Api["Egroo.Server - Minimal API + SignalR"]
+  ChatClient["jihadkhawaja.chat.client - Client chat services"]
+  ChatServer["jihadkhawaja.chat.server - ChatHub + connection tracking"]
+  Shared["jihadkhawaja.chat.shared - Shared models and interfaces"]
+  Db[("PostgreSQL")]
+
+  Browser --> Host
+  Host --> UI
+  Host --> Client
+  Browser --> Api
+  UI --> ChatClient
+  ChatClient --> Shared
+  Api --> ChatServer
+  Api --> Shared
+  ChatServer --> Shared
+  Api --> Db
+```
+
+## Solution Structure
+
+The solution in `src/` is split by responsibility so the UI, transport layer, shared contracts, and server implementation remain independent.
+
+```mermaid
+flowchart LR
+  Egroo["Egroo/Egroo - Blazor host"] --> UI["Egroo.UI"]
+  EgrooClient["Egroo.Client - WASM client"] --> UI
+  UI --> ChatClient["jihadkhawaja.chat.client"]
+  ChatClient --> Shared["jihadkhawaja.chat.shared"]
+  EgrooServer["Egroo.Server - API + DB + repositories"] --> ChatServer["jihadkhawaja.chat.server"]
+  ChatServer --> Shared
+  EgrooServer --> Shared
+  Tests["Egroo.Server.Test"] --> EgrooServer
+```
+
+| Project | Purpose |
+|---|---|
+| `src/Egroo/Egroo` | Blazor host application that serves the web app and coordinates SSR to WASM rendering |
+| `src/Egroo/Egroo.Client` | Client-side WebAssembly project |
+| `src/Egroo.UI` | Shared Razor component library used by both hosting modes |
+| `src/Egroo.Server` | ASP.NET Core backend with Minimal APIs, SignalR, repositories, EF Core, and PostgreSQL |
+| `src/jihadkhawaja.chat.client` | Client services that wrap auth, channel, message, and call interactions |
+| `src/jihadkhawaja.chat.server` | SignalR hub implementation and connection tracking |
+| `src/jihadkhawaja.chat.shared` | Shared DTOs, models, and interfaces |
+| `src/Egroo.Server.Test` | MSTest coverage for server behavior |
+
+## How Messaging Works
+
+One of Egroo's core design choices is that message content is not kept permanently in the main message record. The server stores metadata, encrypts per-recipient content temporarily, and removes pending content after acknowledgment.
 
 ```mermaid
 sequenceDiagram
-    actor User
-    participant UI as Egroo.UI<br/>(Razor Component)
-    participant Client as jihadkhawaja.chat.client<br/>(NuGet)
-    participant Hub as jihadkhawaja.chat.server<br/>(NuGet · ChatHub)
-    participant Repo as Egroo.Server<br/>(Repository / DB)
-    participant RecipientClient as jihadkhawaja.chat.client<br/>(Recipient · NuGet)
-    participant RecipientUI as Egroo.UI<br/>(Recipient)
+  actor User
+  participant UI as Egroo.UI
+  participant Client as chat.client
+  participant Hub as ChatHub
+  participant Repo as Server Repository
+  participant Recipient as Recipient Client
 
-    User->>UI: Types message and hits Send
-    UI->>Client: SendMessage(message)
-    Note over Client: ChatMessageService<br/>wraps HubConnection.InvokeAsync
-    Client-->>Hub: SignalR · SendMessage(message)<br/>over WebSocket
-    Hub->>Hub: Validate sender & channel membership
-    Hub->>Repo: Save message metadata (no content)
-    Hub->>Repo: Encrypt & store content in UserPendingMessages<br/>for each recipient
-    Repo-->>Hub: Saved ✓
-
-    loop For each online recipient
-        Hub-->>RecipientClient: SignalR · ReceiveMessage(message)
-        RecipientClient->>RecipientUI: Trigger OnMessageReceived event
-        RecipientUI->>User: Message displayed in chat
-        RecipientClient-->>Hub: UpdatePendingMessage(messageId)
-        Hub->>Repo: Delete UserPendingMessage record
-    end
-
-    Note over Repo: Content is never stored<br/>permanently — only until delivered
+  User->>UI: Send message
+  UI->>Client: SendMessage(message)
+  Client->>Hub: SignalR invocation
+  Hub->>Repo: Save metadata
+  Hub->>Repo: Encrypt and store pending content
+  Hub-->>Recipient: ReceiveMessage(message)
+  Recipient-->>Hub: UpdatePendingMessage(messageId)
+  Hub->>Repo: Delete pending content
 ```
 
-## 🤖 How Agent Mentions Work
+## How Voice Channel Calls Work
 
-When an agent is added to a channel, it listens for `@mentions` and replies in real time. The response is delivered via the same SignalR pipeline as regular messages.
-
-```mermaid
-sequenceDiagram
-    actor User
-    participant UI as Egroo.UI
-    participant Hub as ChatHub
-    participant Responder as AgentChannelService
-    participant LLM as LLM Provider
-    participant Channel as Channel Members
-
-    User->>UI: Types @AgentName hello!
-    UI->>Hub: SignalR · SendMessage(message)
-    Hub->>Hub: Save & broadcast to members
-    Hub->>Responder: ProcessMentionsAsync(message)
-    Note over Responder: Detects @AgentName or @<Agent Name>
-    Responder->>Responder: Load last 20 messages as context
-    Responder->>LLM: Run agent with instructions + context
-    LLM-->>Responder: Agent response text
-    Responder->>Hub: Broadcast agent reply via IHubContext
-    Hub-->>Channel: SignalR · ReceiveMessage(agentMessage)
-    Note over Channel: Message shows agent name + bot icon
-```
-
-**Key points:**
-- Agent replies are fire-and-forget — `SendMessage` returns immediately; the agent response arrives as a follow-up `ReceiveMessage` event.
-- Any agent in a channel can be mentioned using `@AgentName` (single word) or `@<Agent Name>` (names with spaces).
-- Only agents that are **Active** and **assigned to the channel** will respond.
-- The last 20 channel messages are included as conversation context.
-
----
-
-## 📞 How Channel Voice Calls Work
-
-Voice calls in channels are powered by a **WebRTC Mesh Network**, where every participant establishes a secure peer-to-peer connection with everyone else in the call.
+Voice calls in channels use a WebRTC mesh network. SignalR manages membership and relays WebRTC signaling, while the audio stream stays peer-to-peer between participants.
 
 ```mermaid
 sequenceDiagram
   actor A as Participant A
-  participant H as SignalR Hub
+  participant Hub as SignalR Hub
   actor B as Participant B
 
-  A->>H: JoinChannelCall(channelId)
-  H-->>A: ChannelCallParticipantsChanged([A])
-    
-  B->>H: JoinChannelCall(channelId)
-  H-->>A: ChannelCallParticipantsChanged([A, B])
-  H-->>B: ChannelCallParticipantsChanged([A, B])
+  A->>Hub: JoinChannelCall(channelId)
+  Hub-->>A: ChannelCallParticipantsChanged([A])
 
-  Note over B: New joiner creates WebRTC offers<br/>for existing participants
-  B->>H: SendOfferToUser(A, offerSdp)
-  H-->>A: ReceiveOffer(B, offerSdp)
+  B->>Hub: JoinChannelCall(channelId)
+  Hub-->>A: ChannelCallParticipantsChanged([A, B])
+  Hub-->>B: ChannelCallParticipantsChanged([A, B])
 
-  A->>H: SendAnswerToUser(B, answerSdp)
-  H-->>B: ReceiveAnswer(A, answerSdp)
+  Note over B: New participant creates WebRTC offers for existing members
+  B->>Hub: SendOfferToUser(A, offerSdp)
+  Hub-->>A: ReceiveOffer(B, offerSdp)
 
-  Note over A,B: Exchange ICE Candidates via Hub
+  A->>Hub: SendAnswerToUser(B, answerSdp)
+  Hub-->>B: ReceiveAnswer(A, answerSdp)
 
-  B->>H: SendIceCandidateToUser(A, candidate)
-  H-->>A: ReceiveIceCandidate(B, candidate)
+  Note over A,B: ICE candidates are exchanged through the hub
+  B->>Hub: SendIceCandidateToUser(A, candidate)
+  Hub-->>A: ReceiveIceCandidate(B, candidate)
 
-  Note over A,B: P2P Encrypted Audio Stream Established
+  Note over A,B: Peer-to-peer encrypted audio stream established
 ```
 
-## 📋 Prerequisites
+## AI Agents in Channels
 
-- **.NET 10** (required) for the latest features and optimizations.
-- **Browser**: Any modern browser with WebAssembly support.
+Egroo supports personal AI agents that can be attached to channels and respond when mentioned. Agents can use supported LLM providers and participate as first-class actors in the chat experience.
 
-## 📚 Documentation
+```mermaid
+sequenceDiagram
+  actor User
+  participant Hub as ChatHub
+  participant AgentService as AgentChannelService
+  participant LLM as LLM Provider
+  participant Channel as Channel Members
 
-Comprehensive guides and setup instructions are available in our [Wiki](https://github.com/jihadkhawaja/Egroo/wiki):
+  User->>Hub: Send @AgentName message
+  Hub->>AgentService: Detect mention and load context
+  AgentService->>LLM: Generate reply
+  LLM-->>AgentService: Response text
+  AgentService-->>Channel: Broadcast agent reply
+```
 
-- **[Getting Started](https://github.com/jihadkhawaja/Egroo/wiki/Getting-Started)** - Quick setup guide
-- **[Installation Guide](https://github.com/jihadkhawaja/Egroo/wiki/Installation)** - Detailed installation instructions
-- **[Configuration](https://github.com/jihadkhawaja/Egroo/wiki/Configuration)** - Configuration options and settings
-- **[Development Setup](https://github.com/jihadkhawaja/Egroo/wiki/Development-Setup)** - Setup for contributors
-- **[Deployment Guide](https://github.com/jihadkhawaja/Egroo/wiki/Deployment)** - Production deployment scenarios
-- **[API Documentation](https://github.com/jihadkhawaja/Egroo/wiki/API-Documentation)** - REST API and SignalR reference
-- **[Architecture Overview](https://github.com/jihadkhawaja/Egroo/wiki/Architecture)** - Technical architecture details
-- **[Troubleshooting](https://github.com/jihadkhawaja/Egroo/wiki/Troubleshooting)** - Common issues and solutions
+## Where To Start
 
-## 📸 Screenshots
+The README is the entry point. The wiki is where installation, deployment, and deeper technical details live.
 
-### Friends List
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_friends.jpg" alt="Friends" height="300" />
+| If you want to... | Go here |
+|---|---|
+| Get the app running quickly | [Getting Started](https://github.com/jihadkhawaja/Egroo/wiki/Getting-Started) |
+| Install with more detail | [Installation Guide](https://github.com/jihadkhawaja/Egroo/wiki/Installation) |
+| Configure database, JWT, encryption, and CORS | [Configuration](https://github.com/jihadkhawaja/Egroo/wiki/Configuration) |
+| Set up a contributor workstation | [Development Setup](https://github.com/jihadkhawaja/Egroo/wiki/Development-Setup) |
+| Deploy to production | [Deployment Guide](https://github.com/jihadkhawaja/Egroo/wiki/Deployment) |
+| Understand the backend and runtime design | [Architecture Overview](https://github.com/jihadkhawaja/Egroo/wiki/Architecture) |
+| Explore API and SignalR surface area | [API Documentation](https://github.com/jihadkhawaja/Egroo/wiki/API-Documentation) |
+| Debug common setup issues | [Troubleshooting](https://github.com/jihadkhawaja/Egroo/wiki/Troubleshooting) |
 
-### Channels
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channels.jpg" alt="Channels" height="300" />
+## Local Development At A Glance
 
-### Conversations
-<img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_channel.jpg" alt="Conversations" height="300" />
+For contributors, the normal loop is:
 
-### Responsive
-<div>
-  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channels.jpg" alt="Small Screen Channels" height="300" />
-  <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/egroo_docs_small_screen_channel.jpg" alt="Small Screen Channel" height="300" />
-</div>
+1. Install .NET 10 and PostgreSQL.
+2. Configure `src/Egroo.Server/appsettings.Development.json` with your database, JWT secret, and encryption values.
+3. Start the API from `src/Egroo.Server`.
+4. Start the web host from `src/Egroo/Egroo`.
+5. Run tests from `src/Egroo.Server.Test` or the solution root.
 
-## 🤝 Contribution
+Common commands:
 
-Contributions are welcome! To get started:
+```bash
+dotnet build src/Egroo.slnx --configuration Debug
+dotnet test src/Egroo.Server.Test/Egroo.Server.Test.csproj --verbosity normal
+dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
+dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+```
 
-- Fork the repository and submit pull requests.
-- Report bugs or request features via the [Issues](https://github.com/jihadkhawaja/Egroo/issues) tab.
+For full environment setup, use the [Development Setup](https://github.com/jihadkhawaja/Egroo/wiki/Development-Setup) guide.
 
-## 🌐 Community
+## Contributing
 
-Join the discussion on our **[Discord Server](https://discord.gg/9KMAM2RKVC)** to connect, share ideas, and get help.
+Contributions should be small, reviewable, and aligned with the existing architecture.
 
-## 📄 License
+Before opening a pull request:
 
-This project is licensed under the [**Apache License 2.0**](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
+1. Read the [Contributing Guide](https://github.com/jihadkhawaja/Egroo/blob/main/docs/CONTRIBUTING.md).
+2. Check the [Code of Conduct](https://github.com/jihadkhawaja/Egroo/blob/main/docs/CODE_OF_CONDUCT.md).
+3. Discuss larger changes through an issue first.
+4. Keep documentation updated when behavior or setup changes.
+5. Run tests before submitting your branch.
+
+## Community
+
+- GitHub issues: [Report bugs or request features](https://github.com/jihadkhawaja/Egroo/issues)
+- Discord: [Join the community server](https://discord.gg/9KMAM2RKVC)
+
+## License
+
+Egroo is licensed under the [Apache License 2.0](https://github.com/jihadkhawaja/Egroo/blob/main/LICENSE).
