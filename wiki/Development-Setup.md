@@ -1,263 +1,162 @@
 # Development Setup
 
-This guide will help you set up a development environment for contributing to Egroo.
+This guide is for contributors who want a repeatable local development environment that matches the current solution layout.
 
-## 🎯 Prerequisites
+## Tooling Checklist
 
-### Required Software
+Required:
+
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL 12+](https://www.postgresql.org/download/)
+- [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
-- [Visual Studio 2022](https://visualstudio.microsoft.com/vs/) or [Visual Studio Code](https://code.visualstudio.com/)
 
-### Recommended Tools
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (for containerized development)
-- [Azure Data Studio](https://azure.microsoft.com/en-us/products/data-studio/) or [pgAdmin](https://www.pgadmin.org/) (for database management)
-- [Postman](https://www.postman.com/) or [Thunder Client](https://www.thunderclient.com/) (for API testing)
+Recommended:
 
-## 🛠️ Environment Setup
+- Visual Studio 2022 or Visual Studio Code
+- Docker Desktop for database or deployment experiments
+- pgAdmin, Azure Data Studio, or another PostgreSQL client
 
-### 1. Clone the Repository
+## Solution Layout
+
+| Project | Role |
+|---|---|
+| `src/Egroo/Egroo` | Blazor host application |
+| `src/Egroo/Egroo.Client` | Blazor WebAssembly project |
+| `src/Egroo.UI` | Shared component library |
+| `src/Egroo.Server` | API, SignalR, EF Core, repositories |
+| `src/jihadkhawaja.chat.client` | Client chat services |
+| `src/jihadkhawaja.chat.server` | SignalR hub implementation |
+| `src/jihadkhawaja.chat.shared` | Shared contracts and models |
+| `src/Egroo.Server.Test` | MSTest project |
+
+The main solution file is `src/Egroo.slnx`.
+
+## 1. Clone And Configure
 
 ```bash
 git clone https://github.com/jihadkhawaja/Egroo.git
 cd Egroo
 ```
 
-### 2. Database Setup
+Create a local PostgreSQL database and then update `src/Egroo.Server/appsettings.Development.json`.
 
-#### Option A: Local PostgreSQL
+Example:
 
-1. **Install PostgreSQL**:
-   ```bash
-   # Windows (using Chocolatey)
-   choco install postgresql
-   
-   # macOS (using Homebrew)
-   brew install postgresql
-   
-   # Ubuntu/Debian
-   sudo apt update
-   sudo apt install postgresql postgresql-contrib
-   ```
-
-2. **Create development database**:
-   ```bash
-   sudo -u postgres psql
-   ```
-   
-   ```sql
-   CREATE DATABASE egroo_dev;
-   CREATE USER egroo_dev_user WITH ENCRYPTED PASSWORD 'dev_password';
-   GRANT ALL PRIVILEGES ON DATABASE egroo_dev TO egroo_dev_user;
-   \q
-   ```
-
-#### Option B: Docker PostgreSQL
-
-```bash
-docker run --name egroo-postgres \
-  -e POSTGRES_DB=egroo_dev \
-  -e POSTGRES_USER=egroo_dev_user \
-  -e POSTGRES_PASSWORD=dev_password \
-  -p 5432:5432 \
-  -d postgres:15
-```
-
-### 3. Configure Development Settings
-
-Create development configuration files:
-
-#### Server Configuration
-`src/Egroo.Server/appsettings.Development.json`:
 ```json
 {
+  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
   "Secrets": {
-    "Jwt": "development-jwt-secret-key-not-for-production-use-only-for-dev"
+    "Jwt": "development-jwt-secret-at-least-32-characters"
   },
   "Encryption": {
-    "Key": "DevEncryptionKey12345678901234",
-    "IV": "DevIV12345678901"
-  },
-  "Serilog": {
-    "MinimumLevel": {
-      "Default": "Debug",
-      "Override": {
-        "Microsoft": "Information",
-        "Microsoft.Hosting.Lifetime": "Information",
-        "Microsoft.EntityFrameworkCore.Database.Command": "Information"
-      }
-    },
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"
-        }
-      }
-    ]
+    "Key": "12345678901234567890123456789012",
+    "IV": "1234567890123456"
   }
 }
 ```
 
-#### Client Configuration
-The client API URL is configured at build time in `src/Egroo.UI/Constants/Source.cs`. In `DEBUG` builds it already points to `http://localhost:5175/` by default — no additional configuration file is needed for development.
+## 2. Build The Solution
 
-### 4. Restore Dependencies and Build
+From the repository root:
 
 ```bash
-cd src
-dotnet restore
-dotnet build
+dotnet build src/Egroo.slnx --configuration Debug
 ```
 
-> **Note**: Database migrations are applied automatically when the server starts — no manual `dotnet ef database update` is needed for development. EF tools are still useful for creating new migrations:  
-> `dotnet tool install --global dotnet-ef`
+## 3. Run The App Locally
 
-## 🚀 Running the Application
+Terminal 1:
 
-### Option 1: Using Visual Studio
-
-1. Open `src/Egroo.slnx` in Visual Studio 2022 (17.9+)
-2. Set multiple startup projects:
-   - Right-click solution → Properties
-   - Set `Egroo.Server` and `Egroo` as startup projects
-3. Press F5 to start debugging
-
-### Option 2: Using Command Line
-
-#### Terminal 1 - API Server:
 ```bash
-cd src/Egroo.Server
-dotnet watch run
+dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
 ```
 
-#### Terminal 2 - Web Client:
+Terminal 2:
+
 ```bash
-cd src/Egroo/Egroo
-dotnet watch run
+dotnet watch --project src/Egroo/Egroo/Egroo.csproj
 ```
 
-## 🧪 Running Tests
+Runtime defaults:
 
-### Unit Tests
+- API: `http://localhost:5175`
+- Web app: `http://localhost:5068`
+- Swagger: `http://localhost:5175/swagger`
+
+The UI already targets `http://localhost:5175/` in debug builds through `src/Egroo.UI/Constants/Source.cs`.
+
+## 4. Run Tests
+
+Run the server tests:
+
 ```bash
-cd src
-dotnet test
+dotnet test src/Egroo.Server.Test/Egroo.Server.Test.csproj --verbosity normal
 ```
 
-### Integration Tests
-```bash
-# Start the server first
-cd src/Egroo.Server
-dotnet run &
+The test project uses an in-memory EF Core setup, so it does not require a live PostgreSQL instance for normal test runs.
 
-# Run integration tests
-cd ../Egroo.Server.Test
-dotnet test
+## 5. Working With Migrations
+
+Migrations target `src/Egroo.Server`.
+
+Common scripts:
+
+```powershell
+.\scripts\add-migration.ps1 "MigrationName"
+.\scripts\update-database.ps1
 ```
 
-### Testing with Postman
+Important detail:
 
-Import the Postman collection for API testing:
-1. Download [Egroo.postman_collection.json](../postman/Egroo.postman_collection.json)
-2. Import into Postman
-3. Set environment variables:
-   - `baseUrl`: `http://localhost:5175`
-   - `token`: (obtained from login endpoint)
+- normal local startup already runs `db.Database.MigrateAsync()` automatically
+- use migration scripts when you intentionally change the data model
 
-## 🔧 Development Tools Configuration
+## 6. IDE Notes
 
-### Visual Studio Code Setup
+### Visual Studio
 
-Install recommended extensions:
-```bash
-# Install via VS Code command palette
-code --install-extension ms-dotnettools.csharp
-code --install-extension ms-dotnettools.blazorwasm-companion
-code --install-extension ms-mssql.mssql
-code --install-extension bradlc.vscode-tailwindcss
-```
+Open `src/Egroo.slnx` and run both startup projects:
 
-Create `.vscode/launch.json`:
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Launch Server",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/src/Egroo.Server",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
-    {
-      "name": "Launch Client",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/src/Egroo/Egroo/bin/Debug/net10.0/Egroo.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/src/Egroo/Egroo",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    }
-  ]
-}
-```
+- `Egroo.Server`
+- `Egroo`
 
-Create `.vscode/tasks.json`:
-```json
-{
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "build",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/src/Egroo.slnx",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "publish",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "publish",
-        "${workspaceFolder}/src/Egroo.slnx",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "watch",
-      "command": "dotnet",
-      "type": "process",
+### Visual Studio Code
+
+The workspace already includes build and test tasks for:
+
+- building the full solution
+- building the API
+- building the Blazor host
+- running the server tests
+
+If you mainly work in VS Code, those tasks are the easiest way to keep the standard commands consistent.
+
+## Development Conventions That Affect Setup
+
+- database access lives in repositories in `src/Egroo.Server/Repository`
+- minimal API endpoints live under `src/Egroo.Server/API`
+- the SignalR hub is mapped at `/chathub`
+- CORS is opened in debug builds
+- message content is stored temporarily and encrypted before delivery
+- `IConnectionTracker` is in-memory by default, so local development is effectively single-node
+
+## Suggested Daily Workflow
+
+1. Pull latest changes.
+2. Build the solution.
+3. Start API and web host with `dotnet watch`.
+4. Run tests for the area you changed.
+5. Update docs when behavior or setup changes.
+
+## Related Pages
+
+- [Getting Started](Getting-Started)
+- [Configuration](Configuration)
+- [Deployment](Deployment)
+- [Troubleshooting](Troubleshooting)
       "args": [
         "watch",
         "run",

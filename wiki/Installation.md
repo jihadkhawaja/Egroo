@@ -1,244 +1,156 @@
-# Installation Guide
+# Installation
 
-This comprehensive guide covers different installation methods for Egroo.
+This page explains the setup options that exist in the repository today and which one to pick.
 
-## 📦 Installation Methods
+## Choose The Right Path
 
-### Method 1: Docker Compose (Recommended)
+| Goal | Recommended path |
+|---|---|
+| Run Egroo locally for the first time | Manual .NET plus PostgreSQL setup |
+| Contribute to the codebase | Manual setup plus the [Development Setup](Development-Setup) guide |
+| Run only the backend in containers | `src/Egroo.Server/docker-compose.yaml` |
+| Deploy prebuilt web and API images into an existing Docker environment | `docker-compose-egroo.yml` |
 
-Docker Compose provides the easiest way to deploy Egroo with all dependencies.
+For most newcomers, start with the manual path.
 
-#### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+## Option 1: Manual Local Installation
 
-#### Steps
+### Prerequisites
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/jihadkhawaja/Egroo.git
-   cd Egroo/src
-   ```
-
-2. **Configure environment variables**:
-   ```bash
-   # Create a .env file with your configuration
-   cat > .env << EOF
-   # Database Configuration
-   POSTGRES_DB=egroo
-   POSTGRES_USER=egroo_user
-   POSTGRES_PASSWORD=secure_password_here
-   
-   # JWT Secret (minimum 32 characters)
-   JWT_SECRET=your_jwt_secret_key_here_minimum_32_chars
-   
-   # Encryption (Key = 32 chars, IV = 16 chars)
-   ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
-   ENCRYPTION_IV=Your16CharLongIV
-   
-   # API CORS allowed origins (your web client URL)
-   API_ALLOWED_ORIGINS=https://yourchat.example.com
-   EOF
-   ```
-
-3. **Start the services**:
-   ```bash
-   docker-compose -f docker-compose-egroo.yml up -d
-   ```
-
-4. **Verify installation**:
-   ```bash
-   # Check if containers are running
-   docker ps
-   
-   # Check logs
-   docker-compose -f docker-compose-egroo.yml logs
-   ```
-
-### Method 2: Manual Installation
-
-For development or custom deployments, you can install Egroo manually.
-
-#### Prerequisites
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL 12+](https://www.postgresql.org/download/)
+- [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
-#### Database Setup
+### 1. Clone The Repository
 
-1. **Install PostgreSQL**:
-   ```bash
-   # Ubuntu/Debian
-   sudo apt update
-   sudo apt install postgresql postgresql-contrib
-   
-   # macOS (using Homebrew)
-   brew install postgresql
-   
-   # Windows - Download from https://www.postgresql.org/download/windows/
-   ```
+```bash
+git clone https://github.com/jihadkhawaja/Egroo.git
+cd Egroo
+```
 
-2. **Create database and user**:
-   ```bash
-   sudo -u postgres psql
-   ```
-   
-   ```sql
-   CREATE DATABASE egroo;
-   CREATE USER egroo_user WITH ENCRYPTED PASSWORD 'your_secure_password';
-   GRANT ALL PRIVILEGES ON DATABASE egroo TO egroo_user;
-   \q
-   ```
+### 2. Create The Database
 
-#### Application Setup
+```sql
+CREATE DATABASE egroo_local;
+CREATE USER egroo_local_user WITH PASSWORD 'change-me';
+GRANT ALL PRIVILEGES ON DATABASE egroo_local TO egroo_local_user;
+```
 
-1. **Clone and build**:
-   ```bash
-   git clone https://github.com/jihadkhawaja/Egroo.git
-   cd Egroo/src
-   dotnet restore
-   dotnet build
-   ```
+### 3. Configure The API
 
-2. **Configure the API server**:
-   
-   Create `src/Egroo.Server/appsettings.Production.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Host=localhost;Database=egroo;Username=egroo_user;Password=your_secure_password"
-     },
-     "Secrets": {
-       "Jwt": "your_jwt_secret_key_here"
-     },
-     "Api": {
-       "AllowedOrigins": ["http://localhost:5174", "https://yourdomain.com"]
-     },
-     "Serilog": {
-       "MinimumLevel": {
-         "Default": "Information"
-       },
-       "WriteTo": [
-         {
-           "Name": "Console"
-         },
-         {
-           "Name": "File",
-           "Args": {
-             "path": "logs/egroo-.log",
-             "rollingInterval": "Day"
-           }
-         }
-       ]
-     }
-   }
-   ```
+Edit `src/Egroo.Server/appsettings.Development.json`.
 
-3. **Configure the web client**:
-   
-   The API URL is configured at build time in `src/Egroo.UI/Constants/Source.cs`. For a custom deployment, update the `ConnectionURL` constant to your production API URL before building:
-   ```csharp
-   #else
-   public const string ConnectionURL = "https://your-api-domain.com/";
-   #endif
-   ```
+```json
+{
+  "DetailedErrors": true,
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
+  },
+  "Secrets": {
+    "Jwt": "development-jwt-secret-at-least-32-characters"
+  },
+  "Encryption": {
+    "Key": "12345678901234567890123456789012",
+    "IV": "1234567890123456"
+  }
+}
+```
 
-4. **Start the services** (database migrations run automatically on API startup):
-   
-   Terminal 1 (API Server):
-   ```bash
-   cd src/Egroo.Server
-   dotnet run --environment Production
-   ```
-   
-   Terminal 2 (Web Client):
-   ```bash
-   cd src/Egroo/Egroo
-   dotnet run --environment Production
-   ```
+### 4. Build The Solution
 
-### Method 3: Using Pre-built Docker Images
+```bash
+dotnet build src/Egroo.slnx --configuration Debug
+```
 
-Use the official Docker images for production deployment.
+### 5. Start The API And Web App
 
-1. **Pull the images**:
-   ```bash
-   docker pull jihadkhawaja/egroo-server-prod:latest
-   docker pull jihadkhawaja/egroo-client-prod:latest
-   ```
+Terminal 1:
 
-2. **Create docker-compose.yml**:
-   ```yaml
-   version: '3.8'
-   services:
-     egroo-db:
-       image: postgres:15
-       environment:
-         POSTGRES_DB: egroo
-         POSTGRES_USER: egroo_user
-         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-       volumes:
-         - postgres_data:/var/lib/postgresql/data
-       ports:
-         - "5432:5432"
-   
-     egroo-api:
-       image: jihadkhawaja/egroo-server-prod:latest
-       depends_on:
-         - egroo-db
-       environment:
-         - ConnectionStrings__DefaultConnection=Host=egroo-db;Database=egroo;Username=egroo_user;Password=${POSTGRES_PASSWORD}
-         - Secrets__Jwt=${JWT_SECRET}
-       ports:
-         - "5175:8080"
-   
-     egroo-web:
-       image: jihadkhawaja/egroo-client-prod:latest
-       depends_on:
-         - egroo-api
-       ports:
-         - "5174:8080"
-   
-   volumes:
-     postgres_data:
-   ```
+```bash
+dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
+```
 
-3. **Set environment variables and run**:
-   ```bash
-   export POSTGRES_PASSWORD=your_secure_password
-   export JWT_SECRET=your_jwt_secret
-   docker-compose up -d
-   ```
+Terminal 2:
 
-## 🔍 Verification
+```bash
+dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+```
 
-After installation, verify that Egroo is working correctly:
+### 6. Open The App
 
-1. **Access the application**:
-   - Web Interface: http://localhost:5174 (or configured port)
-   - API: http://localhost:5175 (or configured port)
+- Web app: `http://localhost:5068`
+- API Swagger: `http://localhost:5175/swagger`
 
-2. **Check health endpoints**:
-   ```bash
-   # API health check
-   curl http://localhost:5175/health
-   
-   # Database connection
-   curl http://localhost:5175/api/system/status
-   ```
+## Option 2: Backend-Only Docker Stack
 
-3. **Test user registration**:
-   - Open the web interface
-   - Create a new account
-   - Verify you can log in and access chat features
+The repository includes `src/Egroo.Server/docker-compose.yaml`, which starts:
 
-## 🔧 Post-Installation
+- PostgreSQL
+- the API container built from `src/Egroo.Server/Dockerfile`
 
-- [Configure your installation](Configuration) for your specific needs
-- [Set up SSL/HTTPS](Deployment#ssl-configuration) for production
-- [Configure backup procedures](Deployment#backup-configuration)
-- [Set up monitoring](Deployment#monitoring) for production environments
+Run it from `src/Egroo.Server`:
 
-## 🆘 Troubleshooting
+```bash
+docker compose up --build
+```
 
-If you encounter issues during installation, check the [Troubleshooting Guide](Troubleshooting) for common solutions.
+Notes:
+
+- this compose file is centered on the API, not the full end-user stack
+- it exposes the API on `http://localhost:5175`
+- it uses a development-style PostgreSQL setup and should be reviewed before using it outside local experiments
+
+## Option 3: Prebuilt Web And API Containers
+
+The root `docker-compose-egroo.yml` uses:
+
+- `jihadkhawaja/egroo-server-prod:latest`
+- `jihadkhawaja/egroo-client-prod:latest`
+
+Important caveats:
+
+- it does not provision PostgreSQL
+- it assumes an external Docker network named `internal`
+- it is better suited to an environment where networking, reverse proxying, and persistent configuration are already managed
+
+If you use it:
+
+1. Create the external network:
+
+```bash
+docker network create internal
+```
+
+2. Make sure the required application configuration is provided to the containers.
+
+3. Start the stack:
+
+```bash
+docker compose -f docker-compose-egroo.yml up -d
+```
+
+## Option 4: Build The Docker Images Yourself
+
+From the repository root:
+
+```bash
+docker build -f src/Egroo.Server/Dockerfile -t egroo-server .
+docker build -f src/Egroo/Egroo/Dockerfile -t egroo-web .
+```
+
+This is useful when you want local images without pulling from a registry.
+
+## Installation Checklist
+
+Your setup is ready when all of these are true:
+
+1. PostgreSQL is reachable with the connection string you configured.
+2. `http://localhost:5175/swagger` opens in development.
+3. `http://localhost:5068` loads the UI.
+4. You can sign up and sign in.
+
+## After Installation
+
+- Continue with [Configuration](Configuration) to understand every setting.
+- Continue with [Development Setup](Development-Setup) if you plan to change code.
+- Continue with [Deployment](Deployment) if you are preparing a hosted environment.

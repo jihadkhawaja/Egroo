@@ -1,21 +1,23 @@
-# Configuration Guide
+# Configuration
 
-This guide covers all configuration options available in Egroo for customizing your installation.
+This page documents the settings that matter for getting Egroo running and explains where each one is used.
 
-## 📁 Configuration Files
+## Configuration Sources
 
-Egroo uses standard ASP.NET Core configuration patterns with `appsettings.json` files:
+Egroo follows normal ASP.NET Core configuration precedence:
 
-- `appsettings.json` - Base configuration
-- `appsettings.Development.json` - Development overrides
-- `appsettings.Production.json` - Production overrides
-- Environment variables - Runtime overrides
+1. `src/Egroo.Server/appsettings.json`
+2. `src/Egroo.Server/appsettings.{Environment}.json`
+3. environment variables
 
-## 🖥️ Server Configuration
+The web client also has one build-time constant in `src/Egroo.UI/Constants/Source.cs`.
 
-### Database Configuration
+## Server Settings
 
-#### PostgreSQL (Default)
+### Database Connection
+
+Required key:
+
 ```json
 {
   "ConnectionStrings": {
@@ -24,12 +26,17 @@ Egroo uses standard ASP.NET Core configuration patterns with `appsettings.json` 
 }
 ```
 
-#### Environment Variable Override
+Environment variable form:
+
 ```bash
-export ConnectionStrings__DefaultConnection="Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;"
+ConnectionStrings__DefaultConnection=Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;
 ```
 
-### JWT Authentication
+The API will fail on startup if `DefaultConnection` is missing.
+
+### JWT Secret
+
+Required key:
 
 ```json
 {
@@ -39,225 +46,178 @@ export ConnectionStrings__DefaultConnection="Server=localhost;Port=5432;User Id=
 }
 ```
 
-**Important**: The JWT secret must be at least 32 characters long for security.
+Environment variable form:
 
-### Encryption Configuration
+```bash
+Secrets__Jwt=your-secret-key-here-not-less-than-32-characters
+```
+
+The API uses this to sign and validate JWTs for both REST and SignalR authentication.
+
+### Encryption Settings
+
+Required keys:
 
 ```json
 {
   "Encryption": {
-    "Key": "Your32CharLongEncryptionKeyHere1",
-    "IV": "Your16CharLongIV"
+    "Key": "12345678901234567890123456789012",
+    "IV": "1234567890123456"
   }
 }
 ```
 
-**Important**: 
-- Encryption Key must be exactly 32 characters
-- IV (Initialization Vector) must be exactly 16 characters
-- Use strong, random values in production
+Rules:
 
-**Generate secure keys**:
-```bash
-# Generate 32-character encryption key
-openssl rand -hex 16
+- `Key` must be exactly 32 characters
+- `IV` must be exactly 16 characters
 
-# Generate 16-character IV
-openssl rand -hex 8
+These values are used by `EncryptionService` for temporary message-content storage.
 
-# Generate JWT secret (32+ characters)
-openssl rand -base64 32
-```
+### Allowed Origins
 
-### CORS Configuration
+Optional production setting:
 
 ```json
 {
   "Api": {
     "AllowedOrigins": [
-      "http://localhost:5174",
-      "https://yourchat.example.com",
-      "https://app.yourdomain.com"
+      "https://chat.example.com",
+      "https://app.example.com"
     ]
   }
 }
 ```
 
-For development (allows all origins):
-```json
-{
-  "Api": {
-    "AllowedOrigins": null
-  }
-}
+Environment variable form:
+
+```bash
+Api__AllowedOrigins__0=https://chat.example.com
+Api__AllowedOrigins__1=https://app.example.com
 ```
 
-### Logging Configuration
+Important behavior:
+
+- in debug builds, `Program.cs` explicitly disables origin restrictions and allows any origin
+- this means `AllowedOrigins` matters most outside debug builds
+
+### Logging
+
+Base logging is configured in `appsettings.json` through ASP.NET Core logging and Serilog.
+
+Minimal example:
 
 ```json
 {
   "Logging": {
     "LogLevel": {
       "Default": "Information",
-      "Microsoft": "Warning",
-      "Microsoft.Hosting.Lifetime": "Information"
+      "Microsoft": "Warning"
     }
   },
   "Serilog": {
     "WriteTo": [
       {
-        "Name": "Console",
-        "Args": {
-          "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
-        }
-      },
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/egroo-.log",
-          "rollingInterval": "Day",
-          "retainedFileCountLimit": 30,
-          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
-        }
+        "Name": "Console"
       }
     ]
   }
 }
 ```
 
-### Complete Server Configuration Example
+## Recommended Development Config
 
-`src/Egroo.Server/appsettings.Production.json`:
+`src/Egroo.Server/appsettings.Development.json`:
+
 ```json
 {
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft": "Warning",
-      "Microsoft.Hosting.Lifetime": "Information"
-    }
-  },
-  "Serilog": {
-    "WriteTo": [
-      {
-        "Name": "Console",
-        "Args": {
-          "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
-          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
-        }
-      },
-      {
-        "Name": "File",
-        "Args": {
-          "path": "logs/egroo-server-.log",
-          "rollingInterval": "Day",
-          "retainedFileCountLimit": 30,
-          "outputTemplate": "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
-        }
-      }
-    ]
-  },
+  "DetailedErrors": true,
   "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=secure_password;Database=egroodb;"
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
   "Secrets": {
-    "Jwt": "your-secret-key-here-not-less-than-32-characters"
+    "Jwt": "development-jwt-secret-at-least-32-characters"
   },
   "Encryption": {
-    "Key": "Your32CharLongEncryptionKeyHere1",
-    "IV": "Your16CharLongIV"
-  },
-  "Api": {
-    "AllowedOrigins": [
-      "https://yourchat.example.com"
-    ]
+    "Key": "12345678901234567890123456789012",
+    "IV": "1234567890123456"
   }
 }
 ```
 
-## 🌐 Client Configuration
+## Client Configuration
 
-### API Connection
+### API Base URL
 
-The API connection URL is configured in `src/Egroo.UI/Constants/Source.cs`:
+The web client uses `src/Egroo.UI/Constants/Source.cs`:
+
 ```csharp
 #if DEBUG
-// Development: points to the local API server
 public const string ConnectionURL = "http://localhost:5175/";
 #else
-// Production: update this URL to match your deployed API
 public const string ConnectionURL = "https://api.egroo.org/";
 #endif
 ```
 
-For a custom production deployment, update the `ConnectionURL` constant to point to your hosted API server before building.
+What this means:
 
-### PWA Configuration
+- local development already points to the local API
+- a custom production deployment usually needs the release value changed before build and publish
 
-PWA settings are configured in `src/Egroo/Egroo/wwwroot/manifest.json`:
+### Hub URL
+
+The SignalR hub URL is derived from the base URL plus the hub name:
+
+```csharp
+public const string HubName = "chathub";
+public const string HubConnectionURL = ConnectionURL + HubName;
+```
+
+## Runtime Behavior That Affects Configuration
+
+- JWT is accepted in the `Authorization` header for REST endpoints
+- the SignalR hub also accepts JWT through the `access_token` query string
+- rate limiting is applied under the `Api` policy at 100 requests per minute
+- the API automatically applies pending EF Core migrations on startup
+
+## Example Production Server Config
+
 ```json
 {
-  "name": "Egroo Chat",
-  "short_name": "Egroo",
-  "description": "Real-time chat application",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
-  "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=db;Port=5432;User Id=egroo;Password=strong-password;Database=egroo;"
+  },
+  "Secrets": {
+    "Jwt": "replace-with-a-real-secret-at-least-32-characters"
+  },
+  "Encryption": {
+    "Key": "replace-with-32-char-secret-value",
+    "IV": "replace-with-16-char"
+  },
+  "Api": {
+    "AllowedOrigins": [
+      "https://chat.example.com"
+    ]
+  },
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "Console"
+      }
+    ]
+  }
 }
 ```
 
-## 🐳 Docker Configuration
+## Configuration Checklist
 
-### Environment Variables for Docker
+Before blaming the code, confirm these first:
 
-Create a `.env` file for Docker Compose:
-```bash
-# Database
-POSTGRES_DB=egroodb
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=secure_password_here
-POSTGRES_HOST=egroo-db
-POSTGRES_PORT=5432
-
-# JWT Configuration
-JWT_SECRET=your-secret-key-here-not-less-than-32-characters
-
-# Encryption Configuration
-ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
-ENCRYPTION_IV=Your16CharLongIV
-
-# API Configuration
-API_ALLOWED_ORIGINS=https://yourchat.example.com,https://app.yourdomain.com
-
-# Logging Level
-LOG_LEVEL=Information
-```
-
-### Docker Compose Configuration
-
-`docker-compose.yml`:
-```yaml
-version: '3.8'
-
-services:
-  egroo-db:
-    image: postgres:15
-    container_name: egroo-database
-    restart: unless-stopped
+1. `DefaultConnection` points to a reachable PostgreSQL instance.
+2. `Secrets:Jwt` exists and is long enough.
+3. `Encryption:Key` is 32 characters and `Encryption:IV` is 16 characters.
+4. The client is pointing at the correct API base URL for the environment you are running.
+5. Production origins are explicitly set if the API is not running in debug.
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}

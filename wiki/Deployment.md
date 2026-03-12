@@ -1,263 +1,113 @@
-# Deployment Guide
+# Deployment
 
-This guide covers various deployment scenarios for Egroo in production environments.
+This page focuses on what the repository actually supports today and what to check before you put Egroo behind a public URL.
 
-## 🎯 Deployment Overview
+## Production Shape
 
-Egroo can be deployed in several ways:
-- **Docker Compose** (Recommended for small to medium deployments)
-- **Kubernetes** (For large-scale deployments)
-- **Cloud Platforms** (Azure, AWS, GCP)
-- **Traditional hosting** (IIS, Nginx + Kestrel)
+At minimum, a production deployment needs:
 
-## 🐳 Docker Deployment
+- a PostgreSQL database
+- the Egroo API from `src/Egroo.Server`
+- the Egroo web host from `src/Egroo/Egroo`
+- a reverse proxy or ingress that handles TLS and WebSocket forwarding cleanly
 
-### Production Docker Compose
+## Important Operational Caveats
 
-Create a production-ready `docker-compose.prod.yml`:
+Read these before scaling out:
 
-```yaml
-version: '3.8'
+- the SignalR connection tracker is in-memory by default
+- horizontal scale requires replacing `IConnectionTracker` with a distributed implementation such as Redis
+- the UI release build points to `https://api.egroo.org/` unless you change `src/Egroo.UI/Constants/Source.cs`
+- the API expects valid JWT and encryption settings at startup
+- database migrations run automatically when the API starts
 
-services:
-  egroo-db:
-    image: postgres:15-alpine
-    container_name: egroo-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-egroo}
-      POSTGRES_USER: ${POSTGRES_USER:-egroo_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf
-      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf
-    ports:
-      - "127.0.0.1:5432:5432"
-    networks:
-      - egroo-internal
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-egroo_user} -d ${POSTGRES_DB:-egroo}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+## Deployment Assets In The Repository
 
-  egroo-api:
-    image: jihadkhawaja/egroo-server-prod:latest
-    container_name: egroo-server
-    restart: unless-stopped
-    depends_on:
-      egroo-db:
-        condition: service_healthy
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-      - ConnectionStrings__DefaultConnection=Host=egroo-db;Database=${POSTGRES_DB:-egroo};Username=${POSTGRES_USER:-egroo_user};Password=${POSTGRES_PASSWORD};Port=5432;SSL Mode=Prefer;Trust Server Certificate=true
-      - Secrets__Jwt=${JWT_SECRET}
-      - Encryption__Key=${ENCRYPTION_KEY}
-      - Encryption__IV=${ENCRYPTION_IV}
-      - Api__AllowedOrigins__0=${FRONTEND_URL}
-      - Serilog__MinimumLevel__Default=Warning
-      - Serilog__WriteTo__0__Name=Console
-      - Serilog__WriteTo__1__Name=File
-      - Serilog__WriteTo__1__Args__path=/app/logs/egroo-server-.log
-      - Serilog__WriteTo__1__Args__rollingInterval=Day
-      - Serilog__WriteTo__1__Args__retainedFileCountLimit=30
-    volumes:
-      - ./logs/server:/app/logs
-      - ./data/uploads:/app/uploads
-    ports:
-      - "127.0.0.1:5175:8080"
-    networks:
-      - egroo-internal
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+| File | What it is |
+|---|---|
+| `src/Egroo.Server/Dockerfile` | Builds the API container |
+| `src/Egroo/Egroo/Dockerfile` | Builds the Blazor host container |
+| `docker-compose-egroo.yml` | Minimal compose for prebuilt web and API images on an external network |
+| `src/Egroo.Server/docker-compose.yaml` | Development-oriented API plus PostgreSQL compose file |
 
-  egroo-web:
-    image: jihadkhawaja/egroo-client-prod:latest
-    container_name: egroo-client
-    restart: unless-stopped
-    depends_on:
-      egroo-api:
-        condition: service_healthy
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:8080
-    ports:
-      - "127.0.0.1:5174:8080"
-    networks:
-      - egroo-internal
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080 || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+## Recommended Production Checklist
 
-  nginx:
-    image: nginx:alpine
-    container_name: egroo-nginx
-    restart: unless-stopped
-    depends_on:
-      - egroo-web
-      - egroo-api
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - ./logs/nginx:/var/log/nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - egroo-internal
+1. Provision PostgreSQL separately or as part of your platform.
+2. Set `ConnectionStrings__DefaultConnection` for the API.
+3. Set `Secrets__Jwt`, `Encryption__Key`, and `Encryption__IV`.
+4. Set `Api__AllowedOrigins__*` for the actual web origin.
+5. Update the release API URL in `src/Egroo.UI/Constants/Source.cs` before building the web app.
+6. Put both services behind HTTPS.
+7. Ensure the reverse proxy forwards WebSocket upgrades to `/chathub`.
 
-volumes:
-  postgres_data:
-    driver: local
+## Building Release Images
 
-networks:
-  egroo-internal:
-    driver: bridge
-```
+From the repository root:
 
-### Environment Variables
-
-Create `.env.prod`:
 ```bash
-# Database Configuration
-POSTGRES_DB=egroo_prod
-POSTGRES_USER=egroo_prod_user
-POSTGRES_PASSWORD=very_secure_password_here_use_strong_password
-
-# JWT Configuration (Generate with: openssl rand -base64 64)
-JWT_SECRET=your_super_secure_jwt_secret_key_minimum_256_bits
-
-# Application URLs
-FRONTEND_URL=https://chat.yourdomain.com
-API_URL=https://api.yourdomain.com
-
-# Encryption Configuration (Key = 32 chars, IV = 16 chars)
-ENCRYPTION_KEY=Your32CharLongEncryptionKeyHere1
-ENCRYPTION_IV=Your16CharLongIV
-
-# SSL Certificate paths (if using custom certificates)
-SSL_CERT_PATH=./ssl/fullchain.pem
-SSL_KEY_PATH=./ssl/privkey.pem
+docker build -f src/Egroo.Server/Dockerfile -t egroo-server .
+docker build -f src/Egroo/Egroo/Dockerfile -t egroo-web .
 ```
 
-### Nginx Configuration
+Both Dockerfiles publish .NET 10 applications and expose port `8080` inside the container.
 
-Create `nginx/nginx.conf`:
-```nginx
-events {
-    worker_connections 1024;
-}
+## Using The Root Compose File
 
-http {
-    include       /etc/nginx/mime.types;
-    default_type  application/octet-stream;
-    
-    # Logging
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                   '$status $body_bytes_sent "$http_referer" '
-                   '"$http_user_agent" "$http_x_forwarded_for"';
-    
-    access_log /var/log/nginx/access.log main;
-    error_log /var/log/nginx/error.log warn;
-    
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-    
-    # Rate limiting
-    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-    limit_req_zone $binary_remote_addr zone=auth:10m rate=5r/m;
-    
-    # Upstream servers
-    upstream egroo_api {
-        server egroo-api:8080;
-    }
-    
-    upstream egroo_web {
-        server egroo-web:8080;
-    }
-    
-    # Redirect HTTP to HTTPS
-    server {
-        listen 80;
-        server_name chat.yourdomain.com api.yourdomain.com;
-        return 301 https://$server_name$request_uri;
-    }
-    
-    # Web Frontend
-    server {
-        listen 443 ssl http2;
-        server_name chat.yourdomain.com;
-        
-        ssl_certificate /etc/nginx/ssl/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
-        ssl_prefer_server_ciphers off;
-        
-        # Security headers
-        add_header X-Frame-Options DENY;
-        add_header X-Content-Type-Options nosniff;
-        add_header X-XSS-Protection "1; mode=block";
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-        
-        location / {
-            proxy_pass http://egroo_web;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-    }
-    
-    # API Backend
-    server {
-        listen 443 ssl http2;
-        server_name api.yourdomain.com;
-        
-        ssl_certificate /etc/nginx/ssl/fullchain.pem;
-        ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
-        ssl_prefer_server_ciphers off;
-        
-        # Security headers
-        add_header X-Frame-Options DENY;
-        add_header X-Content-Type-Options nosniff;
-        add_header X-XSS-Protection "1; mode=block";
-        
-        # Rate limiting for auth endpoints
-        location /api/v1/Auth {
-            limit_req zone=auth burst=10 nodelay;
-            proxy_pass http://egroo_api;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-        }
-        
-        # SignalR WebSocket support
-        location /chathub {
-            proxy_pass http://egroo_api;
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+`docker-compose-egroo.yml` references prebuilt images:
+
+- `jihadkhawaja/egroo-server-prod:latest`
+- `jihadkhawaja/egroo-client-prod:latest`
+
+It also expects a Docker network named `internal`.
+
+Example preparation:
+
+```bash
+docker network create internal
+docker compose -f docker-compose-egroo.yml up -d
+```
+
+Use this only if your environment already handles:
+
+- PostgreSQL
+- runtime configuration injection
+- reverse proxy and public routing
+
+## Reverse Proxy Requirements
+
+Your proxy must handle these correctly:
+
+- HTTPS termination
+- forwarding normal HTTP traffic to the web host and API
+- forwarding WebSocket upgrade headers for `/chathub`
+
+If WebSocket upgrades are blocked or downgraded, real-time chat will fail because the hub is configured for WebSockets-only transport.
+
+## Example Environment Variables For The API
+
+```bash
+ASPNETCORE_ENVIRONMENT=Production
+ConnectionStrings__DefaultConnection=Server=db;Port=5432;User Id=egroo;Password=strong-password;Database=egroo;
+Secrets__Jwt=replace-with-a-real-secret-at-least-32-characters
+Encryption__Key=12345678901234567890123456789012
+Encryption__IV=1234567890123456
+Api__AllowedOrigins__0=https://chat.example.com
+```
+
+## Verification After Deployment
+
+Confirm these after every deployment:
+
+1. The API starts without configuration exceptions.
+2. The API can reach PostgreSQL and apply migrations.
+3. The web app loads in the browser.
+4. Sign-in works.
+5. Chat connects and stays connected over SignalR.
+6. Browser developer tools show a successful WebSocket connection for `/chathub`.
+
+## When To Avoid A Fancy First Deployment
+
+If you are still learning the project, do not start with Kubernetes or a multi-node layout. First get a single API instance, a single web host, and one PostgreSQL database running correctly. Then harden the environment around that baseline.
             proxy_set_header X-Forwarded-Proto $scheme;
             proxy_cache_bypass $http_upgrade;
             proxy_read_timeout 86400;

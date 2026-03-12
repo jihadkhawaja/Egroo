@@ -1,87 +1,137 @@
 # Getting Started
 
-This guide will help you get Egroo up and running quickly in your environment.
+This page is the fastest reliable path from a fresh clone to a working local Egroo environment.
 
-## 🏃‍♂️ Quick Start
+## What You Are Starting
 
-The fastest way to get started with Egroo is using Docker Compose:
+For local development, Egroo runs as:
 
-### Using Docker Compose (Recommended)
+- a PostgreSQL database
+- the API and SignalR backend from `src/Egroo.Server`
+- the Blazor web host from `src/Egroo/Egroo`
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/jihadkhawaja/Egroo.git
-   cd Egroo
-   ```
+Default development URLs:
 
-2. **Set up environment variables**:
-   ```bash
-   # Create environment file
-   cp .env.example .env
-   
-   # Edit the environment variables
-   nano .env
-   ```
+- API: `http://localhost:5175`
+- Swagger: `http://localhost:5175/swagger`
+- Web app: `http://localhost:5068`
 
-3. **Start the services**:
-   ```bash
-   docker-compose -f docker-compose-egroo.yml up -d
-   ```
+## Prerequisites
 
-4. **Access the application**:
-   - The containers join an **external Docker network** called `internal` — exposed ports depend on your reverse proxy (e.g., Nginx) configuration.
-   - For development without a proxy, see the [Manual Setup](#manual-setup) section below, where the API runs on `http://localhost:5175` and the web client on `http://localhost:5068`.
-   - Swagger UI (development builds only): `http://localhost:5175/swagger`
+Install these first:
 
-## 🔧 Manual Setup
-
-If you prefer to run Egroo without Docker:
-
-### Prerequisites
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL](https://www.postgresql.org/download/) (version 12 or higher)
+- [PostgreSQL](https://www.postgresql.org/download/)
+- [Git](https://git-scm.com/downloads)
 
-### Database Setup
-1. **Install PostgreSQL** and create a database:
-   ```sql
-   CREATE DATABASE egroo;
-   CREATE USER egroo_user WITH PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE egroo TO egroo_user;
-   ```
+Optional but useful:
 
-2. **Update connection string** in `appsettings.json`:
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "Host=localhost;Database=egroo;Username=egroo_user;Password=your_password"
-     }
-   }
-   ```
+- Visual Studio 2022 or Visual Studio Code
+- pgAdmin or another PostgreSQL client
+- Docker Desktop if you want container-based database or deployment workflows
 
-### Running the Application
-1. **Start the API Server** (database migrations run automatically on startup):
-   ```bash
-   cd src/Egroo.Server
-   dotnet run
-   ```
+## 1. Clone The Repository
 
-2. **Start the Web Client** (in a new terminal):
-   ```bash
-   cd src/Egroo/Egroo
-   dotnet run
-   ```
+```bash
+git clone https://github.com/jihadkhawaja/Egroo.git
+cd Egroo
+```
 
-## 🎯 What's Next?
+## 2. Create A PostgreSQL Database
 
-- [Configure your setup](Configuration) for production use
-- [Set up development environment](Development-Setup) for contributing
-- [Deploy to production](Deployment) with various hosting options
-- [Explore the API](API-Documentation) to build custom integrations
+Example SQL:
 
-## 🚨 Common Issues
+```sql
+CREATE DATABASE egroo_local;
+CREATE USER egroo_local_user WITH PASSWORD 'change-me';
+GRANT ALL PRIVILEGES ON DATABASE egroo_local TO egroo_local_user;
+```
 
-- **Database connection errors**: Ensure PostgreSQL is running and credentials are correct
-- **Port conflicts**: Check if ports 5175 (API) and 5174 (Web) are available
-- **CORS issues**: Verify your allowed origins in configuration
+If you prefer Docker for the database only:
 
-For more troubleshooting help, see the [Troubleshooting Guide](Troubleshooting).
+```bash
+docker run --name egroo-postgres \
+  -e POSTGRES_DB=egroo_local \
+  -e POSTGRES_USER=egroo_local_user \
+  -e POSTGRES_PASSWORD=change-me \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+## 3. Configure The API
+
+Edit `src/Egroo.Server/appsettings.Development.json`.
+
+Minimum example:
+
+```json
+{
+  "DetailedErrors": true,
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
+  },
+  "Secrets": {
+    "Jwt": "development-jwt-secret-at-least-32-characters"
+  },
+  "Encryption": {
+    "Key": "12345678901234567890123456789012",
+    "IV": "1234567890123456"
+  }
+}
+```
+
+Notes:
+
+- `Secrets:Jwt` should be at least 32 characters.
+- `Encryption:Key` must be exactly 32 characters.
+- `Encryption:IV` must be exactly 16 characters.
+- Migrations run automatically when the API starts.
+
+## 4. Start The API
+
+```bash
+dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
+```
+
+What to expect:
+
+- the API listens on `http://localhost:5175`
+- Swagger is available in development
+- the database is migrated automatically on startup
+
+## 5. Start The Web App
+
+Open a second terminal:
+
+```bash
+dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+```
+
+Open `http://localhost:5068` in your browser.
+
+The UI connects to the API base URL configured in `src/Egroo.UI/Constants/Source.cs`. In debug builds, that value is already `http://localhost:5175/`.
+
+## 6. Verify The Setup
+
+Use this quick checklist:
+
+1. `http://localhost:5175/swagger` opens.
+2. `http://localhost:5068` loads the web app.
+3. You can create an account and sign in.
+4. The API console shows no database connection errors.
+
+## Common First-Run Problems
+
+- Database connection failure: the connection string or PostgreSQL credentials are wrong.
+- API starts but crashes immediately: the JWT or encryption settings are missing.
+- Web app loads but chat fails: the API is not running on `http://localhost:5175`.
+- Docker compose confusion: the root `docker-compose-egroo.yml` is not the recommended first-run path for contributors.
+
+For fixes, see [Troubleshooting](Troubleshooting).
+
+## Where To Go Next
+
+- [Installation](Installation) for full setup options and Docker caveats
+- [Configuration](Configuration) for all runtime settings
+- [Development Setup](Development-Setup) if you plan to contribute
+- [Deployment](Deployment) if you are preparing a hosted environment
