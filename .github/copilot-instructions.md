@@ -46,6 +46,13 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 
 ## Key Conventions
 
+### Design / UX
+- Preserve the existing dark chat UI with orange primary accents unless the feature requires a local exception.
+- Chat readability takes priority over subtle styling. Sender bubbles, links, mentions, timestamps, and typing states must remain high-contrast.
+- When styling message content, verify sender and receiver bubbles separately because palette inheritance differs.
+- Mentions should render as semantic chips or tags, not plain text.
+- Links should be visibly clickable and readable in all message states, especially the current-user bubble.
+
 ### Database
 - **Lowercase naming convention** is applied to all EF Core table and column names via `LowerCaseNamingConvention`. Always expect lowercase in migrations and SQL.
 - **Soft deletes**: All entities extend `EntityAudit` (`DateDeleted`, `DeletedBy`). Do not hard-delete tracked entities without good reason.
@@ -66,12 +73,22 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 - `ChatHub` is a **partial class** split by concern: `ChatHub.cs`, `ChatHubMessage.cs`, `ChatHubCall.cs`, `ChatHubChannel.cs`, `ChatHubUser.cs`. Keep this split when adding new hub methods.
 - Hub is mapped at `/chathub` with **WebSockets-only** transport (no SSE or long-polling fallback).
 - `IConnectionTracker` (default: `InMemoryConnectionTracker`) is not distributed. For multi-server deployments, inject a Redis-backed implementation.
+- Client-side message event subscriptions should go through `ChatMessageService` rather than direct component-level `HubConnection.On(...)` handlers.
 
 ### Blazor / UI
 - UI reusable components live in `Egroo.UI/Components/` (subdirs: `Base/`, `Layout/`, `View/`).
 - Use **MudBlazor** components for all UI elements. Add `FluentValidation` validators for new forms.
 - Client-side state caching uses **BlazorDexie** (IndexedDB wrapper `EgrooDB`). Auth token/session is stored in `SessionStorage`.
 - Service calls from UI: use `jihadkhawaja.chat.client` services (`ChatMessageService`, `AuthService`, `ChatChannelService`, etc.) — don't call SignalR `HubConnection` directly.
+- Treat markdown rendering as a presentation layer. Message content should stay transport-safe and portable.
+- User mentions and agent mentions may share UI affordances, but only configured channel agents should trigger agent-response flows.
+- Prefer HTTP upload plus durable links for files rather than binary SignalR payloads.
+
+### Chat Behavior
+- Human users and AI agents share the same channel timeline but should remain visually distinct.
+- Typing indicators should support both users and agents and clear predictably when a real message is received.
+- File links and pasted URLs should render as normal clickable anchors.
+- When adjusting chat visuals, test current-user message bubbles in addition to other-user and agent bubbles.
 
 ### Encryption
 - Message content in `UserPendingMessage` is **AES-encrypted** before storage. Keys (`Encryption:Key` 32-char, `Encryption:IV` 16-char) come from app secrets — never hardcode them.

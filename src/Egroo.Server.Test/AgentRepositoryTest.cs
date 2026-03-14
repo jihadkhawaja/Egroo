@@ -364,6 +364,8 @@ namespace Egroo.Server.Test
             var updated = await repo.UpdateConversationSessionState(conversation.Id, "{\"turn\":2}");
             var deleted = await repo.DeleteConversation(conversation.Id);
             var afterDelete = await repo.GetConversation(conversation.Id);
+            var messagesAfterDelete = await repo.GetConversationMessages(conversation.Id);
+            var conversationsAfterDelete = await repo.GetUserConversations(agent.Id);
 
             Assert.IsNotNull(first);
             Assert.IsNotNull(second);
@@ -376,6 +378,9 @@ namespace Egroo.Server.Test
             Assert.IsTrue(updated);
             Assert.IsTrue(deleted);
             Assert.IsNull(afterDelete);
+            Assert.IsNull(messagesAfterDelete);
+            Assert.IsNotNull(conversationsAfterDelete);
+            Assert.AreEqual(0, conversationsAfterDelete.Length);
         }
 
         [TestMethod]

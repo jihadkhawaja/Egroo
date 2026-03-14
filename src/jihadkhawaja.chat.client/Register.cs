@@ -16,6 +16,7 @@ namespace jihadkhawaja.chat.client
             services.AddScoped<IMessageHub>(sp => sp.GetRequiredService<ChatMessageService>());
             services.AddScoped<ChatCallService>();
             services.AddScoped<AgentService>();
+            services.AddScoped<ChannelFileService>();
 
             return services;
         }

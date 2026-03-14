@@ -103,7 +103,7 @@ Important behavior:
 
 ### Logging
 
-Base logging is configured in `appsettings.json` through ASP.NET Core logging and Serilog.
+Base logging is configured in `appsettings.json` through ASP.NET Core logging.
 
 Minimal example:
 
@@ -114,13 +114,6 @@ Minimal example:
       "Default": "Information",
       "Microsoft": "Warning"
     }
-  },
-  "Serilog": {
-    "WriteTo": [
-      {
-        "Name": "Console"
-      }
-    ]
   }
 }
 ```
@@ -131,7 +124,6 @@ Minimal example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
@@ -198,13 +190,6 @@ public const string HubConnectionURL = ConnectionURL + HubName;
     "AllowedOrigins": [
       "https://chat.example.com"
     ]
-  },
-  "Serilog": {
-    "WriteTo": [
-      {
-        "Name": "Console"
-      }
-    ]
   }
 }
 ```
@@ -218,9 +203,6 @@ Before blaming the code, confirm these first:
 3. `Encryption:Key` is 32 characters and `Encryption:IV` is 16 characters.
 4. The client is pointing at the correct API base URL for the environment you are running.
 5. Production origins are explicitly set if the API is not running in debug.
-  }
-}
-```
 
 ### Staging
 ```json

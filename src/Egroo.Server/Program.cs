@@ -10,14 +10,10 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
-using Serilog;
 using System.Text;
 using System.Threading.RateLimiting;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
-
-//logger
-builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
 #region CORS
 var allowedOrigins = builder.Configuration.GetSection("Api:AllowedOrigins").Get<string[]>();
@@ -97,7 +93,9 @@ builder.Services.AddAuthentication(options =>
             var accessToken = context.Request.Query["access_token"];
 
             var path = context.HttpContext.Request.Path;
-            if (!string.IsNullOrEmpty(accessToken) && (path.StartsWithSegments("/chathub")))
+            if (!string.IsNullOrEmpty(accessToken)
+                && (path.StartsWithSegments("/chathub")
+                    || path.StartsWithSegments("/api/v1/ChannelFiles")))
             {
                 context.Token = accessToken;
             }
@@ -161,6 +159,7 @@ builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 // Agent services (Microsoft Agent Framework)
 builder.Services.AddScoped<IAgentRepository, AgentRepository>();
 builder.Services.AddHttpClient("McpClient");
+builder.Services.AddSingleton<ChannelFileStorageService>();
 builder.Services.AddSingleton<AgentSkillsService>();
 builder.Services.AddSingleton<AgentManagedSkillsService>();
 builder.Services.AddSingleton<McpClientService>();
@@ -207,5 +206,6 @@ app.UseAuthorization();
 app.MapChatHub();
 app.MapAuthentication();
 app.MapAgents();
+app.MapChannelFiles();
 
 app.Run();

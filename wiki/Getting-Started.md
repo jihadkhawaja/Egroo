@@ -66,7 +66,6 @@ Minimum example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
   },

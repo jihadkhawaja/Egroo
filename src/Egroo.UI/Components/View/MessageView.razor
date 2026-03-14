@@ -1,8 +1,9 @@
-﻿@if (IsCurrentUser)
+﻿<div id="@MessageElementId" style="scroll-margin-top: 16px;">
+@if (IsCurrentUser)
 {
     <MudStack Row Justify="Justify.FlexEnd" Class="mb-1">
         <MudPaper Class="pa-3 msg-bubble msg-bubble-current" Elevation="0"
-                  Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
+                  Style="@GetCurrentUserBubbleStyle()">
             <MarkdownContent Content="@Content" />
             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Class="mt-1" Spacing="1">
                 <MudText Typo="Typo.caption" Style="opacity: 0.7; font-size: 0.7rem;">@Date</MudText>
@@ -36,13 +37,14 @@ else
             </MudAvatar>
         }
         <MudPaper Class="pa-3 msg-bubble msg-bubble-other" Elevation="0"
-                  Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
+                  Style="@GetOtherBubbleStyle()">
             <MudText Typo="Typo.caption" Color="@(IsAgent ? Color.Info : Color.Primary)" Style="font-weight: 600;">@DisplayName</MudText>
             <MarkdownContent Content="@Content" />
             <MudText Typo="Typo.caption" Style="opacity: 0.5; font-size: 0.7rem;" Class="mt-1">@Date</MudText>
         </MudPaper>
     </MudStack>
 }
+</div>
 
 @code {
     [Parameter]
@@ -59,4 +61,35 @@ else
     public DateTimeOffset? SentOnDate { get; set; }
     [Parameter]
     public DateTimeOffset? SeenOnDate { get; set; }
+    [Parameter]
+    public string? MessageElementId { get; set; }
+    [Parameter]
+    public bool IsSearchMatch { get; set; }
+    [Parameter]
+    public bool IsSearchFocused { get; set; }
+
+    private string GetCurrentUserBubbleStyle()
+    {
+        return $"max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);{GetSearchStyle()}";
+    }
+
+    private string GetOtherBubbleStyle()
+    {
+        return $"max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);{GetSearchStyle()}";
+    }
+
+    private string GetSearchStyle()
+    {
+        if (IsSearchFocused)
+        {
+            return " box-shadow: 0 0 0 2px rgba(242,89,34,0.75);";
+        }
+
+        if (IsSearchMatch)
+        {
+            return " box-shadow: 0 0 0 1px rgba(242,89,34,0.35);";
+        }
+
+        return string.Empty;
+    }
 }

@@ -7,6 +7,7 @@
 @inject NavigationManager NavigationManager
 @inject AgentService AgentService
 @inject ISnackbar Snackbar
+@inject IDialogService DialogService
 @inject IJSRuntime JSRuntime
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
@@ -33,9 +34,9 @@
                     {
                         @foreach (var conv in conversations)
                         {
-                            <MudMenuItem OnClick="@(() => SwitchConversation(conv))">
+                            <MudMenuItem OnClick="@(() => SwitchConversation(conv))" Disabled="@(isStreaming || currentConversation?.Id == conv.Id)">
                                 <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                                    <MudIcon Icon="@Icons.Material.Filled.ChatBubble" Size="Size.Small" />
+                                    <MudIcon Icon="@(currentConversation?.Id == conv.Id ? Icons.Material.Filled.RadioButtonChecked : Icons.Material.Filled.ChatBubble)" Size="Size.Small" />
                                     <MudText Typo="Typo.body2">
                                         @(conv.Title ?? conv.DateCreated?.ToLocalTime().ToString("MMM dd, HH:mm") ?? "Chat")
                                     </MudText>
@@ -43,6 +44,15 @@
                             </MudMenuItem>
                         }
                         <MudDivider />
+                    }
+                    @if (currentConversation is not null)
+                    {
+                        <MudMenuItem OnClick="DeleteCurrentConversationConfirm" Disabled="@isStreaming">
+                            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" />
+                                <MudText Typo="Typo.body2" Color="Color.Error">Clear Current Conversation</MudText>
+                            </MudStack>
+                        </MudMenuItem>
                     }
                     <MudMenuItem OnClick="CreateNewConversation">
                         <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
@@ -181,13 +191,10 @@
 
         try
         {
-            // Load conversations
-            conversations = await AgentService.GetConversations(agentGuid);
+            await RefreshConversations();
 
-            // Use the most recent conversation or create a new one
-            if (conversations is not null && conversations.Length > 0)
+            if (currentConversation is not null)
             {
-                currentConversation = conversations.OrderByDescending(c => c.DateCreated).First();
                 await LoadMessages();
             }
             else
@@ -243,13 +250,18 @@
 
     private async Task CreateNewConversation()
     {
+        if (isStreaming)
+        {
+            Snackbar.Add("Wait for the current response to finish before starting a new conversation.", Severity.Warning);
+            return;
+        }
+
         var conv = await AgentService.CreateConversation(agentGuid);
         if (conv is not null)
         {
             currentConversation = conv;
             messages.Clear();
-            // Refresh conversation list
-            conversations = await AgentService.GetConversations(agentGuid);
+            await RefreshConversations();
             StateHasChanged();
         }
         else
@@ -260,6 +272,11 @@
 
     private async Task SwitchConversation(AgentConversation conv)
     {
+        if (isStreaming || currentConversation?.Id == conv.Id)
+        {
+            return;
+        }
+
         currentConversation = conv;
         IsBusy = true;
         StateHasChanged();
@@ -268,6 +285,86 @@
 
         IsBusy = false;
         StateHasChanged();
+    }
+
+    private async Task DeleteCurrentConversationConfirm()
+    {
+        if (currentConversation is null)
+        {
+            return;
+        }
+
+        if (isStreaming)
+        {
+            Snackbar.Add("Wait for the current response to finish before clearing this conversation.", Severity.Warning);
+            return;
+        }
+
+        string conversationLabel = currentConversation.Title
+            ?? currentConversation.DateCreated?.ToLocalTime().ToString("MMM dd, HH:mm")
+            ?? "this conversation";
+
+        bool? confirmed = await DialogService.ShowMessageBoxAsync(
+            "Clear Conversation",
+            $"Delete \"{conversationLabel}\" and remove its agent chat history?",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            bool success = await AgentService.DeleteConversation(currentConversation.Id);
+            if (!success)
+            {
+                Snackbar.Add("Failed to delete conversation.", Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Conversation deleted.", Severity.Success);
+            messages.Clear();
+            currentConversation = null;
+            await RefreshConversations();
+
+            if (currentConversation is not null)
+            {
+                await LoadMessages();
+            }
+            else
+            {
+                await CreateNewConversation();
+            }
+        }
+        finally
+        {
+            IsBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshConversations()
+    {
+        conversations = await AgentService.GetConversations(agentGuid);
+
+        if (conversations is null || conversations.Length == 0)
+        {
+            conversations = Array.Empty<AgentConversation>();
+            currentConversation = null;
+            return;
+        }
+
+        if (currentConversation is not null)
+        {
+            currentConversation = conversations.FirstOrDefault(x => x.Id == currentConversation.Id);
+        }
+
+        currentConversation ??= conversations.OrderByDescending(c => c.DateCreated).First();
     }
 
     private async Task OnInputKeyDown(KeyboardEventArgs e)

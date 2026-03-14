@@ -74,6 +74,7 @@ namespace Egroo.Server.Test
             services.AddScoped<IUser, UserRepository>();
             services.AddScoped<IAgentRepository, AgentRepository>();
             services.AddSingleton<IWebHostEnvironment>(_ => new TestWebHostEnvironment());
+            services.AddSingleton<ChannelFileStorageService>();
             services.AddSingleton<AgentSkillsService>();
             services.AddSingleton<AgentManagedSkillsService>();
             services.AddHttpClient("McpClient");

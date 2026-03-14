@@ -44,7 +44,6 @@ Example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
