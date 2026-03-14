@@ -26,6 +26,19 @@ Thanks for contributing to Egroo. This guide is the shortest path from idea to p
 
 5. Update docs when behavior, setup, or public APIs change.
 
+If your change affects one of these areas, update the related docs in the same branch:
+
+- architecture or runtime behavior: `README.md` and `wiki/Architecture.md`
+- setup, configuration, or deployment: the relevant page in `wiki/`
+- public API or SignalR behavior: `wiki/API-Documentation.md`
+- contributor expectations: `docs/CONTRIBUTING.md` or `docs/pull_request_template.md`
+
+If your change updates persisted entities, mappings, or migrations:
+
+- add the EF Core migration
+- make sure `DataContextModelSnapshot` is updated
+- mention the migration explicitly in your pull request
+
 ## Pull requests
 
 Keep pull requests small and reviewable.
@@ -36,7 +49,17 @@ Before submitting, check that:
 - the change solves one clear problem
 - tests pass for the area you changed
 - docs are updated if needed
+- migrations are included if the schema changed
 - the PR description explains the why, not just the diff
+
+## Good Documentation Changes
+
+Keep documentation changes practical:
+
+- prefer instructions that match the files and commands in the repo today
+- remove stale guidance instead of layering exceptions on top of it
+- keep wording consistent across the README, wiki, and contributor docs
+- when changing encryption behavior, be explicit about what happens on the server and what stays on the client device
 
 ## Need help?
 

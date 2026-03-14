@@ -22,8 +22,9 @@ When you update wiki content:
 
 1. Treat the repository files in `wiki/` as the source of truth.
 2. Keep setup steps aligned with the actual codebase and shipped files.
-3. Prefer practical, newcomer-friendly instructions over exhaustive theory.
-4. Remove stale steps instead of layering new steps on top of them.
+3. Keep the README, wiki, and contributor docs aligned on architecture, encryption, and deployment terminology.
+4. Prefer practical, newcomer-friendly instructions over exhaustive theory.
+5. Remove stale steps instead of layering new steps on top of them.
 
 ## Publishing
 

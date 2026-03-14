@@ -5,9 +5,10 @@ This guide provides accurate documentation for the Egroo API, including the REST
 ## 📖 API Overview
 
 The Egroo server exposes:
-- **4 REST endpoints** for authentication (`/api/v1/Auth`)
-- **1 SignalR Hub** at `/chathub` for all real-time functionality (user, channel, message, and call management)
-- **Swagger UI** (development only): `http://localhost:5175/swagger`
+- REST endpoints for authentication under `/api/v1/Auth`
+- REST endpoints for agents under `/api/v1/Agent`
+- 1 SignalR hub at `/chathub` for real-time user, friend, channel, message, and call management
+- Swagger UI in development at `http://localhost:5175/swagger`
 
 All real-time features — user management, friends, channels, messages, and WebRTC calls — are handled exclusively over SignalR using WebSockets.
 
@@ -155,6 +156,7 @@ The SignalR hub supports a maximum message size of **10 MB**.
 | `GetCurrentUserUsername()` | Required | `string?` | Current user's username |
 | `IsUsernameAvailable(string username)` | Anonymous | `bool` | Check username availability |
 | `UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)` | Required | `bool` | Update profile fields |
+| `UpdateEncryptionKey(string? publicKey, string? keyId)` | Required | `bool` | Publish or replace the current device public key used for end-to-end encrypted message delivery |
 | `UpdateAvatar(string? avatarBase64)` | Required | `bool` | Update avatar image |
 | `UpdateCover(string? coverBase64)` | Required | `bool` | Update cover image |
 | `GetAvatar(Guid userId)` | Anonymous | `MediaResult?` | Get avatar for any user |
@@ -201,7 +203,7 @@ The SignalR hub supports a maximum message size of **10 MB**.
 
 ### 💬 Message Methods
 
-Messages are **end-to-end encrypted at rest**. The `content` field is not stored in the `Messages` table — it lives only in `UserPendingMessages` (encrypted) until delivered.
+`Message.Content` is not stored in the `Messages` table. For encrypted delivery flows, the server carries recipient-specific ciphertext in pending-message tables until delivery and the recipient device decrypts locally with its private key.
 
 | Method | Auth | Returns | Description |
 |--------|------|---------|-------------|
@@ -209,6 +211,13 @@ Messages are **end-to-end encrypted at rest**. The `content` field is not stored
 | `UpdateMessage(Message message)` | Required | `bool` | Edit an existing message |
 | `SendPendingMessages()` | Required | void | Deliver queued offline messages |
 | `UpdatePendingMessage(Guid messageid)` | Required | void | Mark a pending message as received |
+| `StartTyping(Guid channelId)` | Required | void | Notify other channel members that the current user started typing |
+| `StopTyping(Guid channelId)` | Required | void | Notify other channel members that the current user stopped typing |
+
+Notes:
+
+- a `Message` can carry plain `Content` or recipient-specific `RecipientContents`
+- encrypted clients typically publish a device key with `UpdateEncryptionKey` before participating in encrypted delivery
 
 **Example — send a message:**
 ```csharp
@@ -268,6 +277,8 @@ These events are pushed from the server to connected clients.
 | `ReceiveOffer` | `Guid channelId, Guid senderId, string offerSdp` | Received WebRTC SDP offer from a peer in a channel call |
 | `ReceiveAnswer` | `Guid channelId, Guid senderId, string answerSdp` | Received WebRTC SDP answer from a peer in a channel call |
 | `ReceiveIceCandidate` | `Guid channelId, Guid senderId, string candidateJson` | Received ICE candidate from a peer in a channel call |
+| `TypingStarted` | `ChannelTypingState typingState` | A user or agent started typing in a channel |
+| `TypingStopped` | `ChannelTypingState typingState` | A user or agent stopped typing in a channel |
 
 **Example listeners (C#):**
 ```csharp

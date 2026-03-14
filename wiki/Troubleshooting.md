@@ -1,12 +1,3 @@
-# Troubleshooting Guide
-
-This guide helps you diagnose and resolve common issues when working with Egroo.
-
-# Troubleshooting
-
-Use this page when the setup steps are correct on paper but the app still does not start or behave correctly.
-
-## API Will Not Start
 # Troubleshooting
 
 Use this page when the setup steps are correct on paper but the app still does not start or behave correctly.
@@ -23,8 +14,8 @@ The `Egroo.Server` process exits on startup or throws a configuration exception.
 2. Make sure `Secrets:Jwt` exists.
 3. Make sure `Encryption:Key` and `Encryption:IV` exist.
 4. Confirm the encryption lengths are exact:
-   - key: 32 characters
-   - IV: 16 characters
+    - key: 32 characters
+    - IV: 16 characters
 
 ## Database Connection Errors
 
@@ -62,6 +53,19 @@ The page opens, but sign-in, channel actions, or real-time chat fail.
 3. Open browser developer tools and check failed requests and WebSocket errors.
 
 In debug builds, the client should already target `http://localhost:5175/`.
+
+## Messages Cannot Be Decrypted On This Device
+
+### Symptom
+
+Messages arrive, but the UI shows an error such as being unable to decrypt them on the current device.
+
+### Checks
+
+1. Confirm the client still has the correct private key in local storage.
+2. Confirm the signed-in user's published `EncryptionKeyId` still matches the local device key.
+3. If browser storage was cleared, regenerate the encryption key from the app settings.
+4. If you signed in on a new device, make sure that device has generated and published its own key.
 
 ## Swagger Does Not Open
 

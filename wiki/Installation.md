@@ -80,6 +80,8 @@ dotnet watch --project src/Egroo/Egroo/Egroo.csproj
 - Web app: `http://localhost:5068`
 - API Swagger: `http://localhost:5175/swagger`
 
+After sign-in, the client can publish a device encryption key for end-to-end encrypted message delivery. If you clear browser storage later, regenerate the device key from the app settings on that device.
+
 ## Option 2: Backend-Only Docker Stack
 
 The repository includes `src/Egroo.Server/docker-compose.yaml`, which starts:
@@ -147,6 +149,7 @@ Your setup is ready when all of these are true:
 2. `http://localhost:5175/swagger` opens in development.
 3. `http://localhost:5068` loads the UI.
 4. You can sign up and sign in.
+5. You can send a message successfully after sign-in.
 
 ## After Installation
 
