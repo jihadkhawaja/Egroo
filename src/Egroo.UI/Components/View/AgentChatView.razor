@@ -1,6 +1,7 @@
 @using jihadkhawaja.chat.client.Services
 @using jihadkhawaja.chat.shared.Models
 @using Microsoft.AspNetCore.Components.Forms
+@using System.Diagnostics
 @using System.Text
 @implements IAsyncDisposable
 @inherits ProtectedViewBase
@@ -224,6 +225,10 @@
     private bool _composerKeyboardRegistered;
     private const long MaxAttachmentBytes = 1 * 1024 * 1024;
     private const int MaxExtractedAttachmentCharacters = 12000;
+    private const int MaxDisplayedAttachmentCharacters = 2000;
+    private const int ImagePreviewMaxWidth = 320;
+    private const int ImagePreviewMaxHeight = 220;
+    private const int StreamUiThrottleMilliseconds = 75;
     private bool CanSendMessage => !string.IsNullOrWhiteSpace(inputMessage) || stagedAttachment is not null;
 
     protected override async Task OnAccessAsync()
@@ -462,6 +467,7 @@
 
         try
         {
+            var renderStopwatch = Stopwatch.StartNew();
             await foreach (var chunk in AgentService.ChatStream(currentConversation.Id, request))
             {
                 if (streamCts.IsCancellationRequested) break;
@@ -473,9 +479,16 @@
                 }
 
                 streamingContent.Append(chunk);
-                StateHasChanged();
-                await ScrollToBottomIfNearBottom();
+                if (renderStopwatch.ElapsedMilliseconds < StreamUiThrottleMilliseconds)
+                {
+                    continue;
+                }
+
+                await RefreshStreamingUiAsync();
+                renderStopwatch.Restart();
             }
+
+            await RefreshStreamingUiAsync();
 
             // Move streaming content to messages list
             if (streamingContent.Length > 0)
@@ -528,7 +541,7 @@
             await using var buffer = new MemoryStream();
             await stream.CopyToAsync(buffer);
 
-            stagedAttachment = BuildAgentAttachment(file.Name, file.ContentType, buffer.ToArray());
+            stagedAttachment = await BuildAgentAttachmentAsync(file, buffer.ToArray());
 
             Snackbar.Add("File attached. Add text if you want, then press send.", Severity.Success);
             await ClearPendingAttachmentSelectionAsync();
@@ -568,6 +581,12 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private async Task RefreshStreamingUiAsync()
+    {
+        await InvokeAsync(StateHasChanged);
+        await ScrollToBottomIfNearBottom();
+    }
+
     private static AgentChatRequest CreateAgentChatRequest(string? messageText, PendingComposerAttachment? attachment)
     {
         string trimmedMessage = messageText?.Trim() ?? string.Empty;
@@ -584,9 +603,12 @@
             ? attachment.DisplayContent
             : $"{trimmedMessage}\n\n{attachment.DisplayContent}";
 
-        string requestMessage = attachment.RequestAttachment is null
-            ? displayMessage
-            : trimmedMessage;
+        string attachmentRequestContent = attachment.RequestContent;
+        string requestMessage = string.IsNullOrWhiteSpace(trimmedMessage)
+            ? attachmentRequestContent
+            : string.IsNullOrWhiteSpace(attachmentRequestContent)
+                ? trimmedMessage
+                : $"{trimmedMessage}\n\n{attachmentRequestContent}";
 
         return new AgentChatRequest
         {
@@ -598,20 +620,25 @@
         };
     }
 
-    private static PendingComposerAttachment BuildAgentAttachment(string fileName, string? contentType, byte[] fileBytes)
+    private static async Task<PendingComposerAttachment> BuildAgentAttachmentAsync(IBrowserFile file, byte[] fileBytes)
     {
+        string fileName = file.Name;
+        string? contentType = file.ContentType;
         string summary = BuildAttachmentSummary(fileName, contentType, fileBytes.LongLength);
         string previewText = BuildAttachmentPreviewText(summary);
 
         if (IsImageAttachment(contentType))
         {
             string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "image/*" : contentType;
+            byte[] previewBytes = await ReadImagePreviewBytesAsync(file, fileBytes);
             string dataUri = BuildDataUri(resolvedContentType, fileBytes);
-            string displayContent = $"{summary}\n![{EscapeMarkdownLabel(fileName)}]({dataUri})";
+            string previewDataUri = BuildDataUri(resolvedContentType, previewBytes);
+            string displayContent = $"{summary}\n![{EscapeMarkdownLabel(fileName)}]({previewDataUri})";
             return new PendingComposerAttachment(
                 fileName,
                 previewText,
                 displayContent,
+                string.Empty,
                 new AgentChatAttachment
                 {
                     FileName = fileName,
@@ -620,16 +647,40 @@
                 });
         }
 
-        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        if (TryReadTextAttachment(fileName, contentType, fileBytes, MaxExtractedAttachmentCharacters, out string? extractedText))
         {
+            string displayExtract = extractedText;
+            if (TryReadTextAttachment(fileName, contentType, fileBytes, MaxDisplayedAttachmentCharacters, out string? shortenedDisplayExtract))
+            {
+                displayExtract = shortenedDisplayExtract;
+            }
+
             return new PendingComposerAttachment(
                 fileName,
                 previewText,
+                $"<details><summary>{summary}</summary>\n\n~~~text\n{displayExtract}\n~~~\n</details>",
                 $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>",
                 null);
         }
 
-        return new PendingComposerAttachment(fileName, previewText, summary, null);
+        return new PendingComposerAttachment(fileName, previewText, summary, summary, null);
+    }
+
+    private static async Task<byte[]> ReadImagePreviewBytesAsync(IBrowserFile file, byte[] originalBytes)
+    {
+        try
+        {
+            IBrowserFile previewFile = await file.RequestImageFileAsync(file.ContentType, ImagePreviewMaxWidth, ImagePreviewMaxHeight);
+            await using var previewStream = previewFile.OpenReadStream(MaxAttachmentBytes);
+            await using var previewBuffer = new MemoryStream();
+            await previewStream.CopyToAsync(previewBuffer);
+            byte[] previewBytes = previewBuffer.ToArray();
+            return previewBytes.Length > 0 ? previewBytes : originalBytes;
+        }
+        catch
+        {
+            return originalBytes;
+        }
     }
 
     private static string BuildDataUri(string contentType, byte[] fileBytes)
@@ -655,7 +706,7 @@
             && contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TryReadTextAttachment(string fileName, string? contentType, byte[] fileBytes, out string? extractedText)
+    private static bool TryReadTextAttachment(string fileName, string? contentType, byte[] fileBytes, int maxCharacters, out string? extractedText)
     {
         extractedText = null;
         if (!IsTextAttachment(fileName, contentType))
@@ -672,9 +723,9 @@
             }
 
             text = text.Replace("\r\n", "\n", StringComparison.Ordinal);
-            if (text.Length > MaxExtractedAttachmentCharacters)
+                    if (text.Length > maxCharacters)
             {
-                text = $"{text[..MaxExtractedAttachmentCharacters]}\n\n[Document truncated after {MaxExtractedAttachmentCharacters} characters.]";
+                        text = $"{text[..maxCharacters]}\n\n[Document truncated after {maxCharacters} characters.]";
             }
 
             extractedText = text.Trim();
@@ -779,7 +830,7 @@
         public string RenderKey => $"{Id}:{Role}:{Content}";
     }
 
-    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string DisplayContent, AgentChatAttachment? RequestAttachment);
+    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string DisplayContent, string RequestContent, AgentChatAttachment? RequestAttachment);
 
     private string GetStreamingRenderKey()
     {
