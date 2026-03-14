@@ -9,6 +9,11 @@ namespace jihadkhawaja.chat.shared.Interfaces
     public interface IAgentChannelResponder
     {
         /// <summary>
+        /// Persist agent-targeted encrypted envelopes for a channel message.
+        /// </summary>
+        Task PersistAgentRecipientContentsAsync(Message message);
+
+        /// <summary>
         /// Process a channel message for @agent mentions and trigger responses.
         /// </summary>
         Task ProcessMentionsAsync(Message message);

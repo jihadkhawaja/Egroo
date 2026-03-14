@@ -198,7 +198,13 @@ else
 
     private async Task<UserDto[]> GetUserFriends()
     {
-        UserFriend[]? userFriends = await ChatUserService.GetUserFriends(SessionStorage.User.Id);
+        UserDto? sessionUser = SessionStorage.User;
+        if (sessionUser is null)
+        {
+            return Array.Empty<UserDto>();
+        }
+
+        UserFriend[]? userFriends = await ChatUserService.GetUserFriends(sessionUser.Id);
         if (userFriends == null)
         {
             return Array.Empty<UserDto>();
@@ -207,15 +213,23 @@ else
 
         for (int i = 0; i < userFriends.Length; i++)
         {
-            if (SessionStorage.User.Id == userFriends[i].FriendUserId)
+            if (sessionUser.Id == userFriends[i].FriendUserId)
             {
                 UserDto? user = await ChatUserService.GetUserPublicDetails(userFriends[i].UserId);
+                if (user is null)
+                {
+                    continue;
+                }
                 user.Id = userFriends[i].UserId;
                 users[i] = user;
             }
             else
             {
                 UserDto? user = await ChatUserService.GetUserPublicDetails(userFriends[i].FriendUserId);
+                if (user is null)
+                {
+                    continue;
+                }
                 user.Id = userFriends[i].FriendUserId;
                 users[i] = user;
             }
@@ -248,6 +262,10 @@ else
         for (int i = 0; i < userFriendRequests.Length; i++)
         {
             UserDto? user = await ChatUserService.GetUserPublicDetails(userFriendRequests[i].UserId);
+            if (user is null)
+            {
+                continue;
+            }
             user.Id = userFriendRequests[i].UserId;
             friendRequestsPublicUsers[i] = user;
         }

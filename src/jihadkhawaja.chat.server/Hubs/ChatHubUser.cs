@@ -117,6 +117,12 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         [Authorize]
+        public Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId)
+        {
+            return _userRepository.UpdateEncryptionKey(publicKey, keyId);
+        }
+
+        [Authorize]
         public Task<bool> UpdateAvatar(string? avatarBase64)
         {
             return _userRepository.UpdateAvatar(avatarBase64);

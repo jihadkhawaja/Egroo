@@ -98,6 +98,56 @@ namespace Egroo.Server.Test
             Assert.IsFalse(result, "SendMessage should reject null content.");
         }
 
+        [TestMethod]
+        public async Task SendMessage_WithRecipientContents_Succeeds()
+        {
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId = _userId,
+                RecipientContents = new List<MessageRecipientContent>
+                {
+                    new()
+                    {
+                        UserId = _userId,
+                        Content = "{\"v\":1,\"ct\":\"cipher\"}"
+                    }
+                }
+            };
+
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                .SendMessage(message);
+
+            Assert.IsTrue(result, "SendMessage should accept recipient-scoped transport payloads.");
+            Assert.AreNotEqual(Guid.Empty, message.Id, "Recipient transport messages should still receive an Id.");
+        }
+
+        [TestMethod]
+        public async Task SendMessage_WithAgentRecipientContents_Succeeds()
+        {
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId = _userId,
+                AgentRecipientContents = new List<MessageAgentRecipientContent>
+                {
+                    new()
+                    {
+                        AgentDefinitionId = Guid.NewGuid(),
+                        Content = "{\"v\":1,\"ct\":\"cipher\"}"
+                    }
+                }
+            };
+
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                .SendMessage(message);
+
+            Assert.IsTrue(result, "SendMessage should accept agent recipient transport payloads.");
+            Assert.AreNotEqual(Guid.Empty, message.Id, "Agent recipient transport messages should still receive an Id.");
+        }
+
         // ── Read / query ─────────────────────────────────────────────────────────────
 
         [TestMethod]

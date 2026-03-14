@@ -14,6 +14,15 @@ namespace jihadkhawaja.chat.shared.Models
     }
 
     /// <summary>
+    /// Controls who is allowed to add a published agent.
+    /// </summary>
+    public enum AgentAddPermission
+    {
+        OwnerOnly = 0,
+        OwnerAndOthers = 1
+    }
+
+    /// <summary>
     /// Represents a user-created AI agent definition with its LLM configuration,
     /// instructions, knowledge, and tools.
     /// </summary>
@@ -62,6 +71,30 @@ namespace jihadkhawaja.chat.shared.Models
         public string? ApiKey { get; set; }
 
         /// <summary>
+        /// Public key used to encrypt channel messages for this agent.
+        /// </summary>
+        [MaxLength(8000)]
+        public string? EncryptionPublicKey { get; set; }
+
+        /// <summary>
+        /// Private key used by the server-hosted agent runtime to decrypt this agent's envelopes.
+        /// Stored encrypted at rest.
+        /// </summary>
+        [MaxLength(12000)]
+        public string? EncryptionPrivateKey { get; set; }
+
+        /// <summary>
+        /// Identifier for the current agent encryption keypair.
+        /// </summary>
+        [MaxLength(128)]
+        public string? EncryptionKeyId { get; set; }
+
+        /// <summary>
+        /// Timestamp of the last encryption keypair generation.
+        /// </summary>
+        public DateTimeOffset? EncryptionKeyUpdatedOn { get; set; }
+
+        /// <summary>
         /// Optional endpoint URL (required for AzureOpenAI and Ollama).
         /// </summary>
         [MaxLength(500)]
@@ -79,7 +112,12 @@ namespace jihadkhawaja.chat.shared.Models
         public bool IsPublished { get; set; }
 
         /// <summary>
-        /// Temperature setting for LLM responses (0.0 - 2.0).
+        /// Controls who can add this published agent.
+        /// </summary>
+        public AgentAddPermission AddPermission { get; set; } = AgentAddPermission.OwnerAndOthers;
+
+        /// <summary>
+        /// Temperature setting for LLM responses (0.0 - 1.0).
         /// </summary>
         public float? Temperature { get; set; }
 
@@ -87,6 +125,40 @@ namespace jihadkhawaja.chat.shared.Models
         /// Max tokens for LLM responses.
         /// </summary>
         public int? MaxTokens { get; set; }
+
+        /// <summary>
+        /// Optional custom skills advertisement prompt template. Must contain a {0} placeholder.
+        /// </summary>
+        [MaxLength(4000)]
+        public string? SkillsInstructionPrompt { get; set; }
+    }
+
+    /// <summary>
+    /// Represents a filesystem directory or skill folder made available to an agent via Agent Skills.
+    /// </summary>
+    public class AgentSkillDirectory : EntityBase
+    {
+        [Required]
+        public Guid AgentDefinitionId { get; set; }
+
+        /// <summary>
+        /// Friendly name shown to users when selecting or reviewing skills.
+        /// </summary>
+        [Required]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Absolute or server-relative path to a skill folder or a parent folder containing skills.
+        /// </summary>
+        [Required]
+        [MaxLength(2000)]
+        public string Path { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether this skill directory should be active for agent runs.
+        /// </summary>
+        public bool IsEnabled { get; set; } = true;
     }
 
     /// <summary>
@@ -276,5 +348,65 @@ namespace jihadkhawaja.chat.shared.Models
         /// Token usage for this message (if available from LLM response).
         /// </summary>
         public int? TokensUsed { get; set; }
+    }
+
+    /// <summary>
+    /// Stores the encrypted copy of a channel message intended for a specific agent.
+    /// </summary>
+    public class AgentPendingMessage : EntityBase
+    {
+        [Required]
+        public Guid AgentDefinitionId { get; set; }
+
+        [Required]
+        public Guid MessageId { get; set; }
+
+        public string? Content { get; set; }
+    }
+
+    /// <summary>
+    /// Represents an attachment supplied with a direct agent chat request.
+    /// </summary>
+    public class AgentChatAttachment
+    {
+        /// <summary>
+        /// Friendly file name shown in the UI and available to the model.
+        /// </summary>
+        [Required]
+        [MaxLength(260)]
+        public string FileName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Attachment media type.
+        /// </summary>
+        [MaxLength(200)]
+        public string? ContentType { get; set; }
+
+        /// <summary>
+        /// Data URI payload used for multimodal inputs such as images.
+        /// </summary>
+        public string? DataUri { get; set; }
+    }
+
+    /// <summary>
+    /// Request payload for a direct agent chat turn.
+    /// </summary>
+    public class AgentChatRequest
+    {
+        /// <summary>
+        /// Text content intended for the model.
+        /// </summary>
+        [Required]
+        public string Message { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Optional conversation display content persisted for the UI.
+        /// </summary>
+        public string? DisplayMessage { get; set; }
+
+        /// <summary>
+        /// Optional multimodal attachments for the current turn.
+        /// </summary>
+        public AgentChatAttachment[]? Attachments { get; set; }
     }
 }

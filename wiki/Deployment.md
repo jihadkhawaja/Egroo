@@ -1,6 +1,6 @@
 # Deployment
 
-This page focuses on what the repository actually supports today and what to check before you put Egroo behind a public URL.
+This page describes what the repository supports today and what to verify before exposing Egroo behind a public URL.
 
 ## Production Shape
 
@@ -9,16 +9,16 @@ At minimum, a production deployment needs:
 - a PostgreSQL database
 - the Egroo API from `src/Egroo.Server`
 - the Egroo web host from `src/Egroo/Egroo`
-- a reverse proxy or ingress that handles TLS and WebSocket forwarding cleanly
+- a reverse proxy or ingress that handles TLS and WebSocket forwarding correctly
 
 ## Important Operational Caveats
 
 Read these before scaling out:
 
-- the SignalR connection tracker is in-memory by default
-- horizontal scale requires replacing `IConnectionTracker` with a distributed implementation such as Redis
-- the UI release build points to `https://api.egroo.org/` unless you change `src/Egroo.UI/Constants/Source.cs`
-- the API expects valid JWT and encryption settings at startup
+- the default SignalR connection tracker is in-memory
+- multi-instance deployments should replace `IConnectionTracker` with a distributed implementation such as Redis
+- the web app release build points to `https://api.egroo.org/` unless you change `src/Egroo.UI/Constants/Source.cs` before building
+- the API expects valid database, JWT, and encryption settings at startup
 - database migrations run automatically when the API starts
 
 ## Deployment Assets In The Repository
@@ -39,6 +39,18 @@ Read these before scaling out:
 5. Update the release API URL in `src/Egroo.UI/Constants/Source.cs` before building the web app.
 6. Put both services behind HTTPS.
 7. Ensure the reverse proxy forwards WebSocket upgrades to `/chathub`.
+
+## End-To-End Encryption Deployment Notes
+
+Egroo's message encryption model has both server-side and client-side parts:
+
+- `Encryption__Key` and `Encryption__IV` are still required on the server
+- user and agent public keys are stored in the database so senders can encrypt per recipient
+- recipient private keys stay on the device or client storage
+
+Operational consequence:
+
+- clearing browser storage or moving users to a fresh device can require the client to regenerate and republish a device key before encrypted messages can be decrypted there
 
 ## Building Release Images
 
@@ -105,23 +117,6 @@ Confirm these after every deployment:
 5. Chat connects and stays connected over SignalR.
 6. Browser developer tools show a successful WebSocket connection for `/chathub`.
 
-## When To Avoid A Fancy First Deployment
+## Start Simple First
 
 If you are still learning the project, do not start with Kubernetes or a multi-node layout. First get a single API instance, a single web host, and one PostgreSQL database running correctly. Then harden the environment around that baseline.
-
-```bash
-# Update Docker images
-docker-compose -f docker-compose.prod.yml pull
-
-# Restart services with zero downtime
-docker-compose -f docker-compose.prod.yml up -d --no-deps egroo-api
-docker-compose -f docker-compose.prod.yml up -d --no-deps egroo-web
-```
-
-### Database Migrations
-
-Database migrations run **automatically on server startup** — no manual migration step is needed in production. The API container will apply any pending migrations before accepting requests.
-
-## 🆘 Troubleshooting Deployment
-
-Common deployment issues and solutions can be found in the [Troubleshooting Guide](Troubleshooting#deployment-issues).

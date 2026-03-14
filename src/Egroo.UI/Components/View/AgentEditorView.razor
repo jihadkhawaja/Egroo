@@ -1,0 +1,1208 @@
+@using jihadkhawaja.chat.client.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inherits ProtectedViewBase
+@inject AgentService AgentService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate Color="Color.Default" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 pt-4 pb-6">
+        <MudStack Spacing="3">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2 agent-editor-header" Wrap="Wrap.Wrap">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="agent-editor-header__leading">
+                    <MudButton OnClick="CloseEditor" Variant="Variant.Text" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack">
+                        Back to Agents
+                    </MudButton>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                    </MudAvatar>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h5">@(IsNew ? "Create Agent" : $"Edit Agent: {Agent.Name}")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Set the basics first, then add context, tools, and sharing controls.
+                        </MudText>
+                    </MudStack>
+                </MudStack>
+
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Class="agent-editor-header__actions">
+                    <MudButton OnClick="CloseEditor" Variant="Variant.Text" Color="Color.Default">Discard</MudButton>
+                    <MudButton OnClick="Save" Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="@saving"
+                               StartIcon="@(saving ? Icons.Material.Filled.HourglassEmpty : (IsNew ? Icons.Material.Filled.ArrowForward : Icons.Material.Filled.Save))">
+                        @(saving ? "Saving..." : (IsNew ? "Create and Continue" : "Save Changes"))
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            <div class="agent-config-shell">
+        <MudStack Spacing="3">
+            <MudPaper Class="pa-4 agent-config-hero" Elevation="0" Outlined>
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="8">
+                        <MudStack Spacing="2">
+                            <MudText Typo="Typo.overline" Color="Color.Secondary">AGENT SETUP</MudText>
+                            <MudText Typo="Typo.h6">@GetHeroTitle()</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">@GetHeroDescription()</MudText>
+
+                            <MudStack Row Wrap="Wrap.Wrap" Spacing="1">
+                                <MudChip T="string" Size="Size.Small" Color="@(IsCoreSetupReady() ? Color.Success : Color.Warning)" Variant="Variant.Outlined">
+                                    @(IsCoreSetupReady() ? "Basics ready" : "Basics needed")
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@(Agent.IsPublished ? Color.Info : Color.Default)" Variant="Variant.Outlined">
+                                    @GetVisibilitySummary()
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                    @GetContextItemCount() context item(s)
+                                </MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                    @GetToolItemCount() tool(s)
+                                </MudChip>
+                            </MudStack>
+                        </MudStack>
+                    </MudItem>
+
+                    <MudItem xs="12" md="4">
+                        <MudPaper Class="pa-3 agent-config-checklist" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle2">Setup checklist</MudText>
+                                <MudStack Spacing="1">
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@GetChecklistIcon(!string.IsNullOrWhiteSpace(Agent.Name))" Color="@GetChecklistColor(!string.IsNullOrWhiteSpace(Agent.Name))" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Name your agent</MudText>
+                                    </MudStack>
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@GetChecklistIcon(!string.IsNullOrWhiteSpace(Agent.Model))" Color="@GetChecklistColor(!string.IsNullOrWhiteSpace(Agent.Model))" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Pick a model</MudText>
+                                    </MudStack>
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@GetChecklistIcon(!string.IsNullOrWhiteSpace(Agent.Instructions))" Color="@GetChecklistColor(!string.IsNullOrWhiteSpace(Agent.Instructions))" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Add behavior instructions</MudText>
+                                    </MudStack>
+                                    <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                        <MudIcon Icon="@GetChecklistIcon(GetContextItemCount() > 0 || GetToolItemCount() > 0)" Color="@GetChecklistColor(GetContextItemCount() > 0 || GetToolItemCount() > 0)" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Add context or tools</MudText>
+                                    </MudStack>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+
+            @if (IsNew)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                    Save the basics once to unlock skills, knowledge, and tool setup. You will stay on this page after creation so you can keep going.
+                </MudAlert>
+            }
+
+            <MudTabs @bind-ActivePanelIndex="activeTabIndex" Elevation="0" Rounded ApplyEffectsToContainer>
+                <MudTabPanel Text="Basics" Icon="@Icons.Material.Filled.Badge">
+                    <MudForm @ref="generalForm">
+                        <MudStack Spacing="3">
+                            <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle1">Identity</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Give the agent a clear name and a short description so it is easy to spot later.
+                                    </MudText>
+                                    <MudTextField @bind-Value="Agent.Name" Label="Agent Name" Required RequiredError="Name is required"
+                                                  MaxLength="200" Counter="200" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    <MudTextField @bind-Value="Agent.Description" Label="Description" Lines="2" MaxLength="2000"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                  HelperText="One or two sentences are usually enough." />
+                                </MudStack>
+                            </MudPaper>
+
+                            <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle1">Behavior</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Tell the agent what role it plays, how it should answer, and what it should avoid.
+                                    </MudText>
+                                    <MudTextField @bind-Value="Agent.Instructions" Label="System Instructions"
+                                                  HelperText="Example: You are a support agent. Be concise, cite known policies, and ask follow-up questions when details are missing."
+                                                  Lines="7" Placeholder="You are a helpful assistant..."
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                </MudStack>
+                            </MudPaper>
+
+                            <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.subtitle1">Visibility</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        Control whether the agent is only for you or can be discovered and added by others.
+                                    </MudText>
+                                    <MudSwitch T="bool" @bind-Value="Agent.IsPublished" Color="Color.Info">
+                                        Publish this agent
+                                    </MudSwitch>
+                                    <MudSelect T="AgentAddPermission" @bind-Value="Agent.AddPermission"
+                                               Label="Who can add this agent?"
+                                               Disabled="@(!Agent.IsPublished)"
+                                               Variant="Variant.Outlined" Margin="Margin.Dense">
+                                        <MudSelectItem Value="AgentAddPermission.OwnerOnly">Only me</MudSelectItem>
+                                        <MudSelectItem Value="AgentAddPermission.OwnerAndOthers">Other users too</MudSelectItem>
+                                    </MudSelect>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                        @GetAddPermissionHelper()
+                                    </MudText>
+                                </MudStack>
+                            </MudPaper>
+                        </MudStack>
+                    </MudForm>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Model" Icon="@Icons.Material.Filled.Cloud">
+                    <MudStack Spacing="3">
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle1">Provider</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Choose where the model runs and which model or deployment name this agent should use.
+                                </MudText>
+                                <MudSelect T="LlmProvider" @bind-Value="Agent.Provider" Label="LLM Provider" Required
+                                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    <MudSelectItem Value="LlmProvider.OpenAI">OpenAI</MudSelectItem>
+                                    <MudSelectItem Value="LlmProvider.AzureOpenAI">Azure OpenAI</MudSelectItem>
+                                    <MudSelectItem Value="LlmProvider.Anthropic">Anthropic (Claude)</MudSelectItem>
+                                    <MudSelectItem Value="LlmProvider.Ollama">Ollama (Local)</MudSelectItem>
+                                </MudSelect>
+
+                                <MudTextField @bind-Value="Agent.Model" Label="Model" Required RequiredError="Model is required"
+                                              Placeholder="@GetModelPlaceholder()" HelperText="@GetModelHelper()"
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+                                @if (Agent.Provider != LlmProvider.Ollama)
+                                {
+                                    <MudTextField @bind-Value="Agent.ApiKey" Label="API Key"
+                                                  Required="@RequiresApiKeyOnCreate()"
+                                                  RequiredError="API key is required"
+                                                  InputType="@(showApiKey ? InputType.Text : InputType.Password)"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentIcon="@(showApiKey ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                                  OnAdornmentClick="() => showApiKey = !showApiKey"
+                                                  HelperText="@GetApiKeyHelper()"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                }
+
+                                @if (Agent.Provider is LlmProvider.AzureOpenAI or LlmProvider.Ollama)
+                                {
+                                    <MudTextField @bind-Value="Agent.Endpoint" Label="Endpoint URL"
+                                                  Placeholder="@GetEndpointPlaceholder()"
+                                                  HelperText="@GetEndpointHelper()"
+                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                }
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.subtitle1">Response tuning</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                    Keep defaults if you are unsure. Lower temperature is steadier, higher temperature is more exploratory.
+                                </MudText>
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="6">
+                                        <MudNumericField T="float?" @bind-Value="Agent.Temperature" Label="Temperature"
+                                                         Min="0f" Max="1f" Step="0.1f"
+                                                         HelperText="0 = deterministic, 1 = more exploratory"
+                                                         Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    </MudItem>
+                                    <MudItem xs="12" md="6">
+                                        <MudNumericField T="int?" @bind-Value="Agent.MaxTokens" Label="Max Tokens"
+                                                         Min="1" Max="128000"
+                                                         HelperText="Maximum response length"
+                                                         Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                    </MudItem>
+                                </MudGrid>
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Context" Icon="@Icons.Material.Filled.LibraryBooks" BadgeData="@GetContextItemCount()">
+                    <MudStack Spacing="3">
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.subtitle1">Skills</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Upload a skill file, write one directly, or add an existing server path when you need advanced control.
+                                        </MudText>
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @GetSkillDirectoryCount() directory(s)
+                                    </MudChip>
+                                </MudStack>
+
+                                <MudTextField @bind-Value="Agent.SkillsInstructionPrompt"
+                                              Label="Custom Skills Prompt"
+                                              Lines="4"
+                                              Placeholder="You have skills available:\n{0}\nUse load_skill before answering."
+                                              HelperText="Optional. Keep {0} in the text so the framework can inject the discovered skill list."
+                                              Variant="Variant.Outlined" Margin="Margin.Dense" />
+
+                                @if (!IsNew)
+                                {
+                                    @if (skillDirectories is not null && skillDirectories.Length > 0)
+                                    {
+                                        @foreach (var skillDirectory in skillDirectories)
+                                        {
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                    <MudStack Spacing="0">
+                                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">skill</MudChip>
+                                                            <MudText Typo="Typo.subtitle2">@skillDirectory.Name</MudText>
+                                                        </MudStack>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @GetSkillDirectoryDescription(skillDirectory)
+                                                        </MudText>
+                                                    </MudStack>
+                                                    <MudStack Row Spacing="1">
+                                                        <MudSwitch T="bool" Value="@skillDirectory.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                                   ValueChanged="@(val => ToggleSkillDirectory(skillDirectory, val))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                                       OnClick="@(() => DeleteSkillDirectory(skillDirectory))" />
+                                                    </MudStack>
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                            No skill directories added yet.
+                                        </MudAlert>
+                                    }
+
+                                    <MudGrid Spacing="2">
+                                        <MudItem xs="12" md="6">
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Spacing="2">
+                                                    <MudText Typo="Typo.subtitle2">Upload skill file</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        Upload a markdown skill file. Plain markdown is wrapped into a valid SKILL.md automatically.
+                                                    </MudText>
+                                                    <MudTextField @bind-Value="uploadManagedSkillName"
+                                                                  Label="Skill Name"
+                                                                  MaxLength="200"
+                                                                  Placeholder="Release notes helper"
+                                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                                    <MudFileUpload T="IReadOnlyList<IBrowserFile>"
+                                                                   Accept=".md,text/markdown,text/plain"
+                                                                   MaximumFileCount="1"
+                                                                   FilesChanged="OnSkillFilesChanged">
+                                                        <CustomContent>
+                                                            <MudButton Color="Color.Primary" Variant="Variant.Outlined" OnClick="@context.OpenFilePickerAsync"
+                                                                       Disabled="@addingManagedSkill"
+                                                                       StartIcon="@Icons.Material.Filled.UploadFile">
+                                                                Upload Skill File
+                                                            </MudButton>
+                                                        </CustomContent>
+                                                    </MudFileUpload>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        Max 256 KB. Best for single-file skills.
+                                                    </MudText>
+                                                </MudStack>
+                                            </MudPaper>
+                                        </MudItem>
+
+                                        <MudItem xs="12" md="6">
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Spacing="2">
+                                                    <MudText Typo="Typo.subtitle2">Create skill manually</MudText>
+                                                    <MudTextField @bind-Value="newManagedSkillName"
+                                                                  Label="Skill Name"
+                                                                  MaxLength="200"
+                                                                  Placeholder="Release notes helper"
+                                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                                    <MudTextField @bind-Value="newManagedSkillContent"
+                                                                  Label="Skill Content"
+                                                                  Lines="6"
+                                                                  Placeholder="## When to use&#10;- Summarize release notes&#10;- Highlight breaking changes"
+                                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                                    <MudButton OnClick="AddManagedSkill" Variant="Variant.Outlined" Color="Color.Primary"
+                                                               StartIcon="@Icons.Material.Filled.Add"
+                                                               Disabled="@(addingManagedSkill || string.IsNullOrWhiteSpace(newManagedSkillName) || string.IsNullOrWhiteSpace(newManagedSkillContent))">
+                                                        @(addingManagedSkill ? "Adding..." : "Add Skill")
+                                                    </MudButton>
+                                                </MudStack>
+                                            </MudPaper>
+                                        </MudItem>
+                                    </MudGrid>
+                                }
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.subtitle1">Knowledge</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Add short facts, policies, or domain notes the agent should always have available.
+                                        </MudText>
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @GetKnowledgeCount() item(s)
+                                    </MudChip>
+                                </MudStack>
+
+                                @if (!IsNew)
+                                {
+                                    @if (knowledgeItems is not null && knowledgeItems.Length > 0)
+                                    {
+                                        @foreach (var item in knowledgeItems)
+                                        {
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                    <MudStack>
+                                                        <MudText Typo="Typo.subtitle2">@item.Title</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="agent-config-preview">
+                                                            @(item.Content.Length > 140 ? item.Content[..140] + "..." : item.Content)
+                                                        </MudText>
+                                                    </MudStack>
+                                                    <MudStack Row Spacing="1">
+                                                        <MudSwitch T="bool" Value="@item.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                                   ValueChanged="@(val => ToggleKnowledge(item, val))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" Color="Color.Primary"
+                                                                       OnClick="@(() => BeginEditKnowledge(item))" />
+                                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                                       OnClick="@(() => DeleteKnowledge(item))" />
+                                                    </MudStack>
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                            No knowledge items added yet.
+                                        </MudAlert>
+                                    }
+
+                                    <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                        <MudStack Spacing="2">
+                                            <MudText Typo="Typo.subtitle2">@(editingKnowledgeId.HasValue ? "Edit knowledge" : "Add knowledge")</MudText>
+                                            <MudTextField @bind-Value="newKnowledgeTitle" Label="Title" MaxLength="500"
+                                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudTextField @bind-Value="newKnowledgeContent" Label="Content" Lines="4"
+                                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudStack Row Spacing="1">
+                                                <MudButton OnClick="SaveKnowledge" Variant="Variant.Outlined" Color="Color.Primary"
+                                                           StartIcon="@(editingKnowledgeId.HasValue ? Icons.Material.Filled.Save : Icons.Material.Filled.Add)"
+                                                           Disabled="@(string.IsNullOrWhiteSpace(newKnowledgeTitle) || string.IsNullOrWhiteSpace(newKnowledgeContent))">
+                                                    @(editingKnowledgeId.HasValue ? "Save Changes" : "Add Knowledge")
+                                                </MudButton>
+                                                @if (editingKnowledgeId.HasValue)
+                                                {
+                                                    <MudButton OnClick="CancelKnowledgeEdit" Variant="Variant.Text" Color="Color.Default">
+                                                        Cancel Edit
+                                                    </MudButton>
+                                                }
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+                </MudTabPanel>
+
+                <MudTabPanel Text="Tools" Icon="@Icons.Material.Filled.Build" BadgeData="@GetToolItemCount()">
+                    <MudStack Spacing="3">
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.subtitle1">Built-in tools</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Platform-provided tools the agent can call during a conversation.
+                                        </MudText>
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @GetBuiltinToolCount() built-in
+                                    </MudChip>
+                                </MudStack>
+
+                                @if (!IsNew)
+                                {
+                                    @if (GetBuiltinToolItems()?.Length > 0)
+                                    {
+                                        @foreach (var tool in GetBuiltinToolItems()!)
+                                        {
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                    <MudStack>
+                                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">builtin</MudChip>
+                                                            <MudText Typo="Typo.subtitle2">@tool.Name</MudText>
+                                                        </MudStack>
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@tool.Description</MudText>
+                                                    </MudStack>
+                                                    <MudSwitch T="bool" Value="@tool.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                               ValueChanged="@(val => ToggleTool(tool, val))" />
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                            No built-in tools configured yet.
+                                        </MudAlert>
+                                    }
+
+                                    <MudButton OnClick="SeedBuiltinTools" Variant="Variant.Outlined" Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Sync"
+                                               Disabled="@seedingBuiltins">
+                                        @(seedingBuiltins ? "Updating..." : "Update Built-in Tools")
+                                    </MudButton>
+                                }
+                            </MudStack>
+                        </MudPaper>
+
+                        <MudPaper Class="pa-4 agent-config-section" Elevation="0" Outlined>
+                            <MudStack Spacing="2">
+                                <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.subtitle1">MCP servers</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                            Connect external MCP servers, discover their tools, and selectively enable them.
+                                        </MudText>
+                                    </MudStack>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                        @GetActiveMcpServerCount() active server(s)
+                                    </MudChip>
+                                </MudStack>
+
+                                @if (!IsNew)
+                                {
+                                    @if (mcpServers is not null && mcpServers.Length > 0)
+                                    {
+                                        @foreach (var server in mcpServers)
+                                        {
+                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                                <MudStack Spacing="2">
+                                                    <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+                                                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                                                            <MudIcon Icon="@Icons.Material.Filled.Hub" Color="@(server.IsActive ? Color.Success : Color.Default)" />
+                                                            <MudStack Spacing="0">
+                                                                <MudText Typo="Typo.subtitle2">@server.Name</MudText>
+                                                                <MudText Typo="Typo.caption" Color="Color.Secondary">@server.Endpoint</MudText>
+                                                                @if (server.LastDiscoveredAt.HasValue)
+                                                                {
+                                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                        Last discovered: @server.LastDiscoveredAt.Value.ToLocalTime().ToString("MMM dd, HH:mm")
+                                                                    </MudText>
+                                                                }
+                                                            </MudStack>
+                                                        </MudStack>
+                                                        <MudStack Row Spacing="1">
+                                                            <MudSwitch T="bool" Value="@server.IsActive" Color="Color.Success" Size="Size.Small"
+                                                                       ValueChanged="@(val => ToggleMcpServer(server, val))" />
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small" Color="Color.Primary"
+                                                                           OnClick="@(() => DiscoverTools(server))"
+                                                                           Disabled="@discoveringServer" />
+                                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                                                           OnClick="@(() => DeleteMcpServer(server))" />
+                                                        </MudStack>
+                                                    </MudStack>
+
+                                                    @if (GetMcpToolsForServer(server.Id)?.Length > 0)
+                                                    {
+                                                        <MudDivider />
+                                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                            @GetMcpToolsForServer(server.Id)!.Length discovered tool(s)
+                                                        </MudText>
+
+                                                        @foreach (var tool in GetMcpToolsForServer(server.Id)!)
+                                                        {
+                                                            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="agent-config-tool-item">
+                                                                <MudStack Spacing="0">
+                                                                    <MudText Typo="Typo.body2">@tool.Name</MudText>
+                                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                                        @(tool.Description.Length > 100 ? tool.Description[..100] + "..." : tool.Description)
+                                                                    </MudText>
+                                                                </MudStack>
+                                                                <MudSwitch T="bool" Value="@tool.IsEnabled" Color="Color.Success" Size="Size.Small"
+                                                                           ValueChanged="@(val => ToggleTool(tool, val))" />
+                                                            </MudStack>
+                                                        }
+                                                    }
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                            No MCP servers connected yet.
+                                        </MudAlert>
+                                    }
+
+                                    <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
+                                        <MudStack Spacing="2">
+                                            <MudText Typo="Typo.subtitle2">Connect MCP server</MudText>
+                                            <MudTextField @bind-Value="newMcpName" Label="Server Name" MaxLength="200"
+                                                          Placeholder="e.g. Internal docs server"
+                                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudTextField @bind-Value="newMcpEndpoint" Label="Endpoint URL" MaxLength="1000"
+                                                          Placeholder="https://mcp-server.example.com/mcp"
+                                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudTextField @bind-Value="newMcpApiKey" Label="API Key or bearer token"
+                                                          InputType="InputType.Password"
+                                                          HelperText="Optional. Leave blank if the server does not require authentication."
+                                                          Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                            <MudButton OnClick="AddMcpServer" Variant="Variant.Outlined" Color="Color.Primary"
+                                                       StartIcon="@Icons.Material.Filled.Add"
+                                                       Disabled="@(string.IsNullOrWhiteSpace(newMcpName) || string.IsNullOrWhiteSpace(newMcpEndpoint) || addingMcpServer)">
+                                                @(addingMcpServer ? "Connecting..." : "Connect and Discover Tools")
+                                            </MudButton>
+                                        </MudStack>
+                                    </MudPaper>
+                                }
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+                </MudTabPanel>
+            </MudTabs>
+        </MudStack>
+        </div>
+
+        </MudStack>
+    </MudContainer>
+}
+
+@code {
+    [Parameter]
+    public Guid? AgentId { get; set; }
+
+    private AgentDefinition Agent { get; set; } = new();
+    private bool IsNew => !AgentId.HasValue;
+
+    private MudForm? generalForm;
+    private const long MaxManagedSkillUploadBytes = 256 * 1024;
+    private bool showApiKey;
+    private bool saving;
+    private int activeTabIndex;
+
+    private AgentSkillDirectory[]? skillDirectories;
+    private string newManagedSkillName = string.Empty;
+    private string newManagedSkillContent = string.Empty;
+    private string uploadManagedSkillName = string.Empty;
+    private bool addingManagedSkill;
+
+    private AgentKnowledge[]? knowledgeItems;
+    private string newKnowledgeTitle = string.Empty;
+    private string newKnowledgeContent = string.Empty;
+    private Guid? editingKnowledgeId;
+
+    private AgentTool[]? toolItems;
+
+    private AgentMcpServer[]? mcpServers;
+    private string newMcpName = string.Empty;
+    private string newMcpEndpoint = string.Empty;
+    private string newMcpApiKey = string.Empty;
+    private bool addingMcpServer;
+    private bool discoveringServer;
+    private bool seedingBuiltins;
+
+    protected override async Task OnAccessAsync()
+    {
+        IsBusy = true;
+
+        try
+        {
+            if (IsNew)
+            {
+                Agent = new AgentDefinition();
+                skillDirectories = null;
+                knowledgeItems = null;
+                toolItems = null;
+                mcpServers = null;
+                return;
+            }
+
+            var loadedAgent = await AgentService.GetAgent(AgentId!.Value);
+            if (loadedAgent is null)
+            {
+                Snackbar.Add("Agent not found.", Severity.Error);
+                NavigationManager.NavigateTo("/agents");
+                return;
+            }
+
+            Agent = loadedAgent;
+            await LoadConfigurationCollections();
+        }
+        finally
+        {
+            IsBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task Save()
+    {
+        if (generalForm is not null)
+        {
+            await generalForm.ValidateAsync();
+            if (!generalForm.IsValid)
+            {
+                activeTabIndex = 0;
+                return;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(Agent.Name) || string.IsNullOrWhiteSpace(Agent.Model))
+        {
+            activeTabIndex = string.IsNullOrWhiteSpace(Agent.Name) ? 0 : 1;
+            Snackbar.Add("Agent name and model are required.", Severity.Warning);
+            return;
+        }
+
+        if (RequiresApiKeyOnCreate() && string.IsNullOrWhiteSpace(Agent.ApiKey))
+        {
+            activeTabIndex = 1;
+            Snackbar.Add("An API key is required for this provider when creating a new agent.", Severity.Warning);
+            return;
+        }
+
+        saving = true;
+        StateHasChanged();
+
+        try
+        {
+            if (IsNew)
+            {
+                var created = await AgentService.CreateAgent(Agent);
+                if (created is null)
+                {
+                    Snackbar.Add("Failed to create agent.", Severity.Error);
+                    return;
+                }
+
+                Agent = created;
+                activeTabIndex = 2;
+
+                await LoadConfigurationCollections();
+                Snackbar.Add("Agent created. Continue with context and tools.", Severity.Success);
+                NavigationManager.NavigateTo($"/agents/{Agent.Id}/edit", false);
+                return;
+            }
+
+            var success = await AgentService.UpdateAgent(Agent);
+            if (success)
+            {
+                Snackbar.Add("Agent changes saved.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to save agent.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void CloseEditor()
+    {
+        NavigationManager.NavigateTo("/agents");
+    }
+
+    private async Task LoadConfigurationCollections()
+    {
+        await Task.WhenAll(LoadSkillDirectories(), LoadKnowledge(), LoadTools(), LoadMcpServers());
+    }
+
+    private async Task LoadSkillDirectories()
+    {
+        skillDirectories = await AgentService.GetSkillDirectories(Agent.Id);
+    }
+
+    private async Task OnSkillFilesChanged(IReadOnlyList<IBrowserFile> files)
+    {
+        if (files.Count == 0)
+        {
+            return;
+        }
+
+        var file = files[0];
+        if (file.Size > MaxManagedSkillUploadBytes)
+        {
+            Snackbar.Add("Skill files must be 256 KB or smaller.", Severity.Warning);
+            return;
+        }
+
+        using var reader = new StreamReader(file.OpenReadStream(MaxManagedSkillUploadBytes));
+        var content = await reader.ReadToEndAsync();
+        var skillName = string.IsNullOrWhiteSpace(uploadManagedSkillName)
+            ? Path.GetFileNameWithoutExtension(file.Name)
+            : uploadManagedSkillName.Trim();
+
+        await SaveManagedSkill(skillName, content, file.Name, "Skill file uploaded.");
+    }
+
+    private async Task AddManagedSkill()
+    {
+        await SaveManagedSkill(newManagedSkillName.Trim(), newManagedSkillContent.Trim(), null, "Skill added.");
+    }
+
+    private async Task SaveManagedSkill(string skillName, string content, string? fileName, string successMessage)
+    {
+        if (string.IsNullOrWhiteSpace(skillName) || string.IsNullOrWhiteSpace(content))
+        {
+            Snackbar.Add("Skill name and content are required.", Severity.Warning);
+            return;
+        }
+
+        addingManagedSkill = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AgentService.AddManagedSkill(Agent.Id, skillName, content, fileName);
+            if (result is null)
+            {
+                Snackbar.Add("Failed to add managed skill.", Severity.Error);
+                return;
+            }
+
+            ResetManagedSkillInputs();
+            await LoadSkillDirectories();
+            Snackbar.Add(successMessage, Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            addingManagedSkill = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ResetManagedSkillInputs()
+    {
+        newManagedSkillName = string.Empty;
+        newManagedSkillContent = string.Empty;
+        uploadManagedSkillName = string.Empty;
+    }
+
+    private async Task ToggleSkillDirectory(AgentSkillDirectory skillDirectory, bool enabled)
+    {
+        skillDirectory.IsEnabled = enabled;
+        var success = await AgentService.UpdateSkillDirectory(skillDirectory);
+        if (success)
+        {
+        }
+        else
+        {
+            skillDirectory.IsEnabled = !enabled;
+            Snackbar.Add("Failed to update skill directory.", Severity.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task DeleteSkillDirectory(AgentSkillDirectory skillDirectory)
+    {
+        var success = await AgentService.DeleteSkillDirectory(skillDirectory.Id);
+        if (success)
+        {
+            await LoadSkillDirectories();
+            Snackbar.Add("Skill directory removed.", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("Failed to remove skill directory.", Severity.Error);
+        }
+    }
+
+    private async Task LoadKnowledge()
+    {
+        knowledgeItems = await AgentService.GetKnowledge(Agent.Id);
+    }
+
+    private void BeginEditKnowledge(AgentKnowledge item)
+    {
+        editingKnowledgeId = item.Id;
+        newKnowledgeTitle = item.Title;
+        newKnowledgeContent = item.Content;
+    }
+
+    private void CancelKnowledgeEdit()
+    {
+        editingKnowledgeId = null;
+        newKnowledgeTitle = string.Empty;
+        newKnowledgeContent = string.Empty;
+    }
+
+    private async Task SaveKnowledge()
+    {
+        if (editingKnowledgeId.HasValue)
+        {
+            var item = knowledgeItems?.FirstOrDefault(x => x.Id == editingKnowledgeId.Value);
+            if (item is null)
+            {
+                Snackbar.Add("Knowledge item could not be found.", Severity.Error);
+                CancelKnowledgeEdit();
+                return;
+            }
+
+            item.Title = newKnowledgeTitle.Trim();
+            item.Content = newKnowledgeContent.Trim();
+
+            var updated = await AgentService.UpdateKnowledge(item);
+            if (updated)
+            {
+                await LoadKnowledge();
+                CancelKnowledgeEdit();
+                Snackbar.Add("Knowledge updated.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Failed to update knowledge.", Severity.Error);
+            }
+
+            return;
+        }
+
+        var newItem = new AgentKnowledge
+        {
+            AgentDefinitionId = Agent.Id,
+            Title = newKnowledgeTitle.Trim(),
+            Content = newKnowledgeContent.Trim(),
+            IsEnabled = true
+        };
+
+        var result = await AgentService.AddKnowledge(Agent.Id, newItem);
+        if (result is not null)
+        {
+            newKnowledgeTitle = string.Empty;
+            newKnowledgeContent = string.Empty;
+            await LoadKnowledge();
+            Snackbar.Add("Knowledge added.", Severity.Success);
+        }
+        else
+        {
+            Snackbar.Add("Failed to add knowledge.", Severity.Error);
+        }
+    }
+
+    private async Task ToggleKnowledge(AgentKnowledge item, bool enabled)
+    {
+        item.IsEnabled = enabled;
+        var success = await AgentService.UpdateKnowledge(item);
+        if (success)
+        {
+        }
+        else
+        {
+            item.IsEnabled = !enabled;
+            Snackbar.Add("Failed to update knowledge.", Severity.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task DeleteKnowledge(AgentKnowledge item)
+    {
+        var success = await AgentService.DeleteKnowledge(item.Id);
+        if (success)
+        {
+            if (editingKnowledgeId == item.Id)
+            {
+                CancelKnowledgeEdit();
+            }
+
+            await LoadKnowledge();
+            Snackbar.Add("Knowledge removed.", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("Failed to remove knowledge.", Severity.Error);
+        }
+    }
+
+    private async Task LoadTools()
+    {
+        toolItems = await AgentService.GetTools(Agent.Id);
+    }
+
+    private async Task ToggleTool(AgentTool tool, bool enabled)
+    {
+        tool.IsEnabled = enabled;
+        var success = await AgentService.UpdateTool(tool);
+        if (success)
+        {
+        }
+        else
+        {
+            tool.IsEnabled = !enabled;
+            Snackbar.Add("Failed to update tool.", Severity.Error);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SeedBuiltinTools()
+    {
+        seedingBuiltins = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AgentService.SeedBuiltinTools(Agent.Id);
+            if (result is not null && (result.Added > 0 || result.Updated > 0))
+            {
+                var changes = new List<string>();
+                if (result.Added > 0)
+                {
+                    changes.Add($"{result.Added} added");
+                }
+
+                if (result.Updated > 0)
+                {
+                    changes.Add($"{result.Updated} updated");
+                }
+
+                Snackbar.Add($"Built-in tools synced: {string.Join(", ", changes)}.", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Built-in tools are already up to date.", Severity.Info);
+            }
+
+            await LoadTools();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            seedingBuiltins = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadMcpServers()
+    {
+        mcpServers = await AgentService.GetMcpServers(Agent.Id);
+    }
+
+    private async Task AddMcpServer()
+    {
+        addingMcpServer = true;
+        StateHasChanged();
+
+        try
+        {
+            var server = await AgentService.AddMcpServer(
+                Agent.Id,
+                newMcpName.Trim(),
+                newMcpEndpoint.Trim(),
+                string.IsNullOrWhiteSpace(newMcpApiKey) ? null : newMcpApiKey);
+
+            if (server is null)
+            {
+                Snackbar.Add("Failed to add MCP server.", Severity.Error);
+                return;
+            }
+
+            newMcpName = string.Empty;
+            newMcpEndpoint = string.Empty;
+            newMcpApiKey = string.Empty;
+
+            Snackbar.Add("MCP server connected. Discovering tools...", Severity.Success);
+            await LoadMcpServers();
+            await DiscoverTools(server);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            addingMcpServer = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleMcpServer(AgentMcpServer server, bool active)
+    {
+        server.IsActive = active;
+        var success = await AgentService.UpdateMcpServer(server);
+        if (success)
+        {
+            await LoadMcpServers();
+        }
+        else
+        {
+            server.IsActive = !active;
+            Snackbar.Add("Failed to update MCP server.", Severity.Error);
+        }
+    }
+
+    private async Task DiscoverTools(AgentMcpServer server)
+    {
+        discoveringServer = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await AgentService.DiscoverMcpTools(server.Id);
+            if (result is not null)
+            {
+                Snackbar.Add($"Discovered {result.Discovered} tool(s) from {server.Name}.", Severity.Success);
+                await Task.WhenAll(LoadTools(), LoadMcpServers());
+            }
+            else
+            {
+                Snackbar.Add("Tool discovery failed. Check the endpoint and try again.", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Discovery error: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            discoveringServer = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteMcpServer(AgentMcpServer server)
+    {
+        var success = await AgentService.DeleteMcpServer(server.Id);
+        if (success)
+        {
+            await Task.WhenAll(LoadTools(), LoadMcpServers());
+            Snackbar.Add("MCP server removed.", Severity.Info);
+        }
+        else
+        {
+            Snackbar.Add("Failed to remove MCP server.", Severity.Error);
+        }
+    }
+
+    private AgentTool[]? GetBuiltinToolItems() =>
+        toolItems?.Where(t => t.Source == AgentToolSource.Builtin).ToArray();
+
+    private AgentTool[]? GetMcpToolsForServer(Guid serverId) =>
+        toolItems?.Where(t => t.Source == AgentToolSource.Mcp && t.McpServerId == serverId).ToArray();
+
+    private bool IsCoreSetupReady() =>
+        !string.IsNullOrWhiteSpace(Agent.Name)
+        && !string.IsNullOrWhiteSpace(Agent.Model)
+        && !string.IsNullOrWhiteSpace(Agent.Instructions);
+
+    private bool RequiresApiKeyOnCreate() => IsNew && Agent.Provider != LlmProvider.Ollama;
+
+    private static string GetSkillDirectoryDescription(AgentSkillDirectory skillDirectory)
+    {
+        var stateText = skillDirectory.IsEnabled ? "Enabled for agent runs." : "Saved but disabled.";
+        return $"{stateText} Stored at {NormalizeSkillPath(skillDirectory.Path)}";
+    }
+
+    private static string NormalizeSkillPath(string path) => path.Replace('\\', '/');
+
+    private int GetSkillDirectoryCount() => skillDirectories?.Length ?? 0;
+
+    private int GetKnowledgeCount() => knowledgeItems?.Length ?? 0;
+
+    private int GetContextItemCount() => GetSkillDirectoryCount() + GetKnowledgeCount();
+
+    private int GetToolItemCount() => toolItems?.Length ?? 0;
+
+    private int GetBuiltinToolCount() => GetBuiltinToolItems()?.Length ?? 0;
+
+    private int GetActiveMcpServerCount() => mcpServers?.Count(x => x.IsActive) ?? 0;
+
+    private string GetHeroTitle() => IsNew
+        ? "Start with a working agent, then enrich it"
+        : "Refine how this agent behaves, what it knows, and what it can use";
+
+    private string GetHeroDescription()
+    {
+        if (IsNew)
+        {
+            return "Most agents only need a name, instructions, and a model to get started. Skills, knowledge, and tools can come next.";
+        }
+
+        return GetContextItemCount() == 0 && GetToolItemCount() == 0
+            ? "This agent is configured, but it still has no added context or tools."
+            : "This agent already has added configuration. Update only the parts you need.";
+    }
+
+    private string GetVisibilitySummary() => !Agent.IsPublished
+        ? "Private"
+        : Agent.AddPermission == AgentAddPermission.OwnerOnly
+            ? "Published, owner only"
+            : "Published, shared";
+
+    private static string GetChecklistIcon(bool completed) => completed
+        ? Icons.Material.Filled.CheckCircle
+        : Icons.Material.Filled.RadioButtonUnchecked;
+
+    private static Color GetChecklistColor(bool completed) => completed ? Color.Success : Color.Default;
+
+    private string GetModelPlaceholder() => Agent.Provider switch
+    {
+        LlmProvider.OpenAI => "gpt-4o",
+        LlmProvider.AzureOpenAI => "gpt-4o",
+        LlmProvider.Anthropic => "claude-sonnet-4-20250514",
+        LlmProvider.Ollama => "llama3.1",
+        _ => "model-name"
+    };
+
+    private string GetModelHelper() => Agent.Provider switch
+    {
+        LlmProvider.OpenAI => "OpenAI model name such as gpt-4o or gpt-4o-mini.",
+        LlmProvider.AzureOpenAI => "Use your Azure deployment name.",
+        LlmProvider.Anthropic => "Claude model such as claude-sonnet-4-20250514.",
+        LlmProvider.Ollama => "Local Ollama model such as llama3.1 or phi3.",
+        _ => string.Empty
+    };
+
+    private string GetApiKeyHelper() => IsNew
+        ? "Required for hosted providers. The key is stored encrypted."
+        : "Leave blank to keep the currently stored key. Enter a new value only if you want to replace it.";
+
+    private string GetEndpointPlaceholder() => Agent.Provider switch
+    {
+        LlmProvider.AzureOpenAI => "https://your-resource.openai.azure.com/",
+        LlmProvider.Ollama => "http://localhost:11434",
+        _ => string.Empty
+    };
+
+    private string GetEndpointHelper() => Agent.Provider switch
+    {
+        LlmProvider.AzureOpenAI => "Your Azure OpenAI resource endpoint.",
+        LlmProvider.Ollama => "Leave blank to use the default localhost endpoint.",
+        _ => string.Empty
+    };
+
+    private string GetAddPermissionHelper() => !Agent.IsPublished
+        ? "This only matters after the agent is published."
+        : Agent.AddPermission == AgentAddPermission.OwnerOnly
+            ? "Only you can add this published agent to friends or channels."
+            : "Other users can add this published agent as a friend and invite it to channels.";
+}

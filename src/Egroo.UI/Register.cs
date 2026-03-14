@@ -16,16 +16,9 @@ namespace Egroo.UI
         {
             ClientModel.CurrentFrameworkPlatform = frameworkPlatform;
 
-            if (frameworkPlatform == FrameworkPlatform.SERVER)
-            {
-                services.AddScoped<SessionStorage>();
-                services.AddScoped<StorageService>();
-            }
-            else
-            {
-                services.AddSingleton<SessionStorage>();
-                services.AddSingleton<StorageService>();
-            }
+            services.AddScoped<SessionStorage>();
+            services.AddScoped<StorageService>();
+            services.AddScoped<EndToEndEncryptionService>();
 
             services.AddBlazorDexie();
             services.AddScoped<EgrooDB>();

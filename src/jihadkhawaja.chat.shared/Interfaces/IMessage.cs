@@ -11,6 +11,8 @@ namespace jihadkhawaja.chat.shared.Interfaces
     public interface IMessageHub : IMessage
     {
         Task SendPendingMessages();
+        Task StartTyping(Guid channelId);
+        Task StopTyping(Guid channelId);
     }
     public interface IMessageRepository : IMessage
     {

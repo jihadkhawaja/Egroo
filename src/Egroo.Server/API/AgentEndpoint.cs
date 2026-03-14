@@ -2,6 +2,7 @@ using Egroo.Server.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Egroo.Server.Security;
+using System.Text;
 
 namespace Egroo.Server.API
 {
@@ -27,8 +28,11 @@ namespace Egroo.Server.API
                     Model = req.Model,
                     ApiKey = req.ApiKey,
                     Endpoint = req.Endpoint,
+                    IsPublished = req.IsPublished,
+                    AddPermission = req.AddPermission,
                     Temperature = req.Temperature,
-                    MaxTokens = req.MaxTokens
+                    MaxTokens = req.MaxTokens,
+                    SkillsInstructionPrompt = req.SkillsInstructionPrompt
                 };
 
                 var result = await repo.CreateAgent(definition);
@@ -37,8 +41,7 @@ namespace Egroo.Server.API
                     return Results.BadRequest(new { error = "Failed to create agent." });
                 }
 
-                // Don't return the encrypted API key
-                result.ApiKey = null;
+                StripSecrets(result);
                 return Results.Ok(result);
             });
 
@@ -47,10 +50,9 @@ namespace Egroo.Server.API
                 var agents = await repo.GetUserAgents();
                 if (agents is not null)
                 {
-                    // Strip API keys from response
                     foreach (var a in agents)
                     {
-                        a.ApiKey = null;
+                        StripSecrets(a);
                     }
                 }
                 return Results.Ok(agents);
@@ -63,7 +65,7 @@ namespace Egroo.Server.API
                 {
                     return Results.NotFound();
                 }
-                agent.ApiKey = null;
+                StripSecrets(agent);
                 return Results.Ok(agent);
             });
 
@@ -80,8 +82,11 @@ namespace Egroo.Server.API
                     ApiKey = req.ApiKey,
                     Endpoint = req.Endpoint,
                     IsActive = req.IsActive,
+                    IsPublished = req.IsPublished,
+                    AddPermission = req.AddPermission,
                     Temperature = req.Temperature,
-                    MaxTokens = req.MaxTokens
+                    MaxTokens = req.MaxTokens,
+                    SkillsInstructionPrompt = req.SkillsInstructionPrompt
                 };
 
                 var success = await repo.UpdateAgent(definition);
@@ -91,6 +96,94 @@ namespace Egroo.Server.API
             group.MapDelete("/{agentId:guid}", async (IAgentRepository repo, Guid agentId) =>
             {
                 var success = await repo.DeleteAgent(agentId);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            // ── Agent Skills ────────────────────────────────────────────
+
+            group.MapPost("/{agentId:guid}/skills", async (IAgentRepository repo, Guid agentId, CreateSkillDirectoryRequest req) =>
+            {
+                var skillDirectory = new AgentSkillDirectory
+                {
+                    AgentDefinitionId = agentId,
+                    Name = ResolveSkillDirectoryName(req.Name, req.Path),
+                    Path = req.Path,
+                    IsEnabled = req.IsEnabled
+                };
+
+                var result = await repo.AddSkillDirectory(skillDirectory);
+                return result is not null ? Results.Ok(result) : Results.BadRequest(new { error = "Failed to add skill directory." });
+            });
+
+            group.MapPost("/{agentId:guid}/skills/managed", async (
+                IAgentRepository repo,
+                AgentManagedSkillsService managedSkills,
+                Guid agentId,
+                CreateManagedSkillRequest req) =>
+            {
+                try
+                {
+                    var managedSkill = managedSkills.CreateManagedSkill(agentId, req.Name, req.Content, req.FileName);
+                    var skillDirectory = new AgentSkillDirectory
+                    {
+                        AgentDefinitionId = agentId,
+                        Name = managedSkill.DisplayName,
+                        Path = managedSkill.RelativeDirectoryPath,
+                        IsEnabled = req.IsEnabled
+                    };
+
+                    var result = await repo.AddSkillDirectory(skillDirectory);
+                    if (result is not null)
+                    {
+                        return Results.Ok(result);
+                    }
+
+                    managedSkills.DeleteManagedSkillDirectory(managedSkill.RelativeDirectoryPath);
+                    return Results.BadRequest(new { error = "Failed to add managed skill." });
+                }
+                catch (ArgumentException ex)
+                {
+                    return Results.BadRequest(new { error = ex.Message });
+                }
+            });
+
+            group.MapGet("/{agentId:guid}/skills", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var directories = await repo.GetAgentSkillDirectories(agentId);
+                return Results.Ok(directories);
+            });
+
+            group.MapPut("/skills/{skillDirectoryId:guid}", async (IAgentRepository repo, Guid skillDirectoryId, UpdateSkillDirectoryRequest req) =>
+            {
+                var skillDirectory = new AgentSkillDirectory
+                {
+                    Id = skillDirectoryId,
+                    Name = ResolveSkillDirectoryName(req.Name, req.Path),
+                    Path = req.Path,
+                    IsEnabled = req.IsEnabled
+                };
+
+                var success = await repo.UpdateSkillDirectory(skillDirectory);
+                return success ? Results.Ok() : Results.BadRequest(new { error = "Failed to update skill directory." });
+            });
+
+            group.MapDelete("/skills/{skillDirectoryId:guid}", async (
+                IAgentRepository repo,
+                AgentManagedSkillsService managedSkills,
+                Guid skillDirectoryId) =>
+            {
+                var skillDirectory = await repo.GetSkillDirectory(skillDirectoryId);
+                if (skillDirectory is null)
+                {
+                    return Results.NotFound();
+                }
+
+                var success = await repo.DeleteSkillDirectory(skillDirectoryId);
+                if (success && managedSkills.IsManagedSkillPath(skillDirectory.Path))
+                {
+                    managedSkills.DeleteManagedSkillDirectory(skillDirectory.Path);
+                }
+
                 return success ? Results.Ok() : Results.NotFound();
             });
 
@@ -195,12 +288,31 @@ namespace Egroo.Server.API
                 var existingTools = await repo.GetAgentTools(agentId);
                 var definitions = BuiltinTools.GetDefinitions();
                 var added = 0;
+                var updated = 0;
+
+                var existingBuiltinTools = (existingTools ?? [])
+                    .Where(t => t.Source == AgentToolSource.Builtin)
+                    .ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
 
                 foreach (var def in definitions)
                 {
-                    // Only add if not already present
-                    if (existingTools is not null && existingTools.Any(t => t.Name == def.Name && t.Source == AgentToolSource.Builtin))
+                    if (existingBuiltinTools.TryGetValue(def.Name, out var existingTool))
                     {
+                        if (existingTool.Description == def.Description
+                            && existingTool.ParametersSchema == def.ParametersSchema)
+                        {
+                            continue;
+                        }
+
+                        existingTool.Description = def.Description;
+                        existingTool.ParametersSchema = def.ParametersSchema;
+
+                        var updateResult = await repo.UpdateTool(existingTool);
+                        if (updateResult)
+                        {
+                            updated++;
+                        }
+
                         continue;
                     }
 
@@ -218,7 +330,7 @@ namespace Egroo.Server.API
                     if (result is not null) added++;
                 }
 
-                return Results.Ok(new { added });
+                return Results.Ok(new { added, updated });
             });
 
             // ── MCP Servers ──────────────────────────────────────────────
@@ -240,7 +352,7 @@ namespace Egroo.Server.API
                     return Results.BadRequest(new { error = "Failed to add MCP server." });
                 }
 
-                result.ApiKey = null; // Don't return encrypted key
+                result.ApiKey = null;
                 return Results.Ok(result);
             });
 
@@ -387,7 +499,7 @@ namespace Egroo.Server.API
                     return Results.Unauthorized();
                 }
 
-                var response = await runtime.ChatAsync(userId, conversationId, req.Message);
+                var response = await runtime.ChatAsync(userId, conversationId, req);
                 return response.Success ? Results.Ok(response) : Results.BadRequest(response);
             });
 
@@ -410,13 +522,13 @@ namespace Egroo.Server.API
                 httpContext.Response.Headers["Cache-Control"] = "no-cache";
                 httpContext.Response.Headers["Connection"] = "keep-alive";
 
-                await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req.Message))
+                await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req))
                 {
-                    await httpContext.Response.WriteAsync($"data: {chunk}\n\n");
+                    await WriteSseEventAsync(httpContext, chunk);
                     await httpContext.Response.Body.FlushAsync();
                 }
 
-                await httpContext.Response.WriteAsync("data: [DONE]\n\n");
+                await WriteSseEventAsync(httpContext, "[DONE]");
                 await httpContext.Response.Body.FlushAsync();
             });
 
@@ -439,7 +551,7 @@ namespace Egroo.Server.API
                 var agents = await repo.SearchPublishedAgents(query, maxResults ?? 20);
                 if (agents is not null)
                 {
-                    foreach (var a in agents) a.ApiKey = null;
+                    foreach (var a in agents) StripSecrets(a);
                 }
                 return Results.Ok(agents);
             }).AllowAnonymous();
@@ -448,7 +560,7 @@ namespace Egroo.Server.API
             {
                 var agent = await repo.GetPublishedAgent(agentId);
                 if (agent is null) return Results.NotFound();
-                agent.ApiKey = null;
+                StripSecrets(agent);
                 return Results.Ok(agent);
             }).AllowAnonymous();
 
@@ -497,10 +609,50 @@ namespace Egroo.Server.API
                 var agents = await repo.GetChannelAgentDefinitions(channelId);
                 if (agents is not null)
                 {
-                    foreach (var a in agents) a.ApiKey = null;
+                    foreach (var a in agents) StripSecrets(a);
                 }
                 return Results.Ok(agents);
             });
+        }
+
+        private static void StripSecrets(AgentDefinition agent)
+        {
+            agent.ApiKey = null;
+            agent.EncryptionPrivateKey = null;
+        }
+
+        private static Task WriteSseEventAsync(HttpContext httpContext, string data)
+        {
+            var builder = new StringBuilder();
+            var normalized = (data ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+            var lines = normalized.Split('\n');
+
+            foreach (var line in lines)
+            {
+                builder.Append("data: ");
+                builder.Append(line);
+                builder.Append('\n');
+            }
+
+            builder.Append('\n');
+            return httpContext.Response.WriteAsync(builder.ToString());
+        }
+
+        private static string ResolveSkillDirectoryName(string? requestedName, string path)
+        {
+            if (!string.IsNullOrWhiteSpace(requestedName))
+            {
+                return requestedName.Trim();
+            }
+
+            var normalizedPath = path.Replace('\\', '/').TrimEnd('/');
+            var lastSegment = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+            if (string.IsNullOrWhiteSpace(lastSegment))
+            {
+                throw new ArgumentException("A skill name or path is required.", nameof(path));
+            }
+
+            return lastSegment;
         }
     }
 
@@ -514,8 +666,11 @@ namespace Egroo.Server.API
         string Model,
         string? ApiKey,
         string? Endpoint,
+        bool IsPublished,
+        AgentAddPermission AddPermission,
         float? Temperature,
-        int? MaxTokens);
+        int? MaxTokens,
+        string? SkillsInstructionPrompt);
 
     public record UpdateAgentRequest(
         string Name,
@@ -526,8 +681,27 @@ namespace Egroo.Server.API
         string? ApiKey,
         string? Endpoint,
         bool IsActive,
+        bool IsPublished,
+        AgentAddPermission AddPermission,
         float? Temperature,
-        int? MaxTokens);
+        int? MaxTokens,
+        string? SkillsInstructionPrompt);
+
+    public record CreateSkillDirectoryRequest(
+        string Name,
+        string Path,
+        bool IsEnabled = true);
+
+    public record UpdateSkillDirectoryRequest(
+        string Name,
+        string Path,
+        bool IsEnabled = true);
+
+    public record CreateManagedSkillRequest(
+        string Name,
+        string Content,
+        string? FileName = null,
+        bool IsEnabled = true);
 
     public record CreateKnowledgeRequest(
         string Title,
@@ -565,6 +739,4 @@ namespace Egroo.Server.API
         bool IsActive = true);
 
     public record CreateConversationRequest(string? Title);
-
-    public record AgentChatRequest(string Message);
 }

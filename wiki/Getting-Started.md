@@ -66,7 +66,6 @@ Minimum example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
   },
@@ -111,20 +110,30 @@ Open `http://localhost:5068` in your browser.
 
 The UI connects to the API base URL configured in `src/Egroo.UI/Constants/Source.cs`. In debug builds, that value is already `http://localhost:5175/`.
 
-## 6. Verify The Setup
+## 6. Create An Account And Publish Your Device Key
+
+Create an account and sign in.
+
+Current chat delivery can use per-recipient end-to-end encrypted payloads. On first sign-in, the client can generate a device key pair locally and publish the public key to the server. The private key stays on the device.
+
+If you later clear browser storage or move to another device, you may need to regenerate or republish the device key from the app settings before encrypted messages can be decrypted on that device.
+
+## 7. Verify The Setup
 
 Use this quick checklist:
 
 1. `http://localhost:5175/swagger` opens.
 2. `http://localhost:5068` loads the web app.
 3. You can create an account and sign in.
-4. The API console shows no database connection errors.
+4. You can create a channel and send a test message.
+5. The API console shows no database connection errors.
 
 ## Common First-Run Problems
 
 - Database connection failure: the connection string or PostgreSQL credentials are wrong.
 - API starts but crashes immediately: the JWT or encryption settings are missing.
 - Web app loads but chat fails: the API is not running on `http://localhost:5175`.
+- Messages arrive but cannot be decrypted: the device is missing the current private key.
 - Docker compose confusion: the root `docker-compose-egroo.yml` is not the recommended first-run path for contributors.
 
 For fixes, see [Troubleshooting](Troubleshooting).

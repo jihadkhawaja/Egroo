@@ -1,4 +1,4 @@
-name: chat-deploy
+name: deploy-egroo
 
 on:
   workflow_dispatch:
@@ -48,24 +48,6 @@ jobs:
                     "Default": "Information",
                     "Microsoft.AspNetCore": "Warning"
                   }
-                },
-                "Serilog": {
-                  "WriteTo": [
-                    {
-                      "Name": "File",
-                      "Args": {
-                        "path": "logs/log.txt",
-                        "rollingInterval": "Day"
-                      }
-                    },
-                    {
-                      "Name": "Console",
-                      "Args": {
-                        "theme": "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console",
-                        "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} <s:{SourceContext}>{NewLine}{Exception}"
-                      }
-                    }
-                  ]
                 },
                 "AllowedHosts": "*",
                 "ConnectionStrings": {

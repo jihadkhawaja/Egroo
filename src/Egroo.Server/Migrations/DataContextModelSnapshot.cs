@@ -18,7 +18,7 @@ namespace Egroo.Server.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.3")
+                .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -49,6 +49,18 @@ namespace Egroo.Server.Migrations
                     b.Property<Guid?>("DeletedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("deletedby");
+
+                    b.Property<string>("EncryptionKeyId")
+                        .HasColumnType("text")
+                        .HasColumnName("encryptionkeyid");
+
+                    b.Property<DateTimeOffset?>("EncryptionKeyUpdatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encryptionkeyupdatedon");
+
+                    b.Property<string>("EncryptionPublicKey")
+                        .HasColumnType("text")
+                        .HasColumnName("encryptionpublickey");
 
                     b.Property<DateTimeOffset?>("LastLoginDate")
                         .HasColumnType("timestamp with time zone")
@@ -209,6 +221,10 @@ namespace Egroo.Server.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AddPermission")
+                        .HasColumnType("integer")
+                        .HasColumnName("addpermission");
+
                     b.Property<string>("ApiKey")
                         .HasColumnType("text")
                         .HasColumnName("apikey");
@@ -237,6 +253,25 @@ namespace Egroo.Server.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("description");
+
+                    b.Property<string>("EncryptionKeyId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("encryptionkeyid");
+
+                    b.Property<DateTimeOffset?>("EncryptionKeyUpdatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encryptionkeyupdatedon");
+
+                    b.Property<string>("EncryptionPrivateKey")
+                        .HasMaxLength(12000)
+                        .HasColumnType("character varying(12000)")
+                        .HasColumnName("encryptionprivatekey");
+
+                    b.Property<string>("EncryptionPublicKey")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("encryptionpublickey");
 
                     b.Property<string>("Endpoint")
                         .HasMaxLength(500)
@@ -274,6 +309,11 @@ namespace Egroo.Server.Migrations
                     b.Property<int>("Provider")
                         .HasColumnType("integer")
                         .HasColumnName("provider");
+
+                    b.Property<string>("SkillsInstructionPrompt")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("skillsinstructionprompt");
 
                     b.Property<float?>("Temperature")
                         .HasColumnType("real")
@@ -415,6 +455,115 @@ namespace Egroo.Server.Migrations
                     b.HasIndex("AgentDefinitionId");
 
                     b.ToTable("agentmcpservers");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentPendingMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text")
+                        .HasColumnName("content");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<Guid>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("messageid");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId", "MessageId")
+                        .IsUnique();
+
+                    b.ToTable("agentpendingmessages");
+                });
+
+            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentSkillDirectory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentDefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentdefinitionid");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("isenabled");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("path");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AgentDefinitionId");
+
+                    b.ToTable("agentskilldirectories");
                 });
 
             modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentTool", b =>

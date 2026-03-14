@@ -1,43 +1,40 @@
 # Egroo Wiki
 
-This wiki is organized for two audiences:
+This wiki is the practical reference for running, extending, and deploying Egroo.
 
-- people trying to run Egroo for the first time
-- contributors who need an accurate view of the current .NET solution and setup flow
-
-Egroo is a self-hosted real-time chat platform built with .NET 10, Blazor Auto, ASP.NET Core, SignalR, and PostgreSQL.
+Egroo is a self-hosted real-time chat platform built with .NET 10, Blazor Auto, ASP.NET Core, SignalR, and PostgreSQL. It supports channel chat, WebRTC voice calls, AI agents, and per-recipient end-to-end encrypted message delivery.
 
 ## Read This First
 
-If you only want the shortest path to a working local environment:
+If you want the shortest path to a working local environment:
 
 1. Install .NET 10 SDK and PostgreSQL.
-2. Update `src/Egroo.Server/appsettings.Development.json` with a valid connection string.
+2. Configure `src/Egroo.Server/appsettings.Development.json` with database, JWT, and encryption settings.
 3. Run `dotnet watch --project src/Egroo.Server/Egroo.Server.csproj`.
 4. Run `dotnet watch --project src/Egroo/Egroo/Egroo.csproj`.
-5. Open `http://localhost:5068`.
+5. Open `http://localhost:5068`, create an account, and sign in.
 
-If you need more detail, continue with the pages below.
+On first sign-in, the client can generate and publish a device encryption key used for end-to-end message decryption on that device.
 
 ## Documentation Map
 
 | Page | Use it for |
 |---|---|
-| [Getting Started](Getting-Started) | First successful local run with the fewest decisions |
-| [Installation](Installation) | Full setup options, including Docker caveats and environment planning |
-| [Configuration](Configuration) | Database, JWT, encryption, client URL, CORS, and environment overrides |
-| [Development Setup](Development-Setup) | Contributor workflow, build, tests, migrations, and project layout |
-| [Deployment](Deployment) | Production planning, reverse proxy, Docker image usage, and operational caveats |
-| [Architecture](Architecture) | System design, package boundaries, and runtime behavior |
-| [API Documentation](API-Documentation) | REST endpoints and SignalR hub surface |
-| [Troubleshooting](Troubleshooting) | Common startup, database, Docker, and SignalR issues |
+| [Getting Started](Getting-Started) | Fastest successful local run |
+| [Installation](Installation) | Full setup choices, including Docker tradeoffs |
+| [Configuration](Configuration) | Database, JWT, encryption, CORS, logging, and client URL settings |
+| [Development Setup](Development-Setup) | Contributor workflow, build, tests, migrations, and repo layout |
+| [Deployment](Deployment) | Production planning, reverse proxy requirements, Docker assets, and scale caveats |
+| [Architecture](Architecture) | Layer boundaries, runtime behavior, encryption flow, voice calls, and agent execution |
+| [API Documentation](API-Documentation) | REST endpoints, SignalR hub methods, and server-to-client events |
+| [Troubleshooting](Troubleshooting) | Common startup, database, WebSocket, Docker, and decryption issues |
 
 ## What You Need Before Running Egroo
 
 - .NET 10 SDK
 - PostgreSQL
 - Two local terminals for the API and web host
-- A browser that supports modern WebSockets and WebAssembly
+- A modern browser with WebSocket and WebAssembly support
 
 Optional tools:
 
@@ -47,23 +44,23 @@ Optional tools:
 
 ## Current Local Runtime Shape
 
-Egroo is not a single executable. In development it runs as separate pieces:
+Egroo runs as separate development processes:
 
-- `src/Egroo.Server` is the API and SignalR backend on `http://localhost:5175`
-- `src/Egroo/Egroo` is the Blazor host on `http://localhost:5068`
-- `src/Egroo.UI/Constants/Source.cs` points the UI to the API base URL
+- `src/Egroo.Server` hosts the API and SignalR backend on `http://localhost:5175`
+- `src/Egroo/Egroo` hosts the Blazor web app on `http://localhost:5068`
+- `src/Egroo.UI/Constants/Source.cs` controls the UI's API base URL
 
-Database migrations are applied automatically when the API starts.
+The API applies pending EF Core migrations on startup.
 
-## Important Notes Before You Choose Docker
+## Docker Caveat
 
-The repository contains Docker assets, but they serve different purposes:
+The repository includes Docker assets, but they target different use cases:
 
 - `docker-compose-egroo.yml` expects prebuilt images and an external Docker network named `internal`
-- `src/Egroo.Server/docker-compose.yaml` is a simpler API plus PostgreSQL development stack
-- the repository does not currently ship a one-command full local stack that provisions web, API, and PostgreSQL together for first-time contributors
+- `src/Egroo.Server/docker-compose.yaml` is a development-oriented API plus PostgreSQL stack
+- the repo does not currently provide a one-command full local stack for first-time contributors
 
-For a first local run, manual .NET plus PostgreSQL setup is the most predictable path.
+For the first local run, manual .NET plus PostgreSQL setup is the most predictable path.
 
 ## Community
 

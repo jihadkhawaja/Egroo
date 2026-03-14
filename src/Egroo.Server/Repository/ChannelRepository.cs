@@ -177,6 +177,9 @@ namespace Egroo.Server.Repository
                 Username = user.Username,
                 ConnectionId = user.ConnectionId,
                 IsOnline = _connectionTracker.IsUserOnline(user.Id),
+                EncryptionPublicKey = user.EncryptionPublicKey,
+                EncryptionKeyId = user.EncryptionKeyId,
+                EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn,
             }).ToArray();
 
             return users;

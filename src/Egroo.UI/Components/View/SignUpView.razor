@@ -44,7 +44,7 @@
                                   HelperText="Min 8 chars, uppercase, lowercase, number, symbol"
                                   @ref="pwField1"
                                   InputType="InputType.Password" Variant="Variant.Outlined"
-                                  Validation="@( (Func<string, string>)(x => PasswordValidator.ValidatePassword(x)) )" />
+                                  Validation="@( (Func<string, string?>)(x => PasswordValidator.ValidatePassword(x)) )" />
 
                     <MudTextField @bind-Value="ConfirmPassword"
                                   T="string"
@@ -86,11 +86,11 @@
 </div>
 
 @code {
-    MudForm form;
-    UserFluentValidator UserValidator;
-    PasswordFluentValidator PasswordValidator;
-    MudTextField<string> pwField1;
-    MudTextField<string> confirmPasswordField;
+    MudForm? form;
+    UserFluentValidator? UserValidator;
+    PasswordFluentValidator PasswordValidator = new();
+    MudTextField<string>? pwField1;
+    MudTextField<string>? confirmPasswordField;
     UserDto model = new UserDto();
     bool IsBusy = false;
 
@@ -128,7 +128,13 @@
     private async Task Submit()
     {
         IsBusy = true;
-        await form.Validate();
+        if (form is null)
+        {
+            IsBusy = false;
+            return;
+        }
+
+        await form.ValidateAsync();
 
         // Validate password using our custom method.
         var passwordError = PasswordValidator.ValidatePassword(Password);
@@ -148,7 +154,7 @@
 
         try
         {
-            var result = await ChatAuthService.SignUp(model?.Username, Password);
+            var result = await ChatAuthService.SignUp(model.Username ?? string.Empty, Password);
 
             if (result != null && result.Success)
             {
@@ -180,6 +186,11 @@
                 SessionStorage.User = user;
 
                 ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+                if (ChatSignalR.HubConnection is null)
+                {
+                    throw new InvalidOperationException("SignalR connection was not initialized.");
+                }
+
                 await ChatSignalR.HubConnection.StartAsync();
 
                 NavigationManager.NavigateTo("/channels", true);
@@ -199,7 +210,7 @@
         }
     }
 
-    private string PasswordMatch(string confirmPassword)
+    private string? PasswordMatch(string confirmPassword)
     {
         // Compare the confirm password with the current Password value
         if (Password != confirmPassword)

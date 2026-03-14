@@ -46,6 +46,10 @@ namespace Egroo.Server.Database
                 .HasIndex(x => x.AgentDefinitionId)
                 .IsUnique(false);
 
+            modelBuilder.Entity<AgentSkillDirectory>()
+                .HasIndex(x => x.AgentDefinitionId)
+                .IsUnique(false);
+
             modelBuilder.Entity<AgentTool>()
                 .HasIndex(x => x.AgentDefinitionId)
                 .IsUnique(false);
@@ -62,6 +66,10 @@ namespace Egroo.Server.Database
                 .HasIndex(x => x.AgentConversationId)
                 .IsUnique(false);
 
+            modelBuilder.Entity<AgentPendingMessage>()
+                .HasIndex(x => new { x.AgentDefinitionId, x.MessageId })
+                .IsUnique(true);
+
             modelBuilder.Entity<ChannelAgent>()
                 .HasIndex(x => new { x.ChannelId, x.AgentDefinitionId })
                 .IsUnique(true);
@@ -77,9 +85,11 @@ namespace Egroo.Server.Database
         public DbSet<ChannelUser> ChannelUsers { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserPendingMessage> UsersPendingMessages { get; set; }
+        public DbSet<AgentPendingMessage> AgentPendingMessages { get; set; }
 
         // Agent entities
         public DbSet<AgentDefinition> AgentDefinitions { get; set; }
+        public DbSet<AgentSkillDirectory> AgentSkillDirectories { get; set; }
         public DbSet<AgentKnowledge> AgentKnowledgeItems { get; set; }
         public DbSet<AgentTool> AgentTools { get; set; }
         public DbSet<AgentMcpServer> AgentMcpServers { get; set; }

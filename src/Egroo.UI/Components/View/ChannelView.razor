@@ -1,5 +1,7 @@
 ﻿@using BlazorDexie.JsModule
 @using Egroo.UI.Helpers
+@using Egroo.UI.Constants
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.SignalR.Client
 @using MudBlazor
 @using jihadkhawaja.chat.client
@@ -10,6 +12,7 @@
 @using jihadkhawaja.chat.shared.Models
 @using System.Net.Http.Json
 @using Microsoft.JSInterop
+@using System.Text.RegularExpressions
 
 @implements IAsyncDisposable
 @inherits ProtectedViewBase
@@ -18,13 +21,15 @@
 @inject StorageService StorageService
 @inject NavigationManager NavigationManager
 @inject IUser ChatUserService
-@inject IMessageHub ChatMessageService
+@inject ChatMessageService ChatMessageService
 @inject IChannel ChatChannelService
 @inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
 @inject ISnackbar Snackbar
 @inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 @inject AgentService AgentService
+@inject ChannelFileService ChannelFileService
+@inject EndToEndEncryptionService EndToEndEncryptionService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
     <!-- Header -->
@@ -52,6 +57,12 @@
                 }
             </MudStack>
             <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                <MudTooltip Text="@(IsSearchOpen ? "Close Search" : "Search Messages")">
+                    <MudIconButton Icon="@(IsSearchOpen ? Icons.Material.Filled.Close : Icons.Material.Filled.Search)"
+                                   Size="Size.Medium"
+                                   Color="@(HasActiveSearch ? Color.Primary : Color.Default)"
+                                   OnClick="ToggleSearch" />
+                </MudTooltip>
                 @if (CallParticipantIds.Count > 0)
                 {
                     <MudAvatarGroup Max="3" Spacing="2" MaxColor="Color.Primary" MaxSize="Size.Small">
@@ -84,12 +95,99 @@
                 </MudTooltip>
             </MudStack>
         </MudStack>
+        @if (!string.IsNullOrWhiteSpace(EncryptionWarning))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                @EncryptionWarning
+            </MudAlert>
+        }
     </MudPaper>
 
     <!-- Messages Container -->
     @if (!IsBusy)
     {
         <MudStack Style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            @if (IsSearchOpen)
+            {
+                <MudPaper Elevation="0" Class="px-4 py-3"
+                          Style="border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); flex-shrink: 0;">
+                    <MudStack Spacing="2">
+                        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                            <MudTextField T="string"
+                                          Value="SearchQuery"
+                                          ValueChanged="OnSearchQueryChangedAsync"
+                                          Immediate="true"
+                                          Placeholder="Search cached chat history"
+                                          Variant="Variant.Outlined"
+                                          Margin="Margin.Dense"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Search"
+                                          Clearable="true"
+                                          Class="flex-grow-1" />
+                            <MudChip T="string"
+                                     Size="Size.Small"
+                                     Variant="Variant.Outlined"
+                                     Color="@(HasActiveSearch ? Color.Primary : Color.Default)">
+                                @GetSearchStatusText()
+                            </MudChip>
+                        </MudStack>
+
+                        @if (ShouldShowSearchHint())
+                        {
+                            <MudText Typo="Typo.caption" Style="opacity: 0.75;">
+                                Search runs against this device's cached channel history. Type at least @SearchMinimumLength characters.
+                            </MudText>
+                        }
+                        else if (!IsSearchLoading && HasActiveSearch && !SearchResults.Any())
+                        {
+                            <MudText Typo="Typo.caption" Style="opacity: 0.75;">
+                                No cached messages matched your search.
+                            </MudText>
+                        }
+
+                        @if (IsSearchLoading)
+                        {
+                            <MudProgressLinear Indeterminate Color="Color.Primary" Class="mt-1" />
+                        }
+                        else if (SearchResults.Any())
+                        {
+                            <div style="max-height: 220px; overflow-y: auto; padding-right: 4px;">
+                                <MudStack Spacing="1">
+                                    @foreach (var result in SearchResults)
+                                    {
+                                        var searchResultStyle = GetSearchResultStyle(result);
+                                        <MudPaper @key="result.ReferenceId"
+                                                  Elevation="0"
+                                                  Class="pa-3"
+                                                  Style="@searchResultStyle"
+                                                  @onclick="() => OpenSearchResultAsync(result)">
+                                            <MudStack Spacing="1">
+                                                <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                                                    <MudText Typo="Typo.caption"
+                                                             Color="@(result.IsAgent ? Color.Info : result.IsCurrentUser ? Color.Secondary : Color.Primary)"
+                                                             Style="font-weight: 600;">
+                                                        @result.DisplayName
+                                                    </MudText>
+                                                    <MudText Typo="Typo.caption" Style="opacity: 0.65;">
+                                                        @result.DateLabel
+                                                    </MudText>
+                                                </MudStack>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudHighlighter Text="@result.PreviewText"
+                                                                    HighlightedText="@SearchQuery"
+                                                                    UntilNextBoundary="false"
+                                                                    CaseSensitive="false"
+                                                                    Markup="false" />
+                                                </MudText>
+                                            </MudStack>
+                                        </MudPaper>
+                                    }
+                                </MudStack>
+                            </div>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
             <div id="messages-container" class="chat-messages-scroll"
                  style="flex: 1; overflow-x: hidden; overflow-y: auto; padding: 16px 24px;">
                 @if (!Messages.Any())
@@ -107,70 +205,111 @@
                 {
                     @foreach (var message in Messages)
                     {
-                        if (message.DateCreated?.ToLocalTime().Date == DateTime.Today)
-                        {
-                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                            Date="@message.DateCreated.Value.ToLocalTime().ToString("h:mm tt")"
-                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
-                            IsAgent="@IsAgentMessage(message)"
-                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                        }
-                        else if (message.DateCreated?.ToLocalTime().Date >= DateTime.Today.AddDays(-6))
-                        {
-                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                            Date="@message.DateCreated.Value.ToLocalTime().ToString("ddd, h:mm tt")"
-                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
-                            IsAgent="@IsAgentMessage(message)"
-                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                        }
-                        else
-                        {
-                            <MessageView DisplayName="@message.DisplayName" Content="@message.Content"
-                            Date="@message.DateCreated?.ToLocalTime().ToString("dd/MM/yyyy h:mm tt")"
-                            IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
-                            IsAgent="@IsAgentMessage(message)"
-                            SentOnDate="@message.DateSent" SeenOnDate="@message.DateSeen" />
-                        }
+                        <MessageView @key="message.ReferenceId"
+                                     DisplayName="@message.DisplayName"
+                                     Content="@GetDisplayContent(message)"
+                                     Date="@GetDisplayDate(message)"
+                                     IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
+                                     IsAgent="@IsAgentMessage(message)"
+                                     SentOnDate="@message.DateSent"
+                                     SeenOnDate="@message.DateSeen"
+                                     MessageElementId="@GetMessageElementId(message.ReferenceId)"
+                                     IsSearchMatch="@VisibleSearchMatchReferenceIds.Contains(message.ReferenceId)"
+                                     IsSearchFocused="@(FocusedSearchReferenceId == message.ReferenceId)" />
                     }
                 }
             </div>
             <!-- Input Area -->
             <div style="flex-shrink: 0; padding: 12px 16px 16px; background: var(--mud-palette-background); position: relative;">
-                @if (showMentionPopup && filteredMentionAgents.Count > 0)
+                @if (TypingParticipants.Count > 0)
+                {
+                    <div class="typing-indicator-shell">
+                        <MudPaper Class="typing-indicator-bubble" Elevation="0">
+                            <div class="typing-indicator-dots" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <MudText Typo="Typo.caption">@GetTypingSummary()</MudText>
+                        </MudPaper>
+                    </div>
+                }
+                @if (showMentionPopup && filteredMentionCandidates.Count > 0)
                 {
                     <MudPaper Class="pa-2 rounded-lg" Elevation="8"
                               Style="position: absolute; bottom: 100%; left: 16px; right: 16px; max-height: 200px; overflow-y: auto; z-index: 10; background: var(--mud-palette-surface); border: 1px solid rgba(255,255,255,0.12);">
                         <MudStack Spacing="0">
-                            @foreach (var agent in filteredMentionAgents)
+                            @for (int i = 0; i < filteredMentionCandidates.Count; i++)
                             {
-                                <MudButton OnClick="@(() => SelectMentionAgent(agent))"
+                                var candidate = filteredMentionCandidates[i];
+                                <MudButton OnClick="@(() => SelectMentionCandidate(candidate))"
                                            Variant="Variant.Text" Color="Color.Default" FullWidth
-                                           Style="justify-content: flex-start; text-transform: none; padding: 6px 12px;">
+                                           Class="@(i == selectedMentionIndex ? "channel-mention-entry channel-mention-entry-selected" : "channel-mention-entry")">
                                     <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" Color="Color.Info" />
-                                        <MudText Typo="Typo.body2">@agent.Name</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">@agent.Provider — @agent.Model</MudText>
+                                        <MudIcon Icon="@(candidate.IsAgent ? Icons.Material.Filled.SmartToy : Icons.Material.Filled.AlternateEmail)"
+                                                 Size="Size.Small"
+                                                 Color="@(candidate.IsAgent ? Color.Info : Color.Primary)" />
+                                        <MudText Typo="Typo.body2">@candidate.Name</MudText>
+                                        @if (!string.IsNullOrWhiteSpace(candidate.Subtitle))
+                                        {
+                                            <MudText Typo="Typo.caption" Class="channel-mention-subtitle">@candidate.Subtitle</MudText>
+                                        }
                                     </MudStack>
                                 </MudButton>
                             }
                         </MudStack>
                     </MudPaper>
                 }
-                <div style="display: flex; align-items: flex-end; gap: 10px; background: var(--mud-palette-surface); border-radius: 24px; padding: 6px 6px 6px 18px; border: 1px solid rgba(255,255,255,0.08); transition: border-color 0.2s;">
+                <div class="channel-composer-shell">
+                    <MudFileUpload @ref="attachmentUpload"
+                                   T="IReadOnlyList<IBrowserFile>"
+                                   Hidden="true"
+                                   Files="pendingAttachmentFiles"
+                                   MaximumFileCount="1"
+                                   FilesChanged="OnAttachmentFilesChanged">
+                        <CustomContent>
+                            <MudTooltip Text="Send file">
+                                <MudIconButton Icon="@Icons.Material.Filled.AttachFile"
+                                               Color="Color.Default"
+                                               Size="Size.Medium"
+                                               Class="channel-composer-attach"
+                                               OnClick="@context.OpenFilePickerAsync"
+                                               Disabled="@(InputDisabled || !IsEndToEndReady)" />
+                            </MudTooltip>
+                        </CustomContent>
+                    </MudFileUpload>
                     <MudTextField @ref="inputMudTextField" Underline="false"
-                    Value="InputContent"
-                    ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                    @bind-Value="InputContent"
+                    @bind-Value:after="OnInputContentChanged"
+                    Immediate="true"
                     InputMode="InputMode.text" InputType="InputType.Text"
                     AutoFocus="false"
-                    Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="EnterPressed"
-                    Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
-                    Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault"
-                    Style="flex: 1; margin: 0;" />
+                    Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="HandleInputKeyDown"
+                    Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="@(InputDisabled || !IsEndToEndReady)"
+                    Sizing="InputSizing.Auto"
+                    Class="channel-composer-input" />
                     <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary"
                     Size="Size.Medium" Variant="Variant.Filled"
-                    Style="border-radius: 50%; width: 40px; height: 40px; min-width: 40px;"
-                    OnClick="SendMessage" ButtonType="ButtonType.Submit" Disabled="InputDisabled" />
+                    Class="channel-composer-send"
+                    OnClick="SendMessage" ButtonType="ButtonType.Submit"
+                    Disabled="@(InputDisabled || !IsEndToEndReady || !CanSendMessage)" />
                 </div>
+                @if (stagedAttachment is not null)
+                {
+                    <MudPaper Class="channel-composer-attachment mt-2 px-3 py-2" Elevation="0">
+                        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@stagedAttachment.FileName</MudText>
+                                <MudText Typo="Typo.caption" Style="opacity: 0.72;">@stagedAttachment.SummaryText</MudText>
+                            </MudStack>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                           Color="Color.Default"
+                                           Size="Size.Small"
+                                           OnClick="ClearStagedAttachmentAsync"
+                                           Disabled="@InputDisabled" />
+                        </MudStack>
+                    </MudPaper>
+                }
             </div>
         </MudStack>
     }
@@ -226,15 +365,24 @@
     private MudTextField<string> inputMudTextField { get; set; } = null!;
     private string? InputContent { get; set; }
     private int MaxMessageLength { get; set; } = 300;
+    private const long MaxAttachmentBytes = 1 * 1024 * 1024;
+    private const int MaxExtractedAttachmentCharacters = 12000;
     private bool InputDisabled { get; set; }
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? attachmentUpload;
+    private IReadOnlyList<IBrowserFile> pendingAttachmentFiles = Array.Empty<IBrowserFile>();
+    private PendingComposerAttachment? stagedAttachment;
     private EgrooDB CacheDB { get; set; } = null!;
-
-    bool _preventDefault;
+    private bool IsEndToEndReady { get; set; }
+    private string? EncryptionWarning { get; set; }
+    private UserDto? CurrentUserProfile { get; set; }
+    private bool CanSendMessage => !string.IsNullOrWhiteSpace(InputContent) || stagedAttachment is not null;
 
     // Mention autocomplete state
     private AgentDefinition[]? channelAgentDefs;
+    private UserDto[] channelUsers = Array.Empty<UserDto>();
     private bool showMentionPopup;
-    private List<AgentDefinition> filteredMentionAgents = new();
+    private List<MentionCandidate> filteredMentionCandidates = new();
+    private int selectedMentionIndex = -1;
     private string mentionSearchToken = string.Empty;
 
     // Voice call state
@@ -249,10 +397,35 @@
 
     // Disposal tracking
     private bool _disposed;
+    private bool _mentionKeyboardRegistered;
     private bool _needsScrollToBottom;
     private bool _needsScrollToBottomIfNearBottom;
+    private string? _scrollToMessageElementId;
+    private bool _isTyping;
+    private CancellationTokenSource? _typingDebounceCts;
+    private CancellationTokenSource? _searchDebounceCts;
+    private Dictionary<string, ChannelTypingState> TypingParticipants { get; set; } = new();
+    private List<Message> CachedChannelMessages { get; set; } = new();
+    private List<ChannelSearchResult> SearchResults { get; set; } = new();
+    private HashSet<Guid> VisibleSearchMatchReferenceIds { get; set; } = new();
+    private bool IsSearchOpen { get; set; }
+    private bool IsSearchLoading { get; set; }
+    private bool IsChannelCacheLoaded { get; set; }
+    private string SearchQuery { get; set; } = string.Empty;
+    private Guid? FocusedSearchReferenceId { get; set; }
+    private Guid _loadedChannelId;
+
+    private const int SearchMinimumLength = 2;
+    private const int SearchResultLimit = 100;
+    private const int SearchWindowRadius = 20;
+    private const int DefaultMessageWindowSize = 50;
+    private static readonly Regex SearchWhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
     // Stored event delegates for unsubscription
+    private Func<Message, Task>? _onMessageReceived;
+    private Func<Message, Task>? _onMessageUpdated;
+    private Func<ChannelTypingState, Task>? _onTypingStarted;
+    private Func<ChannelTypingState, Task>? _onTypingStopped;
     private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
     private Func<Guid, Guid, Task>? _onUserJoinedCall;
     private Func<Guid, Guid, Task>? _onUserLeftCall;
@@ -268,6 +441,7 @@
         RegisterCallEvents();
         CacheDB = new EgrooDB(BlazorDexieOptions);
         Messages = new();
+        TypingParticipants.Clear();
 
         // Register DotNet object reference for JS interop callbacks
         dotNetRef = DotNetObjectReference.Create(this);
@@ -276,24 +450,69 @@
         // Check if there's an existing call in this channel and show participant count
         await RefreshCallParticipants();
 
-        // Load channel agents for @mention autocomplete
+        await RefreshChannelPeopleAsync(GetChannelId());
+
         try
         {
-            channelAgentDefs = await AgentService.GetChannelAgents(GetChannelId());
+            CurrentUserProfile = await ChatUserService.GetUserPrivateDetails() ?? SessionStorage.User;
+            await RefreshEncryptionStateAsync();
         }
         catch
         {
-            channelAgentDefs = Array.Empty<AgentDefinition>();
+            IsEndToEndReady = false;
+            EncryptionWarning = "Unable to initialize end-to-end encryption on this device.";
         }
     }
 
     protected override async Task OnParametersSetAsync()
     {
         var channelId = GetChannelId();
+
+        if (channelId != Guid.Empty && channelId != _loadedChannelId)
+        {
+            await RefreshChannelPeopleAsync(channelId);
+        }
+
         if (channelId != Guid.Empty && SessionStorage?.User != null)
         {
             IsAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User.Id);
         }
+    }
+
+    private async Task RefreshChannelPeopleAsync(Guid channelId)
+    {
+        if (channelId == Guid.Empty)
+        {
+            channelAgentDefs = Array.Empty<AgentDefinition>();
+            channelUsers = Array.Empty<UserDto>();
+            _loadedChannelId = Guid.Empty;
+            UpdateMentionPopup(InputContent);
+            return;
+        }
+
+        try
+        {
+            channelAgentDefs = await AgentService.GetChannelAgents(channelId) ?? Array.Empty<AgentDefinition>();
+        }
+        catch
+        {
+            channelAgentDefs = Array.Empty<AgentDefinition>();
+        }
+
+        try
+        {
+            channelUsers = (await ChatChannelService.GetChannelUsers(channelId) ?? Array.Empty<UserDto>())
+                .Where(x => x.Id != SessionStorage.User?.Id)
+                .OrderBy(x => x.Username)
+                .ToArray();
+        }
+        catch
+        {
+            channelUsers = Array.Empty<UserDto>();
+        }
+
+        _loadedChannelId = channelId;
+        UpdateMentionPopup(InputContent);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -305,8 +524,11 @@
                 .Where(nameof(Message.ChannelId))
                 .IsEqual(GetChannelId())
                 .Limit(50).ToList()) ?? new List<Message>();
-            Messages.AddRange(messages);
-            Messages = Messages.OrderBy(x => x.DateCreated).ToList();
+            foreach (var message in messages)
+            {
+                await PrepareMessageForDisplayAsync(message);
+            }
+            Messages = DeduplicateMessages(messages);
             _ = UpdateUnseenMessages();
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
@@ -325,6 +547,19 @@
             ScrollToMessagesEndIfNearBottom();
         }
 
+        if (!string.IsNullOrWhiteSpace(_scrollToMessageElementId))
+        {
+            string targetId = _scrollToMessageElementId;
+            _scrollToMessageElementId = null;
+            await JSRuntime.InvokeVoidAsync("scrollElementIntoView", targetId);
+        }
+
+        if (!_mentionKeyboardRegistered && !IsBusy && dotNetRef is not null)
+        {
+            _mentionKeyboardRegistered = true;
+            await JSRuntime.InvokeVoidAsync("registerMentionNavigation", ".channel-composer-input input, .channel-composer-input textarea", dotNetRef);
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -333,34 +568,122 @@
         return Guid.TryParse(ChannelId, out Guid id) ? id : Guid.Empty;
     }
 
-    public async Task EnterPressed(KeyboardEventArgs e)
+    private async Task HandleInputKeyDown(KeyboardEventArgs e)
     {
-        bool isSending = (e.Key == "Enter" || e.Key == "NumpadEnter") && !e.ShiftKey;
-        _preventDefault = isSending;
-        if (isSending && !InputDisabled)
+        if ((e.Key == "Enter" || e.Key == "NumpadEnter") && !e.ShiftKey)
         {
-            await SendMessage();
+            return;
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleComposerEnterKey(bool shiftKey)
+    {
+        if (_disposed || shiftKey || InputDisabled)
+        {
+            return;
+        }
+
+        await SendMessage();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task HandleMentionNavigationKey(string key, bool shiftKey)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        bool mentionPopupActive = showMentionPopup && filteredMentionCandidates.Count > 0;
+        if (!mentionPopupActive)
+        {
+            return;
+        }
+
+        if (key is "ArrowDown" or "Down")
+        {
+            MoveMentionSelection(1);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (key is "ArrowUp" or "Up")
+        {
+            MoveMentionSelection(-1);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if ((key == "Enter" || key == "NumpadEnter") && !shiftKey)
+        {
+            SelectCurrentMentionCandidate();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(InputContent))
+        if (!CanSendMessage)
             return;
 
+        var currentUser = SessionStorage.User;
+        if (currentUser is null)
+            return;
+
+        if (!IsEndToEndReady || CurrentUserProfile is null)
+        {
+            Snackbar.Add(EncryptionWarning ?? "End-to-end encryption is not ready on this device.", Severity.Warning);
+            return;
+        }
+
+        await StopTypingAsync();
         InputDisabled = true;
+
+        string plainContent = ComposeMessageContent(InputContent, stagedAttachment?.UserMessageContent);
+        string agentPlainContent = ComposeMessageContent(InputContent, stagedAttachment?.AgentMessageContent ?? stagedAttachment?.UserMessageContent);
 
         Message message = new()
         {
             ChannelId = GetChannelId(),
-            DisplayName = SessionStorage?.User?.Username,
-            Content = InputContent.Trim(),
-            SenderId = SessionStorage.User!.Id,
+            DisplayName = currentUser.Username,
+            SenderId = currentUser.Id,
         };
+
+        try
+        {
+            var recipients = channelUsers
+                .Concat(new[] { CurrentUserProfile })
+                .Where(x => x is not null)
+                .Cast<UserDto>();
+
+            var encryptedPayload = await EndToEndEncryptionService.EncryptMessageForRecipientsAsync(
+                plainContent,
+                recipients,
+                channelAgentDefs ?? Array.Empty<AgentDefinition>(),
+                agentPlainContent);
+
+            message.RecipientContents = encryptedPayload.UserRecipientContents;
+            message.AgentRecipientContents = encryptedPayload.AgentRecipientContents;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+            InputDisabled = false;
+            await inputMudTextField.FocusAsync();
+            return;
+        }
 
         if (await ChatMessageService.SendMessage(message))
         {
+            InputContent = string.Empty;
+            stagedAttachment = null;
+            showMentionPopup = false;
+            filteredMentionCandidates.Clear();
+            selectedMentionIndex = -1;
             await inputMudTextField.ClearAsync();
+            await ClearPendingAttachmentSelectionAsync();
         }
         else
         {
@@ -384,19 +707,298 @@
 
     private bool IsCurrentUserMessage(Guid senderId) => senderId == SessionStorage.User?.Id;
     private bool IsAgentMessage(Message msg) => msg.AgentDefinitionId.HasValue && msg.AgentDefinitionId != Guid.Empty;
+    private bool HasActiveSearch => SearchQuery.Length >= SearchMinimumLength;
+    private static string GetDisplayContent(Message message) => message.DecryptedContent ?? message.Content ?? string.Empty;
 
-    private void OnInputContent(string text)
+    private void OnInputContentChanged()
     {
-        InputContent = text;
-        UpdateMentionPopup(text);
+        UpdateMentionPopup(InputContent);
+        _ = HandleTypingInputAsync(InputContent);
+    }
+
+    private void ToggleSearch()
+    {
+        if (IsSearchOpen)
+        {
+            CloseSearch();
+            return;
+        }
+
+        IsSearchOpen = true;
+    }
+
+    private void CloseSearch()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = null;
+
+        IsSearchOpen = false;
+        IsSearchLoading = false;
+        SearchQuery = string.Empty;
+        SearchResults.Clear();
+        VisibleSearchMatchReferenceIds.Clear();
+        FocusedSearchReferenceId = null;
+        RestoreDefaultMessageWindow();
+    }
+
+    private async Task OnSearchQueryChangedAsync(string? value)
+    {
+        SearchQuery = value?.Trim() ?? string.Empty;
+        FocusedSearchReferenceId = null;
+        await DebounceSearchAsync();
+    }
+
+    private async Task DebounceSearchAsync()
+    {
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+        _searchDebounceCts = new CancellationTokenSource();
+        var cancellationToken = _searchDebounceCts.Token;
+
+        if (!HasActiveSearch)
+        {
+            IsSearchLoading = false;
+            SearchResults.Clear();
+            VisibleSearchMatchReferenceIds.Clear();
+            RestoreDefaultMessageWindow();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        IsSearchLoading = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await Task.Delay(250, cancellationToken);
+            await EnsureChannelCacheLoadedAsync();
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            RefreshSearchResultsFromCache();
+            IsSearchLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task EnsureChannelCacheLoadedAsync()
+    {
+        if (IsChannelCacheLoaded)
+        {
+            return;
+        }
+
+        var cachedMessages = (await CacheDB.Messages
+            .Where(nameof(Message.ChannelId))
+            .IsEqual(GetChannelId())
+            .ToList()) ?? new List<Message>();
+
+        foreach (var message in cachedMessages)
+        {
+            await PrepareMessageForDisplayAsync(message);
+        }
+
+        CachedChannelMessages = cachedMessages
+            .Where(x => x.ReferenceId != Guid.Empty)
+            .GroupBy(x => x.ReferenceId)
+            .Select(x => x.OrderByDescending(GetMessageSortDate).First())
+            .OrderBy(GetMessageSortDate)
+            .ToList();
+
+        IsChannelCacheLoaded = true;
+    }
+
+    private void RefreshSearchResultsFromCache()
+    {
+        if (!HasActiveSearch)
+        {
+            SearchResults.Clear();
+            VisibleSearchMatchReferenceIds.Clear();
+            return;
+        }
+
+        var query = SearchQuery;
+        var matches = new List<ChannelSearchResult>();
+
+        for (int index = CachedChannelMessages.Count - 1; index >= 0; index--)
+        {
+            var message = CachedChannelMessages[index];
+            string searchableContent = GetDisplayContent(message);
+            if (string.IsNullOrWhiteSpace(searchableContent)
+                || !searchableContent.Contains(query, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            matches.Add(new ChannelSearchResult(
+                message.ReferenceId,
+                message.DisplayName ?? (IsCurrentUserMessage(message.SenderId) ? "You" : "Unknown user"),
+                BuildSearchPreview(searchableContent, query),
+                GetDisplayDate(message),
+                IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message),
+                IsAgentMessage(message)));
+
+            if (matches.Count >= SearchResultLimit)
+            {
+                break;
+            }
+        }
+
+        SearchResults = matches;
+        UpdateVisibleSearchMatches();
+    }
+
+    private async Task OpenSearchResultAsync(ChannelSearchResult result)
+    {
+        await EnsureChannelCacheLoadedAsync();
+
+        int index = CachedChannelMessages.FindIndex(x => x.ReferenceId == result.ReferenceId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        int start = Math.Max(0, index - SearchWindowRadius);
+        int take = Math.Min(CachedChannelMessages.Count - start, (SearchWindowRadius * 2) + 1);
+
+        Messages = CachedChannelMessages.Skip(start).Take(take).ToList();
+        FocusedSearchReferenceId = result.ReferenceId;
+        UpdateVisibleSearchMatches();
+        _scrollToMessageElementId = GetMessageElementId(result.ReferenceId);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void RestoreDefaultMessageWindow()
+    {
+        if (IsChannelCacheLoaded && CachedChannelMessages.Count > 0)
+        {
+            Messages = CachedChannelMessages.TakeLast(DefaultMessageWindowSize).ToList();
+        }
+    }
+
+    private void UpdateVisibleSearchMatches()
+    {
+        if (!HasActiveSearch)
+        {
+            VisibleSearchMatchReferenceIds.Clear();
+            return;
+        }
+
+        VisibleSearchMatchReferenceIds = Messages
+            .Where(x => x.ReferenceId != Guid.Empty)
+            .Where(x => !string.IsNullOrWhiteSpace(GetDisplayContent(x))
+                && GetDisplayContent(x).Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+            .Select(x => x.ReferenceId)
+            .ToHashSet();
+    }
+
+    private string GetSearchStatusText()
+    {
+        if (IsSearchLoading)
+        {
+            return "Searching";
+        }
+
+        if (!HasActiveSearch)
+        {
+            return $"Min {SearchMinimumLength} chars";
+        }
+
+        return SearchResults.Count >= SearchResultLimit
+            ? $"Top {SearchResultLimit} matches"
+            : $"{SearchResults.Count} match{(SearchResults.Count == 1 ? string.Empty : "es")}";
+    }
+
+    private string GetSearchResultStyle(ChannelSearchResult result)
+    {
+        string background = FocusedSearchReferenceId == result.ReferenceId
+            ? "rgba(242,89,34,0.16)"
+            : "rgba(255,255,255,0.02)";
+
+        return $"cursor: pointer; border: 1px solid rgba(255,255,255,0.10); background: {background};";
+    }
+
+    private bool ShouldShowSearchHint()
+    {
+        return string.IsNullOrWhiteSpace(SearchQuery) || SearchQuery.Length < SearchMinimumLength;
+    }
+
+    private string GetDisplayDate(Message message)
+    {
+        DateTimeOffset? createdOn = message.DateCreated?.ToLocalTime();
+        if (!createdOn.HasValue)
+        {
+            return string.Empty;
+        }
+
+        if (createdOn.Value.Date == DateTime.Today)
+        {
+            return createdOn.Value.ToString("h:mm tt");
+        }
+
+        if (createdOn.Value.Date >= DateTime.Today.AddDays(-6))
+        {
+            return createdOn.Value.ToString("ddd, h:mm tt");
+        }
+
+        return createdOn.Value.ToString("dd/MM/yyyy h:mm tt");
+    }
+
+    private static DateTimeOffset GetMessageSortDate(Message message)
+    {
+        return message.DateCreated ?? message.DateSent ?? message.DateUpdated ?? DateTimeOffset.MinValue;
+    }
+
+    private static string BuildSearchPreview(string content, string query)
+    {
+        string normalized = SearchWhitespaceRegex.Replace(content, " ").Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return string.Empty;
+        }
+
+        int matchIndex = normalized.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        if (matchIndex < 0)
+        {
+            return normalized.Length <= 180 ? normalized : $"{normalized[..180]}...";
+        }
+
+        int start = Math.Max(0, matchIndex - 60);
+        int end = Math.Min(normalized.Length, matchIndex + query.Length + 100);
+        string preview = normalized[start..end].Trim();
+
+        if (start > 0)
+        {
+            preview = $"...{preview}";
+        }
+
+        if (end < normalized.Length)
+        {
+            preview = $"{preview}...";
+        }
+
+        return preview;
+    }
+
+    private static string GetMessageElementId(Guid referenceId)
+    {
+        return $"channel-message-{referenceId:N}";
     }
 
     private void UpdateMentionPopup(string? text)
     {
-        if (string.IsNullOrEmpty(text) || channelAgentDefs is null || channelAgentDefs.Length == 0)
+        if (string.IsNullOrEmpty(text))
         {
             showMentionPopup = false;
-            filteredMentionAgents.Clear();
+            filteredMentionCandidates.Clear();
+            selectedMentionIndex = -1;
             return;
         }
 
@@ -405,7 +1007,8 @@
         if (lastAt < 0)
         {
             showMentionPopup = false;
-            filteredMentionAgents.Clear();
+            filteredMentionCandidates.Clear();
+            selectedMentionIndex = -1;
             return;
         }
 
@@ -414,7 +1017,8 @@
         if (afterAt.Contains('>') && afterAt.IndexOf('<') == 0)
         {
             showMentionPopup = false;
-            filteredMentionAgents.Clear();
+            filteredMentionCandidates.Clear();
+            selectedMentionIndex = -1;
             return;
         }
 
@@ -425,19 +1029,44 @@
         if (!afterAt.StartsWith("<") && mentionSearchToken.Contains(' '))
         {
             showMentionPopup = false;
-            filteredMentionAgents.Clear();
+            filteredMentionCandidates.Clear();
+            selectedMentionIndex = -1;
             return;
         }
 
-        filteredMentionAgents = channelAgentDefs
-            .Where(a => string.IsNullOrEmpty(mentionSearchToken)
-                || a.Name.Contains(mentionSearchToken, StringComparison.OrdinalIgnoreCase))
+        var candidates = new List<MentionCandidate>();
+
+        if (channelAgentDefs is not null)
+        {
+            candidates.AddRange(channelAgentDefs
+                .Where(a => string.IsNullOrEmpty(mentionSearchToken)
+                    || a.Name.Contains(mentionSearchToken, StringComparison.OrdinalIgnoreCase))
+                .Select(a => new MentionCandidate(
+                    true,
+                    a.Name,
+                    $"{a.Provider} - {a.Model}")));
+        }
+
+        candidates.AddRange(channelUsers
+            .Where(u => !string.IsNullOrWhiteSpace(u.Username))
+            .Where(u => string.IsNullOrEmpty(mentionSearchToken)
+                || u.Username!.Contains(mentionSearchToken, StringComparison.OrdinalIgnoreCase))
+            .Select(u => new MentionCandidate(false, u.Username!, "Channel member")));
+
+        filteredMentionCandidates = candidates
+            .GroupBy(x => $"{x.IsAgent}:{x.Name}", StringComparer.OrdinalIgnoreCase)
+            .Select(x => x.First())
+            .OrderByDescending(x => x.IsAgent)
+            .ThenBy(x => x.Name)
             .ToList();
 
-        showMentionPopup = filteredMentionAgents.Count > 0;
+        showMentionPopup = filteredMentionCandidates.Count > 0;
+        selectedMentionIndex = showMentionPopup
+            ? Math.Clamp(selectedMentionIndex < 0 ? 0 : selectedMentionIndex, 0, filteredMentionCandidates.Count - 1)
+            : -1;
     }
 
-    private void SelectMentionAgent(AgentDefinition agent)
+    private void SelectMentionCandidate(MentionCandidate candidate)
     {
         if (string.IsNullOrEmpty(InputContent))
             return;
@@ -446,12 +1075,320 @@
         if (lastAt < 0) return;
 
         var before = InputContent[..lastAt];
-        var mention = agent.Name.Contains(' ') ? $"@<{agent.Name}> " : $"@{agent.Name} ";
+        var mention = candidate.Name.Contains(' ') ? $"@<{candidate.Name}> " : $"@{candidate.Name} ";
         InputContent = before + mention;
 
         showMentionPopup = false;
-        filteredMentionAgents.Clear();
+        filteredMentionCandidates.Clear();
+        selectedMentionIndex = -1;
         StateHasChanged();
+    }
+
+    private void MoveMentionSelection(int direction)
+    {
+        if (!showMentionPopup || filteredMentionCandidates.Count == 0)
+        {
+            selectedMentionIndex = -1;
+            return;
+        }
+
+        if (selectedMentionIndex < 0)
+        {
+            selectedMentionIndex = 0;
+            return;
+        }
+
+        selectedMentionIndex = (selectedMentionIndex + direction + filteredMentionCandidates.Count) % filteredMentionCandidates.Count;
+    }
+
+    private void SelectCurrentMentionCandidate()
+    {
+        if (!showMentionPopup || filteredMentionCandidates.Count == 0)
+        {
+            return;
+        }
+
+        int safeIndex = selectedMentionIndex < 0 ? 0 : selectedMentionIndex;
+        SelectMentionCandidate(filteredMentionCandidates[safeIndex]);
+    }
+
+    private async Task OnAttachmentFilesChanged(IReadOnlyList<IBrowserFile>? files)
+    {
+        pendingAttachmentFiles = files ?? Array.Empty<IBrowserFile>();
+
+        IBrowserFile? file = pendingAttachmentFiles.FirstOrDefault();
+        if (file is null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxAttachmentBytes)
+        {
+            Snackbar.Add("Files are limited to 1 MB.", Severity.Error);
+            await ClearPendingAttachmentSelectionAsync();
+            return;
+        }
+
+        if (GetChannelId() == Guid.Empty)
+        {
+            Snackbar.Add("Unable to determine the current channel.", Severity.Error);
+            await ClearPendingAttachmentSelectionAsync();
+            return;
+        }
+
+        InputDisabled = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxAttachmentBytes);
+            await using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            var encryptedFile = await EndToEndEncryptionService.EncryptFileAsync(buffer.ToArray(), file.Name, file.ContentType);
+            await using var cipherStream = new MemoryStream(encryptedFile.CipherBytes);
+            string uploadName = $"egroo-{Guid.NewGuid():N}.bin";
+            var uploaded = await ChannelFileService.Upload(GetChannelId(), cipherStream, uploadName, "application/octet-stream");
+            if (uploaded is null)
+            {
+                Snackbar.Add("Failed to upload file.", Severity.Error);
+                await ClearPendingAttachmentSelectionAsync();
+                return;
+            }
+
+            string absoluteUrl = new Uri(new Uri(Source.ConnectionURL), uploaded.Url).ToString();
+            string markdownLink = EndToEndEncryptionService.BuildEncryptedFileToken(absoluteUrl, encryptedFile);
+            ChannelAttachmentContent attachmentContent = BuildChannelAttachmentContent(file.Name, file.ContentType, buffer.ToArray(), markdownLink);
+            string attachmentSummary = BuildAttachmentSummary(file.Name, file.ContentType, buffer.Length);
+            stagedAttachment = new PendingComposerAttachment(
+                file.Name,
+                BuildAttachmentPreviewText(attachmentSummary),
+                attachmentContent.UserMessageContent,
+                attachmentContent.AgentMessageContent);
+
+            Snackbar.Add("File attached. Add text if you want, then press send.", Severity.Success);
+            await ClearPendingAttachmentSelectionAsync();
+            await InvokeAsync(StateHasChanged);
+            await inputMudTextField.FocusAsync();
+        }
+        catch (IOException)
+        {
+            Snackbar.Add("The selected file could not be read.", Severity.Error);
+            await ClearPendingAttachmentSelectionAsync();
+        }
+        finally
+        {
+            InputDisabled = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ClearPendingAttachmentSelectionAsync()
+    {
+        pendingAttachmentFiles = Array.Empty<IBrowserFile>();
+
+        if (attachmentUpload is not null)
+        {
+            await attachmentUpload.ClearAsync();
+        }
+        else
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ClearStagedAttachmentAsync()
+    {
+        stagedAttachment = null;
+        await ClearPendingAttachmentSelectionAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string ComposeMessageContent(string? messageText, string? attachmentContent)
+    {
+        string trimmedMessage = messageText?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(attachmentContent))
+        {
+            return trimmedMessage;
+        }
+
+        return string.IsNullOrWhiteSpace(trimmedMessage)
+            ? attachmentContent
+            : $"{trimmedMessage}\n\n{attachmentContent}";
+    }
+
+    private static string BuildMarkdownLink(string fileName, string url)
+    {
+        string escapedFileName = fileName.Replace("[", "\\[").Replace("]", "\\]");
+        return $"[{escapedFileName}]({url})";
+    }
+
+    private static ChannelAttachmentContent BuildChannelAttachmentContent(string fileName, string? contentType, byte[] fileBytes, string encryptedToken)
+    {
+        string summary = BuildAttachmentSummary(fileName, contentType, fileBytes.LongLength);
+
+        if (IsImageAttachment(contentType))
+        {
+            string altText = fileName.Replace("[", "\\[").Replace("]", "\\]");
+            string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+            string dataUri = $"data:{resolvedContentType};base64,{Convert.ToBase64String(fileBytes)}";
+
+            return new ChannelAttachmentContent(
+                $"{summary}\n{encryptedToken}",
+                $"{summary}\n![{altText}]({dataUri})");
+        }
+
+        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        {
+            return new ChannelAttachmentContent(
+                $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>\n{encryptedToken}",
+                $"{summary}\n\n~~~text\n{extractedText}\n~~~");
+        }
+
+        return new ChannelAttachmentContent($"{summary}\n{encryptedToken}", summary);
+    }
+
+    private static string BuildAttachmentSummary(string fileName, string? contentType, long sizeBytes)
+    {
+        string kind = IsImageAttachment(contentType) ? "Attached image" : "Attached file";
+        string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+        return $"> {kind}: {fileName} ({resolvedContentType}, {FormatAttachmentSize(sizeBytes)})";
+    }
+
+    private static string BuildAttachmentPreviewText(string summary)
+    {
+        return summary.StartsWith("> ", StringComparison.Ordinal) ? summary[2..] : summary;
+    }
+
+    private static bool IsImageAttachment(string? contentType)
+    {
+        return !string.IsNullOrWhiteSpace(contentType)
+            && contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadTextAttachment(string fileName, string? contentType, byte[] fileBytes, out string? extractedText)
+    {
+        extractedText = null;
+        if (!IsTextAttachment(fileName, contentType))
+        {
+            return false;
+        }
+
+        try
+        {
+            string text = System.Text.Encoding.UTF8.GetString(fileBytes);
+            if (text.IndexOf('\0') >= 0)
+            {
+                return false;
+            }
+
+            text = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (text.Length > MaxExtractedAttachmentCharacters)
+            {
+                text = $"{text[..MaxExtractedAttachmentCharacters]}\n\n[Document truncated after {MaxExtractedAttachmentCharacters} characters.]";
+            }
+
+            extractedText = text.Trim();
+            return !string.IsNullOrWhiteSpace(extractedText);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTextAttachment(string fileName, string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            if (contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("xml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("csv", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("javascript", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return Path.GetExtension(fileName).ToLowerInvariant() is ".txt" or ".md" or ".markdown" or ".json" or ".xml" or ".csv" or ".log" or ".yml" or ".yaml" or ".html" or ".htm" or ".css" or ".js" or ".ts" or ".tsx" or ".jsx" or ".cs" or ".razor" or ".sql" or ".ps1" or ".sh";
+    }
+
+    private static string FormatAttachmentSize(long sizeBytes)
+    {
+        if (sizeBytes >= 1024 * 1024)
+        {
+            return $"{sizeBytes / (1024d * 1024d):0.##} MB";
+        }
+
+        if (sizeBytes >= 1024)
+        {
+            return $"{sizeBytes / 1024d:0.##} KB";
+        }
+
+        return $"{sizeBytes} B";
+    }
+
+    private sealed record ChannelAttachmentContent(string UserMessageContent, string AgentMessageContent);
+
+    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string UserMessageContent, string AgentMessageContent);
+
+    private async Task RefreshEncryptionStateAsync()
+    {
+        var readiness = await EndToEndEncryptionService.EnsureIdentityAsync(CurrentUserProfile);
+        IsEndToEndReady = readiness.IsReady;
+        EncryptionWarning = readiness.Message;
+
+        if (!readiness.IsReady || CurrentUserProfile is null || readiness.Identity is null)
+        {
+            return;
+        }
+
+        CurrentUserProfile.EncryptionPublicKey = readiness.Identity.PublicKey;
+        CurrentUserProfile.EncryptionKeyId = readiness.Identity.KeyId;
+        CurrentUserProfile.EncryptionKeyUpdatedOn = DateTimeOffset.UtcNow;
+
+        if (SessionStorage.User?.Id == CurrentUserProfile.Id)
+        {
+            SessionStorage.User.EncryptionPublicKey = CurrentUserProfile.EncryptionPublicKey;
+            SessionStorage.User.EncryptionKeyId = CurrentUserProfile.EncryptionKeyId;
+            SessionStorage.User.EncryptionKeyUpdatedOn = CurrentUserProfile.EncryptionKeyUpdatedOn;
+        }
+    }
+
+    private async Task PrepareMessageForDisplayAsync(Message message)
+    {
+        if (message.AgentDefinitionId is null || message.AgentDefinitionId == Guid.Empty)
+        {
+            var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
+            message.DisplayName = senderUser?.Username ?? message.DisplayName;
+        }
+
+        await EndToEndEncryptionService.GetDisplayContentAsync(message);
+    }
+
+    private static Message CreateCacheRecord(Message source)
+    {
+        return new Message
+        {
+            Id = source.Id,
+            SenderId = source.SenderId,
+            ChannelId = source.ChannelId,
+            ReferenceId = source.ReferenceId,
+            DateSent = source.DateSent,
+            DateSeen = source.DateSeen,
+            DateCreated = source.DateCreated,
+            DateUpdated = source.DateUpdated,
+            DateDeleted = source.DateDeleted,
+            AgentDefinitionId = source.AgentDefinitionId,
+            DisplayName = source.DisplayName,
+            Content = source.Content,
+        };
     }
 
     private async Task UpdateUnseenMessages()
@@ -467,38 +1404,39 @@
 
     private void RegisterMessagingEvents()
     {
-        ChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
+        _onMessageReceived = async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;
 
-            if (Messages.Any(x => x.Id == message.Id))
+            if (Messages.Any(x => x.Id == message.Id || (x.ReferenceId != Guid.Empty && x.ReferenceId == message.ReferenceId)))
             {
+                MergeVisibleMessage(message);
                 await ChatMessageService.UpdatePendingMessage(message.Id);
                 return;
             }
 
-            var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
-            // Preserve agent display name; only override for regular user messages
-            if (message.AgentDefinitionId is null || message.AgentDefinitionId == Guid.Empty)
-            {
-                message.DisplayName = senderUser?.Username;
-            }
-            Messages.Add(message);
+            await PrepareMessageForDisplayAsync(message);
+
+            RemoveTypingParticipantForMessage(message);
+            MergeVisibleMessage(message);
+            UpsertCachedMessage(message);
+            RefreshSearchResultsFromCache();
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
                 await ChatMessageService.UpdateMessage(message);
 
-            await CacheDB.Messages.Add(message);
+            await CacheDB.Messages.Add(CreateCacheRecord(message));
             await ChatMessageService.UpdatePendingMessage(message.Id);
             if (message.SenderId == SessionStorage.User?.Id)
                 _needsScrollToBottom = true;
             else
                 _needsScrollToBottomIfNearBottom = true;
             await InvokeAsync(StateHasChanged);
-        });
+        };
+        ChatMessageService.OnMessageReceived += _onMessageReceived;
 
-        ChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
+        _onMessageUpdated = async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;
@@ -509,12 +1447,236 @@
                 {
                     Messages[i].Id = message.Id;
                     Messages[i].DateSeen = message.DateSeen;
-                    await CacheDB.Messages.Put(Messages[i], Messages[i].ReferenceId);
+                    UpsertCachedMessage(Messages[i]);
+                    RefreshSearchResultsFromCache();
+                    await CacheDB.Messages.Put(CreateCacheRecord(Messages[i]), Messages[i].ReferenceId);
                     await InvokeAsync(StateHasChanged);
                     return;
                 }
             }
-        });
+        };
+        ChatMessageService.OnMessageUpdated += _onMessageUpdated;
+
+        _onTypingStarted = async typingState =>
+        {
+            if (_disposed || typingState.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            if (!typingState.IsAgent && typingState.UserId == SessionStorage.User?.Id)
+            {
+                return;
+            }
+
+            TypingParticipants[GetTypingParticipantKey(typingState)] = typingState;
+            await InvokeAsync(StateHasChanged);
+        };
+        ChatMessageService.OnTypingStarted += _onTypingStarted;
+
+        _onTypingStopped = async typingState =>
+        {
+            if (_disposed || typingState.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            TypingParticipants.Remove(GetTypingParticipantKey(typingState));
+            await InvokeAsync(StateHasChanged);
+        };
+        ChatMessageService.OnTypingStopped += _onTypingStopped;
+    }
+
+    private async Task HandleTypingInputAsync(string? text)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            await StopTypingAsync();
+            return;
+        }
+
+        if (!_isTyping)
+        {
+            _isTyping = true;
+            try
+            {
+                await ChatMessageService.StartTyping(GetChannelId());
+            }
+            catch
+            {
+                _isTyping = false;
+                return;
+            }
+        }
+
+        _typingDebounceCts?.Cancel();
+        _typingDebounceCts?.Dispose();
+        _typingDebounceCts = new CancellationTokenSource();
+        _ = StopTypingAfterDelayAsync(_typingDebounceCts.Token);
+    }
+
+    private async Task StopTypingAfterDelayAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(1500, token);
+            await StopTypingAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task StopTypingAsync()
+    {
+        _typingDebounceCts?.Cancel();
+        _typingDebounceCts?.Dispose();
+        _typingDebounceCts = null;
+
+        if (!_isTyping)
+        {
+            return;
+        }
+
+        _isTyping = false;
+
+        try
+        {
+            await ChatMessageService.StopTyping(GetChannelId());
+        }
+        catch
+        {
+        }
+    }
+
+    private void RemoveTypingParticipantForMessage(Message message)
+    {
+        if (message.AgentDefinitionId.HasValue && message.AgentDefinitionId != Guid.Empty)
+        {
+            TypingParticipants.Remove($"agent:{message.AgentDefinitionId.Value}");
+            return;
+        }
+
+        TypingParticipants.Remove($"user:{message.SenderId}");
+    }
+
+    private static string GetTypingParticipantKey(ChannelTypingState typingState)
+    {
+        return typingState.AgentDefinitionId.HasValue && typingState.AgentDefinitionId != Guid.Empty
+            ? $"agent:{typingState.AgentDefinitionId.Value}"
+            : $"user:{typingState.UserId}";
+    }
+
+    private string GetTypingSummary()
+    {
+        var typers = TypingParticipants.Values
+            .OrderByDescending(x => x.IsAgent)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => x.DisplayName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Cast<string>()
+            .ToList();
+
+        if (typers.Count == 0)
+        {
+            return "Someone is typing...";
+        }
+
+        if (typers.Count == 1)
+        {
+            return $"{typers[0]} is typing...";
+        }
+
+        if (typers.Count == 2)
+        {
+            return $"{typers[0]} and {typers[1]} are typing...";
+        }
+
+        int remaining = typers.Count - 2;
+        return $"{typers[0]}, {typers[1]}, and {remaining} other{(remaining == 1 ? string.Empty : "s")} are typing...";
+    }
+
+    private sealed record MentionCandidate(bool IsAgent, string Name, string? Subtitle);
+    private sealed record ChannelSearchResult(
+        Guid ReferenceId,
+        string DisplayName,
+        string PreviewText,
+        string DateLabel,
+        bool IsCurrentUser,
+        bool IsAgent);
+
+    private void UpsertCachedMessage(Message message)
+    {
+        if (!IsChannelCacheLoaded || message.ReferenceId == Guid.Empty)
+        {
+            return;
+        }
+
+        int index = CachedChannelMessages.FindIndex(x => x.ReferenceId == message.ReferenceId);
+        if (index >= 0)
+        {
+            CachedChannelMessages[index] = message;
+        }
+        else
+        {
+            CachedChannelMessages.Add(message);
+        }
+
+        CachedChannelMessages = CachedChannelMessages
+            .OrderBy(GetMessageSortDate)
+            .ToList();
+    }
+
+    private void MergeVisibleMessage(Message message)
+    {
+        if (message.ReferenceId != Guid.Empty)
+        {
+            int referenceIndex = Messages.FindIndex(x => x.ReferenceId == message.ReferenceId);
+            if (referenceIndex >= 0)
+            {
+                Messages[referenceIndex] = message;
+                Messages = Messages.OrderBy(GetMessageSortDate).ToList();
+                return;
+            }
+        }
+
+        int idIndex = Messages.FindIndex(x => x.Id == message.Id && x.Id != Guid.Empty);
+        if (idIndex >= 0)
+        {
+            Messages[idIndex] = message;
+        }
+        else
+        {
+            Messages.Add(message);
+        }
+
+        Messages = DeduplicateMessages(Messages);
+    }
+
+    private static List<Message> DeduplicateMessages(IEnumerable<Message> messages)
+    {
+        return messages
+            .GroupBy(GetMessageIdentity)
+            .Select(group => group.OrderByDescending(GetMessageSortDate).First())
+            .OrderBy(GetMessageSortDate)
+            .ToList();
+    }
+
+    private static string GetMessageIdentity(Message message)
+    {
+        if (message.ReferenceId != Guid.Empty)
+        {
+            return $"ref:{message.ReferenceId:D}";
+        }
+
+        return message.Id != Guid.Empty
+            ? $"id:{message.Id:D}"
+            : $"fallback:{message.SenderId:D}:{message.ChannelId:D}:{GetMessageSortDate(message).UtcTicks}";
     }
 
     #region Channel Voice Call
@@ -839,7 +2001,26 @@
 
     public async ValueTask DisposeAsync()
     {
+        await StopTypingAsync();
         _disposed = true;
+        _searchDebounceCts?.Cancel();
+        _searchDebounceCts?.Dispose();
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("unregisterMentionNavigation", ".channel-composer-input input, .channel-composer-input textarea");
+        }
+        catch (JSDisconnectedException) { }
+        catch (ObjectDisposedException) { }
+
+        if (_onMessageReceived is not null)
+            ChatMessageService.OnMessageReceived -= _onMessageReceived;
+        if (_onMessageUpdated is not null)
+            ChatMessageService.OnMessageUpdated -= _onMessageUpdated;
+        if (_onTypingStarted is not null)
+            ChatMessageService.OnTypingStarted -= _onTypingStarted;
+        if (_onTypingStopped is not null)
+            ChatMessageService.OnTypingStopped -= _onTypingStopped;
 
         // Unsubscribe all event handlers
         if (_onExistingCallParticipants is not null)

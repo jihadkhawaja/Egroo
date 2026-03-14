@@ -1,0 +1,34 @@
+.agent-config-shell {
+    max-height: min(78vh, 980px);
+}
+
+.agent-config-hero,
+.agent-config-section,
+.agent-config-checklist,
+.agent-config-list-item {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.12);
+}
+
+.agent-config-checklist {
+    height: 100%;
+}
+
+.agent-config-preview {
+    max-height: 44px;
+    overflow: hidden;
+}
+
+.agent-config-tool-item {
+    padding-left: 1rem;
+}
+
+@media (max-width: 960px) {
+    .agent-config-shell {
+        max-height: none;
+    }
+
+    .agent-config-tool-item {
+        padding-left: 0;
+    }
+}

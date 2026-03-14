@@ -1,19 +1,27 @@
-name: MSTest
+name: Coverage
 
 permissions:
-  contents: read
+  contents: write
 
 on:
   pull_request:
 
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - docs/badges/**
+
   workflow_dispatch:
 
 jobs:
-  test:
-    name: Build & Test
+  coverage:
+    name: Test, Coverage & Report
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -26,12 +34,65 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release src/Egroo.Server.Test/Egroo.Server.Test.csproj
 
-      - name: Test
-        run: dotnet test --no-build --configuration Release --logger trx --results-directory TestResults src/Egroo.Server.Test/Egroo.Server.Test.csproj
+      - name: Test with coverage
+        run: >
+          dotnet test --no-build --configuration Release
+          --logger "trx;LogFileName=coverage-tests.trx"
+          --results-directory src/Egroo.Server.Test/TestResults/TestRun
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=cobertura
+          /p:CoverletOutput=TestResults/Coverage/coverage
+          src/Egroo.Server.Test/Egroo.Server.Test.csproj
+
+      - name: Generate coverage report
+        shell: pwsh
+        env:
+          REPORTGENERATOR_LICENSE: ${{ secrets.REPORTGENERATOR_LICENSE }}
+        run: ./scripts/generate-coverage-report.ps1
+
+      - name: Publish coverage summary
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "src/Egroo.Server.Test/TestResults/CoverageReport/Summary.txt") {
+            $summary = Get-Content "src/Egroo.Server.Test/TestResults/CoverageReport/Summary.txt" | Select-Object -First 20 | Out-String
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "## Coverage Summary"
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```text'
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+          }
 
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Test Results
-          path: TestResults/*.trx
+          name: coverage-test-results
+          path: src/Egroo.Server.Test/TestResults/TestRun/*.trx
+          retention-days: 30
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            src/Egroo.Server.Test/TestResults/Coverage/coverage.cobertura.xml
+            src/Egroo.Server.Test/TestResults/CoverageReport/**
+          retention-days: 30
+
+      - name: Update repository coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "docs/badges" | Out-Null
+          Copy-Item "src/Egroo.Server.Test/TestResults/CoverageReport/badge_linecoverage.svg" "docs/badges/coverage.svg" -Force
+          Copy-Item "src/Egroo.Server.Test/TestResults/CoverageReport/Summary.txt" "docs/badges/coverage-summary.txt" -Force
+
+          $changes = git status --porcelain -- docs/badges/coverage.svg docs/badges/coverage-summary.txt
+          if ($changes) {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/badges/coverage.svg docs/badges/coverage-summary.txt
+            git commit -m "chore: update coverage badge"
+            git push
+          }

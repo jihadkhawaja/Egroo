@@ -1,38 +1,37 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
+about: Report a bug so it can be reproduced and fixed
+title: "[Bug]: "
+labels: bug
 assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Summary
+What broke? Keep it short and specific.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## Steps to reproduce
+1. 
+2. 
+3. 
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Expected result
+What did you expect to happen?
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Actual result
+What happened instead? Include the error message if there is one.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+## Environment
+- App area: API, UI, SignalR, auth, agents, other
+- OS:
+- Browser:
+- Branch or commit:
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+## Helpful context
+- Screenshots, logs, or stack traces
+- Anything you already tried
+- Whether this is a regression
 
-**Additional context**
-Add any other context about the problem here.
+## Before submitting
+- [ ] I checked for an existing issue
+- [ ] I included steps someone else can follow

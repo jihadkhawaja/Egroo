@@ -20,7 +20,10 @@ namespace jihadkhawaja.chat.server.Hubs
             if (!await ChannelContainUser(message.ChannelId, message.SenderId))
                 return false;
 
-            if (string.IsNullOrWhiteSpace(message.Content))
+            bool hasTransportContent = !string.IsNullOrWhiteSpace(message.Content)
+                || (message.RecipientContents?.Count > 0);
+
+            if (!hasTransportContent)
                 return false;
 
             bool dbResult = await _messageRepository.SendMessage(message);
@@ -33,28 +36,34 @@ namespace jihadkhawaja.chat.server.Hubs
 
             foreach (UserDto user in users)
             {
-                await SendClientMessage(user, message, ignorePendingMessages: false);
+                string? deliveryContent = GetDeliveryContentForUser(message, user.Id);
+                if (string.IsNullOrWhiteSpace(deliveryContent))
+                {
+                    continue;
+                }
+
+                await SendClientMessage(user, message, ignorePendingMessages: false, deliveryContent);
             }
 
-            // Trigger agent mention processing (fire-and-forget)
             if (_agentChannelResponder is not null)
             {
+                await _agentChannelResponder.PersistAgentRecipientContentsAsync(message);
                 _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
             }
 
             return true;
         }
 
-        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages)
+        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages, string deliveryContent)
         {
-            if (string.IsNullOrWhiteSpace(message.Content))
+            if (string.IsNullOrWhiteSpace(deliveryContent))
                 return false;
 
             UserPendingMessage pendingMsg = new()
             {
                 UserId = user.Id,
                 MessageId = message.Id,
-                Content = message.Content,
+                Content = deliveryContent,
             };
 
             if (!ignorePendingMessages)
@@ -70,7 +79,7 @@ namespace jihadkhawaja.chat.server.Hubs
 
             try
             {
-                await Clients.Client(connectionId).SendAsync("ReceiveMessage", message);
+                await Clients.Client(connectionId).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
                 return true;
             }
             catch (Exception ex)
@@ -123,12 +132,39 @@ namespace jihadkhawaja.chat.server.Hubs
                 var message = await _messageRepository.GetMessageById(pending.MessageId);
                 if (message == null)
                     continue;
-                // Decrypt content if it was previously stored encrypted
-                try { message.Content = _messageRepository.DecryptContent(pending.Content!); }
-                catch { message.Content = pending.Content; }
+                message.Content = pending.Content;
                 var userDto = new UserDto { Id = userId.Value };
-                await SendClientMessage(userDto, message, ignorePendingMessages: true);
+                await SendClientMessage(userDto, message, ignorePendingMessages: true, pending.Content ?? string.Empty);
             }
+        }
+
+        private static string? GetDeliveryContentForUser(Message message, Guid userId)
+        {
+            if (message.RecipientContents is { Count: > 0 })
+            {
+                return message.RecipientContents.FirstOrDefault(x => x.UserId == userId)?.Content;
+            }
+
+            return message.Content;
+        }
+
+        private static Message CloneForDelivery(Message source, string deliveryContent)
+        {
+            return new Message
+            {
+                Id = source.Id,
+                SenderId = source.SenderId,
+                ChannelId = source.ChannelId,
+                ReferenceId = source.ReferenceId,
+                DateSent = source.DateSent,
+                DateSeen = source.DateSeen,
+                DateCreated = source.DateCreated,
+                DateUpdated = source.DateUpdated,
+                DateDeleted = source.DateDeleted,
+                AgentDefinitionId = source.AgentDefinitionId,
+                DisplayName = source.DisplayName,
+                Content = deliveryContent,
+            };
         }
 
         [Authorize]
@@ -139,6 +175,73 @@ namespace jihadkhawaja.chat.server.Hubs
                 return;
 
             await _messageRepository.UpdatePendingMessage(messageid);
+        }
+
+        [Authorize]
+        public async Task StartTyping(Guid channelId)
+        {
+            var userId = GetUserIdFromContext();
+            if (!userId.HasValue || !await ChannelContainUser(channelId, userId.Value))
+            {
+                return;
+            }
+
+            var user = await _userRepository.GetUserPublicDetails(userId.Value);
+            var typingState = new ChannelTypingState
+            {
+                ChannelId = channelId,
+                UserId = userId.Value,
+                DisplayName = user?.Username,
+                IsAgent = false
+            };
+
+            await BroadcastTypingState(channelId, typingState, "TypingStarted", userId.Value);
+        }
+
+        [Authorize]
+        public async Task StopTyping(Guid channelId)
+        {
+            var userId = GetUserIdFromContext();
+            if (!userId.HasValue || !await ChannelContainUser(channelId, userId.Value))
+            {
+                return;
+            }
+
+            var user = await _userRepository.GetUserPublicDetails(userId.Value);
+            var typingState = new ChannelTypingState
+            {
+                ChannelId = channelId,
+                UserId = userId.Value,
+                DisplayName = user?.Username,
+                IsAgent = false
+            };
+
+            await BroadcastTypingState(channelId, typingState, "TypingStopped", userId.Value);
+        }
+
+        private async Task BroadcastTypingState(Guid channelId, ChannelTypingState typingState, string eventName, Guid? excludeUserId = null)
+        {
+            var users = await GetChannelUsers(channelId);
+            if (users == null)
+            {
+                return;
+            }
+
+            foreach (var user in users)
+            {
+                if (excludeUserId.HasValue && user.Id == excludeUserId.Value)
+                {
+                    continue;
+                }
+
+                var connectionIds = _connectionTracker.GetUserConnectionIds(user.Id);
+                if (connectionIds.Count == 0)
+                {
+                    continue;
+                }
+
+                await Clients.Clients(connectionIds).SendAsync(eventName, typingState);
+            }
         }
     }
 }

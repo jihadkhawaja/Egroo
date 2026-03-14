@@ -36,8 +36,11 @@ namespace jihadkhawaja.chat.client.Services
                 def.Model,
                 def.ApiKey,
                 def.Endpoint,
+                def.IsPublished,
+                def.AddPermission,
                 def.Temperature,
-                def.MaxTokens
+                def.MaxTokens,
+                def.SkillsInstructionPrompt
             };
 
             var response = await HttpClient.PostAsJsonAsync(BasePath, payload);
@@ -67,8 +70,11 @@ namespace jihadkhawaja.chat.client.Services
                 def.ApiKey,
                 def.Endpoint,
                 def.IsActive,
+                def.IsPublished,
+                def.AddPermission,
                 def.Temperature,
-                def.MaxTokens
+                def.MaxTokens,
+                def.SkillsInstructionPrompt
             };
 
             var response = await HttpClient.PutAsJsonAsync($"{BasePath}/{def.Id}", payload);
@@ -78,6 +84,42 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> DeleteAgent(Guid agentId)
         {
             var response = await HttpClient.DeleteAsync($"{BasePath}/{agentId}");
+            return response.IsSuccessStatusCode;
+        }
+
+        // ── Agent Skills ─────────────────────────────────────────────
+
+        public async Task<AgentSkillDirectory?> AddSkillDirectory(Guid agentId, AgentSkillDirectory skillDirectory)
+        {
+            var payload = new { skillDirectory.Name, skillDirectory.Path, skillDirectory.IsEnabled };
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/{agentId}/skills", payload);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<AgentSkillDirectory>(JsonOptions);
+        }
+
+        public async Task<AgentSkillDirectory?> AddManagedSkill(Guid agentId, string name, string content, string? fileName = null, bool isEnabled = true)
+        {
+            var payload = new { Name = name, Content = content, FileName = fileName, IsEnabled = isEnabled };
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/{agentId}/skills/managed", payload);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<AgentSkillDirectory>(JsonOptions);
+        }
+
+        public async Task<AgentSkillDirectory[]?> GetSkillDirectories(Guid agentId)
+        {
+            return await HttpClient.GetFromJsonAsync<AgentSkillDirectory[]>($"{BasePath}/{agentId}/skills", JsonOptions);
+        }
+
+        public async Task<bool> UpdateSkillDirectory(AgentSkillDirectory skillDirectory)
+        {
+            var payload = new { skillDirectory.Name, skillDirectory.Path, skillDirectory.IsEnabled };
+            var response = await HttpClient.PutAsJsonAsync($"{BasePath}/skills/{skillDirectory.Id}", payload);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> DeleteSkillDirectory(Guid skillDirectoryId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/skills/{skillDirectoryId}");
             return response.IsSuccessStatusCode;
         }
 
@@ -225,29 +267,36 @@ namespace jihadkhawaja.chat.client.Services
 
         // ── Chat (non-streaming) ─────────────────────────────────────
 
-        public async Task<AgentChatResult?> Chat(Guid conversationId, string message)
+        public Task<AgentChatResult?> Chat(Guid conversationId, string message)
         {
-            var payload = new { Message = message };
-            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/conversations/{conversationId}/chat", payload);
+            return Chat(conversationId, new AgentChatRequest { Message = message });
+        }
+
+        public async Task<AgentChatResult?> Chat(Guid conversationId, AgentChatRequest request)
+        {
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/conversations/{conversationId}/chat", request);
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadFromJsonAsync<AgentChatResult>(JsonOptions);
         }
 
         // ── Chat Streaming (SSE) ─────────────────────────────────────
 
-        public async IAsyncEnumerable<string> ChatStream(Guid conversationId, string message)
+        public IAsyncEnumerable<string> ChatStream(Guid conversationId, string message)
         {
-            var payload = new { Message = message };
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            return ChatStream(conversationId, new AgentChatRequest { Message = message });
+        }
 
-            var request = new HttpRequestMessage(HttpMethod.Post,
+        public async IAsyncEnumerable<string> ChatStream(Guid conversationId, AgentChatRequest request)
+        {
+            var content = JsonContent.Create(request);
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post,
                 $"{BasePath}/conversations/{conversationId}/chat/stream")
             {
                 Content = content
             };
 
-            using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await HttpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
             {
                 yield return "[ERROR] Failed to connect to agent.";
@@ -258,15 +307,46 @@ namespace jihadkhawaja.chat.client.Services
             using var reader = new System.IO.StreamReader(stream);
 
             string? line;
+            var dataLines = new List<string>();
             while ((line = await reader.ReadLineAsync()) is not null)
             {
-                if (string.IsNullOrEmpty(line)) continue;
-                if (!line.StartsWith("data: ")) continue;
+                if (string.IsNullOrEmpty(line))
+                {
+                    if (dataLines.Count == 0)
+                    {
+                        continue;
+                    }
 
-                var data = line["data: ".Length..];
-                if (data == "[DONE]") yield break;
+                    var data = string.Join("\n", dataLines);
+                    dataLines.Clear();
 
-                yield return data;
+                    if (data == "[DONE]")
+                    {
+                        yield break;
+                    }
+
+                    yield return data;
+                    continue;
+                }
+
+                if (!line.StartsWith("data:", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string dataLine = line.Length >= 6 && line[5] == ' '
+                    ? line[6..]
+                    : line[5..];
+                dataLines.Add(dataLine);
+            }
+
+            if (dataLines.Count > 0)
+            {
+                var data = string.Join("\n", dataLines);
+                if (data != "[DONE]")
+                {
+                    yield return data;
+                }
             }
         }
 
@@ -376,6 +456,7 @@ namespace jihadkhawaja.chat.client.Services
     public class SeedResult
     {
         public int Added { get; set; }
+        public int Updated { get; set; }
     }
 
     /// <summary>

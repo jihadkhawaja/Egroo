@@ -1,368 +1,187 @@
 # Architecture Overview
 
-This document provides an accurate overview of Egroo's architecture, design patterns, and technical implementation.
+This document summarizes the current Egroo runtime, project boundaries, encryption flow, and the main interaction paths across chat, voice, and agents.
 
-## System Architecture
+## System Overview
 
 ```mermaid
 flowchart TD
-    Browser["Web Browser / PWA — Blazor Auto Mode SSR → WASM — Egroo.Client + Egroo.UI"]
-    Host["Egroo Host Server — Egroo/Egroo · ASP.NET Core 10 — Serves Blazor server + WASM files"]
-    API["Egroo.Server API — ASP.NET Core 10 Minimal API + SignalR\nREST: /api/v1/Auth/* · SignalR Hub: /chathub · Swagger: /swagger"]
-    DB[("PostgreSQL Database\nauto-migrated on startup")]
-    Enc["AES Message Encryption / Magick.NET for images"]
+    Browser["Browser / PWA"]
+    Db[("PostgreSQL")]
 
-    Browser -- "HTTP(S)" --> Host
-    Browser -- "WebSocket" --> Host
-    Host -- "HTTP(S)" --> API
-    API -- "EF Core" --> DB
-    API -- "EncryptionService" --> Enc
+    subgraph PresentationLayer["Presentation Layer"]
+        direction TB
+        Host["Egroo Host"]
+        UI["Egroo.UI"]
+        Client["Egroo.Client"]
+    end
+
+    subgraph ClientServicesLayer["Client Services Layer"]
+        direction TB
+        ChatClient["jihadkhawaja.chat.client"]
+    end
+
+    subgraph ServerLayer["Server Layer"]
+        direction TB
+        Api["Egroo.Server"]
+        ChatServer["jihadkhawaja.chat.server"]
+    end
+
+    subgraph SharedLayer["Shared Contracts Layer"]
+        direction TB
+        Shared["jihadkhawaja.chat.shared"]
+    end
+
+    Browser --> PresentationLayer
+    Browser --> ServerLayer
+    PresentationLayer --> ClientServicesLayer
+    ClientServicesLayer --> SharedLayer
+    ServerLayer --> SharedLayer
+    ServerLayer --> Db
 ```
 
-## Message Flow: How the NuGet Packages Work Together
+## Project Structure
 
-When a user sends a message the three chat NuGet packages — **`jihadkhawaja.chat.client`**, **`jihadkhawaja.chat.server`**, and **`jihadkhawaja.chat.shared`** — work together in sequence. The diagram below shows each step at a glance.
+| Project | Role |
+|---|---|
+| `src/Egroo/Egroo` | Blazor host application that serves SSR output and the WASM app |
+| `src/Egroo/Egroo.Client` | Client-side WebAssembly project |
+| `src/Egroo.UI` | Shared Razor component library and client-side UI services |
+| `src/Egroo.Server` | ASP.NET Core backend with Minimal APIs, SignalR, EF Core, repositories, and agent services |
+| `src/jihadkhawaja.chat.client` | Client chat services that wrap auth, user, channel, message, and call operations |
+| `src/jihadkhawaja.chat.server` | SignalR `ChatHub` implementation and connection tracking |
+| `src/jihadkhawaja.chat.shared` | Shared models, DTOs, and interfaces |
+| `src/Egroo.Server.Test` | MSTest coverage for server behavior |
+
+## Runtime Principles
+
+### Blazor Auto
+
+- the host serves the initial experience quickly with SSR
+- the app then hydrates into the WebAssembly client
+- shared UI components live in `Egroo.UI`
+
+### SignalR-First Chat
+
+- most interactive user, channel, message, and call behavior flows through `/chathub`
+- the hub is configured for WebSockets-only transport
+- `jihadkhawaja.chat.client` keeps component code away from raw `HubConnection` details
+
+### Self-Hosted Data Ownership
+
+- PostgreSQL is the authoritative store
+- the platform does not depend on a third-party message relay
+- production deployment is controlled by your own infrastructure choices
+
+## End-To-End Encryption
+
+Egroo can send per-recipient encrypted message payloads. The server stores and relays ciphertext, while the receiving device decrypts with its local private key.
+
+```mermaid
+sequenceDiagram
+    actor Sender as Sender Device
+    participant UI as Egroo.UI
+    participant Hub as ChatHub
+    participant Store as Pending Storage
+    actor Recipient as Recipient Device
+
+    Sender->>UI: Load recipient public keys
+    UI->>UI: Encrypt payload for each recipient
+    UI->>Hub: Send metadata + encrypted payloads
+    Hub->>Store: Store ciphertext until delivery
+    Hub-->>Recipient: Relay encrypted payload
+    Recipient->>Recipient: Decrypt with local private key
+
+    Note over Hub,Store: Server handles ciphertext and delivery state
+```
+
+### Encryption Model
+
+- users can publish `EncryptionPublicKey` and `EncryptionKeyId`
+- device private keys stay in client storage
+- `Message.Content` is not stored in the `Messages` table
+- recipient-specific ciphertext is stored temporarily in pending-message tables until acknowledged
+- server-side `EncryptionService` still protects other encrypted server records such as encrypted agent private keys
+
+## Message Delivery Flow
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant UI as Egroo.UI<br/>(Razor Component)
-    participant Client as jihadkhawaja.chat.client<br/>(NuGet)
-    participant Hub as jihadkhawaja.chat.server<br/>(NuGet · ChatHub)
-    participant Repo as Egroo.Server<br/>(Repository / DB)
-    participant RecipientClient as jihadkhawaja.chat.client<br/>(Recipient · NuGet)
-    participant RecipientUI as Egroo.UI<br/>(Recipient)
+    participant UI as Egroo.UI
+    participant Client as chat.client
+    participant Hub as ChatHub
+    participant Repo as Server Repository
+    participant Recipient as Recipient Client
 
-    User->>UI: Types message and hits Send
+    User->>UI: Send message
     UI->>Client: SendMessage(message)
-    Note over Client: ChatMessageService<br/>wraps HubConnection.InvokeAsync
-    Client-->>Hub: SignalR · SendMessage(message)<br/>over WebSocket
-    Hub->>Hub: Validate sender & channel membership
-    Hub->>Repo: Save message metadata (no content)
-    Hub->>Repo: Encrypt & store content in UserPendingMessages<br/>for each recipient
-    Repo-->>Hub: Saved ✓
-
-    loop For each online recipient
-        Hub-->>RecipientClient: SignalR · ReceiveMessage(message)
-        RecipientClient->>RecipientUI: Trigger OnMessageReceived event
-        RecipientUI->>User: Message displayed in chat
-        RecipientClient-->>Hub: UpdatePendingMessage(messageId)
-        Hub->>Repo: Delete UserPendingMessage record
-    end
-
-    Note over Repo: Content is never stored<br/>permanently — only until delivered
+    Client->>Hub: SignalR invocation
+    Hub->>Repo: Save metadata
+    Hub->>Repo: Store per-recipient pending ciphertext
+    Hub-->>Recipient: ReceiveMessage(message)
+    Recipient-->>Hub: UpdatePendingMessage(messageId)
+    Hub->>Repo: Delete pending content
 ```
 
-**Key takeaways:**
-- `jihadkhawaja.chat.shared` — defines the `Message` model and `IMessageHub` interface used by both sides.
-- `jihadkhawaja.chat.client` — wraps the SignalR `HubConnection` so your UI only calls simple methods like `SendMessage()`.
-- `jihadkhawaja.chat.server` — contains the `ChatHub` that runs on the server, handles validation, persistence, encryption, and fan-out to all recipients.
-- Message **content is never permanently stored**; it lives only in `UserPendingMessages` and is deleted the moment the recipient picks it up.
+## Voice Channel Calls
 
----
-
-## WebRTC Channel Voice Calls
-
-Channel voice calls are implemented via a WebRTC Mesh Network. The server orchestrates room membership via SignalR and relays WebRTC signaling, but all voice traffic travels peer-to-peer avoiding the server bottleneck.
+Voice calls use WebRTC mesh networking. SignalR manages room membership and signaling, but the media path stays peer to peer.
 
 ```mermaid
 sequenceDiagram
     actor A as Participant A
-    participant H as SignalR Hub
+    participant Hub as SignalR Hub
     actor B as Participant B
 
-    A->>H: JoinChannelCall(channelId)
-    H-->>A: ChannelCallParticipantsChanged([A])
-    
-    B->>H: JoinChannelCall(channelId)
-    H-->>A: ChannelCallParticipantsChanged([A, B])
-    H-->>B: ChannelCallParticipantsChanged([A, B])
+    A->>Hub: JoinChannelCall(channelId)
+    Hub-->>A: ChannelCallParticipantsChanged([A])
 
-    Note over B: New joiner creates WebRTC offers for existing participants
-    B->>H: SendOfferToUser(A, offerSdp)
-    H-->>A: ReceiveOffer(B, offerSdp)
+    B->>Hub: JoinChannelCall(channelId)
+    Hub-->>A: ChannelCallParticipantsChanged([A, B])
+    Hub-->>B: ChannelCallParticipantsChanged([A, B])
 
-    A->>H: SendAnswerToUser(B, answerSdp)
-    H-->>B: ReceiveAnswer(A, answerSdp)
+    Note over B: New participant creates offers for existing members
+    B->>Hub: SendOfferToUser(A, offerSdp)
+    Hub-->>A: ReceiveOffer(B, offerSdp)
 
-    Note over A,B: Exchange ICE Candidates via Hub
+    A->>Hub: SendAnswerToUser(B, answerSdp)
+    Hub-->>B: ReceiveAnswer(A, answerSdp)
 
-    B->>H: SendIceCandidateToUser(A, candidate)
-    H-->>A: ReceiveIceCandidate(B, candidate)
-
-    Note over A,B: P2P Encrypted Audio Stream Established
+    Note over A,B: ICE candidates are exchanged through the hub
+    B->>Hub: SendIceCandidateToUser(A, candidate)
+    Hub-->>A: ReceiveIceCandidate(B, candidate)
 ```
 
----
+## AI Agents In Channels
 
-## Project Structure
-
-The solution contains multiple projects in `src/`:
-
-| Project | Role |
-|---------|------|
-| `Egroo.Server` | ASP.NET Core API: REST auth endpoints, SignalR hub, database, repositories |
-| `Egroo/Egroo` | Blazor host: serves both Server-side and WASM rendering modes |
-| `Egroo.Client` | Blazor WebAssembly client project |
-| `Egroo.UI` | Shared Razor component library (components, services, constants) |
-| `jihadkhawaja.chat.server` | Chat library — SignalR `ChatHub` implementation and `InMemoryConnectionTracker` |
-| `jihadkhawaja.chat.client` | Chat library — client-side services (auth, user, channel, message, call) |
-| `jihadkhawaja.chat.shared` | Shared models and interfaces used by both server and client |
-| `Egroo.Server.Test` | Integration tests for the API server |
-
-## Design Principles
-
-### 1. Blazor Auto Mode
-- **Server-Side Rendering (SSR)**: Fast initial page load with pre-rendered HTML
-- **WebAssembly (WASM)**: Seamless switch to fully client-side rendering after the WASM bundle is cached
-- Both rendering modes share the same Razor components in `Egroo.UI` and `Egroo.Client`
-
-### 2. SignalR-First Real-time Architecture
-- All user, friend, channel, and message operations are performed through the **SignalR hub** at `/chathub`
-- The hub uses **WebSockets only** — no fallback to long-polling or server-sent events
-- **Connection tracking** is handled per user via `IConnectionTracker` (default: `InMemoryConnectionTracker`); can be replaced with a Redis-backed implementation for distributed deployments
-
-### 3. Message Privacy
-- Message `Content` is **not stored** in the `Messages` database table (`[NotMapped]`)
-- Content is stored encrypted in `UserPendingMessages` until each recipient acknowledges delivery
-- Once delivered (via `UpdatePendingMessage`), the pending record is removed
-- Encryption uses AES via `EncryptionService` (configurable Key + IV in `appsettings.json`)
-
-### 4. Self-Hosted / Data Ownership
-- No third-party message routing — all data stays on your own PostgreSQL instance
-- Docker-ready with official container images
-
-### 5. Progressive Web App (PWA)
-- Installable on mobile and desktop
-- Service worker enables offline capability and background caching
-
-## Server Architecture (Egroo.Server)
-
-### Service Registration (`Program.cs`)
-
-
-
-## Database Schema
-
-The database uses **Entity Framework Core** with **Npgsql** (PostgreSQL provider). Migrations are applied automatically on application startup.
-
-### Key Entities
-
-#### `Channel`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | Auto-generated |
-| `Title` | `string?` | Optional custom title |
-| `IsPublic` | `bool` | Whether discoverable via search |
-| `DateCreated` | `DateTimeOffset?` | Audit |
-| `DateUpdated` | `DateTimeOffset?` | Audit |
-| `DateDeleted` | `DateTimeOffset?` | Soft delete |
-
-#### `ChannelUser`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `ChannelId` | `Guid` | FK to Channel |
-| `UserId` | `Guid` | FK to UserDto |
-| `IsAdmin` | `bool` | Admin flag |
-
-#### `Message`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `SenderId` | `Guid` | |
-| `ChannelId` | `Guid` | |
-| `ReferenceId` | `Guid` | Client-generated idempotency key |
-| `AgentDefinitionId` | `Guid?` | Set when the message was produced by an agent |
-| `DateSent` | `DateTimeOffset?` | |
-| `DateSeen` | `DateTimeOffset?` | |
-| ~~`Content`~~ | ~~`string`~~ | **Not mapped** — not stored |
-
-#### `UserPendingMessage`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `UserId` | `Guid` | Recipient |
-| `MessageId` | `Guid` | FK to Message |
-| `Content` | `string?` | Encrypted message content |
-| `DateUserReceivedOn` | `DateTimeOffset?` | Delivery timestamp |
-
-#### `UserDto`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `Username` | `string` | Unique |
-| `Role` | `string` | User role |
-| `LastLoginDate` | `DateTimeOffset?` | |
-| `UserDetail` | (nav) | Related detail record |
-| `UserStorage` | (nav) | Avatar + cover storage |
-
-#### `UserFriend`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `UserId` | `Guid` | |
-| `FriendUserId` | `Guid` | |
-| `DateAcceptedOn` | `DateTimeOffset?` | Null = pending |
-
-#### `AgentDefinition`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `UserId` | `Guid` | Owner |
-| `Name` | `string` | Display name |
-| `Description` | `string?` | |
-| `Instructions` | `string?` | System prompt |
-| `Provider` | `LlmProvider` | OpenAI, AzureOpenAI, Anthropic, Ollama |
-| `Model` | `string` | Model identifier |
-| `ApiKey` | `string?` | AES-encrypted |
-| `Endpoint` | `string?` | Custom endpoint (Azure / Ollama) |
-| `IsActive` | `bool` | Agent is operational |
-| `IsPublished` | `bool` | Agent is discoverable by others |
-| `Temperature` | `float` | |
-| `MaxTokens` | `int` | |
-
-#### `ChannelAgent`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `ChannelId` | `Guid` | FK to Channel |
-| `AgentDefinitionId` | `Guid` | FK to AgentDefinition |
-| `AddedByUserId` | `Guid` | Who added the agent |
-
-Unique index on `(ChannelId, AgentDefinitionId)`.
-
-#### `UserAgentFriend`
-| Column | Type | Notes |
-|--------|------|-------|
-| `Id` | `Guid` (PK) | |
-| `UserId` | `Guid` | FK to User |
-| `AgentDefinitionId` | `Guid` | FK to AgentDefinition |
-
-Unique index on `(UserId, AgentDefinitionId)`.
-
-## AI Agent Architecture
-
-Egroo supports personal AI agents that can participate in channels and respond to @mentions. Agents are backed by any self-hosted or cloud LLM via the **Microsoft Agent Framework**.
-
-### Agent @Mention Flow
+Agents are first-class channel participants backed by the Microsoft Agent Framework.
 
 ```mermaid
 sequenceDiagram
     actor User
     participant Hub as ChatHub
-    participant Responder as AgentChannelService
-    participant DB as PostgreSQL
+    participant AgentService as AgentChannelService
     participant LLM as LLM Provider
     participant Members as Channel Members
 
-    User->>Hub: SendMessage(@AgentName ...)
-    Hub->>DB: Save message + UserPendingMessages
-    Hub->>Members: ReceiveMessage broadcast
-    Hub-->>Responder: ProcessMentionsAsync(message)
-    Note over Responder: Regex match @Name or @<Name With Spaces>
-    Responder->>DB: Load ChannelAgents for channel
-    Responder->>DB: Load last 20 messages (context)
-    Responder->>LLM: Run AIAgent with instructions + context
-    LLM-->>Responder: Response text
-    Responder->>DB: Save agent Message + UserPendingMessages
-    Responder->>Members: IHubContext ReceiveMessage(agentMessage)
-    Note over Members: Rendered with bot icon, agent name in Info color
+    User->>Hub: Send @AgentName message
+    Hub-->>AgentService: Process mention
+    AgentService->>LLM: Generate reply with context
+    LLM-->>AgentService: Response text
+    AgentService-->>Members: Broadcast agent reply
 ```
 
-### Channel Agent Components
+### Agent Architecture Notes
 
-| Component | Location | Role |
-|-----------|----------|------|
-| `AgentDefinition` | `jihadkhawaja.chat.shared` | Core agent entity: provider, model, instructions, tools |
-| `ChannelAgent` | `jihadkhawaja.chat.shared` | Join table linking an agent to a channel |
-| `UserAgentFriend` | `jihadkhawaja.chat.shared` | Friendship between a user and a published agent |
-| `IAgentChannelResponder` | `jihadkhawaja.chat.shared` | Interface injected into `ChatHub` for mention processing |
-| `AgentChannelService` | `Egroo.Server` | Implements `IAgentChannelResponder`; detects mentions, runs LLM, broadcasts replies |
-| `AgentRuntimeService` | `Egroo.Server` | Builds `AIAgent` instances, resolves LLM provider, executes tool calls |
-| `BuiltinTools` | `Egroo.Server` | Static and scoped built-in tools available to agents |
+- agent definitions live in shared models and are persisted in PostgreSQL
+- `AgentChannelService` loads context, executes the agent runtime, and broadcasts replies
+- agent API keys and agent private keys are protected with server-side encryption
+- agent replies can also be encrypted for recipients before delivery
 
-### Agent Lifecycle
+## Operational Constraints
 
-1. **Create** — users create an `AgentDefinition` with an LLM provider, API key (AES-encrypted), system instructions, knowledge items, and tools.
-2. **Activate** — toggle `IsActive` to make the agent operational.
-3. **Publish** — toggle `IsPublished` to expose the agent in discovery search so any user can add it as a friend.
-4. **Friend** — users (or other agents via the `add_agent_friend` built-in tool) add a published agent as a friend.
-5. **Add to Channel** — a channel admin adds an agent friend to a channel via the channel detail view.
-6. **Respond** — when a message in the channel contains `@AgentName` or `@<Agent Name>`, `AgentChannelService` fires and generates a reply asynchronously.
-
-### Mention Syntax
-
-| Syntax | When to use |
-|--------|-------------|
-| `@AgentName` | Agent name is a single word |
-| `@<Agent Name>` | Agent name contains spaces |
-
-The UI provides autocomplete suggestions as soon as you type `@` — pressing an agent in the popup inserts the correct syntax automatically.
-
-### Built-in Agent Tools
-
-| Tool name | Type | Description |
-|-----------|------|-------------|
-| `get_current_user` | Static | Returns the calling user's profile |
-| `get_datetime` | Static | Returns the current UTC date/time |
-| `search_published_agents` | Scoped | Searches all published agents by query |
-| `add_agent_friend` | Scoped | Adds a published agent as a friend |
-| `add_agent_to_channel` | Scoped | Adds an agent friend to a given channel |
-
----
-
-
-- Tokens are validated on every request (REST and SignalR via `access_token` query param)
-- `ValidateLifetime = true` — expired tokens are rejected
-- Issuer and audience validation are disabled (single-service deployment)
-- JWT secret must be at least 32 characters (configured in `Secrets.Jwt`)
-
-### Message Encryption
-- `EncryptionService` uses **AES** with a configurable Key (32 chars) and IV (16 chars)
-- Message content is encrypted before being written to `UserPendingMessages`
-- Content is decrypted just before delivery to the recipient via `DecryptContent()`
-
-### Image Processing
-- **Magick.NET** (ImageMagick) is used to process and validate avatar and cover images before storage
-
-### Rate Limiting
-- All REST endpoints are covered by a `FixedWindowLimiter`: 100 req/min, queue up to 10
-
-### CORS
-- `AllowedOrigins` from `Api:AllowedOrigins` configuration
-- In `DEBUG` builds, CORS is always fully open (any origin allowed)
-
-## Client Architecture (Egroo.UI + Egroo.Client)
-
-### Shared UI Library (`Egroo.UI`)
-
-
-## Deployment Architecture
-
-### Container Images
-| Image | Purpose |
-|-------|---------|
-| `jihadkhawaja/egroo-server-prod:latest` | Egroo.Server API |
-| `jihadkhawaja/egroo-client-prod:latest` | Egroo Blazor host |
-
-### `docker-compose-egroo.yml`
-The production compose file places both containers on an **external** Docker network (`internal`) — PostgreSQL is expected to be provisioned separately (e.g., a managed database or a separate compose stack).
-
-Memory limits: API → 512 MB, Web → 256 MB.
-
-## Extension Points
-
-### Custom Connection Tracker
-Replace the default `InMemoryConnectionTracker` with a Redis-backed implementation for multi-instance deployments:
-```csharp
-// Register before AddChatHub()
-services.AddSingleton<IConnectionTracker, MyRedisConnectionTracker>();
-builder.Services.AddChatHub();
-```
-
-### Custom Cache Provider
-Implement `IChatCacheProvider` to swap out the client-side message storage backend (IndexedDB, SQLite, etc.):
-```csharp
-services.AddScoped<IChatCacheProvider, MyIndexedDbCacheProvider>();
-```
+- the default `IConnectionTracker` is in-memory and not suitable for horizontal scale on its own
+- `db.Database.MigrateAsync()` applies migrations automatically on API startup
+- release builds still require updating the compiled API base URL in `src/Egroo.UI/Constants/Source.cs`
+- reverse proxies must forward WebSocket upgrades for `/chathub`

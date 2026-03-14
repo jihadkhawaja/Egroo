@@ -13,6 +13,7 @@
 @inject IUser ChatUserService
 @inject IJSRuntime JSRuntime
 @inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
+@inject EndToEndEncryptionService EndToEndEncryptionService
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="py-8">
     <!-- Page Header -->
@@ -134,6 +135,52 @@
         </MudStack>
     }
 
+    @if (MatchesSearch("encryption", "security", "keys", "e2ee", "decrypt"))
+    {
+        <MudStack Spacing="2" Class="mb-8">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Small" Color="Color.Warning" />
+                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">End-to-End Encryption</MudText>
+            </MudStack>
+            <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.45);">
+                Your device holds the private key. The server only stores your public key and cannot decrypt encrypted messages or files.
+            </MudText>
+            <MudPaper Class="pa-6 rounded-xl" Elevation="0"
+                      Style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);">
+                <MudStack Spacing="3">
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                        <MudText Typo="Typo.body1" Style="font-weight: 600;">Device key status</MudText>
+                        <MudChip T="string" Color="@(isEncryptionReady ? Color.Success : Color.Warning)" Variant="Variant.Outlined" Size="Size.Small">
+                            @(isEncryptionReady ? "Ready" : "Attention required")
+                        </MudChip>
+                    </MudStack>
+
+                    @if (!string.IsNullOrWhiteSpace(encryptionStatusMessage))
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined">
+                            @encryptionStatusMessage
+                        </MudAlert>
+                    }
+
+                    <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.45);">Key fingerprint</MudText>
+                    <MudText Typo="Typo.body2">@FormatKeyId(currentUser?.EncryptionKeyId)</MudText>
+
+                    <MudText Typo="Typo.caption" Style="color: rgba(255,255,255,0.45);">Last rotation</MudText>
+                    <MudText Typo="Typo.body2">@FormatKeyDate(currentUser?.EncryptionKeyUpdatedOn)</MudText>
+
+                    <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.7);">
+                        Regenerating your key replaces the current device key and clears local cached history because older encrypted messages and files will no longer decrypt on this device.
+                    </MudText>
+
+                    <MudButton Color="Color.Warning" Variant="Variant.Outlined" OnClick="RegenerateEncryptionKey"
+                               Style="border-radius: 12px; height: 44px; text-transform: none; align-self: flex-start;">
+                        Regenerate Encryption Key
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudStack>
+    }
+
     <!-- Account Section -->
     @if (MatchesSearch("account", "sign out", "logout"))
     {
@@ -210,6 +257,8 @@
     private string FeedbackText { get; set; } = string.Empty;
     private string SearchText { get; set; } = string.Empty;
     private UserDto currentUser = new();
+    private bool isEncryptionReady;
+    private string? encryptionStatusMessage;
 
     // Variables for avatar update
     private string? newAvatarBase64;
@@ -231,6 +280,7 @@
         {
             currentUser = userWithDetail;
         }
+        await RefreshEncryptionStatusAsync();
         _ = FetchAvatar();
         IsBusy = false;
     }
@@ -295,6 +345,77 @@
         await SignOut(false);
     }
 
+    private async Task RefreshEncryptionStatusAsync()
+    {
+        var readiness = await EndToEndEncryptionService.EnsureIdentityAsync(currentUser);
+        isEncryptionReady = readiness.IsReady;
+        encryptionStatusMessage = readiness.Message;
+
+        if (!readiness.IsReady || readiness.Identity is null)
+        {
+            return;
+        }
+
+        currentUser.EncryptionPublicKey = readiness.Identity.PublicKey;
+        currentUser.EncryptionKeyId = readiness.Identity.KeyId;
+        currentUser.EncryptionKeyUpdatedOn ??= DateTimeOffset.UtcNow;
+
+        if (SessionStorage.User?.Id == currentUser.Id)
+        {
+            SessionStorage.User.EncryptionPublicKey = currentUser.EncryptionPublicKey;
+            SessionStorage.User.EncryptionKeyId = currentUser.EncryptionKeyId;
+            SessionStorage.User.EncryptionKeyUpdatedOn = currentUser.EncryptionKeyUpdatedOn;
+        }
+    }
+
+    private async Task RegenerateEncryptionKey()
+    {
+        bool? result = await DialogService.ShowMessageBoxAsync(
+            "Regenerate Encryption Key",
+            "This will replace your current device key, clear local cached history, and older encrypted messages or files will no longer decrypt on this device. Continue?",
+            yesText: "Regenerate",
+            cancelText: "Cancel");
+
+        if (!result.GetValueOrDefault())
+        {
+            return;
+        }
+
+        var identity = await EndToEndEncryptionService.RegenerateIdentityAsync();
+        currentUser.EncryptionPublicKey = identity.PublicKey;
+        currentUser.EncryptionKeyId = identity.KeyId;
+        currentUser.EncryptionKeyUpdatedOn = DateTimeOffset.UtcNow;
+
+        if (SessionStorage.User?.Id == currentUser.Id)
+        {
+            SessionStorage.User.EncryptionPublicKey = currentUser.EncryptionPublicKey;
+            SessionStorage.User.EncryptionKeyId = currentUser.EncryptionKeyId;
+            SessionStorage.User.EncryptionKeyUpdatedOn = currentUser.EncryptionKeyUpdatedOn;
+        }
+
+        await CacheDB.Delete();
+        CacheDB = new EgrooDB(BlazorDexieOptions);
+
+        await RefreshEncryptionStatusAsync();
+        await DialogService.ShowMessageBoxAsync("Encryption Updated", "A new encryption key was generated for this device. Local cached messages were cleared because older encrypted content can no longer be decrypted.", yesText: "OK");
+    }
+
+    private static string FormatKeyId(string? keyId)
+    {
+        if (string.IsNullOrWhiteSpace(keyId))
+        {
+            return "Not configured";
+        }
+
+        return string.Join(" ", Enumerable.Range(0, (keyId.Length + 3) / 4)
+            .Select(index => keyId.Substring(index * 4, Math.Min(4, keyId.Length - (index * 4)))));
+    }
+
+    private static string FormatKeyDate(DateTimeOffset? date)
+    {
+        return date?.ToLocalTime().ToString("dd MMM yyyy, h:mm tt") ?? "Never";
+    }
+
     private async Task SubmitFeedback()
     {
         if (string.IsNullOrWhiteSpace(FeedbackText))
@@ -323,7 +444,7 @@
 
     private async Task UpdateUserDetails()
     {
-        await userForm.Validate();
+        await userForm.ValidateAsync();
         if (!userForm.IsValid)
         {
             await DialogService.ShowMessageBoxAsync("Error", "Please correct the validation errors and try again.");

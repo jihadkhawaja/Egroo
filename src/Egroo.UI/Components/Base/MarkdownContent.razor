@@ -1,5 +1,12 @@
 @using Markdig
+@using Egroo.UI.CacheDB
+@using Egroo.UI.Helpers
 @using Microsoft.AspNetCore.Components
+@using System.Net
+@using System.Text.Encodings.Web
+@using System.Text.RegularExpressions
+
+@inject SessionStorage SessionStorage
 
 <div class="markdown-content">
     @renderedHtml
@@ -8,6 +15,21 @@
 @code {
     private string? _previousContent;
     private MarkupString renderedHtml;
+    private static readonly Regex MentionRegex = new(
+        @"(?<![\w@])@<(?<bracket>[^>\r\n]+)>|(?<![\w@])@(?<plain>[\p{L}\p{N}][\p{L}\p{N}_\-.]*)",
+        RegexOptions.Compiled);
+    private static readonly Regex UrlRegex = new(
+        "(?<![\\]\\(\\\"'=])(https?://[^\\s<]+)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex AnchorRegex = new(
+        @"<a\s+(?![^>]*\btarget=)(?<attrs>[^>]*href=""[^""]+""[^>]*)>",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex HrefRegex = new(
+        @"href=""(?<href>[^""]+)""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EncryptedFileRegex = new(
+        @"\[\[egroo-file:(?<token>[A-Za-z0-9_-]+)\]\]",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
@@ -21,10 +43,144 @@
         if (Content != _previousContent)
         {
             _previousContent = Content;
-            renderedHtml = new MarkupString(
-                string.IsNullOrEmpty(Content)
-                    ? string.Empty
-                    : Markdown.ToHtml(Content, Pipeline));
+            renderedHtml = new MarkupString(RenderContent(Content));
         }
     }
+
+    private string RenderContent(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return string.Empty;
+        }
+
+        var formattedMentions = new List<string>();
+        var encryptedFiles = new List<string>();
+        string markdown = MentionRegex.Replace(content, match =>
+        {
+            string mentionName = match.Groups["bracket"].Success
+                ? match.Groups["bracket"].Value.Trim()
+                : match.Groups["plain"].Value;
+
+            if (string.IsNullOrWhiteSpace(mentionName))
+            {
+                return match.Value;
+            }
+
+            int index = formattedMentions.Count;
+            string encodedMention = HtmlEncoder.Default.Encode($"@{mentionName}");
+            formattedMentions.Add($"<span class=\"mention-tag\">{encodedMention}</span>");
+            return $"EGROO_MENTION_TOKEN_{index}";
+        });
+
+        markdown = EncryptedFileRegex.Replace(markdown, match =>
+        {
+            string token = match.Groups["token"].Value;
+            int index = encryptedFiles.Count;
+            var descriptor = EncryptedFileTokenParser.Parse(token);
+            string label = HtmlEncoder.Default.Encode(descriptor.Label);
+            string encodedToken = HtmlEncoder.Default.Encode(token);
+
+            encryptedFiles.Add(descriptor.IsImage
+                ? $"<a href=\"#\" class=\"egroo-encrypted-file egroo-encrypted-image-link\" data-egroo-file=\"{encodedToken}\"><img class=\"egroo-encrypted-image\" data-egroo-file=\"{encodedToken}\" alt=\"{label}\" loading=\"lazy\" /></a>"
+                : $"<a href=\"#\" class=\"egroo-encrypted-file\" data-egroo-file=\"{encodedToken}\">{label}</a>");
+            return $"EGROO_FILE_TOKEN_{index}";
+        });
+
+        markdown = UrlRegex.Replace(markdown, match =>
+        {
+            string rawUrl = match.Groups[1].Value;
+            string trimmedUrl = rawUrl.TrimEnd('.', ',', '!', '?', ':', ';');
+            string trailing = rawUrl[trimmedUrl.Length..];
+
+            if (string.IsNullOrWhiteSpace(trimmedUrl))
+            {
+                return match.Value;
+            }
+
+            return $"<{trimmedUrl}>{trailing}";
+        });
+
+        string html = Markdown.ToHtml(markdown, Pipeline);
+        for (int i = 0; i < formattedMentions.Count; i++)
+        {
+            html = html.Replace($"EGROO_MENTION_TOKEN_{i}", formattedMentions[i], StringComparison.Ordinal);
+        }
+        for (int i = 0; i < encryptedFiles.Count; i++)
+        {
+            html = html.Replace($"EGROO_FILE_TOKEN_{i}", encryptedFiles[i], StringComparison.Ordinal);
+        }
+
+        html = AnchorRegex.Replace(html, "<a target=\"_blank\" rel=\"noopener noreferrer\" ${attrs}>");
+        html = RewriteChannelFileLinks(html);
+
+        return html;
+    }
+
+    private string RewriteChannelFileLinks(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html) || string.IsNullOrWhiteSpace(SessionStorage.Token))
+        {
+            return html;
+        }
+
+        return HrefRegex.Replace(html, match =>
+        {
+            string originalHref = WebUtility.HtmlDecode(match.Groups["href"].Value);
+            string rewrittenHref = AppendAccessToken(originalHref, SessionStorage.Token);
+
+            if (string.Equals(originalHref, rewrittenHref, StringComparison.Ordinal))
+            {
+                return match.Value;
+            }
+
+            return $"href=\"{HtmlEncoder.Default.Encode(rewrittenHref)}\"";
+        });
+    }
+
+    private static string AppendAccessToken(string href, string token)
+    {
+        if (!IsChannelFileUrl(href) || ContainsAccessToken(href))
+        {
+            return href;
+        }
+
+        string separator = href.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return $"{href}{separator}access_token={Uri.EscapeDataString(token)}";
+    }
+
+    private static bool IsChannelFileUrl(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return false;
+        }
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
+        {
+            return absoluteUri.AbsolutePath.StartsWith("/api/v1/ChannelFiles/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        return href.StartsWith("/api/v1/ChannelFiles/", StringComparison.OrdinalIgnoreCase)
+            || href.StartsWith("api/v1/ChannelFiles/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool ContainsAccessToken(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return false;
+        }
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out var absoluteUri))
+        {
+            return absoluteUri.Query.Contains("access_token=", StringComparison.OrdinalIgnoreCase);
+        }
+
+        int queryIndex = href.IndexOf('?', StringComparison.Ordinal);
+        return queryIndex >= 0
+            && href[(queryIndex + 1)..].Contains("access_token=", StringComparison.OrdinalIgnoreCase);
+    }
+
+
 }

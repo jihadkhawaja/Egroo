@@ -72,7 +72,27 @@ Rules:
 - `Key` must be exactly 32 characters
 - `IV` must be exactly 16 characters
 
-These values are used by `EncryptionService` for temporary message-content storage.
+These values are used by the server-side `EncryptionService` for protected encrypted records and transport-related encrypted storage.
+
+Important distinction:
+
+- these settings are not the client private keys used for end-to-end message decryption
+- end-to-end message keys are generated per device in the client and only the public key is published back to the server
+
+### End-To-End Encryption Behavior
+
+Egroo's message delivery can use a device-scoped end-to-end encryption flow:
+
+- the client generates a key pair locally
+- the client publishes `EncryptionPublicKey` and `EncryptionKeyId` for the signed-in user
+- message payloads are encrypted per recipient using the published public key
+- the recipient device decrypts locally with its private key
+
+Operational notes:
+
+- the private key is not meant to live in server configuration
+- clearing browser storage can remove the local private key for that device
+- if a device key is missing or stale, the client may need to regenerate and republish it from the app settings
 
 ### Allowed Origins
 
@@ -103,7 +123,7 @@ Important behavior:
 
 ### Logging
 
-Base logging is configured in `appsettings.json` through ASP.NET Core logging and Serilog.
+Base logging is configured in `appsettings.json` through ASP.NET Core logging.
 
 Minimal example:
 
@@ -114,13 +134,6 @@ Minimal example:
       "Default": "Information",
       "Microsoft": "Warning"
     }
-  },
-  "Serilog": {
-    "WriteTo": [
-      {
-        "Name": "Console"
-      }
-    ]
   }
 }
 ```
@@ -131,7 +144,6 @@ Minimal example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
@@ -179,6 +191,7 @@ public const string HubConnectionURL = ConnectionURL + HubName;
 - the SignalR hub also accepts JWT through the `access_token` query string
 - rate limiting is applied under the `Api` policy at 100 requests per minute
 - the API automatically applies pending EF Core migrations on startup
+- the client release build still uses the API base URL compiled into `src/Egroo.UI/Constants/Source.cs`
 
 ## Example Production Server Config
 
@@ -198,13 +211,6 @@ public const string HubConnectionURL = ConnectionURL + HubName;
     "AllowedOrigins": [
       "https://chat.example.com"
     ]
-  },
-  "Serilog": {
-    "WriteTo": [
-      {
-        "Name": "Console"
-      }
-    ]
   }
 }
 ```
@@ -218,9 +224,7 @@ Before blaming the code, confirm these first:
 3. `Encryption:Key` is 32 characters and `Encryption:IV` is 16 characters.
 4. The client is pointing at the correct API base URL for the environment you are running.
 5. Production origins are explicitly set if the API is not running in debug.
-  }
-}
-```
+6. If encrypted messages cannot be read, verify the device has the current private key and published key id.
 
 ### Staging
 ```json

@@ -129,5 +129,29 @@ namespace Egroo.Server.Test
         [TestMethod]
         public void PatternMatch_ShortPassword_ReturnsFalse()
             => Assert.IsFalse(PatternMatchHelper.IsValidPassword("ab1!"));
+
+        [TestMethod]
+        public async Task UpdateEncryptionKey_PersistsOnPrivateProfile()
+        {
+            using var signUpScope = _services.CreateScope();
+            var auth = signUpScope.ServiceProvider.GetRequiredService<IAuth>();
+            var signUp = await auth.SignUp("encprofile", "ValidP@ss1!");
+            Assert.IsTrue(signUp.Success, $"SignUp failed: {signUp.Message}");
+
+            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+
+            using var updateScope = authenticatedServices.CreateScope();
+            var userRepo = updateScope.ServiceProvider.GetRequiredService<IUser>();
+            bool updated = await userRepo.UpdateEncryptionKey("public-key-material", "fingerprint-1234");
+            Assert.IsTrue(updated, "Expected encryption key update to succeed.");
+
+            using var readScope = authenticatedServices.CreateScope();
+            var profile = await readScope.ServiceProvider.GetRequiredService<IUser>().GetUserPrivateDetails();
+
+            Assert.IsNotNull(profile, "Expected a private user profile.");
+            Assert.AreEqual("public-key-material", profile.EncryptionPublicKey);
+            Assert.AreEqual("fingerprint-1234", profile.EncryptionKeyId);
+            Assert.IsNotNull(profile.EncryptionKeyUpdatedOn);
+        }
     }
 }

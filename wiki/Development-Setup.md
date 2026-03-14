@@ -44,7 +44,6 @@ Example:
 
 ```json
 {
-  "DetailedErrors": true,
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
@@ -140,8 +139,16 @@ If you mainly work in VS Code, those tasks are the easiest way to keep the stand
 - minimal API endpoints live under `src/Egroo.Server/API`
 - the SignalR hub is mapped at `/chathub`
 - CORS is opened in debug builds
-- message content is stored temporarily and encrypted before delivery
+- message payloads can be encrypted per recipient and decrypted on the receiving device
+- server-side `Encryption:Key` and `Encryption:IV` are still required for protected server records and encrypted transport workflows
 - `IConnectionTracker` is in-memory by default, so local development is effectively single-node
+
+## End-To-End Encryption Notes For Contributors
+
+- user profiles can publish `EncryptionPublicKey` and `EncryptionKeyId`
+- device private keys stay in client storage and are not stored in PostgreSQL
+- clearing browser storage or using a different device can put the client out of sync until the encryption key is regenerated
+- if you change persisted encryption fields or mappings, add a migration and update the docs in the same change
 
 ## Suggested Daily Workflow
 

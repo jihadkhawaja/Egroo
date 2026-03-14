@@ -12,6 +12,7 @@ namespace Egroo.Server.Database
         DbSet<ChannelUser> ChannelUsers { get; set; }
         DbSet<Message> Messages { get; set; }
         DbSet<UserPendingMessage> UsersPendingMessages { get; set; }
+        DbSet<AgentPendingMessage> AgentPendingMessages { get; set; }
 
         // Agent entities
         DbSet<AgentDefinition> AgentDefinitions { get; set; }

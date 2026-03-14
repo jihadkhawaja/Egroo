@@ -25,7 +25,11 @@ namespace Egroo.Server.Repository
 
         public async Task<bool> SendMessage(Message message)
         {
-            if (message == null || string.IsNullOrWhiteSpace(message.Content))
+            bool hasTransportContent = !string.IsNullOrWhiteSpace(message?.Content)
+                || (message?.RecipientContents?.Count > 0)
+                || (message?.AgentRecipientContents?.Count > 0);
+
+            if (message == null || !hasTransportContent)
                 return false;
 
             message.Id = Guid.NewGuid();
