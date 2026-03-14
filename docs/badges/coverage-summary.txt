@@ -1,32 +1,33 @@
 Summary - Egroo Server Coverage
-  Generated on: 3/14/2026 - 4:54:24 PM
-  Coverage date: 3/14/2026 - 4:45:35 PM
+  Generated on: 03/14/2026 - 20:48:38
+  Coverage date: 03/14/2026 - 20:48:31
   Parser: Cobertura
   Assemblies: 4
-  Classes: 117
-  Files: 103
-  Line coverage: 6.5%
-  Covered lines: 1210
-  Uncovered lines: 17266
-  Coverable lines: 18476
-  Total lines: 23382
-  Branch coverage: 21.7% (239 of 1101)
-  Covered branches: 239
-  Total branches: 1101
-  Method coverage: 26.6% (177 of 665)
-  Full method coverage: 19% (127 of 665)
-  Covered methods: 177
-  Fully covered methods: 127
-  Total methods: 665
+  Classes: 134
+  Files: 118
+  Line coverage: 5.4%
+  Covered lines: 1254
+  Uncovered lines: 21736
+  Coverable lines: 22990
+  Total lines: 30222
+  Branch coverage: 23.1% (344 of 1487)
+  Covered branches: 344
+  Total branches: 1487
+  Method coverage: 28.3% (231 of 814)
+  Full method coverage: 20.2% (165 of 814)
+  Covered methods: 231
+  Fully covered methods: 165
+  Total methods: 814
 
-Egroo.Server                                                              6.2%
-  Egroo.Server.API.AgentChatRequest                                         0%
+Egroo.Server                                                                5%
   Egroo.Server.API.AgentEndpoint                                            0%
   Egroo.Server.API.AuthEndpoint                                             0%
   Egroo.Server.API.ChangePasswordRequest                                    0%
+  Egroo.Server.API.ChannelFileEndpoint                                      0%
   Egroo.Server.API.CreateAgentRequest                                       0%
   Egroo.Server.API.CreateConversationRequest                                0%
   Egroo.Server.API.CreateKnowledgeRequest                                   0%
+  Egroo.Server.API.CreateManagedSkillRequest                                0%
   Egroo.Server.API.CreateMcpServerRequest                                   0%
   Egroo.Server.API.CreateSkillDirectoryRequest                              0%
   Egroo.Server.API.CreateToolRequest                                        0%
@@ -37,4 +38,125 @@ Egroo.Server                                                              6.2%
   Egroo.Server.API.UpdateMcpServerRequest                                   0%
   Egroo.Server.API.UpdateSkillDirectoryRequest                              0%
   Egroo.Server.API.UpdateToolRequest                                        0%
-  Egroo.Server.Authorization.TokenGenerator                              91.6%
+  Egroo.Server.Authorization.TokenGenerator                              95.4%
+  Egroo.Server.Database.DataContext                                       100%
+  Egroo.Server.Database.LowerCaseNamingConvention                         100%
+  Egroo.Server.Helpers.CryptographyHelper                                 100%
+  Egroo.Server.Migrations.AddAgentEntities                                  0%
+  Egroo.Server.Migrations.AddMcpServersAndToolSource                        0%
+  Egroo.Server.Migrations.agentchannele2ee                                  0%
+  Egroo.Server.Migrations.AgentChannelPermissionsAndSkills                  0%
+  Egroo.Server.Migrations.AgentChannelSupport                               0%
+  Egroo.Server.Migrations.AgentSkillName                                    0%
+  Egroo.Server.Migrations.allow_empty_pending_message_content               0%
+  Egroo.Server.Migrations.allow_empty_pending_message_id_unique             0%
+  Egroo.Server.Migrations.betterentitybase                                  0%
+  Egroo.Server.Migrations.contenttype                                       0%
+  Egroo.Server.Migrations.contenttype2                                      0%
+  Egroo.Server.Migrations.DataContextModelSnapshot                          0%
+  Egroo.Server.Migrations.encryptedbase                                     0%
+  Egroo.Server.Migrations.endtoendencryption                                0%
+  Egroo.Server.Migrations.fixusersecuritytable                              0%
+  Egroo.Server.Migrations.init                                              0%
+  Egroo.Server.Migrations.MessageRefId                                      0%
+  Egroo.Server.Migrations.namingconvention                                  0%
+  Egroo.Server.Migrations.nullableconnectionid                              0%
+  Egroo.Server.Migrations.publicchannel                                     0%
+  Egroo.Server.Migrations.publicchanneltitle                                0%
+  Egroo.Server.Migrations.requiredRefIdMessage                              0%
+  Egroo.Server.Migrations.revert_allow_empty_pending_message_id_unique      0%
+  Egroo.Server.Migrations.runtimeonlyuserstate                              0%
+  Egroo.Server.Migrations.safemessage                                       0%
+  Egroo.Server.Migrations.usercall2                                         0%
+  Egroo.Server.Migrations.usercaller                                        0%
+  Egroo.Server.Migrations.userdetails                                       0%
+  Egroo.Server.Migrations.userfeedback                                      0%
+  Egroo.Server.Migrations.userfeedback3                                     0%
+  Egroo.Server.Migrations.UserPendingMessages                               0%
+  Egroo.Server.Migrations.userRole                                          0%
+  Egroo.Server.Models.User                                                 50%
+  Egroo.Server.Models.UserSecurity                                          0%
+  Egroo.Server.Repository.AgentRepository                                  79%
+  Egroo.Server.Repository.AuthRepository                                 33.3%
+  Egroo.Server.Repository.BaseRepository                                 57.7%
+  Egroo.Server.Repository.ChannelRepository                              50.3%
+  Egroo.Server.Repository.MessageRepository                              56.1%
+  Egroo.Server.Repository.UserRepository                                  8.8%
+  Egroo.Server.Security.EncryptionService                                 100%
+  Egroo.Server.Security.EndToEndEncryptionService                        11.2%
+  Egroo.Server.Services.AgentAttachmentPromptFormatter                      0%
+  Egroo.Server.Services.AgentChannelService                                 0%
+  Egroo.Server.Services.AgentChatMessageFactory                             0%
+  Egroo.Server.Services.AgentChatResponse                                   0%
+  Egroo.Server.Services.AgentManagedSkillsService                        81.8%
+  Egroo.Server.Services.AgentRuntimeService                                 0%
+  Egroo.Server.Services.AgentSkillsService                               55.6%
+  Egroo.Server.Services.BuiltinToolDefinition                               0%
+  Egroo.Server.Services.BuiltinTools                                        0%
+  Egroo.Server.Services.ChannelFileStorageService                           0%
+  Egroo.Server.Services.JsonRpcError                                        0%
+  Egroo.Server.Services.JsonRpcRequest                                      0%
+  Egroo.Server.Services.JsonRpcResponse<T>                                  0%
+  Egroo.Server.Services.ManagedSkillFile                                  100%
+  Egroo.Server.Services.McpClientService                                    0%
+  Egroo.Server.Services.McpToolCallResult                                   0%
+  Egroo.Server.Services.McpToolContent                                      0%
+  Egroo.Server.Services.McpToolInfo                                         0%
+  Egroo.Server.Services.McpToolProxy                                        0%
+  Egroo.Server.Services.McpToolsListResult                                  0%
+  Program                                                                   0%
+
+jihadkhawaja.chat.client                                                    0%
+  jihadkhawaja.chat.client.Core.ChatSignalR                                 0%
+  jihadkhawaja.chat.client.Register                                         0%
+  jihadkhawaja.chat.client.Services.AgentChatResult                         0%
+  jihadkhawaja.chat.client.Services.AgentService                            0%
+  jihadkhawaja.chat.client.Services.AuthService                             0%
+  jihadkhawaja.chat.client.Services.BuiltinToolDefinition                   0%
+  jihadkhawaja.chat.client.Services.ChannelFileService                      0%
+  jihadkhawaja.chat.client.Services.ChatCallService                         0%
+  jihadkhawaja.chat.client.Services.ChatChannelService                      0%
+  jihadkhawaja.chat.client.Services.ChatMessageService                      0%
+  jihadkhawaja.chat.client.Services.ChatUserService                         0%
+  jihadkhawaja.chat.client.Services.DiscoverResult                          0%
+  jihadkhawaja.chat.client.Services.SeedResult                              0%
+
+jihadkhawaja.chat.server                                                  8.2%
+  jihadkhawaja.chat.server.Hubs.ChatHub                                     0%
+  jihadkhawaja.chat.server.Register                                         0%
+  jihadkhawaja.chat.server.Services.InMemoryConnectionTracker             100%
+
+jihadkhawaja.chat.shared                                                   56%
+  jihadkhawaja.chat.shared.Helpers.PatternMatchHelper                      50%
+  jihadkhawaja.chat.shared.Models.AgentChatAttachment                       0%
+  jihadkhawaja.chat.shared.Models.AgentChatRequest                          0%
+  jihadkhawaja.chat.shared.Models.AgentConversation                       100%
+  jihadkhawaja.chat.shared.Models.AgentConversationMessage                 50%
+  jihadkhawaja.chat.shared.Models.AgentDefinition                         100%
+  jihadkhawaja.chat.shared.Models.AgentKnowledge                          100%
+  jihadkhawaja.chat.shared.Models.AgentMcpServer                          100%
+  jihadkhawaja.chat.shared.Models.AgentPendingMessage                       0%
+  jihadkhawaja.chat.shared.Models.AgentSkillDirectory                     100%
+  jihadkhawaja.chat.shared.Models.AgentTool                               100%
+  jihadkhawaja.chat.shared.Models.CallOffer                                 0%
+  jihadkhawaja.chat.shared.Models.Channel                                  25%
+  jihadkhawaja.chat.shared.Models.ChannelAgent                            100%
+  jihadkhawaja.chat.shared.Models.ChannelFileLink                           0%
+  jihadkhawaja.chat.shared.Models.ChannelTypingState                        0%
+  jihadkhawaja.chat.shared.Models.ChannelUser                             100%
+  jihadkhawaja.chat.shared.Models.EntityAudit                             100%
+  jihadkhawaja.chat.shared.Models.EntityBase                              100%
+  jihadkhawaja.chat.shared.Models.EntityChildBase                           0%
+  jihadkhawaja.chat.shared.Models.MediaResult                               0%
+  jihadkhawaja.chat.shared.Models.Message                                72.7%
+  jihadkhawaja.chat.shared.Models.MessageAgentRecipientContent            100%
+  jihadkhawaja.chat.shared.Models.MessageRecipientContent                 100%
+  jihadkhawaja.chat.shared.Models.Operation                              66.6%
+  jihadkhawaja.chat.shared.Models.UserAgentFriend                         100%
+  jihadkhawaja.chat.shared.Models.UserCall                                  0%
+  jihadkhawaja.chat.shared.Models.UserDetail                               38%
+  jihadkhawaja.chat.shared.Models.UserDto                                44.4%
+  jihadkhawaja.chat.shared.Models.UserFeedback                              0%
+  jihadkhawaja.chat.shared.Models.UserFriend                                0%
+  jihadkhawaja.chat.shared.Models.UserPendingMessage                       75%
+  jihadkhawaja.chat.shared.Models.UserStorage                               0%
