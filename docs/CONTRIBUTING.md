@@ -1,20 +1,44 @@
 # Contributing
 
-Thank you for considering contributing to this project! Please follow these steps:
+Thanks for contributing to Egroo. This guide is the shortest path from idea to pull request.
 
-## Getting Started
+## Before you start
 
-1. Discuss your proposed changes via issue, email, or other methods with the repository owners.
-2. Ensure you adhere to our [Code of Conduct](CODE_OF_CONDUCT.md) in all interactions.
+1. For anything larger than a small fix, open an issue first so the approach can be aligned early.
+2. Read the [Code of Conduct](CODE_OF_CONDUCT.md).
+3. Use the [Development Setup](../wiki/Development-Setup.md) guide if this is your first time running the project locally.
 
-## Pull Request Process
+## Local workflow
 
-1. Fork the repository and create your branch from `main`.
-2. Make your changes and ensure they follow the project style guidelines.
-3. Update documentation as needed.
-4. Submit your pull request to the `main` branch.
-5. Wait for a maintainer to review and approve your pull request.
+1. Fork the repository and create a branch from `main`.
+2. Build the solution:
 
-## Code of Conduct
+	```bash
+	dotnet build src/Egroo.slnx --configuration Debug
+	```
 
-Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+3. Make focused changes that match the existing architecture and style.
+4. Run the relevant tests before opening a pull request:
+
+	```bash
+	dotnet test src/Egroo.Server.Test/Egroo.Server.Test.csproj --verbosity normal
+	```
+
+5. Update docs when behavior, setup, or public APIs change.
+
+## Pull requests
+
+Keep pull requests small and reviewable.
+
+Before submitting, check that:
+
+- the branch is based on `main`
+- the change solves one clear problem
+- tests pass for the area you changed
+- docs are updated if needed
+- the PR description explains the why, not just the diff
+
+## Need help?
+
+- Use GitHub issues for bugs and feature requests.
+- Refer to the [Getting Started](../wiki/Getting-Started.md) and [Development Setup](../wiki/Development-Setup.md) guides for environment setup.

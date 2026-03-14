@@ -1,20 +1,27 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
-title: ''
-labels: ''
+about: Suggest an improvement or new capability
+title: "[Feature]: "
+labels: enhancement
 assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## Problem
+What is missing or painful today?
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+## Proposed solution
+What would you like Egroo to do?
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## Why it helps
+Who benefits, and how?
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+## Alternatives considered
+List any workarounds or other ideas you considered.
+
+## Extra context
+Add screenshots, examples, or API/UI references if helpful.
+
+## Before submitting
+- [ ] I checked for an existing feature request
+- [ ] I explained the problem, not just the idea
