@@ -11,8 +11,7 @@ It combines a Blazor web experience, a SignalR-first real-time backend, per-reci
 [![NuGets Push](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Nuget.yml)
 [![Coverage CI](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
 [![Coverage %](https://raw.githubusercontent.com/jihadkhawaja/Egroo/main/docs/badges/coverage.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/MSTest.yml)
-[![Docker](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Docker.yml)
-[![Chat Deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/Deploy-Chat.yml)
+[![Egroo Deploy](https://github.com/jihadkhawaja/Egroo/actions/workflows/deploy-egroo.yml/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/deploy-egroo.yml)
 [![CodeQL](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/jihadkhawaja/Egroo/actions/workflows/github-code-scanning/codeql)
 
 ## Why Egroo
