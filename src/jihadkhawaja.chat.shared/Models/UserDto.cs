@@ -18,6 +18,9 @@ namespace jihadkhawaja.chat.shared.Models
         [Required]
         public string? Role { get; set; }
         public DateTimeOffset? LastLoginDate { get; set; }
+        public string? EncryptionPublicKey { get; set; }
+        public string? EncryptionKeyId { get; set; }
+        public DateTimeOffset? EncryptionKeyUpdatedOn { get; set; }
         public UserDetail? UserDetail { get; set; }
         public UserStorage? UserStorage { get; set; }
         public ICollection<UserFeedback> UserFeedbacks { get; } = new List<UserFeedback>();

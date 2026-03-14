@@ -29,6 +29,7 @@
 @inject BlazorDexie.Options.BlazorDexieOptions BlazorDexieOptions
 @inject AgentService AgentService
 @inject ChannelFileService ChannelFileService
+@inject EndToEndEncryptionService EndToEndEncryptionService
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
     <!-- Header -->
@@ -94,6 +95,18 @@
                 </MudTooltip>
             </MudStack>
         </MudStack>
+        @if (!string.IsNullOrWhiteSpace(EncryptionWarning))
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                @EncryptionWarning
+            </MudAlert>
+        }
+        @if (channelAgentDefs?.Any() == true)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Text" Class="mt-2 mb-0">
+                End-to-end encrypted messages are only readable by human channel members on their devices. Server-hosted agents cannot read encrypted content.
+            </MudAlert>
+        }
     </MudPaper>
 
     <!-- Messages Container -->
@@ -200,7 +213,7 @@
                     {
                         <MessageView @key="message.ReferenceId"
                                      DisplayName="@message.DisplayName"
-                                     Content="@message.Content"
+                                     Content="@GetDisplayContent(message)"
                                      Date="@GetDisplayDate(message)"
                                      IsCurrentUser="@(IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message))"
                                      IsAgent="@IsAgentMessage(message)"
@@ -267,7 +280,7 @@
                                                Size="Size.Medium"
                                                Class="channel-composer-attach"
                                                OnClick="@context.OpenFilePickerAsync"
-                                               Disabled="InputDisabled" />
+                                               Disabled="@(InputDisabled || !IsEndToEndReady)" />
                             </MudTooltip>
                         </CustomContent>
                     </MudFileUpload>
@@ -277,14 +290,14 @@
                     InputMode="InputMode.text" InputType="InputType.Text"
                     AutoFocus="false"
                     Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="HandleInputKeyDown"
-                    Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="InputDisabled"
+                    Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="@(InputDisabled || !IsEndToEndReady)"
                     Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault"
                     Class="channel-composer-input" />
                     <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary"
                     Size="Size.Medium" Variant="Variant.Filled"
                     Class="channel-composer-send"
                     OnClick="SendMessage" ButtonType="ButtonType.Submit"
-                    Disabled="@(InputDisabled || string.IsNullOrWhiteSpace(InputContent))" />
+                    Disabled="@(InputDisabled || !IsEndToEndReady || string.IsNullOrWhiteSpace(InputContent))" />
                 </div>
             </div>
         </MudStack>
@@ -346,6 +359,9 @@
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? attachmentUpload;
     private IReadOnlyList<IBrowserFile> pendingAttachmentFiles = Array.Empty<IBrowserFile>();
     private EgrooDB CacheDB { get; set; } = null!;
+    private bool IsEndToEndReady { get; set; }
+    private string? EncryptionWarning { get; set; }
+    private UserDto? CurrentUserProfile { get; set; }
 
     bool _preventDefault;
 
@@ -442,6 +458,17 @@
         {
             channelUsers = Array.Empty<UserDto>();
         }
+
+        try
+        {
+            CurrentUserProfile = await ChatUserService.GetUserPrivateDetails() ?? SessionStorage.User;
+            await RefreshEncryptionStateAsync();
+        }
+        catch
+        {
+            IsEndToEndReady = false;
+            EncryptionWarning = "Unable to initialize end-to-end encryption on this device.";
+        }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -462,6 +489,10 @@
                 .Where(nameof(Message.ChannelId))
                 .IsEqual(GetChannelId())
                 .Limit(50).ToList()) ?? new List<Message>();
+            foreach (var message in messages)
+            {
+                await PrepareMessageForDisplayAsync(message);
+            }
             Messages.AddRange(messages);
             Messages = Messages.OrderBy(x => x.DateCreated).ToList();
             _ = UpdateUnseenMessages();
@@ -560,16 +591,40 @@
         if (currentUser is null)
             return;
 
+        if (!IsEndToEndReady || CurrentUserProfile is null)
+        {
+            Snackbar.Add(EncryptionWarning ?? "End-to-end encryption is not ready on this device.", Severity.Warning);
+            return;
+        }
+
         await StopTypingAsync();
         InputDisabled = true;
+
+        string plainContent = InputContent.Trim();
 
         Message message = new()
         {
             ChannelId = GetChannelId(),
             DisplayName = currentUser.Username,
-            Content = InputContent.Trim(),
             SenderId = currentUser.Id,
         };
+
+        try
+        {
+            var recipients = channelUsers
+                .Concat(new[] { CurrentUserProfile })
+                .Where(x => x is not null)
+                .Cast<UserDto>();
+
+            message.RecipientContents = await EndToEndEncryptionService.EncryptMessageForRecipientsAsync(plainContent, recipients);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Warning);
+            InputDisabled = false;
+            await inputMudTextField.FocusAsync();
+            return;
+        }
 
         if (await ChatMessageService.SendMessage(message))
         {
@@ -603,6 +658,7 @@
     private bool IsCurrentUserMessage(Guid senderId) => senderId == SessionStorage.User?.Id;
     private bool IsAgentMessage(Message msg) => msg.AgentDefinitionId.HasValue && msg.AgentDefinitionId != Guid.Empty;
     private bool HasActiveSearch => SearchQuery.Length >= SearchMinimumLength;
+    private static string GetDisplayContent(Message message) => message.DecryptedContent ?? message.Content ?? string.Empty;
 
     private void OnInputContent(string text)
     {
@@ -695,6 +751,11 @@
             .IsEqual(GetChannelId())
             .ToList()) ?? new List<Message>();
 
+        foreach (var message in cachedMessages)
+        {
+            await PrepareMessageForDisplayAsync(message);
+        }
+
         CachedChannelMessages = cachedMessages
             .Where(x => x.ReferenceId != Guid.Empty)
             .GroupBy(x => x.ReferenceId)
@@ -720,8 +781,9 @@
         for (int index = CachedChannelMessages.Count - 1; index >= 0; index--)
         {
             var message = CachedChannelMessages[index];
-            if (string.IsNullOrWhiteSpace(message.Content)
-                || !message.Content.Contains(query, StringComparison.OrdinalIgnoreCase))
+            string searchableContent = GetDisplayContent(message);
+            if (string.IsNullOrWhiteSpace(searchableContent)
+                || !searchableContent.Contains(query, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -729,7 +791,7 @@
             matches.Add(new ChannelSearchResult(
                 message.ReferenceId,
                 message.DisplayName ?? (IsCurrentUserMessage(message.SenderId) ? "You" : "Unknown user"),
-                BuildSearchPreview(message.Content, query),
+                BuildSearchPreview(searchableContent, query),
                 GetDisplayDate(message),
                 IsCurrentUserMessage(message.SenderId) && !IsAgentMessage(message),
                 IsAgentMessage(message)));
@@ -782,8 +844,8 @@
 
         VisibleSearchMatchReferenceIds = Messages
             .Where(x => x.ReferenceId != Guid.Empty)
-            .Where(x => !string.IsNullOrWhiteSpace(x.Content)
-                && x.Content.Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
+            .Where(x => !string.IsNullOrWhiteSpace(GetDisplayContent(x))
+                && GetDisplayContent(x).Contains(SearchQuery, StringComparison.OrdinalIgnoreCase))
             .Select(x => x.ReferenceId)
             .ToHashSet();
     }
@@ -1031,7 +1093,13 @@
         try
         {
             await using var stream = file.OpenReadStream(MaxAttachmentBytes);
-            var uploaded = await ChannelFileService.Upload(GetChannelId(), stream, file.Name, file.ContentType);
+            await using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            var encryptedFile = await EndToEndEncryptionService.EncryptFileAsync(buffer.ToArray(), file.Name, file.ContentType);
+            await using var cipherStream = new MemoryStream(encryptedFile.CipherBytes);
+            string uploadName = $"egroo-{Guid.NewGuid():N}.bin";
+            var uploaded = await ChannelFileService.Upload(GetChannelId(), cipherStream, uploadName, "application/octet-stream");
             if (uploaded is null)
             {
                 Snackbar.Add("Failed to upload file.", Severity.Error);
@@ -1040,7 +1108,7 @@
             }
 
             string absoluteUrl = new Uri(new Uri(Source.ConnectionURL), uploaded.Url).ToString();
-            string markdownLink = BuildMarkdownLink(uploaded.FileName, absoluteUrl);
+            string markdownLink = EndToEndEncryptionService.BuildEncryptedFileToken(absoluteUrl, encryptedFile);
 
             InputContent = string.IsNullOrWhiteSpace(InputContent)
                 ? markdownLink
@@ -1082,6 +1150,59 @@
         return $"[{escapedFileName}]({url})";
     }
 
+    private async Task RefreshEncryptionStateAsync()
+    {
+        var readiness = await EndToEndEncryptionService.EnsureIdentityAsync(CurrentUserProfile);
+        IsEndToEndReady = readiness.IsReady;
+        EncryptionWarning = readiness.Message;
+
+        if (!readiness.IsReady || CurrentUserProfile is null || readiness.Identity is null)
+        {
+            return;
+        }
+
+        CurrentUserProfile.EncryptionPublicKey = readiness.Identity.PublicKey;
+        CurrentUserProfile.EncryptionKeyId = readiness.Identity.KeyId;
+        CurrentUserProfile.EncryptionKeyUpdatedOn = DateTimeOffset.UtcNow;
+
+        if (SessionStorage.User?.Id == CurrentUserProfile.Id)
+        {
+            SessionStorage.User.EncryptionPublicKey = CurrentUserProfile.EncryptionPublicKey;
+            SessionStorage.User.EncryptionKeyId = CurrentUserProfile.EncryptionKeyId;
+            SessionStorage.User.EncryptionKeyUpdatedOn = CurrentUserProfile.EncryptionKeyUpdatedOn;
+        }
+    }
+
+    private async Task PrepareMessageForDisplayAsync(Message message)
+    {
+        if (message.AgentDefinitionId is null || message.AgentDefinitionId == Guid.Empty)
+        {
+            var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
+            message.DisplayName = senderUser?.Username ?? message.DisplayName;
+        }
+
+        await EndToEndEncryptionService.GetDisplayContentAsync(message);
+    }
+
+    private static Message CreateCacheRecord(Message source)
+    {
+        return new Message
+        {
+            Id = source.Id,
+            SenderId = source.SenderId,
+            ChannelId = source.ChannelId,
+            ReferenceId = source.ReferenceId,
+            DateSent = source.DateSent,
+            DateSeen = source.DateSeen,
+            DateCreated = source.DateCreated,
+            DateUpdated = source.DateUpdated,
+            DateDeleted = source.DateDeleted,
+            AgentDefinitionId = source.AgentDefinitionId,
+            DisplayName = source.DisplayName,
+            Content = source.Content,
+        };
+    }
+
     private async Task UpdateUnseenMessages()
     {
         foreach (var msg in Messages)
@@ -1106,12 +1227,7 @@
                 return;
             }
 
-            var senderUser = await ChatUserService.GetUserPublicDetails(message.SenderId);
-            // Preserve agent display name; only override for regular user messages
-            if (message.AgentDefinitionId is null || message.AgentDefinitionId == Guid.Empty)
-            {
-                message.DisplayName = senderUser?.Username;
-            }
+            await PrepareMessageForDisplayAsync(message);
 
             RemoveTypingParticipantForMessage(message);
             Messages.Add(message);
@@ -1121,7 +1237,7 @@
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
                 await ChatMessageService.UpdateMessage(message);
 
-            await CacheDB.Messages.Add(message);
+            await CacheDB.Messages.Add(CreateCacheRecord(message));
             await ChatMessageService.UpdatePendingMessage(message.Id);
             if (message.SenderId == SessionStorage.User?.Id)
                 _needsScrollToBottom = true;
@@ -1144,7 +1260,7 @@
                     Messages[i].DateSeen = message.DateSeen;
                     UpsertCachedMessage(Messages[i]);
                     RefreshSearchResultsFromCache();
-                    await CacheDB.Messages.Put(Messages[i], Messages[i].ReferenceId);
+                    await CacheDB.Messages.Put(CreateCacheRecord(Messages[i]), Messages[i].ReferenceId);
                     await InvokeAsync(StateHasChanged);
                     return;
                 }

@@ -35,6 +35,13 @@ This file captures the practical skills and conventions needed to work effective
 - Shared file messages should use durable links that work as normal clickable anchors.
 - Keep upload limits explicit and user-facing.
 
+## Database Schema Skill
+
+- When a persisted entity, owned type, relationship, index, or EF mapping changes, add a migration.
+- After adding the migration, update the database using the repository scripts.
+- Do not leave `src/Egroo.Server` schema changes without matching migration files and snapshot updates.
+- Use `.github/skills/ef-core-migrations/SKILL.md` for the detailed workflow.
+
 ## Documentation Skill
 
 - Update `.github/copilot-instructions.md` for durable workspace guidance.

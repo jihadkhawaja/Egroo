@@ -69,6 +69,9 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)
             => await HubConnection.InvokeAsync<bool>(nameof(UpdateDetails), displayname, email, firstname, lastname);
 
+        public async Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId)
+            => await HubConnection.InvokeAsync<bool>(nameof(UpdateEncryptionKey), publicKey, keyId);
+
         public async Task<bool> UpdateAvatar(string? avatarBase64)
             => await HubConnection.InvokeAsync<bool>(nameof(UpdateAvatar), avatarBase64);
 

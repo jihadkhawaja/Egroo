@@ -58,6 +58,7 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 - **Soft deletes**: All entities extend `EntityAudit` (`DateDeleted`, `DeletedBy`). Do not hard-delete tracked entities without good reason.
 - **Primary keys**: `EntityBase` uses `Guid`; `EntityChildBase` uses `int`.
 - **User model**: `User` (server-only) extends `UserDto` (shared). Nested owned types: `UserDetail`, `UserSecurity`.
+- **Schema changes require migrations**: If you change a persisted entity, owned type, relationship, index, or EF mapping, add a migration with `./scripts/add-migration.ps1 "<MigrationName>"` and apply it with `./scripts/update-database.ps1`.
 
 ### API
 - Endpoints use **Minimal API route groups** under `/api/v1/{Feature}`. Add new routes to the appropriate group file in `Egroo.Server/API/`.
@@ -98,6 +99,7 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 - Tests use an **in-memory EF Core database** isolated per test via `TestServiceProvider`.
 - Mock HttpContext with claims is provided — use the existing `TestServiceProvider` pattern for new test classes.
 - New features in `Egroo.Server` should have corresponding tests in `Egroo.Server.Test`.
+- For EF Core schema changes, verify that the generated migration files and `DataContextModelSnapshot` are updated alongside the code change.
 
 ## Project-wide Settings (`Directory.Build.props`)
 - **Target framework**: `net10.0`

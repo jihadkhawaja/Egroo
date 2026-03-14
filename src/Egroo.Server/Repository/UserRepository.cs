@@ -58,6 +58,9 @@ namespace Egroo.Server.Repository
                 IsOnline = _connectionTracker.IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
                 DateCreated = user.DateCreated,
+                EncryptionPublicKey = user.EncryptionPublicKey,
+                EncryptionKeyId = user.EncryptionKeyId,
+                EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn,
             };
 
             return userPublicResult;
@@ -82,6 +85,9 @@ namespace Egroo.Server.Repository
                 IsOnline = _connectionTracker.IsUserOnline(user.Id),
                 LastLoginDate = user.LastLoginDate,
                 DateCreated = user.DateCreated,
+                EncryptionPublicKey = user.EncryptionPublicKey,
+                EncryptionKeyId = user.EncryptionKeyId,
+                EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn,
             };
 
             return userPrivateResult;
@@ -102,6 +108,37 @@ namespace Egroo.Server.Repository
             }
 
             return user.Username;
+        }
+
+        public async Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId)
+        {
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId is null)
+            {
+                return false;
+            }
+
+            User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
+            if (user is null)
+            {
+                return false;
+            }
+
+            user.EncryptionPublicKey = string.IsNullOrWhiteSpace(publicKey) ? null : publicKey.Trim();
+            user.EncryptionKeyId = string.IsNullOrWhiteSpace(keyId) ? null : keyId.Trim();
+            user.EncryptionKeyUpdatedOn = user.EncryptionPublicKey is null ? null : DateTimeOffset.UtcNow;
+
+            try
+            {
+                _dbContext.Users.Update(user);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update encryption key for user {UserId}", connectorUserId.Value);
+                return false;
+            }
         }
 
         public async Task<bool> AddFriend(string friendusername)

@@ -21,5 +21,17 @@ namespace jihadkhawaja.chat.shared.Models
         public string? DisplayName { get; set; }
         [NotMapped]
         public string? Content { get; set; }
+        [NotMapped]
+        public string? DecryptedContent { get; set; }
+        [NotMapped]
+        public List<MessageRecipientContent>? RecipientContents { get; set; }
+    }
+
+    public class MessageRecipientContent
+    {
+        [Required]
+        public Guid UserId { get; set; }
+        [Required]
+        public string Content { get; set; } = string.Empty;
     }
 }

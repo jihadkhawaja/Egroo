@@ -2,6 +2,8 @@
 @using Egroo.UI.CacheDB
 @using Microsoft.AspNetCore.Components
 @using System.Net
+@using System.Text
+@using System.Text.Json
 @using System.Text.Encodings.Web
 @using System.Text.RegularExpressions
 
@@ -25,6 +27,9 @@
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex HrefRegex = new(
         @"href=""(?<href>[^""]+)""",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex EncryptedFileRegex = new(
+        @"\[\[egroo-file:(?<token>[A-Za-z0-9_-]+)\]\]",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
@@ -51,6 +56,7 @@
         }
 
         var formattedMentions = new List<string>();
+        var encryptedFiles = new List<string>();
         string markdown = MentionRegex.Replace(content, match =>
         {
             string mentionName = match.Groups["bracket"].Success
@@ -66,6 +72,16 @@
             string encodedMention = HtmlEncoder.Default.Encode($"@{mentionName}");
             formattedMentions.Add($"<span class=\"mention-tag\">{encodedMention}</span>");
             return $"EGROO_MENTION_TOKEN_{index}";
+        });
+
+        markdown = EncryptedFileRegex.Replace(markdown, match =>
+        {
+            string token = match.Groups["token"].Value;
+            int index = encryptedFiles.Count;
+            string label = HtmlEncoder.Default.Encode(GetEncryptedFileLabel(token));
+            string encodedToken = HtmlEncoder.Default.Encode(token);
+            encryptedFiles.Add($"<a href=\"#\" class=\"egroo-encrypted-file\" data-egroo-file=\"{encodedToken}\">{label}</a>");
+            return $"EGROO_FILE_TOKEN_{index}";
         });
 
         markdown = UrlRegex.Replace(markdown, match =>
@@ -86,6 +102,10 @@
         for (int i = 0; i < formattedMentions.Count; i++)
         {
             html = html.Replace($"EGROO_MENTION_TOKEN_{i}", formattedMentions[i], StringComparison.Ordinal);
+        }
+        for (int i = 0; i < encryptedFiles.Count; i++)
+        {
+            html = html.Replace($"EGROO_FILE_TOKEN_{i}", encryptedFiles[i], StringComparison.Ordinal);
         }
 
         html = AnchorRegex.Replace(html, "<a target=\"_blank\" rel=\"noopener noreferrer\" ${attrs}>");
@@ -157,5 +177,36 @@
         int queryIndex = href.IndexOf('?', StringComparison.Ordinal);
         return queryIndex >= 0
             && href[(queryIndex + 1)..].Contains("access_token=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetEncryptedFileLabel(string token)
+    {
+        try
+        {
+            string json = Encoding.UTF8.GetString(Base64UrlDecode(token));
+            using JsonDocument document = JsonDocument.Parse(json);
+            if (document.RootElement.TryGetProperty("FileName", out JsonElement fileName)
+                && !string.IsNullOrWhiteSpace(fileName.GetString()))
+            {
+                return fileName.GetString()!;
+            }
+        }
+        catch
+        {
+        }
+
+        return "Encrypted file";
+    }
+
+    private static byte[] Base64UrlDecode(string value)
+    {
+        string padded = value.Replace('-', '+').Replace('_', '/');
+        int remainder = padded.Length % 4;
+        if (remainder > 0)
+        {
+            padded = padded.PadRight(padded.Length + (4 - remainder), '=');
+        }
+
+        return Convert.FromBase64String(padded);
     }
 }

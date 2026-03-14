@@ -20,11 +20,13 @@ namespace Egroo.UI
             {
                 services.AddScoped<SessionStorage>();
                 services.AddScoped<StorageService>();
+                services.AddScoped<EndToEndEncryptionService>();
             }
             else
             {
                 services.AddSingleton<SessionStorage>();
                 services.AddSingleton<StorageService>();
+                services.AddSingleton<EndToEndEncryptionService>();
             }
 
             services.AddBlazorDexie();

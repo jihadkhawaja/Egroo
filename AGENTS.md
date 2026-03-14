@@ -42,9 +42,11 @@ Egroo is a real-time chat system. Work should preserve fast message flow, readab
 - Preserve existing MudBlazor patterns unless there is a clear UX issue.
 - When changing chat rendering, verify sender bubble, receiver bubble, and agent bubble contrast separately.
 - When adding new HTTP endpoints, follow the minimal API grouping pattern under `/api/v1/{Feature}`.
+- When changing persisted EF Core entities or schema mappings, add a migration and update the database before considering the work complete.
 
 ## Verification
 
 - Build the full solution after cross-project changes.
 - Run `src/Egroo.Server.Test` when server behavior changes.
 - If UI rendering changes, verify both sender and receiver states for the affected component.
+- If a schema change was made, ensure new migration files exist under `src/Egroo.Server/Migrations/` and run the database update script.
