@@ -6,7 +6,7 @@ namespace Egroo.Server.Services
 {
     public class ChannelFileStorageService
     {
-        public const long MaxFileSizeBytes = 25 * 1024 * 1024;
+        public const long MaxFileSizeBytes = 1 * 1024 * 1024;
 
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<ChannelFileStorageService> _logger;

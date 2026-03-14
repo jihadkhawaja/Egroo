@@ -41,7 +41,7 @@ namespace Egroo.Server.API
 
                 if (file.Length > ChannelFileStorageService.MaxFileSizeBytes)
                 {
-                    return Results.BadRequest(new { error = "File exceeds the 25 MB limit." });
+                    return Results.BadRequest(new { error = "File exceeds the 1 MB limit." });
                 }
 
                 var uploaded = await storage.SaveAsync(channelId, file, cancellationToken);

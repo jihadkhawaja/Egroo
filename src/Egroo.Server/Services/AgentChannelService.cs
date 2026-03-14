@@ -450,7 +450,7 @@ namespace Egroo.Server.Services
         {
             if (!string.IsNullOrWhiteSpace(message.Content))
             {
-                return message.Content;
+                return AgentAttachmentPromptFormatter.Normalize(message.Content);
             }
 
             string? transportContent = message.AgentRecipientContents?.FirstOrDefault(x => x.AgentDefinitionId == agent.Id)?.Content;
@@ -460,7 +460,8 @@ namespace Egroo.Server.Services
             }
 
             string? privateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agent.EncryptionPrivateKey);
-            return _endToEndEncryptionService.DecryptTransportContent(transportContent, privateKey);
+            string? content = _endToEndEncryptionService.DecryptTransportContent(transportContent, privateKey);
+            return AgentAttachmentPromptFormatter.Normalize(content);
         }
 
         private async Task<string?> GetContentForAgentAsync(DataContext dbContext, Message message, AgentDefinition agentDef, string? privateKey)
@@ -470,7 +471,8 @@ namespace Egroo.Server.Services
 
             if (!string.IsNullOrWhiteSpace(agentPending?.Content))
             {
-                return _endToEndEncryptionService.DecryptTransportContent(agentPending.Content, privateKey);
+                string? decryptedContent = _endToEndEncryptionService.DecryptTransportContent(agentPending.Content, privateKey);
+                return AgentAttachmentPromptFormatter.Normalize(decryptedContent);
             }
 
             var userPending = await dbContext.UsersPendingMessages
@@ -481,15 +483,15 @@ namespace Egroo.Server.Services
             {
                 try
                 {
-                    return _encryptionService.Decrypt(content);
+                    return AgentAttachmentPromptFormatter.Normalize(_encryptionService.Decrypt(content));
                 }
                 catch
                 {
-                    return content;
+                    return AgentAttachmentPromptFormatter.Normalize(content);
                 }
             }
 
-            return message.Content;
+            return AgentAttachmentPromptFormatter.Normalize(message.Content);
         }
 
         private static Message CloneForUserDelivery(Message source, string deliveryContent)

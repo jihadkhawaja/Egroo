@@ -363,4 +363,50 @@ namespace jihadkhawaja.chat.shared.Models
 
         public string? Content { get; set; }
     }
+
+    /// <summary>
+    /// Represents an attachment supplied with a direct agent chat request.
+    /// </summary>
+    public class AgentChatAttachment
+    {
+        /// <summary>
+        /// Friendly file name shown in the UI and available to the model.
+        /// </summary>
+        [Required]
+        [MaxLength(260)]
+        public string FileName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Attachment media type.
+        /// </summary>
+        [MaxLength(200)]
+        public string? ContentType { get; set; }
+
+        /// <summary>
+        /// Data URI payload used for multimodal inputs such as images.
+        /// </summary>
+        public string? DataUri { get; set; }
+    }
+
+    /// <summary>
+    /// Request payload for a direct agent chat turn.
+    /// </summary>
+    public class AgentChatRequest
+    {
+        /// <summary>
+        /// Text content intended for the model.
+        /// </summary>
+        [Required]
+        public string Message { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Optional conversation display content persisted for the UI.
+        /// </summary>
+        public string? DisplayMessage { get; set; }
+
+        /// <summary>
+        /// Optional multimodal attachments for the current turn.
+        /// </summary>
+        public AgentChatAttachment[]? Attachments { get; set; }
+    }
 }

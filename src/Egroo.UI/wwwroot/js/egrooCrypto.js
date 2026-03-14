@@ -33,6 +33,10 @@
         return textDecoder.decode(base64ToBytes(padded));
     }
 
+    function parseEncryptedFileMetadata(tokenBase64Url) {
+        return JSON.parse(base64UrlToText(tokenBase64Url));
+    }
+
     async function importPublicKey(publicKeyBase64) {
         return crypto.subtle.importKey(
             "spki",
@@ -58,8 +62,8 @@
             .join("");
     }
 
-    async function downloadEncryptedFile(tokenBase64Url) {
-        const metadata = JSON.parse(base64UrlToText(tokenBase64Url));
+    async function decryptEncryptedFileToBlob(tokenBase64Url) {
+        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
         const jwt = localStorage.getItem("token");
 
         if (!jwt) {
@@ -89,7 +93,12 @@
             aesKey,
             cipherBytes);
 
-        const blob = new Blob([plainBuffer], { type: metadata.ContentType || "application/octet-stream" });
+        return new Blob([plainBuffer], { type: metadata.ContentType || "application/octet-stream" });
+    }
+
+    async function downloadEncryptedFile(tokenBase64Url) {
+        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
+        const blob = await decryptEncryptedFileToBlob(tokenBase64Url);
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = objectUrl;
@@ -98,6 +107,50 @@
         anchor.click();
         anchor.remove();
         URL.revokeObjectURL(objectUrl);
+    }
+
+    async function renderEncryptedImage(imageElement) {
+        if (!(imageElement instanceof HTMLImageElement)) {
+            return;
+        }
+
+        const token = imageElement.getAttribute("data-egroo-file");
+        if (!token || imageElement.dataset.egrooLoaded === "true") {
+            return;
+        }
+
+        imageElement.dataset.egrooLoaded = "loading";
+
+        try {
+            const metadata = parseEncryptedFileMetadata(token);
+            const blob = await decryptEncryptedFileToBlob(token);
+            const objectUrl = URL.createObjectURL(blob);
+            const previousObjectUrl = imageElement.dataset.egrooObjectUrl;
+
+            if (previousObjectUrl) {
+                URL.revokeObjectURL(previousObjectUrl);
+            }
+
+            imageElement.src = objectUrl;
+            imageElement.alt = metadata.FileName || imageElement.alt || "Encrypted image";
+            imageElement.dataset.egrooObjectUrl = objectUrl;
+            imageElement.dataset.egrooLoaded = "true";
+        }
+        catch (error) {
+            imageElement.dataset.egrooLoaded = "error";
+            imageElement.alt = imageElement.alt || "Failed to load image";
+            console.error(error);
+        }
+    }
+
+    function hydrateEncryptedImages(root) {
+        if (!(root instanceof Element || root instanceof Document)) {
+            return;
+        }
+
+        root.querySelectorAll(".egroo-encrypted-image[data-egroo-file]").forEach(element => {
+            renderEncryptedImage(element).catch(console.error);
+        });
     }
 
     window.egrooCrypto = {
@@ -211,6 +264,24 @@
 
         downloadEncryptedFile
     };
+
+    hydrateEncryptedImages(document);
+
+    const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            mutation.addedNodes.forEach(node => {
+                if (node instanceof Element) {
+                    if (node.matches(".egroo-encrypted-image[data-egroo-file]")) {
+                        renderEncryptedImage(node).catch(console.error);
+                    }
+
+                    hydrateEncryptedImages(node);
+                }
+            });
+        }
+    });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
 
     document.addEventListener("click", function (event) {
         const target = event.target instanceof Element

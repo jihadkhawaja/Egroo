@@ -72,6 +72,41 @@ window.unregisterMentionNavigation = function (selector) {
     delete input.__egrooMentionNavigationHandler;
 };
 
+window.registerEnterToSend = function (selector, dotNetObject, callbackName) {
+    const input = document.querySelector(selector);
+    if (!input) {
+        return;
+    }
+
+    if (input.__egrooEnterToSendHandler) {
+        input.removeEventListener('keydown', input.__egrooEnterToSendHandler, true);
+    }
+
+    const handler = function (event) {
+        const isEnterKey = event.key === 'Enter' || event.key === 'NumpadEnter';
+        if (!isEnterKey || event.shiftKey) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        dotNetObject.invokeMethodAsync(callbackName, false);
+    };
+
+    input.__egrooEnterToSendHandler = handler;
+    input.addEventListener('keydown', handler, true);
+};
+
+window.unregisterEnterToSend = function (selector) {
+    const input = document.querySelector(selector);
+    if (!input || !input.__egrooEnterToSendHandler) {
+        return;
+    }
+
+    input.removeEventListener('keydown', input.__egrooEnterToSendHandler, true);
+    delete input.__egrooEnterToSendHandler;
+};
+
 window.onbeforeunload = function () {
     try {
         DotNet.invokeMethodAsync('Egroo.UI', 'OnClosedWindow')

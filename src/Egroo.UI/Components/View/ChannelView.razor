@@ -291,8 +291,24 @@
                     Size="Size.Medium" Variant="Variant.Filled"
                     Class="channel-composer-send"
                     OnClick="SendMessage" ButtonType="ButtonType.Submit"
-                    Disabled="@(InputDisabled || !IsEndToEndReady || string.IsNullOrWhiteSpace(InputContent))" />
+                    Disabled="@(InputDisabled || !IsEndToEndReady || !CanSendMessage)" />
                 </div>
+                @if (stagedAttachment is not null)
+                {
+                    <MudPaper Class="channel-composer-attachment mt-2 px-3 py-2" Elevation="0">
+                        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                            <MudStack Spacing="0">
+                                <MudText Typo="Typo.body2" Style="font-weight: 600;">@stagedAttachment.FileName</MudText>
+                                <MudText Typo="Typo.caption" Style="opacity: 0.72;">@stagedAttachment.SummaryText</MudText>
+                            </MudStack>
+                            <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                           Color="Color.Default"
+                                           Size="Size.Small"
+                                           OnClick="ClearStagedAttachmentAsync"
+                                           Disabled="@InputDisabled" />
+                        </MudStack>
+                    </MudPaper>
+                }
             </div>
         </MudStack>
     }
@@ -348,14 +364,17 @@
     private MudTextField<string> inputMudTextField { get; set; } = null!;
     private string? InputContent { get; set; }
     private int MaxMessageLength { get; set; } = 300;
-    private const long MaxAttachmentBytes = 25 * 1024 * 1024;
+    private const long MaxAttachmentBytes = 1 * 1024 * 1024;
+    private const int MaxExtractedAttachmentCharacters = 12000;
     private bool InputDisabled { get; set; }
     private MudFileUpload<IReadOnlyList<IBrowserFile>>? attachmentUpload;
     private IReadOnlyList<IBrowserFile> pendingAttachmentFiles = Array.Empty<IBrowserFile>();
+    private PendingComposerAttachment? stagedAttachment;
     private EgrooDB CacheDB { get; set; } = null!;
     private bool IsEndToEndReady { get; set; }
     private string? EncryptionWarning { get; set; }
     private UserDto? CurrentUserProfile { get; set; }
+    private bool CanSendMessage => !string.IsNullOrWhiteSpace(InputContent) || stagedAttachment is not null;
 
     // Mention autocomplete state
     private AgentDefinition[]? channelAgentDefs;
@@ -583,7 +602,7 @@
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(InputContent))
+        if (!CanSendMessage)
             return;
 
         var currentUser = SessionStorage.User;
@@ -599,7 +618,7 @@
         await StopTypingAsync();
         InputDisabled = true;
 
-        string plainContent = InputContent.Trim();
+        string plainContent = ComposeMessageContent(InputContent, stagedAttachment);
 
         Message message = new()
         {
@@ -634,6 +653,7 @@
         if (await ChatMessageService.SendMessage(message))
         {
             InputContent = string.Empty;
+            stagedAttachment = null;
             showMentionPopup = false;
             filteredMentionCandidates.Clear();
             selectedMentionIndex = -1;
@@ -1080,7 +1100,7 @@
 
         if (file.Size > MaxAttachmentBytes)
         {
-            Snackbar.Add("Files are limited to 25 MB.", Severity.Error);
+            Snackbar.Add("Files are limited to 1 MB.", Severity.Error);
             await ClearPendingAttachmentSelectionAsync();
             return;
         }
@@ -1114,12 +1134,15 @@
 
             string absoluteUrl = new Uri(new Uri(Source.ConnectionURL), uploaded.Url).ToString();
             string markdownLink = EndToEndEncryptionService.BuildEncryptedFileToken(absoluteUrl, encryptedFile);
-
-            InputContent = string.IsNullOrWhiteSpace(InputContent)
-                ? markdownLink
-                : $"{InputContent.TrimEnd()}\n{markdownLink}";
+            string attachmentContent = BuildChannelAttachmentContent(file.Name, file.ContentType, buffer.ToArray(), markdownLink);
+            string attachmentSummary = BuildAttachmentSummary(file.Name, file.ContentType, buffer.Length);
+            stagedAttachment = new PendingComposerAttachment(
+                file.Name,
+                BuildAttachmentPreviewText(attachmentSummary),
+                attachmentContent);
 
             Snackbar.Add("File attached. Add text if you want, then press send.", Severity.Success);
+            await ClearPendingAttachmentSelectionAsync();
             await InvokeAsync(StateHasChanged);
             await inputMudTextField.FocusAsync();
         }
@@ -1149,11 +1172,131 @@
         }
     }
 
+    private async Task ClearStagedAttachmentAsync()
+    {
+        stagedAttachment = null;
+        await ClearPendingAttachmentSelectionAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string ComposeMessageContent(string? messageText, PendingComposerAttachment? attachment)
+    {
+        string trimmedMessage = messageText?.Trim() ?? string.Empty;
+        if (attachment is null)
+        {
+            return trimmedMessage;
+        }
+
+        return string.IsNullOrWhiteSpace(trimmedMessage)
+            ? attachment.MessageContent
+            : $"{trimmedMessage}\n\n{attachment.MessageContent}";
+    }
+
     private static string BuildMarkdownLink(string fileName, string url)
     {
         string escapedFileName = fileName.Replace("[", "\\[").Replace("]", "\\]");
         return $"[{escapedFileName}]({url})";
     }
+
+    private static string BuildChannelAttachmentContent(string fileName, string? contentType, byte[] fileBytes, string encryptedToken)
+    {
+        string summary = BuildAttachmentSummary(fileName, contentType, fileBytes.LongLength);
+
+        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        {
+            return $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>\n{encryptedToken}";
+        }
+
+        return $"{summary}\n{encryptedToken}";
+    }
+
+    private static string BuildAttachmentSummary(string fileName, string? contentType, long sizeBytes)
+    {
+        string kind = IsImageAttachment(contentType) ? "Attached image" : "Attached file";
+        string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+        return $"> {kind}: {fileName} ({resolvedContentType}, {FormatAttachmentSize(sizeBytes)})";
+    }
+
+    private static string BuildAttachmentPreviewText(string summary)
+    {
+        return summary.StartsWith("> ", StringComparison.Ordinal) ? summary[2..] : summary;
+    }
+
+    private static bool IsImageAttachment(string? contentType)
+    {
+        return !string.IsNullOrWhiteSpace(contentType)
+            && contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadTextAttachment(string fileName, string? contentType, byte[] fileBytes, out string? extractedText)
+    {
+        extractedText = null;
+        if (!IsTextAttachment(fileName, contentType))
+        {
+            return false;
+        }
+
+        try
+        {
+            string text = System.Text.Encoding.UTF8.GetString(fileBytes);
+            if (text.IndexOf('\0') >= 0)
+            {
+                return false;
+            }
+
+            text = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (text.Length > MaxExtractedAttachmentCharacters)
+            {
+                text = $"{text[..MaxExtractedAttachmentCharacters]}\n\n[Document truncated after {MaxExtractedAttachmentCharacters} characters.]";
+            }
+
+            extractedText = text.Trim();
+            return !string.IsNullOrWhiteSpace(extractedText);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTextAttachment(string fileName, string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            if (contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("xml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("csv", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("javascript", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return Path.GetExtension(fileName).ToLowerInvariant() is ".txt" or ".md" or ".markdown" or ".json" or ".xml" or ".csv" or ".log" or ".yml" or ".yaml" or ".html" or ".htm" or ".css" or ".js" or ".ts" or ".tsx" or ".jsx" or ".cs" or ".razor" or ".sql" or ".ps1" or ".sh";
+    }
+
+    private static string FormatAttachmentSize(long sizeBytes)
+    {
+        if (sizeBytes >= 1024 * 1024)
+        {
+            return $"{sizeBytes / (1024d * 1024d):0.##} MB";
+        }
+
+        if (sizeBytes >= 1024)
+        {
+            return $"{sizeBytes / 1024d:0.##} KB";
+        }
+
+        return $"{sizeBytes} B";
+    }
+
+    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string MessageContent);
 
     private async Task RefreshEncryptionStateAsync()
     {

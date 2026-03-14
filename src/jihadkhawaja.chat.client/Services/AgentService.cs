@@ -267,29 +267,36 @@ namespace jihadkhawaja.chat.client.Services
 
         // ── Chat (non-streaming) ─────────────────────────────────────
 
-        public async Task<AgentChatResult?> Chat(Guid conversationId, string message)
+        public Task<AgentChatResult?> Chat(Guid conversationId, string message)
         {
-            var payload = new { Message = message };
-            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/conversations/{conversationId}/chat", payload);
+            return Chat(conversationId, new AgentChatRequest { Message = message });
+        }
+
+        public async Task<AgentChatResult?> Chat(Guid conversationId, AgentChatRequest request)
+        {
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/conversations/{conversationId}/chat", request);
             if (!response.IsSuccessStatusCode) return null;
             return await response.Content.ReadFromJsonAsync<AgentChatResult>(JsonOptions);
         }
 
         // ── Chat Streaming (SSE) ─────────────────────────────────────
 
-        public async IAsyncEnumerable<string> ChatStream(Guid conversationId, string message)
+        public IAsyncEnumerable<string> ChatStream(Guid conversationId, string message)
         {
-            var payload = new { Message = message };
-            var json = JsonSerializer.Serialize(payload);
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            return ChatStream(conversationId, new AgentChatRequest { Message = message });
+        }
 
-            var request = new HttpRequestMessage(HttpMethod.Post,
+        public async IAsyncEnumerable<string> ChatStream(Guid conversationId, AgentChatRequest request)
+        {
+            var content = JsonContent.Create(request);
+
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post,
                 $"{BasePath}/conversations/{conversationId}/chat/stream")
             {
                 Content = content
             };
 
-            using var response = await HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            using var response = await HttpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
             if (!response.IsSuccessStatusCode)
             {
                 yield return "[ERROR] Failed to connect to agent.";

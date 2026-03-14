@@ -44,7 +44,7 @@ namespace Egroo.Server.Services
         /// Send a user message to an agent and get the response.
         /// Manages a full conversation turn: stores user message, runs agent, stores response.
         /// </summary>
-        public async Task<AgentChatResponse> ChatAsync(Guid userId, Guid conversationId, string userMessage)
+        public async Task<AgentChatResponse> ChatAsync(Guid userId, Guid conversationId, AgentChatRequest request)
         {
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
@@ -107,11 +107,15 @@ namespace Egroo.Server.Services
                 return AgentChatResponse.Error($"Failed to create agent: {ex.Message}");
             }
 
+            string storedUserMessage = string.IsNullOrWhiteSpace(request.DisplayMessage)
+                ? request.Message
+                : request.DisplayMessage;
+
             // Load prior messages and build ChatMessage list for conversation memory
             var chatMessages = await BuildChatHistory(dbContext, conversationId);
 
             // Add the new user message to the history
-            chatMessages.Add(new ChatMessage(ChatRole.User, userMessage));
+            chatMessages.Add(AgentChatMessageFactory.CreateUserMessage(request));
 
             // Store user message in DB
             var userMsg = new AgentConversationMessage
@@ -119,7 +123,7 @@ namespace Egroo.Server.Services
                 Id = Guid.NewGuid(),
                 AgentConversationId = conversationId,
                 Role = "user",
-                Content = userMessage,
+                Content = storedUserMessage,
                 DateCreated = DateTimeOffset.UtcNow,
                 CreatedBy = userId
             };
@@ -171,7 +175,7 @@ namespace Egroo.Server.Services
         /// <summary>
         /// Send a user message and stream the response token-by-token.
         /// </summary>
-        public async IAsyncEnumerable<string> ChatStreamAsync(Guid userId, Guid conversationId, string userMessage)
+        public async IAsyncEnumerable<string> ChatStreamAsync(Guid userId, Guid conversationId, AgentChatRequest request)
         {
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
@@ -222,9 +226,13 @@ namespace Egroo.Server.Services
                 yield break;
             }
 
+            string storedUserMessage = string.IsNullOrWhiteSpace(request.DisplayMessage)
+                ? request.Message
+                : request.DisplayMessage;
+
             // Build chat history and add user message
             var chatMessages = await BuildChatHistory(dbContext, conversationId);
-            chatMessages.Add(new ChatMessage(ChatRole.User, userMessage));
+            chatMessages.Add(AgentChatMessageFactory.CreateUserMessage(request));
 
             // Store user message in DB
             var userMsg = new AgentConversationMessage
@@ -232,7 +240,7 @@ namespace Egroo.Server.Services
                 Id = Guid.NewGuid(),
                 AgentConversationId = conversationId,
                 Role = "user",
-                Content = userMessage,
+                Content = storedUserMessage,
                 DateCreated = DateTimeOffset.UtcNow,
                 CreatedBy = userId
             };
@@ -288,7 +296,8 @@ namespace Egroo.Server.Services
                     "system" => ChatRole.System,
                     _ => ChatRole.User
                 };
-                messages.Add(new ChatMessage(role, msg.Content));
+
+                messages.Add(AgentChatMessageFactory.CreateStoredMessage(role, msg.Content));
             }
 
             return messages;

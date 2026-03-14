@@ -225,7 +225,11 @@
 }
 
 .markdown-content img {
-    max-width: 100%;
+    max-width: min(100%, 280px);
+    max-height: 220px;
+    display: block;
+    margin-top: 0.45rem;
+    object-fit: contain;
     border-radius: 8px;
 }
 
@@ -321,6 +325,12 @@
 
 .channel-composer-send.mud-disabled {
     box-shadow: none;
+}
+
+.channel-composer-attachment {
+    background: color-mix(in srgb, var(--mud-palette-surface) 96%, black 4%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
 }
 
 .channel-mention-entry {

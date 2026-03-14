@@ -499,7 +499,7 @@ namespace Egroo.Server.API
                     return Results.Unauthorized();
                 }
 
-                var response = await runtime.ChatAsync(userId, conversationId, req.Message);
+                var response = await runtime.ChatAsync(userId, conversationId, req);
                 return response.Success ? Results.Ok(response) : Results.BadRequest(response);
             });
 
@@ -522,7 +522,7 @@ namespace Egroo.Server.API
                 httpContext.Response.Headers["Cache-Control"] = "no-cache";
                 httpContext.Response.Headers["Connection"] = "keep-alive";
 
-                await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req.Message))
+                await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req))
                 {
                     await WriteSseEventAsync(httpContext, chunk);
                     await httpContext.Response.Body.FlushAsync();
@@ -739,6 +739,4 @@ namespace Egroo.Server.API
         bool IsActive = true);
 
     public record CreateConversationRequest(string? Title);
-
-    public record AgentChatRequest(string Message);
 }

@@ -1,6 +1,8 @@
 @using jihadkhawaja.chat.client.Services
+@using jihadkhawaja.chat.shared.Models
+@using Microsoft.AspNetCore.Components.Forms
 @using System.Text
-@implements IDisposable
+@implements IAsyncDisposable
 @inherits ProtectedViewBase
 
 @inject SessionStorage SessionStorage
@@ -144,20 +146,56 @@
 
         <!-- Input Area -->
         <div style="flex-shrink: 0; padding: 12px 16px 16px; background: var(--mud-palette-background);">
-            <div style="display: flex; align-items: flex-end; gap: 10px; background: var(--mud-palette-surface); border-radius: 24px; padding: 6px 6px 6px 18px; border: 1px solid rgba(255,255,255,0.08); transition: border-color 0.2s;">
-                <MudTextField @bind-Value="inputMessage" Variant="Variant.Text"
+            <div class="channel-composer-shell">
+                <MudFileUpload @ref="attachmentUpload"
+                               T="IReadOnlyList<IBrowserFile>"
+                               Hidden="true"
+                               Files="pendingAttachmentFiles"
+                               MaximumFileCount="1"
+                               FilesChanged="OnAttachmentFilesChanged">
+                    <CustomContent>
+                        <MudIconButton Icon="@Icons.Material.Filled.AttachFile"
+                                       Color="Color.Default"
+                                       Size="Size.Medium"
+                                       Class="channel-composer-attach"
+                                       Title="Attach document or image"
+                                       OnClick="@context.OpenFilePickerAsync"
+                                       Disabled="@(isStreaming || isAttachmentBusy)" />
+                    </CustomContent>
+                </MudFileUpload>
+                <MudTextField @ref="inputMudTextField"
+                              @bind-Value="inputMessage"
+                              Underline="false"
+                              Variant="Variant.Text"
                               Placeholder="Type a message..."
-                              Disabled="@isStreaming"
+                              Disabled="@(isStreaming || isAttachmentBusy)"
                               Immediate
-                              OnKeyDown="OnInputKeyDown"
-                              Lines="1" MaxLines="5"
-                              Style="flex: 1; margin: 0;" />
+                              Lines="1"
+                              MaxLines="5"
+                              Sizing="InputSizing.Auto"
+                              Class="agent-chat-composer-input" />
                 <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" Size="Size.Medium"
                                Variant="Variant.Filled"
-                               Style="border-radius: 50%; width: 40px; height: 40px; min-width: 40px;"
+                               Class="channel-composer-send"
                                OnClick="SendMessage"
-                               Disabled="@(isStreaming || string.IsNullOrWhiteSpace(inputMessage))" />
+                               Disabled="@(isStreaming || isAttachmentBusy || !CanSendMessage)" />
             </div>
+            @if (stagedAttachment is not null)
+            {
+                <MudPaper Class="channel-composer-attachment mt-2 px-3 py-2" Elevation="0">
+                    <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Spacing="2">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@stagedAttachment.FileName</MudText>
+                            <MudText Typo="Typo.caption" Style="opacity: 0.72;">@stagedAttachment.SummaryText</MudText>
+                        </MudStack>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close"
+                                       Color="Color.Default"
+                                       Size="Size.Small"
+                                       OnClick="ClearStagedAttachmentAsync"
+                                       Disabled="@(isStreaming || isAttachmentBusy)" />
+                    </MudStack>
+                </MudPaper>
+            }
         </div>
     }
 </MudContainer>
@@ -173,10 +211,20 @@
     private AgentConversation? currentConversation;
     private AgentConversation[]? conversations;
     private List<ChatMessageDisplay> messages = new();
+    private MudTextField<string> inputMudTextField { get; set; } = null!;
     private string inputMessage = string.Empty;
     private bool isStreaming;
+    private bool isAttachmentBusy;
     private StringBuilder streamingContent = new();
     private CancellationTokenSource? streamCts;
+    private MudFileUpload<IReadOnlyList<IBrowserFile>>? attachmentUpload;
+    private IReadOnlyList<IBrowserFile> pendingAttachmentFiles = Array.Empty<IBrowserFile>();
+    private PendingComposerAttachment? stagedAttachment;
+    private DotNetObjectReference<AgentChatView>? dotNetRef;
+    private bool _composerKeyboardRegistered;
+    private const long MaxAttachmentBytes = 1 * 1024 * 1024;
+    private const int MaxExtractedAttachmentCharacters = 12000;
+    private bool CanSendMessage => !string.IsNullOrWhiteSpace(inputMessage) || stagedAttachment is not null;
 
     protected override async Task OnAccessAsync()
     {
@@ -185,6 +233,8 @@
             NavigationManager.NavigateTo("/agents");
             return;
         }
+
+        dotNetRef ??= DotNetObjectReference.Create(this);
 
         IsBusy = true;
         StateHasChanged();
@@ -222,6 +272,17 @@
             _needsScrollToBottom = false;
             await ScrollToBottom();
         }
+
+        if (!_composerKeyboardRegistered && !IsBusy && dotNetRef is not null)
+        {
+            _composerKeyboardRegistered = true;
+            await JSRuntime.InvokeVoidAsync(
+                "registerEnterToSend",
+                ".agent-chat-composer-input input, .agent-chat-composer-input textarea",
+                dotNetRef,
+                "HandleComposerEnterKey");
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -367,24 +428,29 @@
         currentConversation ??= conversations.OrderByDescending(c => c.DateCreated).First();
     }
 
-    private async Task OnInputKeyDown(KeyboardEventArgs e)
+    [JSInvokable]
+    public async Task HandleComposerEnterKey(bool shiftKey)
     {
-        if (e.Key == "Enter" && !e.ShiftKey && !isStreaming && !string.IsNullOrWhiteSpace(inputMessage))
+        if (shiftKey || isStreaming || isAttachmentBusy || !CanSendMessage)
         {
-            await SendMessage();
+            return;
         }
+
+        await SendMessage();
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(inputMessage) || isStreaming || currentConversation is null)
+        if (!CanSendMessage || isStreaming || isAttachmentBusy || currentConversation is null)
             return;
 
-        var userMessage = inputMessage.Trim();
+        var request = CreateAgentChatRequest(inputMessage, stagedAttachment);
         inputMessage = string.Empty;
+        stagedAttachment = null;
 
         // Add user message to display
-        messages.Add(new ChatMessageDisplay { Role = "user", Content = userMessage });
+        messages.Add(new ChatMessageDisplay { Role = "user", Content = request.DisplayMessage ?? request.Message });
         _needsScrollToBottom = true;
         StateHasChanged();
 
@@ -396,7 +462,7 @@
 
         try
         {
-            await foreach (var chunk in AgentService.ChatStream(currentConversation.Id, userMessage))
+            await foreach (var chunk in AgentService.ChatStream(currentConversation.Id, request))
             {
                 if (streamCts.IsCancellationRequested) break;
 
@@ -436,6 +502,232 @@
         }
     }
 
+    private async Task OnAttachmentFilesChanged(IReadOnlyList<IBrowserFile>? files)
+    {
+        pendingAttachmentFiles = files ?? Array.Empty<IBrowserFile>();
+
+        IBrowserFile? file = pendingAttachmentFiles.FirstOrDefault();
+        if (file is null)
+        {
+            return;
+        }
+
+        if (file.Size > MaxAttachmentBytes)
+        {
+            Snackbar.Add("Files are limited to 1 MB.", Severity.Error);
+            await ClearPendingAttachmentSelectionAsync();
+            return;
+        }
+
+        isAttachmentBusy = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await using var stream = file.OpenReadStream(MaxAttachmentBytes);
+            await using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+
+            stagedAttachment = BuildAgentAttachment(file.Name, file.ContentType, buffer.ToArray());
+
+            Snackbar.Add("File attached. Add text if you want, then press send.", Severity.Success);
+            await ClearPendingAttachmentSelectionAsync();
+            await InvokeAsync(StateHasChanged);
+            await inputMudTextField.FocusAsync();
+        }
+        catch (IOException)
+        {
+            Snackbar.Add("The selected file could not be read.", Severity.Error);
+            await ClearPendingAttachmentSelectionAsync();
+        }
+        finally
+        {
+            isAttachmentBusy = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ClearPendingAttachmentSelectionAsync()
+    {
+        pendingAttachmentFiles = Array.Empty<IBrowserFile>();
+
+        if (attachmentUpload is not null)
+        {
+            await attachmentUpload.ClearAsync();
+        }
+        else
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ClearStagedAttachmentAsync()
+    {
+        stagedAttachment = null;
+        await ClearPendingAttachmentSelectionAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static AgentChatRequest CreateAgentChatRequest(string? messageText, PendingComposerAttachment? attachment)
+    {
+        string trimmedMessage = messageText?.Trim() ?? string.Empty;
+        if (attachment is null)
+        {
+            return new AgentChatRequest
+            {
+                Message = trimmedMessage,
+                DisplayMessage = trimmedMessage
+            };
+        }
+
+        string displayMessage = string.IsNullOrWhiteSpace(trimmedMessage)
+            ? attachment.DisplayContent
+            : $"{trimmedMessage}\n\n{attachment.DisplayContent}";
+
+        string requestMessage = attachment.RequestAttachment is null
+            ? displayMessage
+            : trimmedMessage;
+
+        return new AgentChatRequest
+        {
+            Message = requestMessage,
+            DisplayMessage = displayMessage,
+            Attachments = attachment.RequestAttachment is null
+                ? null
+                : new[] { attachment.RequestAttachment }
+        };
+    }
+
+    private static PendingComposerAttachment BuildAgentAttachment(string fileName, string? contentType, byte[] fileBytes)
+    {
+        string summary = BuildAttachmentSummary(fileName, contentType, fileBytes.LongLength);
+        string previewText = BuildAttachmentPreviewText(summary);
+
+        if (IsImageAttachment(contentType))
+        {
+            string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "image/*" : contentType;
+            string dataUri = BuildDataUri(resolvedContentType, fileBytes);
+            string displayContent = $"{summary}\n![{EscapeMarkdownLabel(fileName)}]({dataUri})";
+            return new PendingComposerAttachment(
+                fileName,
+                previewText,
+                displayContent,
+                new AgentChatAttachment
+                {
+                    FileName = fileName,
+                    ContentType = resolvedContentType,
+                    DataUri = dataUri
+                });
+        }
+
+        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        {
+            return new PendingComposerAttachment(
+                fileName,
+                previewText,
+                $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>",
+                null);
+        }
+
+        return new PendingComposerAttachment(fileName, previewText, summary, null);
+    }
+
+    private static string BuildDataUri(string contentType, byte[] fileBytes)
+    {
+        return $"data:{contentType};base64,{Convert.ToBase64String(fileBytes)}";
+    }
+
+    private static string BuildAttachmentPreviewText(string summary)
+    {
+        return summary.StartsWith("> ", StringComparison.Ordinal) ? summary[2..] : summary;
+    }
+
+    private static string BuildAttachmentSummary(string fileName, string? contentType, long sizeBytes)
+    {
+        string kind = IsImageAttachment(contentType) ? "Attached image" : "Attached file";
+        string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+        return $"> {kind}: {fileName} ({resolvedContentType}, {FormatAttachmentSize(sizeBytes)})";
+    }
+
+    private static bool IsImageAttachment(string? contentType)
+    {
+        return !string.IsNullOrWhiteSpace(contentType)
+            && contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryReadTextAttachment(string fileName, string? contentType, byte[] fileBytes, out string? extractedText)
+    {
+        extractedText = null;
+        if (!IsTextAttachment(fileName, contentType))
+        {
+            return false;
+        }
+
+        try
+        {
+            string text = Encoding.UTF8.GetString(fileBytes);
+            if (text.IndexOf('\0') >= 0)
+            {
+                return false;
+            }
+
+            text = text.Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (text.Length > MaxExtractedAttachmentCharacters)
+            {
+                text = $"{text[..MaxExtractedAttachmentCharacters]}\n\n[Document truncated after {MaxExtractedAttachmentCharacters} characters.]";
+            }
+
+            extractedText = text.Trim();
+            return !string.IsNullOrWhiteSpace(extractedText);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool IsTextAttachment(string fileName, string? contentType)
+    {
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            if (contentType.StartsWith("text/", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (contentType.Contains("json", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("xml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("yaml", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("csv", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("javascript", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return Path.GetExtension(fileName).ToLowerInvariant() is ".txt" or ".md" or ".markdown" or ".json" or ".xml" or ".csv" or ".log" or ".yml" or ".yaml" or ".html" or ".htm" or ".css" or ".js" or ".ts" or ".tsx" or ".jsx" or ".cs" or ".razor" or ".sql" or ".ps1" or ".sh";
+    }
+
+    private static string FormatAttachmentSize(long sizeBytes)
+    {
+        if (sizeBytes >= 1024 * 1024)
+        {
+            return $"{sizeBytes / (1024d * 1024d):0.##} MB";
+        }
+
+        if (sizeBytes >= 1024)
+        {
+            return $"{sizeBytes / 1024d:0.##} KB";
+        }
+
+        return $"{sizeBytes} B";
+    }
+
+    private static string EscapeMarkdownLabel(string value)
+    {
+        return value.Replace("[", "\\[").Replace("]", "\\]");
+    }
+
     private async Task ScrollToBottom()
     {
         try
@@ -460,10 +752,23 @@
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         streamCts?.Cancel();
         streamCts?.Dispose();
+
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("unregisterEnterToSend", ".agent-chat-composer-input input, .agent-chat-composer-input textarea");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
+        dotNetRef?.Dispose();
     }
 
     private class ChatMessageDisplay
@@ -473,6 +778,8 @@
         public string Content { get; set; } = string.Empty;
         public string RenderKey => $"{Id}:{Role}:{Content}";
     }
+
+    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string DisplayContent, AgentChatAttachment? RequestAttachment);
 
     private string GetStreamingRenderKey()
     {
