@@ -285,7 +285,7 @@
                     AutoFocus="false"
                     Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="HandleInputKeyDown"
                     Lines="1" MaxLines="5" MaxLength="MaxMessageLength" Disabled="@(InputDisabled || !IsEndToEndReady)"
-                    Sizing="InputSizing.Auto" KeyDownPreventDefault="_preventDefault"
+                    Sizing="InputSizing.Auto"
                     Class="channel-composer-input" />
                     <MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary"
                     Size="Size.Medium" Variant="Variant.Filled"
@@ -356,8 +356,6 @@
     private bool IsEndToEndReady { get; set; }
     private string? EncryptionWarning { get; set; }
     private UserDto? CurrentUserProfile { get; set; }
-
-    bool _preventDefault;
 
     // Mention autocomplete state
     private AgentDefinition[]? channelAgentDefs;
@@ -530,15 +528,22 @@
 
     private async Task HandleInputKeyDown(KeyboardEventArgs e)
     {
-        bool isSending = (e.Key == "Enter" || e.Key == "NumpadEnter") && !e.ShiftKey;
-
-        if (isSending && !InputDisabled)
+        if ((e.Key == "Enter" || e.Key == "NumpadEnter") && !e.ShiftKey)
         {
-            await SendMessage();
+            return;
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleComposerEnterKey(bool shiftKey)
+    {
+        if (_disposed || shiftKey || InputDisabled)
+        {
             return;
         }
 
-        _preventDefault = false;
+        await SendMessage();
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]

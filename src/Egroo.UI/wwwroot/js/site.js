@@ -38,20 +38,24 @@ window.registerMentionNavigation = function (selector, dotNetObject) {
 
     const handler = function (event) {
         const mentionPopupActive = document.querySelector('.channel-mention-entry') !== null;
-        const isHandledKey = event.key === 'ArrowDown'
+        const isArrowKey = event.key === 'ArrowDown'
             || event.key === 'Down'
             || event.key === 'ArrowUp'
-            || event.key === 'Up'
-            || event.key === 'Enter'
-            || event.key === 'NumpadEnter';
+            || event.key === 'Up';
+        const isEnterKey = event.key === 'Enter' || event.key === 'NumpadEnter';
 
-        if (!mentionPopupActive || !isHandledKey) {
+        if (mentionPopupActive && (isArrowKey || isEnterKey)) {
+            event.preventDefault();
+            event.stopPropagation();
+            dotNetObject.invokeMethodAsync('HandleMentionNavigationKey', event.key, !!event.shiftKey);
             return;
         }
 
-        event.preventDefault();
-        event.stopPropagation();
-        dotNetObject.invokeMethodAsync('HandleMentionNavigationKey', event.key, !!event.shiftKey);
+        if (!event.shiftKey && isEnterKey) {
+            event.preventDefault();
+            event.stopPropagation();
+            dotNetObject.invokeMethodAsync('HandleComposerEnterKey', false);
+        }
     };
 
     input.__egrooMentionNavigationHandler = handler;
