@@ -1,4 +1,4 @@
-name: chat-deploy
+name: deploy-egroo
 
 on:
   workflow_dispatch:
