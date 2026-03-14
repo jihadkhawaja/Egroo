@@ -155,6 +155,11 @@ else
         ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
         SessionStorage.AppState = AppState.CREATING_SESSION;
         await InvokeAsync(StateHasChanged);
+        if (ChatSignalR.HubConnection is null)
+        {
+            throw new InvalidOperationException("SignalR connection was not initialized.");
+        }
+
         await ChatSignalR.HubConnection.StartAsync();
     }
 

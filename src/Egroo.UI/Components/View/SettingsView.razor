@@ -323,7 +323,7 @@
 
     private async Task UpdateUserDetails()
     {
-        await userForm.Validate();
+        await userForm.ValidateAsync();
         if (!userForm.IsValid)
         {
             await DialogService.ShowMessageBoxAsync("Error", "Please correct the validation errors and try again.");

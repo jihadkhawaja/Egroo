@@ -1,0 +1,9 @@
+@page "/agents/new"
+@page "/agents/{AgentId:guid}/edit"
+
+<AgentEditorView AgentId="@AgentId" />
+
+@code {
+    [Parameter]
+    public Guid? AgentId { get; set; }
+}

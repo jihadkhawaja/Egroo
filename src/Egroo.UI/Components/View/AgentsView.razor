@@ -27,7 +27,7 @@ else
                     <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Large" Color="Color.Default" />
                     <MudText Typo="Typo.h6" Color="Color.Default">No agents yet</MudText>
                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                        Create your first AI agent with your own LLM provider, instructions, knowledge, and tools.
+                        Start with the basics, then keep going in the same setup flow to add knowledge, skills, and tools.
                     </MudText>
                     <MudButton OnClick="OpenCreateDialog" Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Add">Create Agent</MudButton>
@@ -77,6 +77,9 @@ else
                                     @if (agent.IsPublished)
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">Published</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Outlined">
+                                            @(agent.AddPermission == AgentAddPermission.OwnerOnly ? "Owner Only" : "Shared")
+                                        </MudChip>
                                     }
                                 </MudStack>
                             </MudCardContent>
@@ -87,7 +90,7 @@ else
                                            Disabled="@(!agent.IsActive)">Chat</MudButton>
                                 <MudButton Size="Size.Small" Color="Color.Default" Variant="Variant.Text"
                                            StartIcon="@Icons.Material.Filled.Edit"
-                                           OnClick="@(() => OpenEditDialog(agent))">Configure</MudButton>
+                                           OnClick="@(() => OpenEditDialog(agent))">Edit Setup</MudButton>
                                 <MudSpacer />
                                 <MudTooltip Text="@(agent.IsPublished ? "Unpublish" : "Publish")">
                                     <MudIconButton Size="Size.Small"
@@ -134,52 +137,14 @@ else
         }
     }
 
-    private async Task OpenCreateDialog()
+    private void OpenCreateDialog()
     {
-        var parameters = new DialogParameters<AgentConfigDialog>
-        {
-            { x => x.Agent, new AgentDefinition() },
-            { x => x.IsNew, true }
-        };
-
-        var options = new DialogOptions
-        {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseOnEscapeKey = true
-        };
-
-        var dialog = await DialogService.ShowAsync<AgentConfigDialog>("Create Agent", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is not null && !result.Canceled)
-        {
-            await LoadAgents();
-        }
+        NavigationManager.NavigateTo("/agents/new");
     }
 
-    private async Task OpenEditDialog(AgentDefinition agent)
+    private void OpenEditDialog(AgentDefinition agent)
     {
-        var parameters = new DialogParameters<AgentConfigDialog>
-        {
-            { x => x.Agent, agent },
-            { x => x.IsNew, false }
-        };
-
-        var options = new DialogOptions
-        {
-            MaxWidth = MaxWidth.Medium,
-            FullWidth = true,
-            CloseOnEscapeKey = true
-        };
-
-        var dialog = await DialogService.ShowAsync<AgentConfigDialog>("Configure Agent", parameters, options);
-        var result = await dialog.Result;
-
-        if (result is not null && !result.Canceled)
-        {
-            await LoadAgents();
-        }
+        NavigationManager.NavigateTo($"/agents/{agent.Id}/edit");
     }
 
     private async Task ToggleAgent(AgentDefinition agent, bool active)

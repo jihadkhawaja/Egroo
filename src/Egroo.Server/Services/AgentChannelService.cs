@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
 using OpenAI;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace Egroo.Server.Services
@@ -20,31 +21,35 @@ namespace Egroo.Server.Services
     public class AgentChannelService : IAgentChannelResponder
     {
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly AgentSkillsService _agentSkillsService;
         private readonly EncryptionService _encryptionService;
         private readonly McpClientService _mcpClientService;
         private readonly IHubContext<ChatHub> _hubContext;
         private readonly IConnectionTracker _connectionTracker;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<AgentChannelService> _logger;
-
-        /// <summary>
-        /// Raised when an agent produces a response message that should be sent to the channel.
-        /// The hub subscribes to this to broadcast the agent message via SignalR.
-        /// </summary>
-        public event Func<Message, Task>? OnAgentResponse;
+        private readonly ConcurrentDictionary<string, int> _activeTypingStates = new();
 
         public AgentChannelService(
             IServiceScopeFactory scopeFactory,
+            AgentSkillsService agentSkillsService,
             EncryptionService encryptionService,
             McpClientService mcpClientService,
             IHubContext<ChatHub> hubContext,
             IConnectionTracker connectionTracker,
+            ILoggerFactory loggerFactory,
+            IServiceProvider serviceProvider,
             ILogger<AgentChannelService> logger)
         {
             _scopeFactory = scopeFactory;
+            _agentSkillsService = agentSkillsService;
             _encryptionService = encryptionService;
             _mcpClientService = mcpClientService;
             _hubContext = hubContext;
             _connectionTracker = connectionTracker;
+            _loggerFactory = loggerFactory;
+            _serviceProvider = serviceProvider;
             _logger = logger;
         }
 
@@ -118,10 +123,22 @@ namespace Egroo.Server.Services
 
         private async Task GenerateAgentResponseAsync(AgentDefinition agentDef, Message triggerMessage)
         {
+            ChannelTypingState? typingState = null;
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+
+                typingState = new ChannelTypingState
+                {
+                    ChannelId = triggerMessage.ChannelId,
+                    UserId = agentDef.UserId,
+                    AgentDefinitionId = agentDef.Id,
+                    DisplayName = agentDef.Name,
+                    IsAgent = true
+                };
+
+                await StartTypingAsync(dbContext, typingState);
 
                 // Decrypt API key
                 string? apiKey = null;
@@ -150,11 +167,18 @@ namespace Egroo.Server.Services
                 // Build tools
                 var tools = await BuildTools(dbContext, agentDef.Id, agentDef.UserId);
 
+                var skillDirectories = await dbContext.AgentSkillDirectories
+                    .Where(x => x.AgentDefinitionId == agentDef.Id && x.IsEnabled && x.DateDeleted == null)
+                    .OrderBy(x => x.DateCreated)
+                    .ToListAsync();
+
+                var contextProviders = _agentSkillsService.CreateContextProviders(skillDirectories, agentDef.SkillsInstructionPrompt);
+
                 // Create agent
                 AIAgent agent;
                 try
                 {
-                    agent = AgentRuntimeService.CreateAgentStatic(agentDef, apiKey, instructions, tools);
+                    agent = AgentRuntimeService.CreateAgentStatic(agentDef, apiKey, instructions, tools, contextProviders, _loggerFactory, _serviceProvider);
                 }
                 catch (Exception ex)
                 {
@@ -259,6 +283,22 @@ namespace Egroo.Server.Services
                 _logger.LogError(ex, "Error generating agent response for {AgentId} in channel {ChannelId}",
                     agentDef.Id, triggerMessage.ChannelId);
             }
+            finally
+            {
+                if (typingState is not null)
+                {
+                    try
+                    {
+                        using var scope = _scopeFactory.CreateScope();
+                        var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+                        await StopTypingAsync(dbContext, typingState);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to stop typing indicator for agent {AgentId}", agentDef.Id);
+                    }
+                }
+            }
         }
 
         private async Task BroadcastAgentMessage(DataContext dbContext, Message message)
@@ -300,6 +340,60 @@ namespace Egroo.Server.Services
             }
 
             await dbContext.SaveChangesAsync();
+        }
+
+        private async Task StartTypingAsync(DataContext dbContext, ChannelTypingState typingState)
+        {
+            string key = GetTypingKey(typingState);
+            int activeCount = _activeTypingStates.AddOrUpdate(key, 1, (_, current) => current + 1);
+            if (activeCount == 1)
+            {
+                await BroadcastTypingState(dbContext, typingState, "TypingStarted");
+            }
+        }
+
+        private async Task StopTypingAsync(DataContext dbContext, ChannelTypingState typingState)
+        {
+            string key = GetTypingKey(typingState);
+            int remaining = _activeTypingStates.AddOrUpdate(key, 0, (_, current) => Math.Max(current - 1, 0));
+            if (remaining <= 0)
+            {
+                _activeTypingStates.TryRemove(key, out _);
+                await BroadcastTypingState(dbContext, typingState, "TypingStopped");
+            }
+        }
+
+        private async Task BroadcastTypingState(DataContext dbContext, ChannelTypingState typingState, string eventName)
+        {
+            var channelUserIds = await dbContext.ChannelUsers
+                .Where(x => x.ChannelId == typingState.ChannelId)
+                .Select(x => x.UserId)
+                .ToListAsync();
+
+            foreach (var userId in channelUserIds)
+            {
+                var connectionIds = _connectionTracker.GetUserConnectionIds(userId);
+                if (connectionIds.Count == 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await _hubContext.Clients.Clients(connectionIds).SendAsync(eventName, typingState);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to send typing state {EventName} to user {UserId}", eventName, userId);
+                }
+            }
+        }
+
+        private static string GetTypingKey(ChannelTypingState typingState)
+        {
+            return typingState.AgentDefinitionId.HasValue
+                ? $"agent:{typingState.AgentDefinitionId.Value}"
+                : $"user:{typingState.UserId}";
         }
 
         private static async Task<string> BuildInstructions(DataContext dbContext, AgentDefinition agentDef)

@@ -121,7 +121,7 @@ namespace Egroo.UI.Services
 
         public void WriteToJsonFile<T>(string fileName, string path, T objectToWrite, bool append = false, bool encrypt = false, int key = 757) where T : new()
         {
-            TextWriter writer = null;
+            TextWriter? writer = null;
             try
             {
                 string contentsToWriteToFile = JsonSerializer.Serialize(objectToWrite);
@@ -142,9 +142,9 @@ namespace Egroo.UI.Services
                 writer?.Close();
             }
         }
-        public T ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new()
+        public T? ReadFromJsonFile<T>(string fileName, string path, bool isEncrypted = false, int key = 757) where T : new()
         {
-            TextReader reader = null;
+            TextReader? reader = null;
             try
             {
                 reader = new StreamReader(Path.Combine(path, fileName));
@@ -171,7 +171,7 @@ namespace Egroo.UI.Services
 
         public void WriteToJsonFile(string fileName, string path, string objectToWrite, bool append = false, bool encrypt = false, int key = 757)
         {
-            TextWriter writer = null;
+            TextWriter? writer = null;
             try
             {
                 string contentsToWriteToFile = objectToWrite;
@@ -194,7 +194,7 @@ namespace Egroo.UI.Services
         }
         public string ReadFromJsonFile(string fileName, string path, bool isEncrypted = false, int key = 757)
         {
-            TextReader reader = null;
+            TextReader? reader = null;
             try
             {
                 reader = new StreamReader(Path.Combine(path, fileName));
@@ -211,7 +211,7 @@ namespace Egroo.UI.Services
             }
             catch
             {
-                return default;
+                return string.Empty;
             }
             finally
             {

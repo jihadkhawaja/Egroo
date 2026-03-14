@@ -36,8 +36,11 @@ namespace jihadkhawaja.chat.client.Services
                 def.Model,
                 def.ApiKey,
                 def.Endpoint,
+                def.IsPublished,
+                def.AddPermission,
                 def.Temperature,
-                def.MaxTokens
+                def.MaxTokens,
+                def.SkillsInstructionPrompt
             };
 
             var response = await HttpClient.PostAsJsonAsync(BasePath, payload);
@@ -67,8 +70,11 @@ namespace jihadkhawaja.chat.client.Services
                 def.ApiKey,
                 def.Endpoint,
                 def.IsActive,
+                def.IsPublished,
+                def.AddPermission,
                 def.Temperature,
-                def.MaxTokens
+                def.MaxTokens,
+                def.SkillsInstructionPrompt
             };
 
             var response = await HttpClient.PutAsJsonAsync($"{BasePath}/{def.Id}", payload);
@@ -78,6 +84,42 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> DeleteAgent(Guid agentId)
         {
             var response = await HttpClient.DeleteAsync($"{BasePath}/{agentId}");
+            return response.IsSuccessStatusCode;
+        }
+
+        // ── Agent Skills ─────────────────────────────────────────────
+
+        public async Task<AgentSkillDirectory?> AddSkillDirectory(Guid agentId, AgentSkillDirectory skillDirectory)
+        {
+            var payload = new { skillDirectory.Name, skillDirectory.Path, skillDirectory.IsEnabled };
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/{agentId}/skills", payload);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<AgentSkillDirectory>(JsonOptions);
+        }
+
+        public async Task<AgentSkillDirectory?> AddManagedSkill(Guid agentId, string name, string content, string? fileName = null, bool isEnabled = true)
+        {
+            var payload = new { Name = name, Content = content, FileName = fileName, IsEnabled = isEnabled };
+            var response = await HttpClient.PostAsJsonAsync($"{BasePath}/{agentId}/skills/managed", payload);
+            if (!response.IsSuccessStatusCode) return null;
+            return await response.Content.ReadFromJsonAsync<AgentSkillDirectory>(JsonOptions);
+        }
+
+        public async Task<AgentSkillDirectory[]?> GetSkillDirectories(Guid agentId)
+        {
+            return await HttpClient.GetFromJsonAsync<AgentSkillDirectory[]>($"{BasePath}/{agentId}/skills", JsonOptions);
+        }
+
+        public async Task<bool> UpdateSkillDirectory(AgentSkillDirectory skillDirectory)
+        {
+            var payload = new { skillDirectory.Name, skillDirectory.Path, skillDirectory.IsEnabled };
+            var response = await HttpClient.PutAsJsonAsync($"{BasePath}/skills/{skillDirectory.Id}", payload);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> DeleteSkillDirectory(Guid skillDirectoryId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/skills/{skillDirectoryId}");
             return response.IsSuccessStatusCode;
         }
 
@@ -376,6 +418,7 @@ namespace jihadkhawaja.chat.client.Services
     public class SeedResult
     {
         public int Added { get; set; }
+        public int Updated { get; set; }
     }
 
     /// <summary>

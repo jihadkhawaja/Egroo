@@ -1,25 +1,45 @@
 @using jihadkhawaja.chat.client.Services
 @using Microsoft.AspNetCore.Components.Forms
+@inherits ProtectedViewBase
 @inject AgentService AgentService
+@inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<MudDialog>
-    <TitleContent>
-        <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-            <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
-                <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
-            </MudAvatar>
-            <MudStack Spacing="0">
-                <MudText Typo="Typo.h6">@(IsNew ? "Create Agent" : $"Agent Setup: {Agent.Name}")</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
-                    Set the basics first, then add context, tools, and sharing controls.
-                </MudText>
-            </MudStack>
-        </MudStack>
-    </TitleContent>
+@if (IsBusy)
+{
+    <MudProgressLinear Indeterminate Color="Color.Default" />
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="my-4 pt-4 pb-6">
+        <MudStack Spacing="3">
+            <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2 agent-editor-header" Wrap="Wrap.Wrap">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="agent-editor-header__leading">
+                    <MudButton OnClick="CloseEditor" Variant="Variant.Text" Color="Color.Default" StartIcon="@Icons.Material.Filled.ArrowBack">
+                        Back to Agents
+                    </MudButton>
+                    <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">
+                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" />
+                    </MudAvatar>
+                    <MudStack Spacing="0">
+                        <MudText Typo="Typo.h5">@(IsNew ? "Create Agent" : $"Edit Agent: {Agent.Name}")</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                            Set the basics first, then add context, tools, and sharing controls.
+                        </MudText>
+                    </MudStack>
+                </MudStack>
 
-    <DialogContent>
-        <div class="agent-config-shell">
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="1" Class="agent-editor-header__actions">
+                    <MudButton OnClick="CloseEditor" Variant="Variant.Text" Color="Color.Default">Discard</MudButton>
+                    <MudButton OnClick="Save" Variant="Variant.Filled" Color="Color.Primary"
+                               Disabled="@saving"
+                               StartIcon="@(saving ? Icons.Material.Filled.HourglassEmpty : (IsNew ? Icons.Material.Filled.ArrowForward : Icons.Material.Filled.Save))">
+                        @(saving ? "Saving..." : (IsNew ? "Create and Continue" : "Save Changes"))
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+
+            <div class="agent-config-shell">
         <MudStack Spacing="3">
             <MudPaper Class="pa-4 agent-config-hero" Elevation="0" Outlined>
                 <MudGrid Spacing="3">
@@ -77,7 +97,7 @@
             @if (IsNew)
             {
                 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
-                    Save the basics once to unlock skills, knowledge, and tool setup. The dialog stays open after creation so you can keep going.
+                    Save the basics once to unlock skills, knowledge, and tool setup. You will stay on this page after creation so you can keep going.
                 </MudAlert>
             }
 
@@ -238,10 +258,8 @@
                                                 <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
                                                     <MudStack Spacing="0">
                                                         <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                                                            <MudChip T="string" Size="Size.Small" Color="@(IsManagedSkillDirectory(skillDirectory) ? Color.Info : Color.Default)" Variant="Variant.Outlined">
-                                                                @(IsManagedSkillDirectory(skillDirectory) ? "managed" : "path")
-                                                            </MudChip>
-                                                            <MudText Typo="Typo.subtitle2">@GetSkillDirectoryTitle(skillDirectory)</MudText>
+                                                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">skill</MudChip>
+                                                            <MudText Typo="Typo.subtitle2">@skillDirectory.Name</MudText>
                                                         </MudStack>
                                                         <MudText Typo="Typo.caption" Color="Color.Secondary">
                                                             @GetSkillDirectoryDescription(skillDirectory)
@@ -265,13 +283,18 @@
                                     }
 
                                     <MudGrid Spacing="2">
-                                        <MudItem xs="12" md="4">
+                                        <MudItem xs="12" md="6">
                                             <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
                                                 <MudStack Spacing="2">
                                                     <MudText Typo="Typo.subtitle2">Upload skill file</MudText>
                                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
                                                         Upload a markdown skill file. Plain markdown is wrapped into a valid SKILL.md automatically.
                                                     </MudText>
+                                                    <MudTextField @bind-Value="uploadManagedSkillName"
+                                                                  Label="Skill Name"
+                                                                  MaxLength="200"
+                                                                  Placeholder="Release notes helper"
+                                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
                                                     <MudFileUpload T="IReadOnlyList<IBrowserFile>"
                                                                    Accept=".md,text/markdown,text/plain"
                                                                    MaximumFileCount="1"
@@ -291,7 +314,7 @@
                                             </MudPaper>
                                         </MudItem>
 
-                                        <MudItem xs="12" md="4">
+                                        <MudItem xs="12" md="6">
                                             <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
                                                 <MudStack Spacing="2">
                                                     <MudText Typo="Typo.subtitle2">Create skill manually</MudText>
@@ -309,27 +332,6 @@
                                                                StartIcon="@Icons.Material.Filled.Add"
                                                                Disabled="@(addingManagedSkill || string.IsNullOrWhiteSpace(newManagedSkillName) || string.IsNullOrWhiteSpace(newManagedSkillContent))">
                                                         @(addingManagedSkill ? "Adding..." : "Add Skill")
-                                                    </MudButton>
-                                                </MudStack>
-                                            </MudPaper>
-                                        </MudItem>
-
-                                        <MudItem xs="12" md="4">
-                                            <MudPaper Class="pa-3 agent-config-list-item" Elevation="0" Outlined>
-                                                <MudStack Spacing="2">
-                                                    <MudText Typo="Typo.subtitle2">Add server path</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                        Advanced option for existing approved skill folders already present on the server.
-                                                    </MudText>
-                                                    <MudTextField @bind-Value="newSkillDirectoryPath"
-                                                                  Label="Directory Path"
-                                                                  MaxLength="2000"
-                                                                  Placeholder="skills or C:\\agent-skills\\team"
-                                                                  Variant="Variant.Outlined" Margin="Margin.Dense" />
-                                                    <MudButton OnClick="AddSkillDirectory" Variant="Variant.Outlined" Color="Color.Default"
-                                                               StartIcon="@Icons.Material.Filled.FolderOpen"
-                                                               Disabled="@(string.IsNullOrWhiteSpace(newSkillDirectoryPath))">
-                                                        Add Path
                                                     </MudButton>
                                                 </MudStack>
                                             </MudPaper>
@@ -574,39 +576,28 @@
             </MudTabs>
         </MudStack>
         </div>
-    </DialogContent>
 
-    <DialogActions>
-        <MudButton OnClick="CloseDialog" Variant="Variant.Text" Color="Color.Default">@GetDismissLabel()</MudButton>
-        <MudButton OnClick="Save" Variant="Variant.Filled" Color="Color.Primary"
-                   Disabled="@saving"
-                   StartIcon="@(saving ? Icons.Material.Filled.HourglassEmpty : (IsNew ? Icons.Material.Filled.ArrowForward : Icons.Material.Filled.Save))">
-            @(saving ? "Saving..." : (IsNew ? "Create and Continue" : "Save Changes"))
-        </MudButton>
-    </DialogActions>
-</MudDialog>
+        </MudStack>
+    </MudContainer>
+}
 
 @code {
-    [CascadingParameter]
-    private IMudDialogInstance MudDialog { get; set; } = null!;
-
     [Parameter]
-    public AgentDefinition Agent { get; set; } = new();
+    public Guid? AgentId { get; set; }
 
-    [Parameter]
-    public bool IsNew { get; set; }
+    private AgentDefinition Agent { get; set; } = new();
+    private bool IsNew => !AgentId.HasValue;
 
     private MudForm? generalForm;
     private const long MaxManagedSkillUploadBytes = 256 * 1024;
     private bool showApiKey;
     private bool saving;
-    private bool hasSavedChanges;
     private int activeTabIndex;
 
     private AgentSkillDirectory[]? skillDirectories;
-    private string newSkillDirectoryPath = string.Empty;
     private string newManagedSkillName = string.Empty;
     private string newManagedSkillContent = string.Empty;
+    private string uploadManagedSkillName = string.Empty;
     private bool addingManagedSkill;
 
     private AgentKnowledge[]? knowledgeItems;
@@ -624,11 +615,37 @@
     private bool discoveringServer;
     private bool seedingBuiltins;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAccessAsync()
     {
-        if (!IsNew)
+        IsBusy = true;
+
+        try
         {
+            if (IsNew)
+            {
+                Agent = new AgentDefinition();
+                skillDirectories = null;
+                knowledgeItems = null;
+                toolItems = null;
+                mcpServers = null;
+                return;
+            }
+
+            var loadedAgent = await AgentService.GetAgent(AgentId!.Value);
+            if (loadedAgent is null)
+            {
+                Snackbar.Add("Agent not found.", Severity.Error);
+                NavigationManager.NavigateTo("/agents");
+                return;
+            }
+
+            Agent = loadedAgent;
             await LoadConfigurationCollections();
+        }
+        finally
+        {
+            IsBusy = false;
+            StateHasChanged();
         }
     }
 
@@ -673,19 +690,17 @@
                 }
 
                 Agent = created;
-                IsNew = false;
-                hasSavedChanges = true;
                 activeTabIndex = 2;
 
                 await LoadConfigurationCollections();
                 Snackbar.Add("Agent created. Continue with context and tools.", Severity.Success);
+                NavigationManager.NavigateTo($"/agents/{Agent.Id}/edit", false);
                 return;
             }
 
             var success = await AgentService.UpdateAgent(Agent);
             if (success)
             {
-                hasSavedChanges = true;
                 Snackbar.Add("Agent changes saved.", Severity.Success);
             }
             else
@@ -704,15 +719,9 @@
         }
     }
 
-    private void CloseDialog()
+    private void CloseEditor()
     {
-        if (hasSavedChanges)
-        {
-            MudDialog.Close(DialogResult.Ok(Agent));
-            return;
-        }
-
-        MudDialog.Cancel();
+        NavigationManager.NavigateTo("/agents");
     }
 
     private async Task LoadConfigurationCollections()
@@ -723,29 +732,6 @@
     private async Task LoadSkillDirectories()
     {
         skillDirectories = await AgentService.GetSkillDirectories(Agent.Id);
-    }
-
-    private async Task AddSkillDirectory()
-    {
-        var skillDirectory = new AgentSkillDirectory
-        {
-            AgentDefinitionId = Agent.Id,
-            Path = newSkillDirectoryPath.Trim(),
-            IsEnabled = true
-        };
-
-        var result = await AgentService.AddSkillDirectory(Agent.Id, skillDirectory);
-        if (result is not null)
-        {
-            hasSavedChanges = true;
-            newSkillDirectoryPath = string.Empty;
-            await LoadSkillDirectories();
-            Snackbar.Add("Skill directory added.", Severity.Success);
-        }
-        else
-        {
-            Snackbar.Add("Failed to add skill directory.", Severity.Error);
-        }
     }
 
     private async Task OnSkillFilesChanged(IReadOnlyList<IBrowserFile> files)
@@ -764,7 +750,9 @@
 
         using var reader = new StreamReader(file.OpenReadStream(MaxManagedSkillUploadBytes));
         var content = await reader.ReadToEndAsync();
-        var skillName = Path.GetFileNameWithoutExtension(file.Name);
+        var skillName = string.IsNullOrWhiteSpace(uploadManagedSkillName)
+            ? Path.GetFileNameWithoutExtension(file.Name)
+            : uploadManagedSkillName.Trim();
 
         await SaveManagedSkill(skillName, content, file.Name, "Skill file uploaded.");
     }
@@ -794,7 +782,6 @@
                 return;
             }
 
-            hasSavedChanges = true;
             ResetManagedSkillInputs();
             await LoadSkillDirectories();
             Snackbar.Add(successMessage, Severity.Success);
@@ -814,6 +801,7 @@
     {
         newManagedSkillName = string.Empty;
         newManagedSkillContent = string.Empty;
+        uploadManagedSkillName = string.Empty;
     }
 
     private async Task ToggleSkillDirectory(AgentSkillDirectory skillDirectory, bool enabled)
@@ -822,7 +810,6 @@
         var success = await AgentService.UpdateSkillDirectory(skillDirectory);
         if (success)
         {
-            hasSavedChanges = true;
         }
         else
         {
@@ -838,7 +825,6 @@
         var success = await AgentService.DeleteSkillDirectory(skillDirectory.Id);
         if (success)
         {
-            hasSavedChanges = true;
             await LoadSkillDirectories();
             Snackbar.Add("Skill directory removed.", Severity.Info);
         }
@@ -885,7 +871,6 @@
             var updated = await AgentService.UpdateKnowledge(item);
             if (updated)
             {
-                hasSavedChanges = true;
                 await LoadKnowledge();
                 CancelKnowledgeEdit();
                 Snackbar.Add("Knowledge updated.", Severity.Success);
@@ -909,7 +894,6 @@
         var result = await AgentService.AddKnowledge(Agent.Id, newItem);
         if (result is not null)
         {
-            hasSavedChanges = true;
             newKnowledgeTitle = string.Empty;
             newKnowledgeContent = string.Empty;
             await LoadKnowledge();
@@ -927,7 +911,6 @@
         var success = await AgentService.UpdateKnowledge(item);
         if (success)
         {
-            hasSavedChanges = true;
         }
         else
         {
@@ -948,7 +931,6 @@
                 CancelKnowledgeEdit();
             }
 
-            hasSavedChanges = true;
             await LoadKnowledge();
             Snackbar.Add("Knowledge removed.", Severity.Info);
         }
@@ -969,7 +951,6 @@
         var success = await AgentService.UpdateTool(tool);
         if (success)
         {
-            hasSavedChanges = true;
         }
         else
         {
@@ -990,7 +971,6 @@
             var result = await AgentService.SeedBuiltinTools(Agent.Id);
             if (result is not null && (result.Added > 0 || result.Updated > 0))
             {
-                hasSavedChanges = true;
                 var changes = new List<string>();
                 if (result.Added > 0)
                 {
@@ -1046,7 +1026,6 @@
                 return;
             }
 
-            hasSavedChanges = true;
             newMcpName = string.Empty;
             newMcpEndpoint = string.Empty;
             newMcpApiKey = string.Empty;
@@ -1072,7 +1051,6 @@
         var success = await AgentService.UpdateMcpServer(server);
         if (success)
         {
-            hasSavedChanges = true;
             await LoadMcpServers();
         }
         else
@@ -1092,7 +1070,6 @@
             var result = await AgentService.DiscoverMcpTools(server.Id);
             if (result is not null)
             {
-                hasSavedChanges = true;
                 Snackbar.Add($"Discovered {result.Discovered} tool(s) from {server.Name}.", Severity.Success);
                 await Task.WhenAll(LoadTools(), LoadMcpServers());
             }
@@ -1117,7 +1094,6 @@
         var success = await AgentService.DeleteMcpServer(server.Id);
         if (success)
         {
-            hasSavedChanges = true;
             await Task.WhenAll(LoadTools(), LoadMcpServers());
             Snackbar.Add("MCP server removed.", Severity.Info);
         }
@@ -1140,32 +1116,10 @@
 
     private bool RequiresApiKeyOnCreate() => IsNew && Agent.Provider != LlmProvider.Ollama;
 
-    private static bool IsManagedSkillDirectory(AgentSkillDirectory skillDirectory) =>
-        NormalizeSkillPath(skillDirectory.Path).StartsWith("skills/managed/agents/", StringComparison.OrdinalIgnoreCase);
-
-    private static string GetSkillDirectoryTitle(AgentSkillDirectory skillDirectory)
-    {
-        if (!IsManagedSkillDirectory(skillDirectory))
-        {
-            return skillDirectory.Path;
-        }
-
-        var lastSegment = NormalizeSkillPath(skillDirectory.Path).Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? skillDirectory.Path;
-        if (lastSegment.Length > 9 && lastSegment[^9] == '-')
-        {
-            lastSegment = lastSegment[..^9];
-        }
-
-        return string.Join(' ', lastSegment.Split('-', StringSplitOptions.RemoveEmptyEntries)
-            .Select(token => char.ToUpperInvariant(token[0]) + token[1..]));
-    }
-
     private static string GetSkillDirectoryDescription(AgentSkillDirectory skillDirectory)
     {
         var stateText = skillDirectory.IsEnabled ? "Enabled for agent runs." : "Saved but disabled.";
-        return IsManagedSkillDirectory(skillDirectory)
-            ? $"{stateText} Managed folder: {NormalizeSkillPath(skillDirectory.Path)}"
-            : $"{stateText} Directory path: {NormalizeSkillPath(skillDirectory.Path)}";
+        return $"{stateText} Stored at {NormalizeSkillPath(skillDirectory.Path)}";
     }
 
     private static string NormalizeSkillPath(string path) => path.Replace('\\', '/');
@@ -1203,8 +1157,6 @@
         : Agent.AddPermission == AgentAddPermission.OwnerOnly
             ? "Published, owner only"
             : "Published, shared";
-
-    private string GetDismissLabel() => hasSavedChanges || !IsNew ? "Close" : "Cancel";
 
     private static string GetChecklistIcon(bool completed) => completed
         ? Icons.Material.Filled.CheckCircle

@@ -18,7 +18,7 @@
 @inject StorageService StorageService
 @inject NavigationManager NavigationManager
 @inject IUser ChatUserService
-@inject IMessageHub ChatMessageService
+@inject ChatMessageService ChatMessageService
 @inject IChannel ChatChannelService
 @inject ChatCallService ChatCallService
 @inject IJSRuntime JSRuntime
@@ -136,6 +136,19 @@
             </div>
             <!-- Input Area -->
             <div style="flex-shrink: 0; padding: 12px 16px 16px; background: var(--mud-palette-background); position: relative;">
+                @if (TypingParticipants.Count > 0)
+                {
+                    <div class="typing-indicator-shell">
+                        <MudPaper Class="typing-indicator-bubble" Elevation="0">
+                            <div class="typing-indicator-dots" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <MudText Typo="Typo.caption">@GetTypingSummary()</MudText>
+                        </MudPaper>
+                    </div>
+                }
                 @if (showMentionPopup && filteredMentionAgents.Count > 0)
                 {
                     <MudPaper Class="pa-2 rounded-lg" Elevation="8"
@@ -251,8 +264,15 @@
     private bool _disposed;
     private bool _needsScrollToBottom;
     private bool _needsScrollToBottomIfNearBottom;
+    private bool _isTyping;
+    private CancellationTokenSource? _typingDebounceCts;
+    private Dictionary<string, ChannelTypingState> TypingParticipants { get; set; } = new();
 
     // Stored event delegates for unsubscription
+    private Func<Message, Task>? _onMessageReceived;
+    private Func<Message, Task>? _onMessageUpdated;
+    private Func<ChannelTypingState, Task>? _onTypingStarted;
+    private Func<ChannelTypingState, Task>? _onTypingStopped;
     private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
     private Func<Guid, Guid, Task>? _onUserJoinedCall;
     private Func<Guid, Guid, Task>? _onUserLeftCall;
@@ -268,6 +288,7 @@
         RegisterCallEvents();
         CacheDB = new EgrooDB(BlazorDexieOptions);
         Messages = new();
+        TypingParticipants.Clear();
 
         // Register DotNet object reference for JS interop callbacks
         dotNetRef = DotNetObjectReference.Create(this);
@@ -348,14 +369,19 @@
         if (string.IsNullOrWhiteSpace(InputContent))
             return;
 
+        var currentUser = SessionStorage.User;
+        if (currentUser is null)
+            return;
+
+        await StopTypingAsync();
         InputDisabled = true;
 
         Message message = new()
         {
             ChannelId = GetChannelId(),
-            DisplayName = SessionStorage?.User?.Username,
+            DisplayName = currentUser.Username,
             Content = InputContent.Trim(),
-            SenderId = SessionStorage.User!.Id,
+            SenderId = currentUser.Id,
         };
 
         if (await ChatMessageService.SendMessage(message))
@@ -389,6 +415,7 @@
     {
         InputContent = text;
         UpdateMentionPopup(text);
+        _ = HandleTypingInputAsync(text);
     }
 
     private void UpdateMentionPopup(string? text)
@@ -467,7 +494,7 @@
 
     private void RegisterMessagingEvents()
     {
-        ChatSignalR.HubConnection?.On<Message>("ReceiveMessage", async message =>
+        _onMessageReceived = async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;
@@ -484,6 +511,8 @@
             {
                 message.DisplayName = senderUser?.Username;
             }
+
+            RemoveTypingParticipantForMessage(message);
             Messages.Add(message);
 
             if (message.DateSeen is null && message.SenderId != SessionStorage.User?.Id)
@@ -496,9 +525,10 @@
             else
                 _needsScrollToBottomIfNearBottom = true;
             await InvokeAsync(StateHasChanged);
-        });
+        };
+        ChatMessageService.OnMessageReceived += _onMessageReceived;
 
-        ChatSignalR.HubConnection?.On<Message>("UpdateMessage", async message =>
+        _onMessageUpdated = async message =>
         {
             if (message.ChannelId != GetChannelId())
                 return;
@@ -514,7 +544,151 @@
                     return;
                 }
             }
-        });
+        };
+        ChatMessageService.OnMessageUpdated += _onMessageUpdated;
+
+        _onTypingStarted = async typingState =>
+        {
+            if (_disposed || typingState.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            if (!typingState.IsAgent && typingState.UserId == SessionStorage.User?.Id)
+            {
+                return;
+            }
+
+            TypingParticipants[GetTypingParticipantKey(typingState)] = typingState;
+            await InvokeAsync(StateHasChanged);
+        };
+        ChatMessageService.OnTypingStarted += _onTypingStarted;
+
+        _onTypingStopped = async typingState =>
+        {
+            if (_disposed || typingState.ChannelId != GetChannelId())
+            {
+                return;
+            }
+
+            TypingParticipants.Remove(GetTypingParticipantKey(typingState));
+            await InvokeAsync(StateHasChanged);
+        };
+        ChatMessageService.OnTypingStopped += _onTypingStopped;
+    }
+
+    private async Task HandleTypingInputAsync(string? text)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            await StopTypingAsync();
+            return;
+        }
+
+        if (!_isTyping)
+        {
+            _isTyping = true;
+            try
+            {
+                await ChatMessageService.StartTyping(GetChannelId());
+            }
+            catch
+            {
+                _isTyping = false;
+                return;
+            }
+        }
+
+        _typingDebounceCts?.Cancel();
+        _typingDebounceCts?.Dispose();
+        _typingDebounceCts = new CancellationTokenSource();
+        _ = StopTypingAfterDelayAsync(_typingDebounceCts.Token);
+    }
+
+    private async Task StopTypingAfterDelayAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(1500, token);
+            await StopTypingAsync();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private async Task StopTypingAsync()
+    {
+        _typingDebounceCts?.Cancel();
+        _typingDebounceCts?.Dispose();
+        _typingDebounceCts = null;
+
+        if (!_isTyping)
+        {
+            return;
+        }
+
+        _isTyping = false;
+
+        try
+        {
+            await ChatMessageService.StopTyping(GetChannelId());
+        }
+        catch
+        {
+        }
+    }
+
+    private void RemoveTypingParticipantForMessage(Message message)
+    {
+        if (message.AgentDefinitionId.HasValue && message.AgentDefinitionId != Guid.Empty)
+        {
+            TypingParticipants.Remove($"agent:{message.AgentDefinitionId.Value}");
+            return;
+        }
+
+        TypingParticipants.Remove($"user:{message.SenderId}");
+    }
+
+    private static string GetTypingParticipantKey(ChannelTypingState typingState)
+    {
+        return typingState.AgentDefinitionId.HasValue && typingState.AgentDefinitionId != Guid.Empty
+            ? $"agent:{typingState.AgentDefinitionId.Value}"
+            : $"user:{typingState.UserId}";
+    }
+
+    private string GetTypingSummary()
+    {
+        var typers = TypingParticipants.Values
+            .OrderByDescending(x => x.IsAgent)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => x.DisplayName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Cast<string>()
+            .ToList();
+
+        if (typers.Count == 0)
+        {
+            return "Someone is typing...";
+        }
+
+        if (typers.Count == 1)
+        {
+            return $"{typers[0]} is typing...";
+        }
+
+        if (typers.Count == 2)
+        {
+            return $"{typers[0]} and {typers[1]} are typing...";
+        }
+
+        int remaining = typers.Count - 2;
+        return $"{typers[0]}, {typers[1]}, and {remaining} other{(remaining == 1 ? string.Empty : "s")} are typing...";
     }
 
     #region Channel Voice Call
@@ -839,7 +1013,17 @@
 
     public async ValueTask DisposeAsync()
     {
+        await StopTypingAsync();
         _disposed = true;
+
+        if (_onMessageReceived is not null)
+            ChatMessageService.OnMessageReceived -= _onMessageReceived;
+        if (_onMessageUpdated is not null)
+            ChatMessageService.OnMessageUpdated -= _onMessageUpdated;
+        if (_onTypingStarted is not null)
+            ChatMessageService.OnTypingStarted -= _onTypingStarted;
+        if (_onTypingStopped is not null)
+            ChatMessageService.OnTypingStopped -= _onTypingStopped;
 
         // Unsubscribe all event handlers
         if (_onExistingCallParticipants is not null)

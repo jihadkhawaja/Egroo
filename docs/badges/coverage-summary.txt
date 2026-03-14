@@ -1,0 +1,40 @@
+Summary - Egroo Server Coverage
+  Generated on: 3/14/2026 - 4:54:24 PM
+  Coverage date: 3/14/2026 - 4:45:35 PM
+  Parser: Cobertura
+  Assemblies: 4
+  Classes: 117
+  Files: 103
+  Line coverage: 6.5%
+  Covered lines: 1210
+  Uncovered lines: 17266
+  Coverable lines: 18476
+  Total lines: 23382
+  Branch coverage: 21.7% (239 of 1101)
+  Covered branches: 239
+  Total branches: 1101
+  Method coverage: 26.6% (177 of 665)
+  Full method coverage: 19% (127 of 665)
+  Covered methods: 177
+  Fully covered methods: 127
+  Total methods: 665
+
+Egroo.Server                                                              6.2%
+  Egroo.Server.API.AgentChatRequest                                         0%
+  Egroo.Server.API.AgentEndpoint                                            0%
+  Egroo.Server.API.AuthEndpoint                                             0%
+  Egroo.Server.API.ChangePasswordRequest                                    0%
+  Egroo.Server.API.CreateAgentRequest                                       0%
+  Egroo.Server.API.CreateConversationRequest                                0%
+  Egroo.Server.API.CreateKnowledgeRequest                                   0%
+  Egroo.Server.API.CreateMcpServerRequest                                   0%
+  Egroo.Server.API.CreateSkillDirectoryRequest                              0%
+  Egroo.Server.API.CreateToolRequest                                        0%
+  Egroo.Server.API.SignInRequest                                            0%
+  Egroo.Server.API.SignUpRequest                                            0%
+  Egroo.Server.API.UpdateAgentRequest                                       0%
+  Egroo.Server.API.UpdateKnowledgeRequest                                   0%
+  Egroo.Server.API.UpdateMcpServerRequest                                   0%
+  Egroo.Server.API.UpdateSkillDirectoryRequest                              0%
+  Egroo.Server.API.UpdateToolRequest                                        0%
+  Egroo.Server.Authorization.TokenGenerator                              91.6%

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.AI;
+using jihadkhawaja.chat.shared.Models;
 using System.ComponentModel;
 using System.Globalization;
 using System.Text;
@@ -38,19 +39,19 @@ namespace Egroo.Server.Services
             new()
             {
                 Name = "search_published_agents",
-                Description = "Search for published AI agents on the platform by name or description. Use this to discover agents that can be added as friends and invited to channels.",
+                Description = "Search for published AI agents on the platform by name or description. Returns agents you own plus agents other users have allowed to be added.",
                 ParametersSchema = """{"type":"object","properties":{"query":{"type":"string","description":"Search term to find agents by name or description"},"max_results":{"type":"integer","description":"Maximum number of results to return (default: 10)"}},"required":["query"]}"""
             },
             new()
             {
                 Name = "add_agent_friend",
-                Description = "Add a published AI agent as a friend. The agent must be published. Once added as a friend, the agent can be invited to channels.",
+                Description = "Add a published AI agent as a friend. The agent must be published and shared by its owner for other users.",
                 ParametersSchema = """{"type":"object","properties":{"agent_id":{"type":"string","description":"The unique ID (GUID) of the published agent to add as friend"}},"required":["agent_id"]}"""
             },
             new()
             {
                 Name = "add_agent_to_channel",
-                Description = "Add an AI agent to a channel. The caller must be an admin of the channel. The agent must be owned by the caller or be a published agent that the caller has added as a friend.",
+                Description = "Add an AI agent to a channel. The caller must be an admin of the channel. The agent must be owned by the caller or be a published shared agent that the caller has added as a friend.",
                 ParametersSchema = """{"type":"object","properties":{"channel_id":{"type":"string","description":"The unique ID (GUID) of the channel to add the agent to"},"agent_id":{"type":"string","description":"The unique ID (GUID) of the agent to add"}},"required":["channel_id","agent_id"]}"""
             }
         ];
@@ -86,7 +87,7 @@ namespace Egroo.Server.Services
                 AIFunctionFactory.Create(
                     ([Description("Search term to find agents by name or description")] string query,
                      [Description("Maximum number of results to return (default: 10)")] int? max_results) =>
-                        SearchPublishedAgentsImpl(scopeFactory, query, max_results ?? 10),
+                        SearchPublishedAgentsImpl(scopeFactory, callerUserId, query, max_results ?? 10),
                     "search_published_agents",
                     "Search for published AI agents on the platform by name or description."),
 
@@ -240,16 +241,18 @@ namespace Egroo.Server.Services
 
         // ── Agent Platform Interaction Implementations ───────────────
 
-        private static async Task<string> SearchPublishedAgentsImpl(IServiceScopeFactory scopeFactory, string query, int maxResults)
+        private static async Task<string> SearchPublishedAgentsImpl(IServiceScopeFactory scopeFactory, Guid callerUserId, string query, int maxResults)
         {
             using var scope = scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<Database.DataContext>();
+            var lowerQuery = query.ToLower();
 
             var agents = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
                 dbContext.AgentDefinitions
                     .Where(x => x.IsPublished && x.IsActive && x.DateDeleted == null
-                        && (x.Name.ToLower().Contains(query.ToLower())
-                            || (x.Description != null && x.Description.ToLower().Contains(query.ToLower()))))
+                        && (x.UserId == callerUserId || x.AddPermission == AgentAddPermission.OwnerAndOthers)
+                        && (x.Name.ToLower().Contains(lowerQuery)
+                            || (x.Description != null && x.Description.ToLower().Contains(lowerQuery))))
                     .OrderByDescending(x => x.DateCreated)
                     .Take(maxResults));
 
@@ -266,6 +269,7 @@ namespace Egroo.Server.Services
                 if (!string.IsNullOrWhiteSpace(a.Description))
                     sb.AppendLine($"    Description: {a.Description}");
                 sb.AppendLine($"    Provider: {a.Provider}, Model: {a.Model}");
+                sb.AppendLine($"    Add permission: {(a.AddPermission == AgentAddPermission.OwnerOnly ? "owner only" : "owner and other users")}");
             }
             return sb.ToString();
         }
@@ -287,6 +291,11 @@ namespace Egroo.Server.Services
             if (agent is null)
             {
                 return "Agent not found or is not published.";
+            }
+
+            if (agent.UserId != callerUserId && agent.AddPermission == AgentAddPermission.OwnerOnly)
+            {
+                return "This agent can only be added by its owner.";
             }
 
             var existing = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
@@ -345,6 +354,23 @@ namespace Egroo.Server.Services
             if (agent.UserId != callerUserId && !agent.IsPublished)
             {
                 return "Agent is not published and you are not the owner.";
+            }
+
+            if (agent.UserId != callerUserId && agent.AddPermission == AgentAddPermission.OwnerOnly)
+            {
+                return "This agent can only be added by its owner.";
+            }
+
+            if (agent.UserId != callerUserId)
+            {
+                var isFriend = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                    dbContext.UserAgentFriends,
+                    x => x.UserId == callerUserId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+
+                if (!isFriend)
+                {
+                    return "Add this agent as a friend before inviting it to a channel.";
+                }
             }
 
             var existing = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(

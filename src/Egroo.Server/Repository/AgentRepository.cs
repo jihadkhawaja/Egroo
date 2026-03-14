@@ -103,8 +103,11 @@ namespace Egroo.Server.Repository
             existing.Model = definition.Model;
             existing.Endpoint = definition.Endpoint;
             existing.IsActive = definition.IsActive;
+            existing.IsPublished = definition.IsPublished;
+            existing.AddPermission = definition.AddPermission;
             existing.Temperature = definition.Temperature;
             existing.MaxTokens = definition.MaxTokens;
+            existing.SkillsInstructionPrompt = definition.SkillsInstructionPrompt;
             existing.DateUpdated = DateTimeOffset.UtcNow;
             existing.UpdatedBy = userId.Value;
 
@@ -155,6 +158,168 @@ namespace Egroo.Server.Repository
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to delete agent definition");
+                return false;
+            }
+        }
+
+        // ── Agent Skills ────────────────────────────────────────────────
+
+        public async Task<AgentSkillDirectory?> AddSkillDirectory(AgentSkillDirectory skillDirectory)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return null;
+            }
+
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == skillDirectory.AgentDefinitionId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return null;
+            }
+
+            skillDirectory.Id = Guid.NewGuid();
+            skillDirectory.DateCreated = DateTimeOffset.UtcNow;
+            skillDirectory.CreatedBy = userId.Value;
+
+            try
+            {
+                await _dbContext.AgentSkillDirectories.AddAsync(skillDirectory);
+                await _dbContext.SaveChangesAsync();
+                return skillDirectory;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to add agent skill directory");
+                return null;
+            }
+        }
+
+        public async Task<AgentSkillDirectory?> GetSkillDirectory(Guid skillDirectoryId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return null;
+            }
+
+            var skillDirectory = await _dbContext.AgentSkillDirectories
+                .FirstOrDefaultAsync(x => x.Id == skillDirectoryId && x.DateDeleted == null);
+
+            if (skillDirectory is null)
+            {
+                return null;
+            }
+
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == skillDirectory.AgentDefinitionId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            return agent is null ? null : skillDirectory;
+        }
+
+        public async Task<AgentSkillDirectory[]?> GetAgentSkillDirectories(Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return null;
+            }
+
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == agentId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return null;
+            }
+
+            return await _dbContext.AgentSkillDirectories
+                .Where(x => x.AgentDefinitionId == agentId && x.DateDeleted == null)
+                .OrderBy(x => x.DateCreated)
+                .ToArrayAsync();
+        }
+
+        public async Task<bool> UpdateSkillDirectory(AgentSkillDirectory skillDirectory)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            var existing = await _dbContext.AgentSkillDirectories
+                .FirstOrDefaultAsync(x => x.Id == skillDirectory.Id && x.DateDeleted == null);
+
+            if (existing is null)
+            {
+                return false;
+            }
+
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == existing.AgentDefinitionId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return false;
+            }
+
+            existing.Path = skillDirectory.Path;
+            existing.Name = skillDirectory.Name;
+            existing.IsEnabled = skillDirectory.IsEnabled;
+            existing.DateUpdated = DateTimeOffset.UtcNow;
+            existing.UpdatedBy = userId.Value;
+
+            try
+            {
+                _dbContext.AgentSkillDirectories.Update(existing);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update agent skill directory");
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteSkillDirectory(Guid skillDirectoryId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return false;
+            }
+
+            var existing = await _dbContext.AgentSkillDirectories
+                .FirstOrDefaultAsync(x => x.Id == skillDirectoryId && x.DateDeleted == null);
+
+            if (existing is null)
+            {
+                return false;
+            }
+
+            var agent = await _dbContext.AgentDefinitions
+                .FirstOrDefaultAsync(x => x.Id == existing.AgentDefinitionId && x.UserId == userId.Value && x.DateDeleted == null);
+
+            if (agent is null)
+            {
+                return false;
+            }
+
+            existing.DateDeleted = DateTimeOffset.UtcNow;
+            existing.DeletedBy = userId.Value;
+
+            try
+            {
+                _dbContext.AgentSkillDirectories.Update(existing);
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete agent skill directory");
                 return false;
             }
         }
@@ -952,6 +1117,8 @@ namespace Egroo.Server.Repository
 
         public async Task<AgentDefinition[]?> SearchPublishedAgents(string query, int maxResults = 20)
         {
+            var userId = GetConnectorUserId();
+
             if (string.IsNullOrWhiteSpace(query))
             {
                 return Array.Empty<AgentDefinition>();
@@ -961,6 +1128,8 @@ namespace Egroo.Server.Repository
 
             return await _dbContext.AgentDefinitions
                 .Where(x => x.IsPublished && x.IsActive && x.DateDeleted == null
+                    && (x.AddPermission == AgentAddPermission.OwnerAndOthers
+                        || (userId.HasValue && x.UserId == userId.Value))
                     && (x.Name.ToLower().Contains(lowerQuery)
                         || (x.Description != null && x.Description.ToLower().Contains(lowerQuery))))
                 .OrderByDescending(x => x.DateCreated)
@@ -970,8 +1139,15 @@ namespace Egroo.Server.Repository
 
         public async Task<AgentDefinition?> GetPublishedAgent(Guid agentId)
         {
+            var userId = GetConnectorUserId();
+
             return await _dbContext.AgentDefinitions
-                .FirstOrDefaultAsync(x => x.Id == agentId && x.IsPublished && x.IsActive && x.DateDeleted == null);
+                .FirstOrDefaultAsync(x => x.Id == agentId
+                    && x.IsPublished
+                    && x.IsActive
+                    && x.DateDeleted == null
+                    && (x.AddPermission == AgentAddPermission.OwnerAndOthers
+                        || (userId.HasValue && x.UserId == userId.Value)));
         }
 
         // ── Agent Friends ────────────────────────────────────────────────
@@ -989,6 +1165,11 @@ namespace Egroo.Server.Repository
                 .FirstOrDefaultAsync(x => x.Id == agentId && x.IsPublished && x.IsActive && x.DateDeleted == null);
 
             if (agent is null)
+            {
+                return false;
+            }
+
+            if (agent.UserId != userId.Value && agent.AddPermission == AgentAddPermission.OwnerOnly)
             {
                 return false;
             }
@@ -1114,6 +1295,11 @@ namespace Egroo.Server.Repository
             if (agent.UserId != userId.Value)
             {
                 if (!agent.IsPublished)
+                {
+                    return false;
+                }
+
+                if (agent.AddPermission == AgentAddPermission.OwnerOnly)
                 {
                     return false;
                 }

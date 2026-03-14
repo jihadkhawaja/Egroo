@@ -15,19 +15,28 @@ namespace Egroo.Server.Services
     public class AgentRuntimeService
     {
         private readonly IServiceScopeFactory _scopeFactory;
+        private readonly AgentSkillsService _agentSkillsService;
         private readonly EncryptionService _encryptionService;
         private readonly McpClientService _mcpClientService;
+        private readonly ILoggerFactory _loggerFactory;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<AgentRuntimeService> _logger;
 
         public AgentRuntimeService(
             IServiceScopeFactory scopeFactory,
+            AgentSkillsService agentSkillsService,
             EncryptionService encryptionService,
             McpClientService mcpClientService,
+            ILoggerFactory loggerFactory,
+            IServiceProvider serviceProvider,
             ILogger<AgentRuntimeService> logger)
         {
             _scopeFactory = scopeFactory;
+            _agentSkillsService = agentSkillsService;
             _encryptionService = encryptionService;
             _mcpClientService = mcpClientService;
+            _loggerFactory = loggerFactory;
+            _serviceProvider = serviceProvider;
             _logger = logger;
         }
 
@@ -84,11 +93,13 @@ namespace Egroo.Server.Services
             // Build function tools from agent tool definitions
             var tools = await BuildTools(dbContext, agentDef.Id, userId);
 
+            var skillDirectories = await BuildSkillDirectories(dbContext, agentDef.Id);
+
             // Create the AIAgent via Microsoft Agent Framework
             AIAgent agent;
             try
             {
-                agent = CreateAgent(agentDef, apiKey, instructions, tools);
+                agent = CreateAgent(agentDef, apiKey, instructions, tools, skillDirectories);
             }
             catch (Exception ex)
             {
@@ -191,12 +202,13 @@ namespace Egroo.Server.Services
 
             string instructions = await BuildInstructions(dbContext, agentDef);
             var tools = await BuildTools(dbContext, agentDef.Id, userId);
+            var skillDirectories = await BuildSkillDirectories(dbContext, agentDef.Id);
 
             AIAgent agent;
             string? createError = null;
             try
             {
-                agent = CreateAgent(agentDef, apiKey, instructions, tools);
+                agent = CreateAgent(agentDef, apiKey, instructions, tools, skillDirectories);
             }
             catch (Exception ex)
             {
@@ -401,31 +413,54 @@ namespace Egroo.Server.Services
             return tools;
         }
 
+        private static async Task<List<AgentSkillDirectory>> BuildSkillDirectories(DataContext dbContext, Guid agentId)
+        {
+            return await dbContext.AgentSkillDirectories
+                .Where(x => x.AgentDefinitionId == agentId && x.IsEnabled && x.DateDeleted == null)
+                .OrderBy(x => x.DateCreated)
+                .ToListAsync();
+        }
+
         /// <summary>
         /// Create an AIAgent instance based on the provider configuration.
         /// Uses Microsoft Agent Framework extension methods for each provider.
         /// </summary>
-        private static AIAgent CreateAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        private AIAgent CreateAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools, IReadOnlyList<AgentSkillDirectory> skillDirectories)
         {
-            return CreateAgentStatic(agentDef, apiKey, instructions, tools);
+            var contextProviders = _agentSkillsService.CreateContextProviders(skillDirectories, agentDef.SkillsInstructionPrompt);
+            return CreateAgentStatic(agentDef, apiKey, instructions, tools, contextProviders, _loggerFactory, _serviceProvider);
         }
 
         /// <summary>
         /// Public static factory for creating an AIAgent. Used by AgentChannelService for channel mentions.
         /// </summary>
-        internal static AIAgent CreateAgentStatic(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        internal static AIAgent CreateAgentStatic(
+            AgentDefinition agentDef,
+            string? apiKey,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders = null,
+            ILoggerFactory? loggerFactory = null,
+            IServiceProvider? serviceProvider = null)
         {
             return agentDef.Provider switch
             {
-                LlmProvider.OpenAI => CreateOpenAIAgent(agentDef, apiKey, instructions, tools),
-                LlmProvider.AzureOpenAI => CreateAzureOpenAIAgent(agentDef, apiKey, instructions, tools),
-                LlmProvider.Anthropic => CreateAnthropicAgent(agentDef, apiKey, instructions, tools),
-                LlmProvider.Ollama => CreateOllamaAgent(agentDef, instructions, tools),
+                LlmProvider.OpenAI => CreateOpenAIAgent(agentDef, apiKey, instructions, tools, contextProviders, loggerFactory, serviceProvider),
+                LlmProvider.AzureOpenAI => CreateAzureOpenAIAgent(agentDef, apiKey, instructions, tools, contextProviders, loggerFactory, serviceProvider),
+                LlmProvider.Anthropic => CreateAnthropicAgent(agentDef, apiKey, instructions, tools, contextProviders, loggerFactory, serviceProvider),
+                LlmProvider.Ollama => CreateOllamaAgent(agentDef, instructions, tools, contextProviders, loggerFactory, serviceProvider),
                 _ => throw new NotSupportedException($"Provider {agentDef.Provider} is not supported.")
             };
         }
 
-        private static AIAgent CreateOpenAIAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        private static AIAgent CreateOpenAIAgent(
+            AgentDefinition agentDef,
+            string? apiKey,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders,
+            ILoggerFactory? loggerFactory,
+            IServiceProvider? serviceProvider)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -437,12 +472,20 @@ namespace Egroo.Server.Services
 
             return OpenAI.Chat.OpenAIChatClientExtensions.AsAIAgent(
                 chatClient,
-                instructions: instructions,
-                name: agentDef.Name,
-                tools: tools.Count > 0 ? tools : null);
+                CreateAgentOptions(agentDef, instructions, tools, contextProviders),
+                null,
+                loggerFactory,
+                serviceProvider);
         }
 
-        private static AIAgent CreateAzureOpenAIAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        private static AIAgent CreateAzureOpenAIAgent(
+            AgentDefinition agentDef,
+            string? apiKey,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders,
+            ILoggerFactory? loggerFactory,
+            IServiceProvider? serviceProvider)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -460,12 +503,20 @@ namespace Egroo.Server.Services
 
             return OpenAI.Chat.OpenAIChatClientExtensions.AsAIAgent(
                 chatClient,
-                instructions: instructions,
-                name: agentDef.Name,
-                tools: tools.Count > 0 ? tools : null);
+                CreateAgentOptions(agentDef, instructions, tools, contextProviders),
+                null,
+                loggerFactory,
+                serviceProvider);
         }
 
-        private static AIAgent CreateAnthropicAgent(AgentDefinition agentDef, string? apiKey, string instructions, IList<AITool> tools)
+        private static AIAgent CreateAnthropicAgent(
+            AgentDefinition agentDef,
+            string? apiKey,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders,
+            ILoggerFactory? loggerFactory,
+            IServiceProvider? serviceProvider)
         {
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -476,13 +527,19 @@ namespace Egroo.Server.Services
 
             return Anthropic.AnthropicClientExtensions.AsAIAgent(
                 client,
-                model: agentDef.Model,
-                instructions: instructions,
-                name: agentDef.Name,
-                tools: tools.Count > 0 ? tools : null);
+                CreateAgentOptions(agentDef, instructions, tools, contextProviders),
+                null,
+                loggerFactory,
+                serviceProvider);
         }
 
-        private static AIAgent CreateOllamaAgent(AgentDefinition agentDef, string instructions, IList<AITool> tools)
+        private static AIAgent CreateOllamaAgent(
+            AgentDefinition agentDef,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders,
+            ILoggerFactory? loggerFactory,
+            IServiceProvider? serviceProvider)
         {
             var endpoint = string.IsNullOrWhiteSpace(agentDef.Endpoint)
                 ? "http://localhost:11434"
@@ -493,9 +550,32 @@ namespace Egroo.Server.Services
                 modelId: agentDef.Model);
 
             return chatClient.AsAIAgent(
-                instructions: instructions,
-                name: agentDef.Name,
-                tools: tools.Count > 0 ? tools : null);
+                CreateAgentOptions(agentDef, instructions, tools, contextProviders),
+                loggerFactory,
+                serviceProvider);
+        }
+
+        private static ChatClientAgentOptions CreateAgentOptions(
+            AgentDefinition agentDef,
+            string instructions,
+            IList<AITool> tools,
+            IReadOnlyList<AIContextProvider>? contextProviders)
+        {
+            return new ChatClientAgentOptions
+            {
+                Name = agentDef.Name,
+                Description = agentDef.Description,
+                ChatOptions = new ChatOptions
+                {
+                    Instructions = instructions,
+                    Tools = tools.Count > 0 ? tools : null,
+                    Temperature = agentDef.Temperature,
+                    MaxOutputTokens = agentDef.MaxTokens
+                },
+                AIContextProviders = contextProviders is { Count: > 0 }
+                    ? contextProviders.ToArray()
+                    : null
+            };
         }
     }
 

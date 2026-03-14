@@ -1,5 +1,7 @@
 @using Markdig
 @using Microsoft.AspNetCore.Components
+@using System.Text.Encodings.Web
+@using System.Text.RegularExpressions
 
 <div class="markdown-content">
     @renderedHtml
@@ -8,6 +10,9 @@
 @code {
     private string? _previousContent;
     private MarkupString renderedHtml;
+    private static readonly Regex MentionRegex = new(
+        @"(?<![\w@])@<(?<bracket>[^>\r\n]+)>|(?<![\w@])@(?<plain>[\p{L}\p{N}][\p{L}\p{N}_\-.]*)",
+        RegexOptions.Compiled);
 
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
@@ -21,10 +26,41 @@
         if (Content != _previousContent)
         {
             _previousContent = Content;
-            renderedHtml = new MarkupString(
-                string.IsNullOrEmpty(Content)
-                    ? string.Empty
-                    : Markdown.ToHtml(Content, Pipeline));
+            renderedHtml = new MarkupString(RenderContent(Content));
         }
+    }
+
+    private static string RenderContent(string? content)
+    {
+        if (string.IsNullOrEmpty(content))
+        {
+            return string.Empty;
+        }
+
+        var formattedMentions = new List<string>();
+        string markdown = MentionRegex.Replace(content, match =>
+        {
+            string mentionName = match.Groups["bracket"].Success
+                ? match.Groups["bracket"].Value.Trim()
+                : match.Groups["plain"].Value;
+
+            if (string.IsNullOrWhiteSpace(mentionName))
+            {
+                return match.Value;
+            }
+
+            int index = formattedMentions.Count;
+            string encodedMention = HtmlEncoder.Default.Encode($"@{mentionName}");
+            formattedMentions.Add($"<span class=\"mention-tag\">{encodedMention}</span>");
+            return $"EGROO_MENTION_TOKEN_{index}";
+        });
+
+        string html = Markdown.ToHtml(markdown, Pipeline);
+        for (int i = 0; i < formattedMentions.Count; i++)
+        {
+            html = html.Replace($"EGROO_MENTION_TOKEN_{i}", formattedMentions[i], StringComparison.Ordinal);
+        }
+
+        return html;
     }
 }

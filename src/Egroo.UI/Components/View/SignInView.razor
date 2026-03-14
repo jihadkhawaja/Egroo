@@ -70,10 +70,10 @@
 </div>
 
 @code {
-    MudForm form;
+    MudForm? form;
 
-    string Username { get; set; }
-    string Password { get; set; }
+    string Username { get; set; } = string.Empty;
+    string Password { get; set; } = string.Empty;
     bool IsBusy = false;
 
     private IEnumerable<string> NotEmpty(string text)
@@ -87,7 +87,13 @@
     private async Task Submit()
     {
         IsBusy = true;
-        await form.Validate();
+        if (form is null)
+        {
+            IsBusy = false;
+            return;
+        }
+
+        await form.ValidateAsync();
 
         if (!form.IsValid)
         {
@@ -144,6 +150,11 @@
 
             // Initialize and start the SignalR connection.
             ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+            if (ChatSignalR.HubConnection is null)
+            {
+                throw new InvalidOperationException("SignalR connection was not initialized.");
+            }
+
             await ChatSignalR.HubConnection.StartAsync();
 
             // Navigate to the channels page.

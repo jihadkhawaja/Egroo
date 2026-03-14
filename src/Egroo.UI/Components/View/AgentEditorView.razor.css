@@ -1,0 +1,54 @@
+.agent-editor-header {
+    gap: 1rem;
+}
+
+.agent-editor-header__leading,
+.agent-editor-header__actions {
+    gap: 0.75rem;
+}
+
+.agent-config-shell {
+    max-height: min(78vh, 980px);
+}
+
+.agent-config-hero,
+.agent-config-section,
+.agent-config-checklist,
+.agent-config-list-item {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.12);
+}
+
+.agent-config-checklist {
+    height: 100%;
+}
+
+.agent-config-preview {
+    max-height: 44px;
+    overflow: hidden;
+}
+
+.agent-config-tool-item {
+    padding-left: 1rem;
+}
+
+@media (max-width: 960px) {
+    .agent-editor-header,
+    .agent-editor-header__leading,
+    .agent-editor-header__actions {
+        width: 100%;
+    }
+
+    .agent-editor-header__leading,
+    .agent-editor-header__actions {
+        justify-content: space-between;
+    }
+
+    .agent-config-shell {
+        max-height: none;
+    }
+
+    .agent-config-tool-item {
+        padding-left: 0;
+    }
+}

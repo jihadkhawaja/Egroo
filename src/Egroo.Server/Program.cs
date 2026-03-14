@@ -161,6 +161,8 @@ builder.Services.AddScoped<IMessageRepository, MessageRepository>();
 // Agent services (Microsoft Agent Framework)
 builder.Services.AddScoped<IAgentRepository, AgentRepository>();
 builder.Services.AddHttpClient("McpClient");
+builder.Services.AddSingleton<AgentSkillsService>();
+builder.Services.AddSingleton<AgentManagedSkillsService>();
 builder.Services.AddSingleton<McpClientService>();
 builder.Services.AddSingleton<AgentRuntimeService>();
 builder.Services.AddSingleton<AgentChannelService>();

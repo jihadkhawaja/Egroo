@@ -14,6 +14,15 @@ namespace jihadkhawaja.chat.shared.Models
     }
 
     /// <summary>
+    /// Controls who is allowed to add a published agent.
+    /// </summary>
+    public enum AgentAddPermission
+    {
+        OwnerOnly = 0,
+        OwnerAndOthers = 1
+    }
+
+    /// <summary>
     /// Represents a user-created AI agent definition with its LLM configuration,
     /// instructions, knowledge, and tools.
     /// </summary>
@@ -79,7 +88,12 @@ namespace jihadkhawaja.chat.shared.Models
         public bool IsPublished { get; set; }
 
         /// <summary>
-        /// Temperature setting for LLM responses (0.0 - 2.0).
+        /// Controls who can add this published agent.
+        /// </summary>
+        public AgentAddPermission AddPermission { get; set; } = AgentAddPermission.OwnerAndOthers;
+
+        /// <summary>
+        /// Temperature setting for LLM responses (0.0 - 1.0).
         /// </summary>
         public float? Temperature { get; set; }
 
@@ -87,6 +101,40 @@ namespace jihadkhawaja.chat.shared.Models
         /// Max tokens for LLM responses.
         /// </summary>
         public int? MaxTokens { get; set; }
+
+        /// <summary>
+        /// Optional custom skills advertisement prompt template. Must contain a {0} placeholder.
+        /// </summary>
+        [MaxLength(4000)]
+        public string? SkillsInstructionPrompt { get; set; }
+    }
+
+    /// <summary>
+    /// Represents a filesystem directory or skill folder made available to an agent via Agent Skills.
+    /// </summary>
+    public class AgentSkillDirectory : EntityBase
+    {
+        [Required]
+        public Guid AgentDefinitionId { get; set; }
+
+        /// <summary>
+        /// Friendly name shown to users when selecting or reviewing skills.
+        /// </summary>
+        [Required]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Absolute or server-relative path to a skill folder or a parent folder containing skills.
+        /// </summary>
+        [Required]
+        [MaxLength(2000)]
+        public string Path { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Whether this skill directory should be active for agent runs.
+        /// </summary>
+        public bool IsEnabled { get; set; } = true;
     }
 
     /// <summary>

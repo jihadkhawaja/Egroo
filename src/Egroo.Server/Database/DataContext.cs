@@ -46,6 +46,10 @@ namespace Egroo.Server.Database
                 .HasIndex(x => x.AgentDefinitionId)
                 .IsUnique(false);
 
+            modelBuilder.Entity<AgentSkillDirectory>()
+                .HasIndex(x => x.AgentDefinitionId)
+                .IsUnique(false);
+
             modelBuilder.Entity<AgentTool>()
                 .HasIndex(x => x.AgentDefinitionId)
                 .IsUnique(false);
@@ -80,6 +84,7 @@ namespace Egroo.Server.Database
 
         // Agent entities
         public DbSet<AgentDefinition> AgentDefinitions { get; set; }
+        public DbSet<AgentSkillDirectory> AgentSkillDirectories { get; set; }
         public DbSet<AgentKnowledge> AgentKnowledgeItems { get; set; }
         public DbSet<AgentTool> AgentTools { get; set; }
         public DbSet<AgentMcpServer> AgentMcpServers { get; set; }

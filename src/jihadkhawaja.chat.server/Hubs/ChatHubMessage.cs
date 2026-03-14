@@ -140,5 +140,72 @@ namespace jihadkhawaja.chat.server.Hubs
 
             await _messageRepository.UpdatePendingMessage(messageid);
         }
+
+        [Authorize]
+        public async Task StartTyping(Guid channelId)
+        {
+            var userId = GetUserIdFromContext();
+            if (!userId.HasValue || !await ChannelContainUser(channelId, userId.Value))
+            {
+                return;
+            }
+
+            var user = await _userRepository.GetUserPublicDetails(userId.Value);
+            var typingState = new ChannelTypingState
+            {
+                ChannelId = channelId,
+                UserId = userId.Value,
+                DisplayName = user?.Username,
+                IsAgent = false
+            };
+
+            await BroadcastTypingState(channelId, typingState, "TypingStarted", userId.Value);
+        }
+
+        [Authorize]
+        public async Task StopTyping(Guid channelId)
+        {
+            var userId = GetUserIdFromContext();
+            if (!userId.HasValue || !await ChannelContainUser(channelId, userId.Value))
+            {
+                return;
+            }
+
+            var user = await _userRepository.GetUserPublicDetails(userId.Value);
+            var typingState = new ChannelTypingState
+            {
+                ChannelId = channelId,
+                UserId = userId.Value,
+                DisplayName = user?.Username,
+                IsAgent = false
+            };
+
+            await BroadcastTypingState(channelId, typingState, "TypingStopped", userId.Value);
+        }
+
+        private async Task BroadcastTypingState(Guid channelId, ChannelTypingState typingState, string eventName, Guid? excludeUserId = null)
+        {
+            var users = await GetChannelUsers(channelId);
+            if (users == null)
+            {
+                return;
+            }
+
+            foreach (var user in users)
+            {
+                if (excludeUserId.HasValue && user.Id == excludeUserId.Value)
+                {
+                    continue;
+                }
+
+                var connectionIds = _connectionTracker.GetUserConnectionIds(user.Id);
+                if (connectionIds.Count == 0)
+                {
+                    continue;
+                }
+
+                await Clients.Clients(connectionIds).SendAsync(eventName, typingState);
+            }
+        }
     }
 }

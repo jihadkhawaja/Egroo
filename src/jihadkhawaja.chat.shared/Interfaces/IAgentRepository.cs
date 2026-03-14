@@ -14,6 +14,13 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<bool> UpdateAgent(AgentDefinition definition);
         Task<bool> DeleteAgent(Guid agentId);
 
+        // ── Agent Skills ────────────────────────────────────────────────
+        Task<AgentSkillDirectory?> AddSkillDirectory(AgentSkillDirectory skillDirectory);
+        Task<AgentSkillDirectory?> GetSkillDirectory(Guid skillDirectoryId);
+        Task<AgentSkillDirectory[]?> GetAgentSkillDirectories(Guid agentId);
+        Task<bool> UpdateSkillDirectory(AgentSkillDirectory skillDirectory);
+        Task<bool> DeleteSkillDirectory(Guid skillDirectoryId);
+
         // ── Knowledge ────────────────────────────────────────────────────
         Task<AgentKnowledge?> AddKnowledge(AgentKnowledge knowledge);
         Task<AgentKnowledge[]?> GetAgentKnowledge(Guid agentId);
@@ -59,5 +66,6 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<bool> AddAgentToChannel(Guid channelId, Guid agentId);
         Task<bool> RemoveAgentFromChannel(Guid channelId, Guid agentId);
         Task<ChannelAgent[]?> GetChannelAgents(Guid channelId);
-        Task<AgentDefinition[]?> GetChannelAgentDefinitions(Guid channelId);    }
+        Task<AgentDefinition[]?> GetChannelAgentDefinitions(Guid channelId);
+    }
 }
