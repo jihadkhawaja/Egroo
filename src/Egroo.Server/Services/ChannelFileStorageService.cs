@@ -60,11 +60,29 @@ namespace Egroo.Server.Services
         public bool TryResolveFile(Guid channelId, string token, string fileName, out string filePath, out string contentType, out string downloadFileName)
         {
             string safeFileName = SanitizeFileName(Uri.UnescapeDataString(fileName));
+            string? safeToken = SanitizeToken(token);
+            if (safeToken is null)
+            {
+                filePath = string.Empty;
+                contentType = "application/octet-stream";
+                downloadFileName = safeFileName;
+                return false;
+            }
+
             downloadFileName = safeFileName;
-            filePath = Path.Combine(StorageRoot, channelId.ToString("N"), token, safeFileName);
+            filePath = Path.Combine(StorageRoot, channelId.ToString("N"), safeToken, safeFileName);
             contentType = GetContentType(safeFileName);
 
-            return File.Exists(filePath);
+            // Ensure the resolved path stays within the storage root to prevent traversal.
+            string fullStorageRoot = Path.GetFullPath(StorageRoot);
+            string fullFilePath = Path.GetFullPath(filePath);
+            if (!fullFilePath.StartsWith(fullStorageRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                filePath = string.Empty;
+                return false;
+            }
+
+            return File.Exists(fullFilePath);
         }
 
         private string GetContentType(string fileName)
@@ -86,6 +104,33 @@ namespace Egroo.Server.Services
             }
 
             return string.IsNullOrWhiteSpace(candidate) ? "file" : candidate;
+        }
+
+        private static string? SanitizeToken(string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            string trimmed = token.Trim();
+
+            // Reject obvious traversal or multi-segment patterns.
+            if (trimmed.Contains("..", StringComparison.Ordinal) ||
+                trimmed.Contains('/', StringComparison.Ordinal) ||
+                trimmed.Contains('\\', StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            // Optionally constrain length to avoid abuse.
+            const int maxLength = 64;
+            if (trimmed.Length > maxLength)
+            {
+                trimmed = trimmed.Substring(0, maxLength);
+            }
+
+            return trimmed;
         }
     }
 }
