@@ -46,6 +46,48 @@ namespace Egroo.Server.Services
                 return new ChatMessage(role, content ?? string.Empty);
             }
 
+            return CreateChatMessage(role, BuildUserContentsFromStoredContent(content));
+        }
+
+        public static ChatMessage CreateChannelMessage(ChatRole role, string senderName, string? content)
+        {
+            string prefix = $"[{senderName}]: ";
+            if (role != ChatRole.User)
+            {
+                string normalized = AgentAttachmentPromptFormatter.Normalize(content);
+                return new ChatMessage(role, normalized ?? string.Empty);
+            }
+
+            var contents = new List<AIContent>
+            {
+                new TextContent(prefix)
+            };
+
+            foreach (var item in BuildUserContentsFromStoredContent(content))
+            {
+                contents.Add(item);
+            }
+
+            return CreateChatMessage(role, contents);
+        }
+
+        private static ChatMessage CreateChatMessage(ChatRole role, IList<AIContent> contents)
+        {
+            if (contents.Count == 1 && contents[0] is TextContent text)
+            {
+                return new ChatMessage(role, text.Text);
+            }
+
+            if (contents.Count == 0)
+            {
+                return new ChatMessage(role, string.Empty);
+            }
+
+            return new ChatMessage(role, contents);
+        }
+
+        private static List<AIContent> BuildUserContentsFromStoredContent(string? content)
+        {
             var contents = new List<AIContent>();
             string source = content ?? string.Empty;
             int cursor = 0;
@@ -70,22 +112,7 @@ namespace Egroo.Server.Services
                 AddTextContent(contents, source[cursor..]);
             }
 
-            return CreateChatMessage(role, contents);
-        }
-
-        private static ChatMessage CreateChatMessage(ChatRole role, IList<AIContent> contents)
-        {
-            if (contents.Count == 1 && contents[0] is TextContent text)
-            {
-                return new ChatMessage(role, text.Text);
-            }
-
-            if (contents.Count == 0)
-            {
-                return new ChatMessage(role, string.Empty);
-            }
-
-            return new ChatMessage(role, contents);
+            return contents;
         }
 
         private static void AddTextContent(ICollection<AIContent> contents, string? text)

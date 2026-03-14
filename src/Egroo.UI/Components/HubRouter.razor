@@ -47,9 +47,15 @@ else
             // If the connection is already established, update UI and exit.
             if (ChatSignalR.HubConnection is not null)
             {
-                IsBusy = false;
-                await InvokeAsync(StateHasChanged);
-                return;
+                if (ChatSignalR.HubConnection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+                {
+                    IsBusy = false;
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
+                await ChatSignalR.HubConnection.DisposeAsync();
+                ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
             }
 
             // Initialize session

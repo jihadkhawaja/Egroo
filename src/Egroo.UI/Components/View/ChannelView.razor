@@ -279,8 +279,9 @@
                         </CustomContent>
                     </MudFileUpload>
                     <MudTextField @ref="inputMudTextField" Underline="false"
-                    Value="InputContent"
-                    ValueChanged="@((string s) => OnInputContent(s))" Immediate="true"
+                    @bind-Value="InputContent"
+                    @bind-Value:after="OnInputContentChanged"
+                    Immediate="true"
                     InputMode="InputMode.text" InputType="InputType.Text"
                     AutoFocus="false"
                     Placeholder="Type a message..." Variant="Variant.Text" OnKeyDown="HandleInputKeyDown"
@@ -412,6 +413,7 @@
     private bool IsChannelCacheLoaded { get; set; }
     private string SearchQuery { get; set; } = string.Empty;
     private Guid? FocusedSearchReferenceId { get; set; }
+    private Guid _loadedChannelId;
 
     private const int SearchMinimumLength = 2;
     private const int SearchResultLimit = 100;
@@ -448,27 +450,7 @@
         // Check if there's an existing call in this channel and show participant count
         await RefreshCallParticipants();
 
-        // Load channel agents for @mention autocomplete
-        try
-        {
-            channelAgentDefs = await AgentService.GetChannelAgents(GetChannelId());
-        }
-        catch
-        {
-            channelAgentDefs = Array.Empty<AgentDefinition>();
-        }
-
-        try
-        {
-            channelUsers = (await ChatChannelService.GetChannelUsers(GetChannelId()) ?? Array.Empty<UserDto>())
-                .Where(x => x.Id != SessionStorage.User?.Id)
-                .OrderBy(x => x.Username)
-                .ToArray();
-        }
-        catch
-        {
-            channelUsers = Array.Empty<UserDto>();
-        }
+        await RefreshChannelPeopleAsync(GetChannelId());
 
         try
         {
@@ -485,10 +467,52 @@
     protected override async Task OnParametersSetAsync()
     {
         var channelId = GetChannelId();
+
+        if (channelId != Guid.Empty && channelId != _loadedChannelId)
+        {
+            await RefreshChannelPeopleAsync(channelId);
+        }
+
         if (channelId != Guid.Empty && SessionStorage?.User != null)
         {
             IsAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User.Id);
         }
+    }
+
+    private async Task RefreshChannelPeopleAsync(Guid channelId)
+    {
+        if (channelId == Guid.Empty)
+        {
+            channelAgentDefs = Array.Empty<AgentDefinition>();
+            channelUsers = Array.Empty<UserDto>();
+            _loadedChannelId = Guid.Empty;
+            UpdateMentionPopup(InputContent);
+            return;
+        }
+
+        try
+        {
+            channelAgentDefs = await AgentService.GetChannelAgents(channelId) ?? Array.Empty<AgentDefinition>();
+        }
+        catch
+        {
+            channelAgentDefs = Array.Empty<AgentDefinition>();
+        }
+
+        try
+        {
+            channelUsers = (await ChatChannelService.GetChannelUsers(channelId) ?? Array.Empty<UserDto>())
+                .Where(x => x.Id != SessionStorage.User?.Id)
+                .OrderBy(x => x.Username)
+                .ToArray();
+        }
+        catch
+        {
+            channelUsers = Array.Empty<UserDto>();
+        }
+
+        _loadedChannelId = channelId;
+        UpdateMentionPopup(InputContent);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -504,8 +528,7 @@
             {
                 await PrepareMessageForDisplayAsync(message);
             }
-            Messages.AddRange(messages);
-            Messages = Messages.OrderBy(x => x.DateCreated).ToList();
+            Messages = DeduplicateMessages(messages);
             _ = UpdateUnseenMessages();
             IsBusy = false;
             await InvokeAsync(StateHasChanged);
@@ -618,7 +641,8 @@
         await StopTypingAsync();
         InputDisabled = true;
 
-        string plainContent = ComposeMessageContent(InputContent, stagedAttachment);
+        string plainContent = ComposeMessageContent(InputContent, stagedAttachment?.UserMessageContent);
+        string agentPlainContent = ComposeMessageContent(InputContent, stagedAttachment?.AgentMessageContent ?? stagedAttachment?.UserMessageContent);
 
         Message message = new()
         {
@@ -637,7 +661,8 @@
             var encryptedPayload = await EndToEndEncryptionService.EncryptMessageForRecipientsAsync(
                 plainContent,
                 recipients,
-                channelAgentDefs ?? Array.Empty<AgentDefinition>());
+                channelAgentDefs ?? Array.Empty<AgentDefinition>(),
+                agentPlainContent);
 
             message.RecipientContents = encryptedPayload.UserRecipientContents;
             message.AgentRecipientContents = encryptedPayload.AgentRecipientContents;
@@ -685,11 +710,10 @@
     private bool HasActiveSearch => SearchQuery.Length >= SearchMinimumLength;
     private static string GetDisplayContent(Message message) => message.DecryptedContent ?? message.Content ?? string.Empty;
 
-    private void OnInputContent(string text)
+    private void OnInputContentChanged()
     {
-        InputContent = text;
-        UpdateMentionPopup(text);
-        _ = HandleTypingInputAsync(text);
+        UpdateMentionPopup(InputContent);
+        _ = HandleTypingInputAsync(InputContent);
     }
 
     private void ToggleSearch()
@@ -1134,12 +1158,13 @@
 
             string absoluteUrl = new Uri(new Uri(Source.ConnectionURL), uploaded.Url).ToString();
             string markdownLink = EndToEndEncryptionService.BuildEncryptedFileToken(absoluteUrl, encryptedFile);
-            string attachmentContent = BuildChannelAttachmentContent(file.Name, file.ContentType, buffer.ToArray(), markdownLink);
+            ChannelAttachmentContent attachmentContent = BuildChannelAttachmentContent(file.Name, file.ContentType, buffer.ToArray(), markdownLink);
             string attachmentSummary = BuildAttachmentSummary(file.Name, file.ContentType, buffer.Length);
             stagedAttachment = new PendingComposerAttachment(
                 file.Name,
                 BuildAttachmentPreviewText(attachmentSummary),
-                attachmentContent);
+                attachmentContent.UserMessageContent,
+                attachmentContent.AgentMessageContent);
 
             Snackbar.Add("File attached. Add text if you want, then press send.", Severity.Success);
             await ClearPendingAttachmentSelectionAsync();
@@ -1179,17 +1204,17 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private static string ComposeMessageContent(string? messageText, PendingComposerAttachment? attachment)
+    private static string ComposeMessageContent(string? messageText, string? attachmentContent)
     {
         string trimmedMessage = messageText?.Trim() ?? string.Empty;
-        if (attachment is null)
+        if (string.IsNullOrWhiteSpace(attachmentContent))
         {
             return trimmedMessage;
         }
 
         return string.IsNullOrWhiteSpace(trimmedMessage)
-            ? attachment.MessageContent
-            : $"{trimmedMessage}\n\n{attachment.MessageContent}";
+            ? attachmentContent
+            : $"{trimmedMessage}\n\n{attachmentContent}";
     }
 
     private static string BuildMarkdownLink(string fileName, string url)
@@ -1198,16 +1223,29 @@
         return $"[{escapedFileName}]({url})";
     }
 
-    private static string BuildChannelAttachmentContent(string fileName, string? contentType, byte[] fileBytes, string encryptedToken)
+    private static ChannelAttachmentContent BuildChannelAttachmentContent(string fileName, string? contentType, byte[] fileBytes, string encryptedToken)
     {
         string summary = BuildAttachmentSummary(fileName, contentType, fileBytes.LongLength);
 
-        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        if (IsImageAttachment(contentType))
         {
-            return $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>\n{encryptedToken}";
+            string altText = fileName.Replace("[", "\\[").Replace("]", "\\]");
+            string resolvedContentType = string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType;
+            string dataUri = $"data:{resolvedContentType};base64,{Convert.ToBase64String(fileBytes)}";
+
+            return new ChannelAttachmentContent(
+                $"{summary}\n{encryptedToken}",
+                $"{summary}\n![{altText}]({dataUri})");
         }
 
-        return $"{summary}\n{encryptedToken}";
+        if (TryReadTextAttachment(fileName, contentType, fileBytes, out string? extractedText))
+        {
+            return new ChannelAttachmentContent(
+                $"<details><summary>{summary}</summary>\n\n~~~text\n{extractedText}\n~~~\n</details>\n{encryptedToken}",
+                $"{summary}\n\n~~~text\n{extractedText}\n~~~");
+        }
+
+        return new ChannelAttachmentContent($"{summary}\n{encryptedToken}", summary);
     }
 
     private static string BuildAttachmentSummary(string fileName, string? contentType, long sizeBytes)
@@ -1296,7 +1334,9 @@
         return $"{sizeBytes} B";
     }
 
-    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string MessageContent);
+    private sealed record ChannelAttachmentContent(string UserMessageContent, string AgentMessageContent);
+
+    private sealed record PendingComposerAttachment(string FileName, string SummaryText, string UserMessageContent, string AgentMessageContent);
 
     private async Task RefreshEncryptionStateAsync()
     {
@@ -1369,8 +1409,9 @@
             if (message.ChannelId != GetChannelId())
                 return;
 
-            if (Messages.Any(x => x.Id == message.Id))
+            if (Messages.Any(x => x.Id == message.Id || (x.ReferenceId != Guid.Empty && x.ReferenceId == message.ReferenceId)))
             {
+                MergeVisibleMessage(message);
                 await ChatMessageService.UpdatePendingMessage(message.Id);
                 return;
             }
@@ -1378,7 +1419,7 @@
             await PrepareMessageForDisplayAsync(message);
 
             RemoveTypingParticipantForMessage(message);
-            Messages.Add(message);
+            MergeVisibleMessage(message);
             UpsertCachedMessage(message);
             RefreshSearchResultsFromCache();
 
@@ -1589,6 +1630,53 @@
         CachedChannelMessages = CachedChannelMessages
             .OrderBy(GetMessageSortDate)
             .ToList();
+    }
+
+    private void MergeVisibleMessage(Message message)
+    {
+        if (message.ReferenceId != Guid.Empty)
+        {
+            int referenceIndex = Messages.FindIndex(x => x.ReferenceId == message.ReferenceId);
+            if (referenceIndex >= 0)
+            {
+                Messages[referenceIndex] = message;
+                Messages = Messages.OrderBy(GetMessageSortDate).ToList();
+                return;
+            }
+        }
+
+        int idIndex = Messages.FindIndex(x => x.Id == message.Id && x.Id != Guid.Empty);
+        if (idIndex >= 0)
+        {
+            Messages[idIndex] = message;
+        }
+        else
+        {
+            Messages.Add(message);
+        }
+
+        Messages = DeduplicateMessages(Messages);
+    }
+
+    private static List<Message> DeduplicateMessages(IEnumerable<Message> messages)
+    {
+        return messages
+            .GroupBy(GetMessageIdentity)
+            .Select(group => group.OrderByDescending(GetMessageSortDate).First())
+            .OrderBy(GetMessageSortDate)
+            .ToList();
+    }
+
+    private static string GetMessageIdentity(Message message)
+    {
+        if (message.ReferenceId != Guid.Empty)
+        {
+            return $"ref:{message.ReferenceId:D}";
+        }
+
+        return message.Id != Guid.Empty
+            ? $"id:{message.Id:D}"
+            : $"fallback:{message.SenderId:D}:{message.ChannelId:D}:{GetMessageSortDate(message).UtcTicks}";
     }
 
     #region Channel Voice Call

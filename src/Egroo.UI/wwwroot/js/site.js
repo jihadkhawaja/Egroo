@@ -64,12 +64,14 @@ window.registerMentionNavigation = function (selector, dotNetObject) {
 
 window.unregisterMentionNavigation = function (selector) {
     const input = document.querySelector(selector);
-    if (!input || !input.__egrooMentionNavigationHandler) {
+    if (!input) {
         return;
     }
 
-    input.removeEventListener('keydown', input.__egrooMentionNavigationHandler, true);
-    delete input.__egrooMentionNavigationHandler;
+    if (input.__egrooMentionNavigationHandler) {
+        input.removeEventListener('keydown', input.__egrooMentionNavigationHandler, true);
+        delete input.__egrooMentionNavigationHandler;
+    }
 };
 
 window.registerEnterToSend = function (selector, dotNetObject, callbackName) {

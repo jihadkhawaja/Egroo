@@ -144,18 +144,20 @@ namespace Egroo.Server.Services
                 var mentionedAgents = new List<(AgentDefinition Agent, string TriggerContent)>();
                 foreach (var agent in agentDefs)
                 {
-                    string? triggerContent = GetAgentReadableContent(message, agent);
+                    string? triggerContent = GetAgentMessageContent(message, agent);
                     if (string.IsNullOrWhiteSpace(triggerContent))
                     {
                         continue;
                     }
 
+                    string readableTriggerContent = AgentAttachmentPromptFormatter.Normalize(triggerContent);
+
                     // Match @<Agent Name> (bracket syntax for names with spaces) or @AgentName (no spaces)
                     var escapedName = Regex.Escape(agent.Name);
                     var bracketPattern = $@"@<{escapedName}>";
                     var plainPattern = $@"@{escapedName}(?:\b|$)";
-                    if (Regex.IsMatch(triggerContent, bracketPattern, RegexOptions.IgnoreCase)
-                        || Regex.IsMatch(triggerContent, plainPattern, RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(readableTriggerContent, bracketPattern, RegexOptions.IgnoreCase)
+                        || Regex.IsMatch(readableTriggerContent, plainPattern, RegexOptions.IgnoreCase))
                     {
                         mentionedAgents.Add((agent, triggerContent));
                     }
@@ -277,21 +279,13 @@ namespace Egroo.Server.Services
                         var senderAgent = await dbContext.AgentDefinitions
                             .FirstOrDefaultAsync(x => x.Id == msg.AgentDefinitionId.Value);
                         senderName = senderAgent?.Name ?? "Agent";
-                        chatMessages.Add(new ChatMessage(ChatRole.Assistant, $"[{senderName}]: {content}"));
+                        chatMessages.Add(AgentChatMessageFactory.CreateChannelMessage(ChatRole.Assistant, senderName, content));
                     }
                     else
                     {
                         var sender = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == msg.SenderId);
                         senderName = sender?.Username ?? "Unknown";
-
-                        if (msg.Id == triggerMessage.Id)
-                        {
-                            chatMessages.Add(new ChatMessage(ChatRole.User, $"[{senderName}]: {content}"));
-                        }
-                        else
-                        {
-                            chatMessages.Add(new ChatMessage(ChatRole.User, $"[{senderName}]: {content}"));
-                        }
+                        chatMessages.Add(AgentChatMessageFactory.CreateChannelMessage(ChatRole.User, senderName, content));
                     }
                 }
 
@@ -308,7 +302,7 @@ namespace Egroo.Server.Services
                     return;
                 }
 
-                string responseText = agentResponse.Text ?? string.Empty;
+                string responseText = NormalizeAgentReply(agentResponse.Text, agentDef.Name);
                 if (string.IsNullOrWhiteSpace(responseText))
                 {
                     return;
@@ -446,11 +440,11 @@ namespace Egroo.Server.Services
             await dbContext.SaveChangesAsync();
         }
 
-        private string? GetAgentReadableContent(Message message, AgentDefinition agent)
+        private string? GetAgentMessageContent(Message message, AgentDefinition agent)
         {
             if (!string.IsNullOrWhiteSpace(message.Content))
             {
-                return AgentAttachmentPromptFormatter.Normalize(message.Content);
+                return message.Content;
             }
 
             string? transportContent = message.AgentRecipientContents?.FirstOrDefault(x => x.AgentDefinitionId == agent.Id)?.Content;
@@ -460,8 +454,7 @@ namespace Egroo.Server.Services
             }
 
             string? privateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agent.EncryptionPrivateKey);
-            string? content = _endToEndEncryptionService.DecryptTransportContent(transportContent, privateKey);
-            return AgentAttachmentPromptFormatter.Normalize(content);
+            return _endToEndEncryptionService.DecryptTransportContent(transportContent, privateKey);
         }
 
         private async Task<string?> GetContentForAgentAsync(DataContext dbContext, Message message, AgentDefinition agentDef, string? privateKey)
@@ -471,8 +464,7 @@ namespace Egroo.Server.Services
 
             if (!string.IsNullOrWhiteSpace(agentPending?.Content))
             {
-                string? decryptedContent = _endToEndEncryptionService.DecryptTransportContent(agentPending.Content, privateKey);
-                return AgentAttachmentPromptFormatter.Normalize(decryptedContent);
+                return _endToEndEncryptionService.DecryptTransportContent(agentPending.Content, privateKey);
             }
 
             var userPending = await dbContext.UsersPendingMessages
@@ -483,15 +475,15 @@ namespace Egroo.Server.Services
             {
                 try
                 {
-                    return AgentAttachmentPromptFormatter.Normalize(_encryptionService.Decrypt(content));
+                    return _encryptionService.Decrypt(content);
                 }
                 catch
                 {
-                    return AgentAttachmentPromptFormatter.Normalize(content);
+                    return content;
                 }
             }
 
-            return AgentAttachmentPromptFormatter.Normalize(message.Content);
+            return message.Content;
         }
 
         private static Message CloneForUserDelivery(Message source, string deliveryContent)
@@ -565,6 +557,24 @@ namespace Egroo.Server.Services
             return typingState.AgentDefinitionId.HasValue
                 ? $"agent:{typingState.AgentDefinitionId.Value}"
                 : $"user:{typingState.UserId}";
+        }
+
+        private static string NormalizeAgentReply(string? responseText, string agentName)
+        {
+            string normalized = (responseText ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            string escapedName = Regex.Escape(agentName);
+            normalized = Regex.Replace(
+                normalized,
+                $@"^\s*(?:\[{escapedName}\]|{escapedName})\s*:\s*",
+                string.Empty,
+                RegexOptions.IgnoreCase);
+
+            return normalized.Trim();
         }
 
         private static async Task<string> BuildInstructions(DataContext dbContext, AgentDefinition agentDef)

@@ -82,9 +82,14 @@ namespace Egroo.Server.Security
         public ChannelEncryptionResult EncryptForChannelRecipients(
             string plaintext,
             IEnumerable<UserDto> userRecipients,
-            IEnumerable<AgentDefinition> agentRecipients)
+            IEnumerable<AgentDefinition> agentRecipients,
+            string? agentPlaintext = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(plaintext);
+
+            string resolvedAgentPlaintext = string.IsNullOrWhiteSpace(agentPlaintext)
+                ? plaintext
+                : agentPlaintext;
 
             var distinctUsers = userRecipients
                 .Where(x => x.Id != Guid.Empty)
@@ -114,8 +119,42 @@ namespace Egroo.Server.Security
                 throw new InvalidOperationException($"Missing encryption keys for: {string.Join(", ", missing)}.");
             }
 
-            byte[] rawAesKey = RandomNumberGenerator.GetBytes(32);
-            byte[] iv = RandomNumberGenerator.GetBytes(12);
+            byte[] userCipher = EncryptPlaintext(plaintext, out byte[] userKey, out byte[] userIv);
+            bool reuseAgentCipher = string.Equals(plaintext, resolvedAgentPlaintext, StringComparison.Ordinal);
+            byte[] agentCipher;
+
+            byte[] agentKey;
+            byte[] agentIv;
+            if (reuseAgentCipher)
+            {
+                agentCipher = userCipher;
+                agentKey = userKey;
+                agentIv = userIv;
+            }
+            else
+            {
+                agentCipher = EncryptPlaintext(resolvedAgentPlaintext, out agentKey, out agentIv);
+            }
+
+            var userContents = distinctUsers.Select(user => new MessageRecipientContent
+            {
+                UserId = user.Id,
+                Content = BuildPayload(user.EncryptionPublicKey!, user.EncryptionKeyId, userKey, userIv, userCipher)
+            }).ToList();
+
+            var agentContents = distinctAgents.Select(agent => new MessageAgentRecipientContent
+            {
+                AgentDefinitionId = agent.Id,
+                Content = BuildPayload(agent.EncryptionPublicKey!, agent.EncryptionKeyId, agentKey, agentIv, agentCipher)
+            }).ToList();
+
+            return new ChannelEncryptionResult(userContents, agentContents);
+        }
+
+        private static byte[] EncryptPlaintext(string plaintext, out byte[] rawAesKey, out byte[] iv)
+        {
+            rawAesKey = RandomNumberGenerator.GetBytes(32);
+            iv = RandomNumberGenerator.GetBytes(12);
             byte[] plainBytes = Encoding.UTF8.GetBytes(plaintext);
             byte[] cipherBytes = new byte[plainBytes.Length];
             byte[] tag = new byte[16];
@@ -128,20 +167,7 @@ namespace Egroo.Server.Security
             byte[] combinedCipher = new byte[cipherBytes.Length + tag.Length];
             Buffer.BlockCopy(cipherBytes, 0, combinedCipher, 0, cipherBytes.Length);
             Buffer.BlockCopy(tag, 0, combinedCipher, cipherBytes.Length, tag.Length);
-
-            var userContents = distinctUsers.Select(user => new MessageRecipientContent
-            {
-                UserId = user.Id,
-                Content = BuildPayload(user.EncryptionPublicKey!, user.EncryptionKeyId, rawAesKey, iv, combinedCipher)
-            }).ToList();
-
-            var agentContents = distinctAgents.Select(agent => new MessageAgentRecipientContent
-            {
-                AgentDefinitionId = agent.Id,
-                Content = BuildPayload(agent.EncryptionPublicKey!, agent.EncryptionKeyId, rawAesKey, iv, combinedCipher)
-            }).ToList();
-
-            return new ChannelEncryptionResult(userContents, agentContents);
+            return combinedCipher;
         }
 
         private static string BuildPayload(string publicKeyBase64, string? keyId, byte[] rawAesKey, byte[] iv, byte[] cipherBytes)

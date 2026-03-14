@@ -83,7 +83,8 @@ namespace Egroo.UI.Services
         public async Task<ChannelEncryptedPayload> EncryptMessageForRecipientsAsync(
             string plaintext,
             IEnumerable<UserDto> userRecipients,
-            IEnumerable<AgentDefinition>? agentRecipients = null)
+            IEnumerable<AgentDefinition>? agentRecipients = null,
+            string? agentPlaintext = null)
         {
             var userRecipientRequests = userRecipients
                 .Where(x => x.Id != Guid.Empty)
@@ -110,19 +111,28 @@ namespace Egroo.UI.Services
                 throw new InvalidOperationException($"Missing encryption keys for: {string.Join(", ", missingRecipients)}.");
             }
 
-            var payloads = await _jsRuntime.InvokeAsync<EncryptedRecipientPayload[]>(
-                "egrooCrypto.encryptMessageForRecipients",
-                new
-                {
+            string resolvedAgentPlaintext = string.IsNullOrWhiteSpace(agentPlaintext)
+                ? plaintext
+                : agentPlaintext;
+
+            var userPayloads = userRecipientRequests.Length == 0
+                ? Array.Empty<EncryptedRecipientPayload>()
+                : await EncryptRecipientPayloadsAsync(
                     plaintext,
-                    recipients = userRecipientRequests
+                    userRecipientRequests
                         .Select(x => new EncryptionRecipientRequest(x.Id, null, x.EncryptionPublicKey!, x.EncryptionKeyId))
-                        .Concat(agentRecipientRequests.Select(x => new EncryptionRecipientRequest(null, x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId)))
-                        .ToArray()
-                });
+                        .ToArray());
+
+            var agentPayloads = agentRecipientRequests.Length == 0
+                ? Array.Empty<EncryptedRecipientPayload>()
+                : await EncryptRecipientPayloadsAsync(
+                    resolvedAgentPlaintext,
+                    agentRecipientRequests
+                        .Select(x => new EncryptionRecipientRequest(null, x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId))
+                        .ToArray());
 
             return new ChannelEncryptedPayload(
-                payloads
+                userPayloads
                     .Where(x => x.UserId.HasValue)
                     .Select(x => new MessageRecipientContent
                     {
@@ -130,7 +140,7 @@ namespace Egroo.UI.Services
                         Content = x.Content
                     })
                     .ToList(),
-                payloads
+                agentPayloads
                     .Where(x => x.AgentDefinitionId.HasValue)
                     .Select(x => new MessageAgentRecipientContent
                     {
@@ -233,6 +243,17 @@ namespace Egroo.UI.Services
         private async Task SaveLocalIdentityAsync(EncryptionIdentity identity)
         {
             await _storageService.SetLocalStorage(IdentityStorageKey, JsonSerializer.Serialize(identity));
+        }
+
+        private async Task<EncryptedRecipientPayload[]> EncryptRecipientPayloadsAsync(string plaintext, EncryptionRecipientRequest[] recipients)
+        {
+            return await _jsRuntime.InvokeAsync<EncryptedRecipientPayload[]>(
+                "egrooCrypto.encryptMessageForRecipients",
+                new
+                {
+                    plaintext,
+                    recipients
+                });
         }
 
         private static string Base64UrlEncode(byte[] value)

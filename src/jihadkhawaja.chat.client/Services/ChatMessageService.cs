@@ -9,6 +9,7 @@ namespace jihadkhawaja.chat.client.Services
     {
         private readonly List<IDisposable> _subscriptions = new();
         private bool _isSubscribed;
+        private HubConnection? _subscribedConnection;
 
         public event Func<Message, Task>? OnMessageReceived;
         public event Func<Message, Task>? OnMessageUpdated;
@@ -25,12 +26,21 @@ namespace jihadkhawaja.chat.client.Services
 
         private void EnsureSubscriptions()
         {
-            if (_isSubscribed || ChatSignalR.HubConnection is null)
+            if (ChatSignalR.HubConnection is null)
             {
                 return;
             }
 
-            _subscriptions.Add(ChatSignalR.HubConnection.On<Message>("ReceiveMessage", async message =>
+            if (_isSubscribed && ReferenceEquals(_subscribedConnection, ChatSignalR.HubConnection))
+            {
+                return;
+            }
+
+            ResetSubscriptions();
+
+            var connection = ChatSignalR.HubConnection;
+
+            _subscriptions.Add(connection.On<Message>("ReceiveMessage", async message =>
             {
                 if (OnMessageReceived != null)
                 {
@@ -38,7 +48,7 @@ namespace jihadkhawaja.chat.client.Services
                 }
             }));
 
-            _subscriptions.Add(ChatSignalR.HubConnection.On<Message>("UpdateMessage", async message =>
+            _subscriptions.Add(connection.On<Message>("UpdateMessage", async message =>
             {
                 if (OnMessageUpdated != null)
                 {
@@ -46,7 +56,7 @@ namespace jihadkhawaja.chat.client.Services
                 }
             }));
 
-            _subscriptions.Add(ChatSignalR.HubConnection.On<ChannelTypingState>("TypingStarted", async typingState =>
+            _subscriptions.Add(connection.On<ChannelTypingState>("TypingStarted", async typingState =>
             {
                 if (OnTypingStarted != null)
                 {
@@ -54,7 +64,7 @@ namespace jihadkhawaja.chat.client.Services
                 }
             }));
 
-            _subscriptions.Add(ChatSignalR.HubConnection.On<ChannelTypingState>("TypingStopped", async typingState =>
+            _subscriptions.Add(connection.On<ChannelTypingState>("TypingStopped", async typingState =>
             {
                 if (OnTypingStopped != null)
                 {
@@ -62,7 +72,20 @@ namespace jihadkhawaja.chat.client.Services
                 }
             }));
 
+            _subscribedConnection = connection;
             _isSubscribed = true;
+        }
+
+        private void ResetSubscriptions()
+        {
+            foreach (var subscription in _subscriptions)
+            {
+                subscription.Dispose();
+            }
+
+            _subscriptions.Clear();
+            _isSubscribed = false;
+            _subscribedConnection = null;
         }
 
         public async Task<bool> SendMessage(Message message)
@@ -103,13 +126,7 @@ namespace jihadkhawaja.chat.client.Services
 
         public void Dispose()
         {
-            foreach (var subscription in _subscriptions)
-            {
-                subscription.Dispose();
-            }
-
-            _subscriptions.Clear();
-            _isSubscribed = false;
+            ResetSubscriptions();
         }
     }
 }
