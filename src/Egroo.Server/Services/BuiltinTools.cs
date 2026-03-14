@@ -1,6 +1,7 @@
 using Microsoft.Extensions.AI;
 using jihadkhawaja.chat.shared.Models;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -324,7 +325,7 @@ namespace Egroo.Server.Services
 
         private static async Task<string> AddAgentToChannelImpl(IServiceScopeFactory scopeFactory, Guid callerUserId, string channelIdStr, string agentIdStr)
         {
-            if (!Guid.TryParse(channelIdStr, out var channelId) || !Guid.TryParse(agentIdStr, out var agentId))
+            if (!TryParseChannelAgentIds(channelIdStr, agentIdStr, out var channelId, out var agentId))
             {
                 return "Invalid ID format. Please provide valid GUIDs.";
             }
@@ -332,52 +333,24 @@ namespace Egroo.Server.Services
             using var scope = scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<Database.DataContext>();
 
-            // Verify channel admin
-            var isAdmin = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
-                dbContext.ChannelUsers,
-                x => x.ChannelId == channelId && x.UserId == callerUserId && x.IsAdmin);
-
-            if (!isAdmin)
+            if (!await IsChannelAdminAsync(dbContext, channelId, callerUserId))
             {
                 return "You must be a channel admin to add agents.";
             }
 
-            var agent = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
-                dbContext.AgentDefinitions,
-                x => x.Id == agentId && x.IsActive && x.DateDeleted == null);
-
+            var agent = await GetActiveAgentAsync(dbContext, agentId);
             if (agent is null)
             {
                 return "Agent not found or is not active.";
             }
 
-            if (agent.UserId != callerUserId && !agent.IsPublished)
+            var accessError = await ValidateAgentChannelAccessAsync(dbContext, callerUserId, agent, agentId);
+            if (accessError is not null)
             {
-                return "Agent is not published and you are not the owner.";
+                return accessError;
             }
 
-            if (agent.UserId != callerUserId && agent.AddPermission == AgentAddPermission.OwnerOnly)
-            {
-                return "This agent can only be added by its owner.";
-            }
-
-            if (agent.UserId != callerUserId)
-            {
-                var isFriend = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
-                    dbContext.UserAgentFriends,
-                    x => x.UserId == callerUserId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
-
-                if (!isFriend)
-                {
-                    return "Add this agent as a friend before inviting it to a channel.";
-                }
-            }
-
-            var existing = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
-                dbContext.ChannelAgents,
-                x => x.ChannelId == channelId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
-
-            if (existing is not null)
+            if (await IsAgentAlreadyInChannelAsync(dbContext, channelId, agentId))
             {
                 return $"Agent '{agent.Name}' is already in the channel.";
             }
@@ -397,11 +370,69 @@ namespace Egroo.Server.Services
 
             return $"Successfully added agent '{agent.Name}' to the channel.";
         }
+
+        private static bool TryParseChannelAgentIds(string channelIdStr, string agentIdStr, out Guid channelId, out Guid agentId)
+        {
+            channelId = Guid.Empty;
+            agentId = Guid.Empty;
+            return Guid.TryParse(channelIdStr, out channelId) && Guid.TryParse(agentIdStr, out agentId);
+        }
+
+        private static Task<bool> IsChannelAdminAsync(Database.DataContext dbContext, Guid channelId, Guid callerUserId)
+        {
+            return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                dbContext.ChannelUsers,
+                x => x.ChannelId == channelId && x.UserId == callerUserId && x.IsAdmin);
+        }
+
+        private static Task<AgentDefinition?> GetActiveAgentAsync(Database.DataContext dbContext, Guid agentId)
+        {
+            return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                dbContext.AgentDefinitions,
+                x => x.Id == agentId && x.IsActive && x.DateDeleted == null);
+        }
+
+        private static async Task<string?> ValidateAgentChannelAccessAsync(Database.DataContext dbContext, Guid callerUserId, AgentDefinition agent, Guid agentId)
+        {
+            if (agent.UserId == callerUserId)
+            {
+                return null;
+            }
+
+            if (!agent.IsPublished)
+            {
+                return "Agent is not published and you are not the owner.";
+            }
+
+            if (agent.AddPermission == AgentAddPermission.OwnerOnly)
+            {
+                return "This agent can only be added by its owner.";
+            }
+
+            return await HasFriendAccessAsync(dbContext, callerUserId, agentId)
+                ? null
+                : "Add this agent as a friend before inviting it to a channel.";
+        }
+
+        private static Task<bool> HasFriendAccessAsync(Database.DataContext dbContext, Guid callerUserId, Guid agentId)
+        {
+            return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                dbContext.UserAgentFriends,
+                x => x.UserId == callerUserId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+        }
+
+        private static Task<bool> IsAgentAlreadyInChannelAsync(Database.DataContext dbContext, Guid channelId, Guid agentId)
+        {
+            return Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AnyAsync(
+                dbContext.ChannelAgents,
+                x => x.ChannelId == channelId && x.AgentDefinitionId == agentId && x.DateDeleted == null);
+        }
     }
 
     /// <summary>
     /// Definition of a built-in tool for seeding/display purposes.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class BuiltinToolDefinition
     {
         public string Name { get; set; } = string.Empty;

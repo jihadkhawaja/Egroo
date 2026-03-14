@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.shared.Models
 {
@@ -367,6 +368,7 @@ namespace jihadkhawaja.chat.shared.Models
     /// <summary>
     /// Represents an attachment supplied with a direct agent chat request.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class AgentChatAttachment
     {
         /// <summary>
@@ -391,6 +393,7 @@ namespace jihadkhawaja.chat.shared.Models
     /// <summary>
     /// Request payload for a direct agent chat turn.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class AgentChatRequest
     {
         /// <summary>

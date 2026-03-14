@@ -10,20 +10,7 @@ namespace jihadkhawaja.chat.server.Hubs
         [Authorize]
         public async Task<bool> SendMessage(Message message)
         {
-            if (message == null)
-                return false;
-
-            var userId = GetUserIdFromContext();
-            if (!userId.HasValue || userId.Value != message.SenderId)
-                return false;
-
-            if (!await ChannelContainUser(message.ChannelId, message.SenderId))
-                return false;
-
-            bool hasTransportContent = !string.IsNullOrWhiteSpace(message.Content)
-                || (message.RecipientContents?.Count > 0);
-
-            if (!hasTransportContent)
+            if (!await CanSendMessageAsync(message))
                 return false;
 
             bool dbResult = await _messageRepository.SendMessage(message);
@@ -34,6 +21,41 @@ namespace jihadkhawaja.chat.server.Hubs
             if (users == null)
                 return false;
 
+            await DeliverMessageToUsersAsync(users, message);
+            await NotifyAgentsAsync(message);
+
+            return true;
+        }
+
+        private async Task<bool> CanSendMessageAsync(Message? message)
+        {
+            if (message is null)
+            {
+                return false;
+            }
+
+            var userId = GetUserIdFromContext();
+            if (!userId.HasValue || userId.Value != message.SenderId)
+            {
+                return false;
+            }
+
+            if (!await ChannelContainUser(message.ChannelId, message.SenderId))
+            {
+                return false;
+            }
+
+            return HasTransportContent(message);
+        }
+
+        private static bool HasTransportContent(Message message)
+        {
+            return !string.IsNullOrWhiteSpace(message.Content)
+                || message.RecipientContents?.Count > 0;
+        }
+
+        private async Task DeliverMessageToUsersAsync(IEnumerable<UserDto> users, Message message)
+        {
             foreach (UserDto user in users)
             {
                 string? deliveryContent = GetDeliveryContentForUser(message, user.Id);
@@ -44,14 +66,17 @@ namespace jihadkhawaja.chat.server.Hubs
 
                 await SendClientMessage(user, message, ignorePendingMessages: false, deliveryContent);
             }
+        }
 
-            if (_agentChannelResponder is not null)
+        private async Task NotifyAgentsAsync(Message message)
+        {
+            if (_agentChannelResponder is null)
             {
-                await _agentChannelResponder.PersistAgentRecipientContentsAsync(message);
-                _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
+                return;
             }
 
-            return true;
+            await _agentChannelResponder.PersistAgentRecipientContentsAsync(message);
+            _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
         }
 
         private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages, string deliveryContent)

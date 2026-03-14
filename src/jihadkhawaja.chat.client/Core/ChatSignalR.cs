@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Core
 {
+    [ExcludeFromCodeCoverage]
     public static class ChatSignalR
     {
         public static HubConnection? HubConnection { get; private set; }

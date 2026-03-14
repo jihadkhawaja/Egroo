@@ -1,4 +1,5 @@
 using jihadkhawaja.chat.shared.Interfaces;
+using System.Diagnostics.CodeAnalysis;
 
 namespace Egroo.Server.API
 {
@@ -32,7 +33,12 @@ namespace Egroo.Server.API
         }
     }
 
+    [ExcludeFromCodeCoverage]
     public record SignUpRequest(string Username, string Password);
+
+    [ExcludeFromCodeCoverage]
     public record SignInRequest(string Username, string Password);
+
+    [ExcludeFromCodeCoverage]
     public record ChangePasswordRequest(string OldPassword, string NewPassword);
 }

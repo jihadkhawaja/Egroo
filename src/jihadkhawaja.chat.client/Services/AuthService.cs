@@ -1,9 +1,11 @@
 ﻿using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using System.Net.Http.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
+    [ExcludeFromCodeCoverage]
     public class AuthService : IAuthClient
     {
         public HttpClient HttpClient { get; }

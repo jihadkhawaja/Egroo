@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.AI;
 
 namespace Egroo.Server.Services
@@ -85,21 +86,10 @@ namespace Egroo.Server.Services
             {
                 var client = _httpClientFactory.CreateClient("McpClient");
                 ConfigureAuth(client, apiKey);
-
-                var rpcParams = new Dictionary<string, object?>
-                {
-                    ["name"] = toolName,
-                };
-
-                if (arguments is not null && arguments.Value.ValueKind != JsonValueKind.Undefined)
-                {
-                    rpcParams["arguments"] = arguments;
-                }
-
                 var request = new JsonRpcRequest
                 {
                     Method = "tools/call",
-                    Params = rpcParams,
+                    Params = BuildCallParameters(toolName, arguments),
                     Id = Guid.NewGuid().ToString()
                 };
 
@@ -107,40 +97,74 @@ namespace Egroo.Server.Services
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var response = await client.PostAsync(endpoint, content);
-
                 if (!response.IsSuccessStatusCode)
                 {
-                    return $"[MCP Error] Server returned {response.StatusCode}";
+                    return FormatServerError(response.StatusCode);
                 }
 
-                var responseBody = await response.Content.ReadAsStringAsync();
-                var rpcResponse = JsonSerializer.Deserialize<JsonRpcResponse<McpToolCallResult>>(responseBody, JsonOptions);
-
-                if (rpcResponse?.Error is not null)
-                {
-                    return $"[MCP Error] {rpcResponse.Error.Message}";
-                }
-
-                if (rpcResponse?.Result?.Content is not null)
-                {
-                    var sb = new StringBuilder();
-                    foreach (var item in rpcResponse.Result.Content)
-                    {
-                        if (item.Type == "text" && item.Text is not null)
-                        {
-                            sb.AppendLine(item.Text);
-                        }
-                    }
-                    return sb.ToString().TrimEnd();
-                }
-
-                return string.Empty;
+                var rpcResponse = await DeserializeCallResponseAsync(response);
+                return FormatCallResponse(rpcResponse);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to call tool '{Tool}' on MCP server at {Endpoint}", toolName, endpoint);
                 return $"[MCP Error] {ex.Message}";
             }
+        }
+
+        private static Dictionary<string, object?> BuildCallParameters(string toolName, JsonElement? arguments)
+        {
+            var rpcParams = new Dictionary<string, object?>
+            {
+                ["name"] = toolName,
+            };
+
+            if (arguments is not null && arguments.Value.ValueKind != JsonValueKind.Undefined)
+            {
+                rpcParams["arguments"] = arguments;
+            }
+
+            return rpcParams;
+        }
+
+        private static string FormatServerError(System.Net.HttpStatusCode statusCode)
+        {
+            return $"[MCP Error] Server returned {statusCode}";
+        }
+
+        private static async Task<JsonRpcResponse<McpToolCallResult>?> DeserializeCallResponseAsync(HttpResponseMessage response)
+        {
+            var responseBody = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<JsonRpcResponse<McpToolCallResult>>(responseBody, JsonOptions);
+        }
+
+        private static string FormatCallResponse(JsonRpcResponse<McpToolCallResult>? rpcResponse)
+        {
+            if (rpcResponse?.Error is not null)
+            {
+                return $"[MCP Error] {rpcResponse.Error.Message}";
+            }
+
+            if (rpcResponse?.Result?.Content is null)
+            {
+                return string.Empty;
+            }
+
+            return JoinTextContent(rpcResponse.Result.Content);
+        }
+
+        private static string JoinTextContent(IEnumerable<McpToolContent> content)
+        {
+            var sb = new StringBuilder();
+            foreach (var item in content)
+            {
+                if (item.Type == "text" && item.Text is not null)
+                {
+                    sb.AppendLine(item.Text);
+                }
+            }
+
+            return sb.ToString().TrimEnd();
         }
 
         /// <summary>
@@ -204,6 +228,7 @@ namespace Egroo.Server.Services
 
     // ── MCP JSON-RPC Protocol Types ─────────────────────────────────────
 
+    [ExcludeFromCodeCoverage]
     public class JsonRpcRequest
     {
         [JsonPropertyName("jsonrpc")]
@@ -219,6 +244,7 @@ namespace Egroo.Server.Services
         public string? Id { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public class JsonRpcResponse<T>
     {
         [JsonPropertyName("jsonrpc")]
@@ -234,6 +260,7 @@ namespace Egroo.Server.Services
         public string? Id { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public class JsonRpcError
     {
         [JsonPropertyName("code")]
@@ -243,12 +270,14 @@ namespace Egroo.Server.Services
         public string Message { get; set; } = string.Empty;
     }
 
+    [ExcludeFromCodeCoverage]
     public class McpToolsListResult
     {
         [JsonPropertyName("tools")]
         public List<McpToolInfo>? Tools { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public class McpToolInfo
     {
         [JsonPropertyName("name")]
@@ -261,6 +290,7 @@ namespace Egroo.Server.Services
         public JsonElement? InputSchema { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public class McpToolCallResult
     {
         [JsonPropertyName("content")]
@@ -270,6 +300,7 @@ namespace Egroo.Server.Services
         public bool? IsError { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public class McpToolContent
     {
         [JsonPropertyName("type")]
@@ -282,6 +313,7 @@ namespace Egroo.Server.Services
     /// <summary>
     /// Represents an MCP tool ready to be wired as an AITool proxy.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class McpToolProxy
     {
         public string Endpoint { get; set; } = string.Empty;

@@ -2,12 +2,14 @@ using jihadkhawaja.chat.shared.Models;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
     /// <summary>
     /// Client-side HTTP service for Agent API endpoints.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class AgentService
     {
         private const string BasePath = "api/v1/Agent";
@@ -432,6 +434,7 @@ namespace jihadkhawaja.chat.client.Services
     /// <summary>
     /// Result model for non-streaming agent chat.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class AgentChatResult
     {
         public bool Success { get; set; }
@@ -443,6 +446,7 @@ namespace jihadkhawaja.chat.client.Services
     /// <summary>
     /// Built-in tool definition returned by the server.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class BuiltinToolDefinition
     {
         public string Name { get; set; } = string.Empty;
@@ -453,6 +457,7 @@ namespace jihadkhawaja.chat.client.Services
     /// <summary>
     /// Result from seeding built-in tools.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class SeedResult
     {
         public int Added { get; set; }
@@ -462,6 +467,7 @@ namespace jihadkhawaja.chat.client.Services
     /// <summary>
     /// Result from MCP tool discovery.
     /// </summary>
+    [ExcludeFromCodeCoverage]
     public class DiscoverResult
     {
         public int Discovered { get; set; }

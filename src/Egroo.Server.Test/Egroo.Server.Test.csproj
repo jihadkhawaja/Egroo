@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <ExcludeByAttribute>ExcludeFromCodeCoverageAttribute,CompilerGeneratedAttribute,GeneratedCodeAttribute</ExcludeByAttribute>
+    <ExcludeByFile>**/Migrations/*.cs,**/Migrations/**/*.cs,**/bin/**/*.cs,**/obj/**/*.cs</ExcludeByFile>
   </PropertyGroup>
 
   <ItemGroup>

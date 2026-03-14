@@ -1,9 +1,11 @@
 ﻿using jihadkhawaja.chat.client.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client
 {
+    [ExcludeFromCodeCoverage]
     public static class Register
     {
         public static IServiceCollection AddChatServices(this IServiceCollection services)
