@@ -2,9 +2,9 @@
 
 <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="128"/>
 
-Egroo is a self-hosted real-time chat platform built with Blazor, ASP.NET Core, SignalR, and PostgreSQL. It is designed for teams that want modern chat, voice, and AI-assisted collaboration without giving up control of their infrastructure or data.
+Egroo is a self-hosted real-time chat platform built with Blazor, ASP.NET Core, SignalR, and PostgreSQL. It is designed for teams that want modern chat, voice, end-to-end encrypted messaging, and AI-assisted collaboration without giving up control of their infrastructure or data.
 
-It combines a Blazor web experience, a SignalR-first real-time backend, ephemeral encrypted message delivery, channel voice calls over WebRTC, and optional AI agents that can participate in conversations when mentioned.
+It combines a Blazor web experience, a SignalR-first real-time backend, per-recipient end-to-end encrypted messaging with ephemeral delivery, channel voice calls over WebRTC, and optional AI agents that can participate in conversations when mentioned.
 
 ## Build Status
 
@@ -20,6 +20,7 @@ It combines a Blazor web experience, a SignalR-first real-time backend, ephemera
 - Self-hosted architecture with PostgreSQL storage and no third-party message relay.
 - Blazor Auto rendering for fast first load with WebAssembly after hydration.
 - SignalR-based real-time messaging and presence.
+- End-to-end encrypted messaging with per-recipient payloads.
 - Ephemeral encrypted message delivery for stronger privacy.
 - WebRTC channel voice calls.
 - AI agents that can be created, published, added to channels, and triggered with mentions.
@@ -29,7 +30,8 @@ It combines a Blazor web experience, a SignalR-first real-time backend, ephemera
 | Capability | What it means |
 |---|---|
 | Real-time chat | Fast message delivery over SignalR WebSockets |
-| Privacy-first delivery | Message content is encrypted and stored only until recipients receive it |
+| End-to-end encrypted messaging | Per-recipient payloads are encrypted with recipient public keys and decrypted on the receiving device |
+| Privacy-first delivery | Message metadata is stored separately and encrypted pending content is removed after recipients acknowledge delivery |
 | Voice channels | Peer-to-peer channel audio using WebRTC signaling through the hub |
 | Blazor UI | Shared Razor components across server and WebAssembly experiences |
 | AI agents | User-owned agents powered by OpenAI, Azure OpenAI, Anthropic, or Ollama |
@@ -42,25 +44,37 @@ At a high level, Egroo separates the web host, the API server, shared UI librari
 ```mermaid
 flowchart TD
   Browser["Browser / PWA"]
-  Host["Egroo Host - Blazor Auto host"]
-  UI["Egroo.UI - Shared Razor components"]
-  Client["Egroo.Client - WASM client project"]
-  Api["Egroo.Server - Minimal API + SignalR"]
-  ChatClient["jihadkhawaja.chat.client - Client chat services"]
-  ChatServer["jihadkhawaja.chat.server - ChatHub + connection tracking"]
-  Shared["jihadkhawaja.chat.shared - Shared models and interfaces"]
   Db[("PostgreSQL")]
 
-  Browser --> Host
-  Host --> UI
-  Host --> Client
-  Browser --> Api
-  UI --> ChatClient
-  ChatClient --> Shared
-  Api --> ChatServer
-  Api --> Shared
-  ChatServer --> Shared
-  Api --> Db
+  subgraph PresentationLayer["Presentation Layer"]
+    direction TB
+    Host["Egroo Host"]
+    UI["Egroo.UI"]
+    Client["Egroo.Client"]
+  end
+
+  subgraph ClientServicesLayer["Client Services Layer"]
+    direction TB
+    ChatClient["jihadkhawaja.chat.client"]
+  end
+
+  subgraph ServerLayer["Server Layer"]
+    direction TB
+    Api["Egroo.Server"]
+    ChatServer["jihadkhawaja.chat.server"]
+  end
+
+  subgraph SharedLayer["Shared Contracts Layer"]
+    direction TB
+    Shared["jihadkhawaja.chat.shared"]
+  end
+
+  Browser --> PresentationLayer
+  Browser --> ServerLayer
+  PresentationLayer --> ClientServicesLayer
+  ClientServicesLayer --> SharedLayer
+  ServerLayer --> SharedLayer
+  ServerLayer --> Db
 ```
 
 ## Solution Structure
@@ -69,14 +83,43 @@ The solution in `src/` is split by responsibility so the UI, transport layer, sh
 
 ```mermaid
 flowchart LR
-  Egroo["Egroo/Egroo - Blazor host"] --> UI["Egroo.UI"]
-  EgrooClient["Egroo.Client - WASM client"] --> UI
-  UI --> ChatClient["jihadkhawaja.chat.client"]
-  ChatClient --> Shared["jihadkhawaja.chat.shared"]
-  EgrooServer["Egroo.Server - API + DB + repositories"] --> ChatServer["jihadkhawaja.chat.server"]
-  ChatServer --> Shared
-  EgrooServer --> Shared
-  Tests["Egroo.Server.Test"] --> EgrooServer
+  subgraph AppLayer["App Layer"]
+    direction TB
+    EgrooHost["Egroo/Egroo"]
+    EgrooClient["Egroo.Client"]
+  end
+
+  subgraph UiLayer["UI Layer"]
+    direction TB
+    UiProject["Egroo.UI"]
+  end
+
+  subgraph ClientLayer["Client Transport Layer"]
+    direction TB
+    ClientProject["jihadkhawaja.chat.client"]
+  end
+
+  subgraph SharedLayer["Shared Contracts Layer"]
+    direction TB
+    SharedProject["jihadkhawaja.chat.shared"]
+  end
+
+  subgraph ServerLayer["Server Layer"]
+    direction TB
+    ServerProject["Egroo.Server"]
+    ChatServerProject["jihadkhawaja.chat.server"]
+  end
+
+  subgraph TestLayer["Test Layer"]
+    direction TB
+    TestProject["Egroo.Server.Test"]
+  end
+
+  AppLayer --> UiLayer
+  UiLayer --> ClientLayer
+  ClientLayer --> SharedLayer
+  ServerLayer --> SharedLayer
+  TestLayer --> ServerLayer
 ```
 
 | Project | Purpose |
@@ -92,7 +135,7 @@ flowchart LR
 
 ## How Messaging Works
 
-One of Egroo's core design choices is that message content is not kept permanently in the main message record. The server stores metadata, encrypts per-recipient content temporarily, and removes pending content after acknowledgment.
+One of Egroo's core design choices is that message content is not kept permanently in the main message record. The server stores metadata, carries per-recipient encrypted payloads, and removes pending encrypted content after acknowledgment.
 
 ```mermaid
 sequenceDiagram
@@ -111,6 +154,28 @@ sequenceDiagram
   Hub-->>Recipient: ReceiveMessage(message)
   Recipient-->>Hub: UpdatePendingMessage(messageId)
   Hub->>Repo: Delete pending content
+```
+
+## How End-To-End Encryption Works
+
+Egroo encrypts message payloads for each recipient using published public keys. The server relays and temporarily stores ciphertext, while recipients decrypt on their own device with the matching private key.
+
+```mermaid
+sequenceDiagram
+  actor Sender as Sender Device
+  participant UI as Egroo.UI
+  participant Hub as ChatHub
+  participant Store as Pending Storage
+  actor Recipient as Recipient Device
+
+  Sender->>UI: Load recipient public keys
+  UI->>UI: Encrypt payload for each recipient
+  UI->>Hub: Send metadata + encrypted payloads
+  Hub->>Store: Store ciphertext until delivery
+  Hub-->>Recipient: Relay encrypted payload
+  Recipient->>Recipient: Decrypt with local private key
+
+  Note over Hub,Store: Server handles ciphertext and delivery state
 ```
 
 ## How Voice Channel Calls Work
