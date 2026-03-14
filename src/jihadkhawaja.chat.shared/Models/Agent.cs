@@ -71,6 +71,30 @@ namespace jihadkhawaja.chat.shared.Models
         public string? ApiKey { get; set; }
 
         /// <summary>
+        /// Public key used to encrypt channel messages for this agent.
+        /// </summary>
+        [MaxLength(8000)]
+        public string? EncryptionPublicKey { get; set; }
+
+        /// <summary>
+        /// Private key used by the server-hosted agent runtime to decrypt this agent's envelopes.
+        /// Stored encrypted at rest.
+        /// </summary>
+        [MaxLength(12000)]
+        public string? EncryptionPrivateKey { get; set; }
+
+        /// <summary>
+        /// Identifier for the current agent encryption keypair.
+        /// </summary>
+        [MaxLength(128)]
+        public string? EncryptionKeyId { get; set; }
+
+        /// <summary>
+        /// Timestamp of the last encryption keypair generation.
+        /// </summary>
+        public DateTimeOffset? EncryptionKeyUpdatedOn { get; set; }
+
+        /// <summary>
         /// Optional endpoint URL (required for AzureOpenAI and Ollama).
         /// </summary>
         [MaxLength(500)]
@@ -324,5 +348,19 @@ namespace jihadkhawaja.chat.shared.Models
         /// Token usage for this message (if available from LLM response).
         /// </summary>
         public int? TokensUsed { get; set; }
+    }
+
+    /// <summary>
+    /// Stores the encrypted copy of a channel message intended for a specific agent.
+    /// </summary>
+    public class AgentPendingMessage : EntityBase
+    {
+        [Required]
+        public Guid AgentDefinitionId { get; set; }
+
+        [Required]
+        public Guid MessageId { get; set; }
+
+        public string? Content { get; set; }
     }
 }

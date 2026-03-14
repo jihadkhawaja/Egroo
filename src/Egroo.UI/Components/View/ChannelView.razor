@@ -101,12 +101,6 @@
                 @EncryptionWarning
             </MudAlert>
         }
-        @if (channelAgentDefs?.Any() == true)
-        {
-            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Text" Class="mt-2 mb-0">
-                End-to-end encrypted messages are only readable by human channel members on their devices. Server-hosted agents cannot read encrypted content.
-            </MudAlert>
-        }
     </MudPaper>
 
     <!-- Messages Container -->
@@ -616,7 +610,13 @@
                 .Where(x => x is not null)
                 .Cast<UserDto>();
 
-            message.RecipientContents = await EndToEndEncryptionService.EncryptMessageForRecipientsAsync(plainContent, recipients);
+            var encryptedPayload = await EndToEndEncryptionService.EncryptMessageForRecipientsAsync(
+                plainContent,
+                recipients,
+                channelAgentDefs ?? Array.Empty<AgentDefinition>());
+
+            message.RecipientContents = encryptedPayload.UserRecipientContents;
+            message.AgentRecipientContents = encryptedPayload.AgentRecipientContents;
         }
         catch (Exception ex)
         {

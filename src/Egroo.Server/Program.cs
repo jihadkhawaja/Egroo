@@ -150,6 +150,7 @@ builder.Services.AddSingleton<EncryptionService>(sp =>
     var iv = configuration.GetSection("Encryption")["IV"];
     return new EncryptionService(key, iv);
 });
+builder.Services.AddSingleton<EndToEndEncryptionService>();
 // Repositories (implement shared interfaces)
 builder.Services.AddScoped<IAuth, AuthRepository>();
 builder.Services.AddScoped<IUser, UserRepository>();

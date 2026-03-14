@@ -93,22 +93,22 @@
                 {
                     @if (msg.Role == "user")
                     {
-                        <MudStack Row Justify="Justify.FlexEnd" Class="mb-2">
+                        <MudStack @key="msg.Id" Row Justify="Justify.FlexEnd" Class="mb-2">
                             <MudPaper Class="pa-3" Elevation="0"
                                       Style="max-width: 75%; border-radius: 16px 16px 4px 16px; background: var(--mud-palette-primary); color: var(--mud-palette-primary-text);">
-                                <MarkdownContent Content="@msg.Content" />
+                                <MarkdownContent @key="msg.RenderKey" Content="@msg.Content" />
                             </MudPaper>
                         </MudStack>
                     }
                     else
                     {
-                        <MudStack Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
+                        <MudStack @key="msg.Id" Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
                             <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
                                 <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
                             </MudAvatar>
                             <MudPaper Class="pa-3" Elevation="0"
                                       Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
-                                <MarkdownContent Content="@msg.Content" />
+                                <MarkdownContent @key="msg.RenderKey" Content="@msg.Content" />
                             </MudPaper>
                         </MudStack>
                     }
@@ -117,13 +117,13 @@
                 @* Streaming response in progress *@
                 @if (isStreaming && streamingContent.Length > 0)
                 {
-                    <MudStack Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
+                    <MudStack @key="GetStreamingRenderKey()" Row Justify="Justify.FlexStart" Spacing="2" Class="mb-2">
                         <MudAvatar Color="Color.Secondary" Size="Size.Small" Style="align-self: flex-end;">
                             <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
                         </MudAvatar>
                         <MudPaper Class="pa-3" Elevation="0"
                                   Style="max-width: 75%; border-radius: 16px 16px 16px 4px; background: var(--mud-palette-surface);">
-                            <MarkdownContent Content="@streamingContent.ToString()" />
+                            <MarkdownContent @key="GetStreamingRenderKey()" Content="@streamingContent.ToString()" />
                         </MudPaper>
                     </MudStack>
                 }
@@ -468,7 +468,14 @@
 
     private class ChatMessageDisplay
     {
+        public Guid Id { get; init; } = Guid.NewGuid();
         public string Role { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
+        public string RenderKey => $"{Id}:{Role}:{Content}";
+    }
+
+    private string GetStreamingRenderKey()
+    {
+        return $"stream:{currentConversation?.Id}:{streamingContent}";
     }
 }

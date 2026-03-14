@@ -80,17 +80,29 @@ namespace Egroo.UI.Services
             return await GenerateAndPublishIdentityAsync();
         }
 
-        public async Task<List<MessageRecipientContent>> EncryptMessageForRecipientsAsync(string plaintext, IEnumerable<UserDto> recipients)
+        public async Task<ChannelEncryptedPayload> EncryptMessageForRecipientsAsync(
+            string plaintext,
+            IEnumerable<UserDto> userRecipients,
+            IEnumerable<AgentDefinition>? agentRecipients = null)
         {
-            var recipientRequests = recipients
+            var userRecipientRequests = userRecipients
                 .Where(x => x.Id != Guid.Empty)
                 .GroupBy(x => x.Id)
                 .Select(x => x.First())
                 .ToArray();
 
-            string[] missingRecipients = recipientRequests
+            var agentRecipientRequests = (agentRecipients ?? Array.Empty<AgentDefinition>())
+                .Where(x => x.Id != Guid.Empty)
+                .GroupBy(x => x.Id)
+                .Select(x => x.First())
+                .ToArray();
+
+            string[] missingRecipients = userRecipientRequests
                 .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey))
                 .Select(x => x.Username ?? x.Id.ToString("D"))
+                .Concat(agentRecipientRequests
+                    .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey))
+                    .Select(x => x.Name))
                 .ToArray();
 
             if (missingRecipients.Length > 0)
@@ -103,14 +115,29 @@ namespace Egroo.UI.Services
                 new
                 {
                     plaintext,
-                    recipients = recipientRequests.Select(x => new EncryptionRecipientRequest(x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId)).ToArray()
+                    recipients = userRecipientRequests
+                        .Select(x => new EncryptionRecipientRequest(x.Id, null, x.EncryptionPublicKey!, x.EncryptionKeyId))
+                        .Concat(agentRecipientRequests.Select(x => new EncryptionRecipientRequest(null, x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId)))
+                        .ToArray()
                 });
 
-            return payloads.Select(x => new MessageRecipientContent
-            {
-                UserId = x.UserId,
-                Content = x.Content
-            }).ToList();
+            return new ChannelEncryptedPayload(
+                payloads
+                    .Where(x => x.UserId.HasValue)
+                    .Select(x => new MessageRecipientContent
+                    {
+                        UserId = x.UserId!.Value,
+                        Content = x.Content
+                    })
+                    .ToList(),
+                payloads
+                    .Where(x => x.AgentDefinitionId.HasValue)
+                    .Select(x => new MessageAgentRecipientContent
+                    {
+                        AgentDefinitionId = x.AgentDefinitionId!.Value,
+                        Content = x.Content
+                    })
+                    .ToList());
         }
 
         public async Task<string?> GetDisplayContentAsync(Message message)
@@ -242,8 +269,12 @@ namespace Egroo.UI.Services
             string IvBase64,
             long OriginalSizeBytes);
 
-        private sealed record EncryptionRecipientRequest(Guid UserId, string PublicKey, string? KeyId);
-        private sealed record EncryptedRecipientPayload(Guid UserId, string Content);
+        public sealed record ChannelEncryptedPayload(
+            List<MessageRecipientContent> UserRecipientContents,
+            List<MessageAgentRecipientContent> AgentRecipientContents);
+
+        private sealed record EncryptionRecipientRequest(Guid? UserId, Guid? AgentDefinitionId, string PublicKey, string? KeyId);
+        private sealed record EncryptedRecipientPayload(Guid? UserId, Guid? AgentDefinitionId, string Content);
         private sealed record BrowserDecryptionResult(string Status, string? Plaintext);
         private sealed record BrowserEncryptedFile(string EncryptedBase64, string KeyBase64, string IvBase64);
         private sealed record EncryptedFileTokenMetadata(int V, string Url, string FileName, string ContentType, long SizeBytes, string Key, string Iv);

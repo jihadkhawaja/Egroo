@@ -300,15 +300,46 @@ namespace jihadkhawaja.chat.client.Services
             using var reader = new System.IO.StreamReader(stream);
 
             string? line;
+            var dataLines = new List<string>();
             while ((line = await reader.ReadLineAsync()) is not null)
             {
-                if (string.IsNullOrEmpty(line)) continue;
-                if (!line.StartsWith("data: ")) continue;
+                if (string.IsNullOrEmpty(line))
+                {
+                    if (dataLines.Count == 0)
+                    {
+                        continue;
+                    }
 
-                var data = line["data: ".Length..];
-                if (data == "[DONE]") yield break;
+                    var data = string.Join("\n", dataLines);
+                    dataLines.Clear();
 
-                yield return data;
+                    if (data == "[DONE]")
+                    {
+                        yield break;
+                    }
+
+                    yield return data;
+                    continue;
+                }
+
+                if (!line.StartsWith("data:", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                string dataLine = line.Length >= 6 && line[5] == ' '
+                    ? line[6..]
+                    : line[5..];
+                dataLines.Add(dataLine);
+            }
+
+            if (dataLines.Count > 0)
+            {
+                var data = string.Join("\n", dataLines);
+                if (data != "[DONE]")
+                {
+                    yield return data;
+                }
             }
         }
 

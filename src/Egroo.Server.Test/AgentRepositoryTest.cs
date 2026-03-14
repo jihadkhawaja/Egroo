@@ -56,6 +56,9 @@ namespace Egroo.Server.Test
             Assert.IsNotNull(stored);
             Assert.AreNotEqual("plain-text-key", stored.ApiKey);
             Assert.AreEqual("plain-text-key", encryption.Decrypt(stored.ApiKey!));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(stored.EncryptionPublicKey));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(stored.EncryptionPrivateKey));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(stored.EncryptionKeyId));
         }
 
         [TestMethod]
@@ -519,6 +522,37 @@ namespace Egroo.Server.Test
             Assert.IsTrue(removed);
             Assert.IsNotNull(definitionsAfterRemoval);
             Assert.AreEqual(0, definitionsAfterRemoval.Length);
+        }
+
+        [TestMethod]
+        public async Task GetChannelAgentDefinitions_BackfillsMissingEncryptionIdentity()
+        {
+            var agent = await CreateAgentForOwner("channel-key-agent");
+            var channel = await CreateAdminChannel(_ownerUserId);
+
+            using (var seedScope = _ownerServices.CreateScope())
+            {
+                var db = seedScope.ServiceProvider.GetRequiredService<DataContext>();
+                var stored = await db.AgentDefinitions.FindAsync(agent.Id);
+                Assert.IsNotNull(stored);
+                stored.EncryptionPublicKey = null;
+                stored.EncryptionPrivateKey = null;
+                stored.EncryptionKeyId = null;
+                stored.EncryptionKeyUpdatedOn = null;
+                await db.SaveChangesAsync();
+            }
+
+            using var scope = _ownerServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IAgentRepository>();
+
+            await repo.AddAgentToChannel(channel.Id, agent.Id);
+            var definitions = await repo.GetChannelAgentDefinitions(channel.Id);
+
+            Assert.IsNotNull(definitions);
+            Assert.AreEqual(1, definitions.Length);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(definitions[0].EncryptionPublicKey));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(definitions[0].EncryptionPrivateKey));
+            Assert.IsFalse(string.IsNullOrWhiteSpace(definitions[0].EncryptionKeyId));
         }
 
         [TestMethod]

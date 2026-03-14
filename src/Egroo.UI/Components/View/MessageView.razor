@@ -4,7 +4,7 @@
     <MudStack Row Justify="Justify.FlexEnd" Class="mb-1">
         <MudPaper Class="pa-3 msg-bubble msg-bubble-current" Elevation="0"
                   Style="@GetCurrentUserBubbleStyle()">
-            <MarkdownContent Content="@Content" />
+            <MarkdownContent @key="GetMarkdownRenderKey()" Content="@Content" />
             <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.FlexEnd" Class="mt-1" Spacing="1">
                 <MudText Typo="Typo.caption" Style="opacity: 0.7; font-size: 0.7rem;">@Date</MudText>
                 @if (SentOnDate is not null && SeenOnDate is not null)
@@ -39,7 +39,7 @@ else
         <MudPaper Class="pa-3 msg-bubble msg-bubble-other" Elevation="0"
                   Style="@GetOtherBubbleStyle()">
             <MudText Typo="Typo.caption" Color="@(IsAgent ? Color.Info : Color.Primary)" Style="font-weight: 600;">@DisplayName</MudText>
-            <MarkdownContent Content="@Content" />
+            <MarkdownContent @key="GetMarkdownRenderKey()" Content="@Content" />
             <MudText Typo="Typo.caption" Style="opacity: 0.5; font-size: 0.7rem;" Class="mt-1">@Date</MudText>
         </MudPaper>
     </MudStack>
@@ -91,5 +91,10 @@ else
         }
 
         return string.Empty;
+    }
+
+    private string GetMarkdownRenderKey()
+    {
+        return $"{MessageElementId}:{Content}:{Date}:{IsAgent}:{IsCurrentUser}";
     }
 }

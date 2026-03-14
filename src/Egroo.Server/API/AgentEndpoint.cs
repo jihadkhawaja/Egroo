@@ -2,6 +2,7 @@ using Egroo.Server.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Egroo.Server.Security;
+using System.Text;
 
 namespace Egroo.Server.API
 {
@@ -40,8 +41,7 @@ namespace Egroo.Server.API
                     return Results.BadRequest(new { error = "Failed to create agent." });
                 }
 
-                // Don't return the encrypted API key
-                result.ApiKey = null;
+                StripSecrets(result);
                 return Results.Ok(result);
             });
 
@@ -50,10 +50,9 @@ namespace Egroo.Server.API
                 var agents = await repo.GetUserAgents();
                 if (agents is not null)
                 {
-                    // Strip API keys from response
                     foreach (var a in agents)
                     {
-                        a.ApiKey = null;
+                        StripSecrets(a);
                     }
                 }
                 return Results.Ok(agents);
@@ -66,7 +65,7 @@ namespace Egroo.Server.API
                 {
                     return Results.NotFound();
                 }
-                agent.ApiKey = null;
+                StripSecrets(agent);
                 return Results.Ok(agent);
             });
 
@@ -353,7 +352,7 @@ namespace Egroo.Server.API
                     return Results.BadRequest(new { error = "Failed to add MCP server." });
                 }
 
-                result.ApiKey = null; // Don't return encrypted key
+                result.ApiKey = null;
                 return Results.Ok(result);
             });
 
@@ -525,11 +524,11 @@ namespace Egroo.Server.API
 
                 await foreach (var chunk in runtime.ChatStreamAsync(userId, conversationId, req.Message))
                 {
-                    await httpContext.Response.WriteAsync($"data: {chunk}\n\n");
+                    await WriteSseEventAsync(httpContext, chunk);
                     await httpContext.Response.Body.FlushAsync();
                 }
 
-                await httpContext.Response.WriteAsync("data: [DONE]\n\n");
+                await WriteSseEventAsync(httpContext, "[DONE]");
                 await httpContext.Response.Body.FlushAsync();
             });
 
@@ -552,7 +551,7 @@ namespace Egroo.Server.API
                 var agents = await repo.SearchPublishedAgents(query, maxResults ?? 20);
                 if (agents is not null)
                 {
-                    foreach (var a in agents) a.ApiKey = null;
+                    foreach (var a in agents) StripSecrets(a);
                 }
                 return Results.Ok(agents);
             }).AllowAnonymous();
@@ -561,7 +560,7 @@ namespace Egroo.Server.API
             {
                 var agent = await repo.GetPublishedAgent(agentId);
                 if (agent is null) return Results.NotFound();
-                agent.ApiKey = null;
+                StripSecrets(agent);
                 return Results.Ok(agent);
             }).AllowAnonymous();
 
@@ -610,10 +609,33 @@ namespace Egroo.Server.API
                 var agents = await repo.GetChannelAgentDefinitions(channelId);
                 if (agents is not null)
                 {
-                    foreach (var a in agents) a.ApiKey = null;
+                    foreach (var a in agents) StripSecrets(a);
                 }
                 return Results.Ok(agents);
             });
+        }
+
+        private static void StripSecrets(AgentDefinition agent)
+        {
+            agent.ApiKey = null;
+            agent.EncryptionPrivateKey = null;
+        }
+
+        private static Task WriteSseEventAsync(HttpContext httpContext, string data)
+        {
+            var builder = new StringBuilder();
+            var normalized = (data ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
+            var lines = normalized.Split('\n');
+
+            foreach (var line in lines)
+            {
+                builder.Append("data: ");
+                builder.Append(line);
+                builder.Append('\n');
+            }
+
+            builder.Append('\n');
+            return httpContext.Response.WriteAsync(builder.ToString());
         }
 
         private static string ResolveSkillDirectoryName(string? requestedName, string path)

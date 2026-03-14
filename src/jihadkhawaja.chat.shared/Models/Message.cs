@@ -25,12 +25,22 @@ namespace jihadkhawaja.chat.shared.Models
         public string? DecryptedContent { get; set; }
         [NotMapped]
         public List<MessageRecipientContent>? RecipientContents { get; set; }
+        [NotMapped]
+        public List<MessageAgentRecipientContent>? AgentRecipientContents { get; set; }
     }
 
     public class MessageRecipientContent
     {
         [Required]
         public Guid UserId { get; set; }
+        [Required]
+        public string Content { get; set; } = string.Empty;
+    }
+
+    public class MessageAgentRecipientContent
+    {
+        [Required]
+        public Guid AgentDefinitionId { get; set; }
         [Required]
         public string Content { get; set; } = string.Empty;
     }

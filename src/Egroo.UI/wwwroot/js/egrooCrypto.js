@@ -139,7 +139,8 @@
                 const wrappedKey = new Uint8Array(await crypto.subtle.encrypt({ name: "RSA-OAEP" }, publicKey, rawAesKey));
 
                 results.push({
-                    userId: recipient.userId,
+                    userId: recipient.userId || null,
+                    agentDefinitionId: recipient.agentDefinitionId || null,
                     content: JSON.stringify({
                         v: 1,
                         alg: "RSA-OAEP-256/A256GCM",

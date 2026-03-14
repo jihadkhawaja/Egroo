@@ -52,6 +52,7 @@ namespace Egroo.Server.Test
 
             // ── AES Encryption ──────────────────────────────────────────────────────────
             services.AddSingleton(new EncryptionService(EncryptionKey, EncryptionIV));
+            services.AddSingleton<EndToEndEncryptionService>();
 
             // ── HTTP context (real auth claims or anonymous) ────────────────────────────
             if (authenticatedUserId.HasValue)

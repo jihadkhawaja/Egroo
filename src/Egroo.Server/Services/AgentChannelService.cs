@@ -23,6 +23,7 @@ namespace Egroo.Server.Services
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly AgentSkillsService _agentSkillsService;
         private readonly EncryptionService _encryptionService;
+        private readonly EndToEndEncryptionService _endToEndEncryptionService;
         private readonly McpClientService _mcpClientService;
         private readonly IHubContext<ChatHub> _hubContext;
         private readonly IConnectionTracker _connectionTracker;
@@ -35,6 +36,7 @@ namespace Egroo.Server.Services
             IServiceScopeFactory scopeFactory,
             AgentSkillsService agentSkillsService,
             EncryptionService encryptionService,
+            EndToEndEncryptionService endToEndEncryptionService,
             McpClientService mcpClientService,
             IHubContext<ChatHub> hubContext,
             IConnectionTracker connectionTracker,
@@ -45,6 +47,7 @@ namespace Egroo.Server.Services
             _scopeFactory = scopeFactory;
             _agentSkillsService = agentSkillsService;
             _encryptionService = encryptionService;
+            _endToEndEncryptionService = endToEndEncryptionService;
             _mcpClientService = mcpClientService;
             _hubContext = hubContext;
             _connectionTracker = connectionTracker;
@@ -57,13 +60,61 @@ namespace Egroo.Server.Services
         /// Detect @mentions for channel agents and trigger responses asynchronously.
         /// Called after a message is successfully sent in a channel.
         /// </summary>
-        public async Task ProcessMentionsAsync(Message message)
+        public async Task PersistAgentRecipientContentsAsync(Message message)
         {
-            if (string.IsNullOrWhiteSpace(message.Content))
+            if (message.Id == Guid.Empty || message.AgentRecipientContents is not { Count: > 0 })
             {
                 return;
             }
 
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
+
+                var agentContents = message.AgentRecipientContents
+                    .Where(x => x.AgentDefinitionId != Guid.Empty && !string.IsNullOrWhiteSpace(x.Content))
+                    .GroupBy(x => x.AgentDefinitionId)
+                    .Select(x => x.First())
+                    .ToArray();
+
+                if (agentContents.Length == 0)
+                {
+                    return;
+                }
+
+                var existingIds = await dbContext.AgentPendingMessages
+                    .Where(x => x.MessageId == message.Id)
+                    .Select(x => x.AgentDefinitionId)
+                    .ToListAsync();
+
+                foreach (var agentContent in agentContents)
+                {
+                    if (existingIds.Contains(agentContent.AgentDefinitionId))
+                    {
+                        continue;
+                    }
+
+                    await dbContext.AgentPendingMessages.AddAsync(new AgentPendingMessage
+                    {
+                        Id = Guid.NewGuid(),
+                        AgentDefinitionId = agentContent.AgentDefinitionId,
+                        MessageId = message.Id,
+                        Content = agentContent.Content,
+                        DateCreated = DateTimeOffset.UtcNow
+                    });
+                }
+
+                await dbContext.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error storing agent recipient envelopes for message {MessageId}", message.Id);
+            }
+        }
+
+        public async Task ProcessMentionsAsync(Message message)
+        {
             try
             {
                 using var scope = _scopeFactory.CreateScope();
@@ -90,17 +141,23 @@ namespace Egroo.Server.Services
                 }
 
                 // Find mentioned agents by @name or @<name> pattern (case-insensitive)
-                var mentionedAgents = new List<AgentDefinition>();
+                var mentionedAgents = new List<(AgentDefinition Agent, string TriggerContent)>();
                 foreach (var agent in agentDefs)
                 {
+                    string? triggerContent = GetAgentReadableContent(message, agent);
+                    if (string.IsNullOrWhiteSpace(triggerContent))
+                    {
+                        continue;
+                    }
+
                     // Match @<Agent Name> (bracket syntax for names with spaces) or @AgentName (no spaces)
                     var escapedName = Regex.Escape(agent.Name);
                     var bracketPattern = $@"@<{escapedName}>";
                     var plainPattern = $@"@{escapedName}(?:\b|$)";
-                    if (Regex.IsMatch(message.Content, bracketPattern, RegexOptions.IgnoreCase)
-                        || Regex.IsMatch(message.Content, plainPattern, RegexOptions.IgnoreCase))
+                    if (Regex.IsMatch(triggerContent, bracketPattern, RegexOptions.IgnoreCase)
+                        || Regex.IsMatch(triggerContent, plainPattern, RegexOptions.IgnoreCase))
                     {
-                        mentionedAgents.Add(agent);
+                        mentionedAgents.Add((agent, triggerContent));
                     }
                 }
 
@@ -110,9 +167,9 @@ namespace Egroo.Server.Services
                 }
 
                 // Process each mentioned agent (fire-and-forget per agent)
-                foreach (var agentDef in mentionedAgents)
+                foreach (var mentionedAgent in mentionedAgents)
                 {
-                    _ = Task.Run(() => GenerateAgentResponseAsync(agentDef, message));
+                    _ = Task.Run(() => GenerateAgentResponseAsync(mentionedAgent.Agent, message, mentionedAgent.TriggerContent));
                 }
             }
             catch (Exception ex)
@@ -121,7 +178,7 @@ namespace Egroo.Server.Services
             }
         }
 
-        private async Task GenerateAgentResponseAsync(AgentDefinition agentDef, Message triggerMessage)
+        private async Task GenerateAgentResponseAsync(AgentDefinition agentDef, Message triggerMessage, string triggerContent)
         {
             ChannelTypingState? typingState = null;
             try
@@ -164,6 +221,13 @@ namespace Egroo.Server.Services
                 instructions += "You were mentioned with @" + agentDef.Name + ". ";
                 instructions += "Respond naturally to the conversation. Keep your response concise and relevant.";
 
+                string? agentPrivateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agentDef.EncryptionPrivateKey);
+                if (string.IsNullOrWhiteSpace(agentPrivateKey) && triggerMessage.AgentRecipientContents is not null)
+                {
+                    _logger.LogWarning("Agent {AgentId} has no private key available for encrypted channel processing.", agentDef.Id);
+                    return;
+                }
+
                 // Build tools
                 var tools = await BuildTools(dbContext, agentDef.Id, agentDef.UserId);
 
@@ -197,16 +261,9 @@ namespace Egroo.Server.Services
                 var chatMessages = new List<ChatMessage>();
                 foreach (var msg in recentMessages)
                 {
-                    // Load display names and decrypt content from pending messages
-                    var pendingMsg = await dbContext.UsersPendingMessages
-                        .FirstOrDefaultAsync(x => x.MessageId == msg.Id && x.DateDeleted == null);
-
-                    string? content = pendingMsg?.Content;
-                    if (!string.IsNullOrWhiteSpace(content))
-                    {
-                        try { content = _encryptionService.Decrypt(content); }
-                        catch { /* use as-is if decryption fails */ }
-                    }
+                    string? content = msg.Id == triggerMessage.Id
+                        ? triggerContent
+                        : await GetContentForAgentAsync(dbContext, msg, agentDef, agentPrivateKey);
 
                     if (string.IsNullOrWhiteSpace(content))
                     {
@@ -275,7 +332,6 @@ namespace Egroo.Server.Services
                 await dbContext.Messages.AddAsync(responseMessage);
                 await dbContext.SaveChangesAsync();
 
-                // Create encrypted pending messages and broadcast to channel members
                 await BroadcastAgentMessage(dbContext, responseMessage);
             }
             catch (Exception ex)
@@ -303,43 +359,156 @@ namespace Egroo.Server.Services
 
         private async Task BroadcastAgentMessage(DataContext dbContext, Message message)
         {
-            // Get all users in the channel
-            var channelUserIds = await dbContext.ChannelUsers
+            var channelUsers = await dbContext.ChannelUsers
                 .Where(x => x.ChannelId == message.ChannelId)
-                .Select(x => x.UserId)
+                .Join(dbContext.Users,
+                    channelUser => channelUser.UserId,
+                    user => user.Id,
+                    (_, user) => new UserDto
+                    {
+                        Id = user.Id,
+                        Username = user.Username,
+                        EncryptionPublicKey = user.EncryptionPublicKey,
+                        EncryptionKeyId = user.EncryptionKeyId,
+                        EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn
+                    })
                 .ToListAsync();
 
-            // Create pending messages and send via SignalR for each online member
-            foreach (var userId in channelUserIds)
+            var channelAgents = await dbContext.ChannelAgents
+                .Where(x => x.ChannelId == message.ChannelId && x.DateDeleted == null)
+                .Join(dbContext.AgentDefinitions,
+                    channelAgent => channelAgent.AgentDefinitionId,
+                    definition => definition.Id,
+                    (_, definition) => definition)
+                .Where(x => x.IsActive && x.DateDeleted == null)
+                .ToListAsync();
+
+            EndToEndEncryptionService.ChannelEncryptionResult encryptedPayload;
+            try
             {
+                encryptedPayload = _endToEndEncryptionService.EncryptForChannelRecipients(message.Content!, channelUsers, channelAgents);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to encrypt agent response for channel {ChannelId}", message.ChannelId);
+                return;
+            }
+
+            message.RecipientContents = encryptedPayload.UserRecipientContents;
+            message.AgentRecipientContents = encryptedPayload.AgentRecipientContents;
+
+            foreach (var user in channelUsers)
+            {
+                string? deliveryContent = encryptedPayload.UserRecipientContents.FirstOrDefault(x => x.UserId == user.Id)?.Content;
+                if (string.IsNullOrWhiteSpace(deliveryContent))
+                {
+                    continue;
+                }
+
                 var pendingMsg = new UserPendingMessage
                 {
                     Id = Guid.NewGuid(),
-                    UserId = userId,
+                    UserId = user.Id,
                     MessageId = message.Id,
-                    Content = _encryptionService.Encrypt(message.Content!),
+                    Content = deliveryContent,
                     DateCreated = DateTimeOffset.UtcNow
                 };
 
                 await dbContext.UsersPendingMessages.AddAsync(pendingMsg);
 
-                // Send real-time notification to online users
-                var connectionIds = _connectionTracker.GetUserConnectionIds(userId);
+                var connectionIds = _connectionTracker.GetUserConnectionIds(user.Id);
                 if (connectionIds.Count > 0)
                 {
                     var lastConnection = connectionIds.Last();
                     try
                     {
-                        await _hubContext.Clients.Client(lastConnection).SendAsync("ReceiveMessage", message);
+                        await _hubContext.Clients.Client(lastConnection).SendAsync("ReceiveMessage", CloneForUserDelivery(message, deliveryContent));
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to send agent message to user {UserId}", userId);
+                        _logger.LogWarning(ex, "Failed to send agent message to user {UserId}", user.Id);
                     }
                 }
             }
 
+            foreach (var agentRecipient in encryptedPayload.AgentRecipientContents)
+            {
+                await dbContext.AgentPendingMessages.AddAsync(new AgentPendingMessage
+                {
+                    Id = Guid.NewGuid(),
+                    AgentDefinitionId = agentRecipient.AgentDefinitionId,
+                    MessageId = message.Id,
+                    Content = agentRecipient.Content,
+                    DateCreated = DateTimeOffset.UtcNow
+                });
+            }
+
             await dbContext.SaveChangesAsync();
+        }
+
+        private string? GetAgentReadableContent(Message message, AgentDefinition agent)
+        {
+            if (!string.IsNullOrWhiteSpace(message.Content))
+            {
+                return message.Content;
+            }
+
+            string? transportContent = message.AgentRecipientContents?.FirstOrDefault(x => x.AgentDefinitionId == agent.Id)?.Content;
+            if (string.IsNullOrWhiteSpace(transportContent))
+            {
+                return null;
+            }
+
+            string? privateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agent.EncryptionPrivateKey);
+            return _endToEndEncryptionService.DecryptTransportContent(transportContent, privateKey);
+        }
+
+        private async Task<string?> GetContentForAgentAsync(DataContext dbContext, Message message, AgentDefinition agentDef, string? privateKey)
+        {
+            var agentPending = await dbContext.AgentPendingMessages
+                .FirstOrDefaultAsync(x => x.AgentDefinitionId == agentDef.Id && x.MessageId == message.Id && x.DateDeleted == null);
+
+            if (!string.IsNullOrWhiteSpace(agentPending?.Content))
+            {
+                return _endToEndEncryptionService.DecryptTransportContent(agentPending.Content, privateKey);
+            }
+
+            var userPending = await dbContext.UsersPendingMessages
+                .FirstOrDefaultAsync(x => x.MessageId == message.Id && x.DateDeleted == null);
+
+            string? content = userPending?.Content;
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                try
+                {
+                    return _encryptionService.Decrypt(content);
+                }
+                catch
+                {
+                    return content;
+                }
+            }
+
+            return message.Content;
+        }
+
+        private static Message CloneForUserDelivery(Message source, string deliveryContent)
+        {
+            return new Message
+            {
+                Id = source.Id,
+                SenderId = source.SenderId,
+                ChannelId = source.ChannelId,
+                ReferenceId = source.ReferenceId,
+                DateSent = source.DateSent,
+                DateSeen = source.DateSeen,
+                DateCreated = source.DateCreated,
+                DateUpdated = source.DateUpdated,
+                DateDeleted = source.DateDeleted,
+                AgentDefinitionId = source.AgentDefinitionId,
+                DisplayName = source.DisplayName,
+                Content = deliveryContent,
+            };
         }
 
         private async Task StartTypingAsync(DataContext dbContext, ChannelTypingState typingState)

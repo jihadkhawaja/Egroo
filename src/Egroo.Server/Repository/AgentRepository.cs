@@ -9,16 +9,19 @@ namespace Egroo.Server.Repository
     public class AgentRepository : BaseRepository, IAgentRepository
     {
         private readonly EncryptionService _encryptionService;
+        private readonly EndToEndEncryptionService _endToEndEncryptionService;
 
         public AgentRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
             IConnectionTracker connectionTracker,
             EncryptionService encryptionService,
+            EndToEndEncryptionService endToEndEncryptionService,
             ILogger<AgentRepository> logger)
             : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
             _encryptionService = encryptionService;
+            _endToEndEncryptionService = endToEndEncryptionService;
         }
 
         // ── Agent Definition ─────────────────────────────────────────────
@@ -40,6 +43,8 @@ namespace Egroo.Server.Repository
             {
                 definition.ApiKey = _encryptionService.Encrypt(definition.ApiKey);
             }
+
+            EnsureAgentIdentity(definition);
 
             try
             {
@@ -116,6 +121,8 @@ namespace Egroo.Server.Repository
             {
                 existing.ApiKey = _encryptionService.Encrypt(definition.ApiKey);
             }
+
+            EnsureAgentIdentity(existing);
 
             try
             {
@@ -1332,6 +1339,8 @@ namespace Egroo.Server.Repository
                 CreatedBy = userId.Value
             };
 
+            EnsureAgentIdentity(agent);
+
             try
             {
                 await _dbContext.ChannelAgents.AddAsync(channelAgent);
@@ -1404,9 +1413,40 @@ namespace Egroo.Server.Repository
                 return Array.Empty<AgentDefinition>();
             }
 
-            return await _dbContext.AgentDefinitions
+            var definitions = await _dbContext.AgentDefinitions
                 .Where(x => channelAgents.Contains(x.Id) && x.IsActive && x.DateDeleted == null)
                 .ToArrayAsync();
+
+            var updated = false;
+            foreach (var definition in definitions)
+            {
+                updated |= EnsureAgentIdentity(definition);
+            }
+
+            if (updated)
+            {
+                await _dbContext.SaveChangesAsync();
+            }
+
+            return definitions;
+        }
+
+        private bool EnsureAgentIdentity(AgentDefinition definition)
+        {
+            if (!string.IsNullOrWhiteSpace(definition.EncryptionPublicKey)
+                && !string.IsNullOrWhiteSpace(definition.EncryptionPrivateKey)
+                && !string.IsNullOrWhiteSpace(definition.EncryptionKeyId))
+            {
+                return false;
+            }
+
+            var identity = _endToEndEncryptionService.GenerateAgentIdentity();
+            definition.EncryptionPublicKey = identity.PublicKey;
+            definition.EncryptionPrivateKey = identity.EncryptedPrivateKey;
+            definition.EncryptionKeyId = identity.KeyId;
+            definition.EncryptionKeyUpdatedOn = identity.UpdatedOn;
+            definition.DateUpdated = DateTimeOffset.UtcNow;
+            return true;
         }
     }
 }

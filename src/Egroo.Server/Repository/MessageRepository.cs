@@ -26,7 +26,8 @@ namespace Egroo.Server.Repository
         public async Task<bool> SendMessage(Message message)
         {
             bool hasTransportContent = !string.IsNullOrWhiteSpace(message?.Content)
-                || (message?.RecipientContents?.Count > 0);
+                || (message?.RecipientContents?.Count > 0)
+                || (message?.AgentRecipientContents?.Count > 0);
 
             if (message == null || !hasTransportContent)
                 return false;

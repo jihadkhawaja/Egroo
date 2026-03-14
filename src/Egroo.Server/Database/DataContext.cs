@@ -66,6 +66,10 @@ namespace Egroo.Server.Database
                 .HasIndex(x => x.AgentConversationId)
                 .IsUnique(false);
 
+            modelBuilder.Entity<AgentPendingMessage>()
+                .HasIndex(x => new { x.AgentDefinitionId, x.MessageId })
+                .IsUnique(true);
+
             modelBuilder.Entity<ChannelAgent>()
                 .HasIndex(x => new { x.ChannelId, x.AgentDefinitionId })
                 .IsUnique(true);
@@ -81,6 +85,7 @@ namespace Egroo.Server.Database
         public DbSet<ChannelUser> ChannelUsers { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<UserPendingMessage> UsersPendingMessages { get; set; }
+        public DbSet<AgentPendingMessage> AgentPendingMessages { get; set; }
 
         // Agent entities
         public DbSet<AgentDefinition> AgentDefinitions { get; set; }

@@ -45,9 +45,9 @@ namespace jihadkhawaja.chat.server.Hubs
                 await SendClientMessage(user, message, ignorePendingMessages: false, deliveryContent);
             }
 
-            // Server-hosted agents only see legacy plaintext messages.
-            if (_agentChannelResponder is not null && (message.RecipientContents is null || message.RecipientContents.Count == 0))
+            if (_agentChannelResponder is not null)
             {
+                await _agentChannelResponder.PersistAgentRecipientContentsAsync(message);
                 _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
             }
 
