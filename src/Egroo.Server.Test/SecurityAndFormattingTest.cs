@@ -218,5 +218,459 @@ namespace Egroo.Server.Test
                 .Replace('+', '-')
                 .Replace('/', '_');
         }
+
+        // ── Additional Normalize tests ──────────────────────────────────────────────
+
+        [TestMethod]
+        public void Normalize_NullContent_ReturnsEmpty()
+        {
+            Assert.AreEqual(string.Empty, AgentAttachmentPromptFormatter.Normalize(null));
+        }
+
+        [TestMethod]
+        public void Normalize_EmptyContent_ReturnsEmpty()
+        {
+            Assert.AreEqual(string.Empty, AgentAttachmentPromptFormatter.Normalize(""));
+        }
+
+        [TestMethod]
+        public void Normalize_WhitespaceContent_ReturnsEmpty()
+        {
+            Assert.AreEqual(string.Empty, AgentAttachmentPromptFormatter.Normalize("   "));
+        }
+
+        [TestMethod]
+        public void Normalize_PlainText_ReturnsUnchanged()
+        {
+            Assert.AreEqual("Hello, world!", AgentAttachmentPromptFormatter.Normalize("Hello, world!"));
+        }
+
+        [TestMethod]
+        public void Normalize_ImageFileToken_ReturnsAttachedImage()
+        {
+            string token = EncodeToken(new
+            {
+                FileName = "photo.png",
+                ContentType = "image/jpeg"
+            });
+
+            string normalized = AgentAttachmentPromptFormatter.Normalize($"[[egroo-file:{token}]]");
+            StringAssert.Contains(normalized, "[Attached image: photo.png]");
+        }
+
+        [TestMethod]
+        public void Normalize_NonImageFileToken_ReturnsAttachedFile()
+        {
+            string token = EncodeToken(new
+            {
+                FileName = "document.pdf",
+                ContentType = "application/pdf"
+            });
+
+            string normalized = AgentAttachmentPromptFormatter.Normalize($"[[egroo-file:{token}]]");
+            StringAssert.Contains(normalized, "[Attached file: document.pdf]");
+        }
+
+        [TestMethod]
+        public void Normalize_ImageDataUrl_WithEmptyAlt_UsesDefaultLabel()
+        {
+            string content = "![](data:image/png;base64,abc)";
+            string normalized = AgentAttachmentPromptFormatter.Normalize(content);
+
+            StringAssert.Contains(normalized, "[Attached image: Image]");
+        }
+
+        [TestMethod]
+        public void Normalize_MultipleTokens_ReplacesAll()
+        {
+            string token1 = EncodeToken(new { FileName = "a.txt", ContentType = "text/plain" });
+            string token2 = EncodeToken(new { FileName = "b.png", ContentType = "image/png" });
+
+            string content = $"[[egroo-file:{token1}]] and [[egroo-file:{token2}]]";
+            string normalized = AgentAttachmentPromptFormatter.Normalize(content);
+
+            StringAssert.Contains(normalized, "[Attached file: a.txt]");
+            StringAssert.Contains(normalized, "[Attached image: b.png]");
+        }
+
+        // ── Additional EndToEndEncryptionService tests ──────────────────────────────
+
+        [TestMethod]
+        public void EndToEndEncryptionService_DecryptAgentPrivateKey_NullInput_ReturnsNull()
+        {
+            var service = CreateEndToEndService();
+            Assert.IsNull(service.DecryptAgentPrivateKey(null));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_DecryptAgentPrivateKey_EmptyInput_ReturnsNull()
+        {
+            var service = CreateEndToEndService();
+            Assert.IsNull(service.DecryptAgentPrivateKey(""));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_DecryptTransportContent_NullPayload_ReturnsEmpty()
+        {
+            var service = CreateEndToEndService();
+            Assert.AreEqual(string.Empty, service.DecryptTransportContent(null, "key"));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_DecryptTransportContent_NonJsonPayload_ReturnsAsIs()
+        {
+            var service = CreateEndToEndService();
+            Assert.AreEqual("not-json", service.DecryptTransportContent("not-json", "key"));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_EncryptForChannelRecipients_EmptyPlaintext_Throws()
+        {
+            var service = CreateEndToEndService();
+
+            Assert.ThrowsExactly<ArgumentException>(() =>
+                service.EncryptForChannelRecipients(
+                    "",
+                    Array.Empty<UserDto>(),
+                    Array.Empty<AgentDefinition>()));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_EncryptForChannelRecipients_SamePlaintextForUserAndAgent()
+        {
+            var service = CreateEndToEndService();
+            var userIdentity = service.GenerateAgentIdentity();
+            var agentIdentity = service.GenerateAgentIdentity();
+
+            var result = service.EncryptForChannelRecipients(
+                "shared message",
+                new[]
+                {
+                    new UserDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Username = "user1",
+                        EncryptionPublicKey = userIdentity.PublicKey,
+                        EncryptionKeyId = userIdentity.KeyId
+                    }
+                },
+                new[]
+                {
+                    new AgentDefinition
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Agent",
+                        EncryptionPublicKey = agentIdentity.PublicKey,
+                        EncryptionKeyId = agentIdentity.KeyId
+                    }
+                });
+
+            string? userPrivateKey = service.DecryptAgentPrivateKey(userIdentity.EncryptedPrivateKey);
+            string? agentPrivateKey = service.DecryptAgentPrivateKey(agentIdentity.EncryptedPrivateKey);
+
+            Assert.AreEqual("shared message", service.DecryptTransportContent(result.UserRecipientContents.Single().Content, userPrivateKey));
+            Assert.AreEqual("shared message", service.DecryptTransportContent(result.AgentRecipientContents.Single().Content, agentPrivateKey));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_EncryptForChannelRecipients_DuplicateRecipientsDeduped()
+        {
+            var service = CreateEndToEndService();
+            var userIdentity = service.GenerateAgentIdentity();
+            var userId = Guid.NewGuid();
+
+            var result = service.EncryptForChannelRecipients(
+                "hello",
+                new[]
+                {
+                    new UserDto { Id = userId, Username = "user1", EncryptionPublicKey = userIdentity.PublicKey, EncryptionKeyId = userIdentity.KeyId },
+                    new UserDto { Id = userId, Username = "user1", EncryptionPublicKey = userIdentity.PublicKey, EncryptionKeyId = userIdentity.KeyId }
+                },
+                Array.Empty<AgentDefinition>());
+
+            Assert.AreEqual(1, result.UserRecipientContents.Count);
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_ThrowsWhenAgentKeyIsMissing()
+        {
+            var service = CreateEndToEndService();
+
+            Assert.ThrowsExactly<InvalidOperationException>(() =>
+                service.EncryptForChannelRecipients(
+                    "hello",
+                    Array.Empty<UserDto>(),
+                    new[]
+                    {
+                        new AgentDefinition
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = "NoKeyAgent"
+                        }
+                    }));
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_DecryptTransportContent_InvalidCipherWithKey_ReturnsNull()
+        {
+            var service = CreateEndToEndService();
+            var identity = service.GenerateAgentIdentity();
+            string? privateKey = service.DecryptAgentPrivateKey(identity.EncryptedPrivateKey);
+
+            // Valid-looking envelope but with garbage wrapped key
+            string fakePayload = JsonSerializer.Serialize(new
+            {
+                v = 1,
+                alg = "RSA-OAEP-256/A256GCM",
+                kid = identity.KeyId,
+                iv = Convert.ToBase64String(new byte[12]),
+                ct = Convert.ToBase64String(new byte[32]),
+                wk = Convert.ToBase64String(new byte[256])
+            });
+
+            var result = service.DecryptTransportContent(fakePayload, privateKey);
+            Assert.IsNull(result);
+        }
+
+        // ── Additional AgentChatMessageFactory tests ────────────────────────────────
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateStoredMessage_AssistantRole_ReturnsStringContent()
+        {
+            var message = AgentChatMessageFactory.CreateStoredMessage(ChatRole.Assistant, "Hello from assistant");
+
+            Assert.AreEqual(ChatRole.Assistant, message.Role);
+            Assert.AreEqual("Hello from assistant", message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateStoredMessage_NullContent_ReturnsEmpty()
+        {
+            var message = AgentChatMessageFactory.CreateStoredMessage(ChatRole.Assistant, null);
+            Assert.AreEqual(string.Empty, message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateStoredMessage_UserRole_NoImages_ReturnsSingleText()
+        {
+            var message = AgentChatMessageFactory.CreateStoredMessage(ChatRole.User, "Plain text message");
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.AreEqual("Plain text message", message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateChannelMessage_UserRole_PrependsName()
+        {
+            var message = AgentChatMessageFactory.CreateChannelMessage(ChatRole.User, "alice", "hello world");
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.AreEqual(2, message.Contents.Count);
+            Assert.AreEqual("[alice]: ", ((TextContent)message.Contents[0]).Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateChannelMessage_AssistantRole_NormalizesContent()
+        {
+            var message = AgentChatMessageFactory.CreateChannelMessage(ChatRole.Assistant, "bot", "Hello world");
+            Assert.AreEqual("Hello world", message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateUserMessage_NoAttachments_ReturnsTextOnly()
+        {
+            var message = AgentChatMessageFactory.CreateUserMessage(new AgentChatRequest
+            {
+                Message = "Just text"
+            });
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.AreEqual("Just text", message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateUserMessage_NonImageAttachment_ReturnsFileLabel()
+        {
+            var message = AgentChatMessageFactory.CreateUserMessage(new AgentChatRequest
+            {
+                Message = "See attached",
+                Attachments = new[]
+                {
+                    new AgentChatAttachment
+                    {
+                        FileName = "report.pdf",
+                        ContentType = "application/pdf",
+                        DataUri = "data:application/pdf;base64,AQID"
+                    }
+                }
+            });
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.IsTrue(message.Contents.Count >= 2);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateStoredMessage_EmptyContent_User_ReturnsEmptyText()
+        {
+            var message = AgentChatMessageFactory.CreateStoredMessage(ChatRole.User, "");
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.AreEqual(string.Empty, message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateChannelMessage_NullContent_ReturnsEmpty()
+        {
+            var message = AgentChatMessageFactory.CreateChannelMessage(ChatRole.Assistant, "bot", null);
+            Assert.AreEqual(string.Empty, message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateUserMessage_ImageAttachment_ReturnsDataContent()
+        {
+            // 1x1 transparent PNG, valid base64
+            var png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQIHWNgAAIABAABIniyygAAAABJRU5ErkJggg==";
+            var message = AgentChatMessageFactory.CreateUserMessage(new AgentChatRequest
+            {
+                Message = "Check this image",
+                Attachments = new[]
+                {
+                    new AgentChatAttachment
+                    {
+                        FileName = "photo.png",
+                        ContentType = "image/png",
+                        DataUri = $"data:image/png;base64,{png}"
+                    }
+                }
+            });
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.IsTrue(message.Contents.Count >= 2);
+            Assert.IsTrue(message.Contents.Any(c => c is DataContent));
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateUserMessage_NullAttachments_ReturnsTextOnly()
+        {
+            var message = AgentChatMessageFactory.CreateUserMessage(new AgentChatRequest
+            {
+                Message = "No attachments"
+            });
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.AreEqual("No attachments", message.Text);
+        }
+
+        [TestMethod]
+        public void AgentChatMessageFactory_CreateStoredMessage_UserRole_WithDataUrl_ExtractsImage()
+        {
+            // 1x1 transparent PNG, valid base64
+            var png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQIHWNgAAIABAABIniyygAAAABJRU5ErkJggg==";
+            var content = $"Before ![Alt](data:image/png;base64,{png}) After";
+            var message = AgentChatMessageFactory.CreateStoredMessage(ChatRole.User, content);
+
+            Assert.AreEqual(ChatRole.User, message.Role);
+            Assert.IsTrue(message.Contents.Count >= 2, "Should have text + data content");
+        }
+
+        // ── AgentChatResponse ───────────────────────────────────────────────────────
+
+        [TestMethod]
+        public void AgentChatResponse_Error_ReturnsFalseSuccessWithMessage()
+        {
+            var response = AgentChatResponse.Error("Something went wrong");
+
+            Assert.IsFalse(response.Success);
+            Assert.AreEqual("Something went wrong", response.Message);
+            Assert.IsNull(response.MessageId);
+            Assert.IsNull(response.ConversationId);
+        }
+
+        [TestMethod]
+        public void AgentChatResponse_DefaultProperties()
+        {
+            var response = new AgentChatResponse();
+
+            Assert.IsFalse(response.Success);
+            Assert.AreEqual(string.Empty, response.Message);
+            Assert.IsNull(response.MessageId);
+            Assert.IsNull(response.ConversationId);
+        }
+
+        [TestMethod]
+        public void AgentChatResponse_CanSetAllProperties()
+        {
+            var msgId = Guid.NewGuid();
+            var convId = Guid.NewGuid();
+            var response = new AgentChatResponse
+            {
+                Success = true,
+                Message = "OK",
+                MessageId = msgId,
+                ConversationId = convId
+            };
+
+            Assert.IsTrue(response.Success);
+            Assert.AreEqual("OK", response.Message);
+            Assert.AreEqual(msgId, response.MessageId);
+            Assert.AreEqual(convId, response.ConversationId);
+        }
+
+        // ── EncryptionService constructor validation ────────────────────────────────
+
+        [TestMethod]
+        public void EncryptionService_NullKey_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => new EncryptionService(null, "1234567890123456"));
+        }
+
+        [TestMethod]
+        public void EncryptionService_EmptyKey_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => new EncryptionService("", "1234567890123456"));
+        }
+
+        [TestMethod]
+        public void EncryptionService_NullIV_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => new EncryptionService("12345678901234567890123456789012", null));
+        }
+
+        [TestMethod]
+        public void EncryptionService_EmptyIV_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentNullException>(() => new EncryptionService("12345678901234567890123456789012", ""));
+        }
+
+        [TestMethod]
+        public void EncryptionService_WrongKeyLength_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentException>(() => new EncryptionService("short", "1234567890123456"));
+        }
+
+        [TestMethod]
+        public void EncryptionService_WrongIVLength_Throws()
+        {
+            Assert.ThrowsExactly<ArgumentException>(() => new EncryptionService("12345678901234567890123456789012", "short"));
+        }
+
+        // ── Additional Normalize branch tests ───────────────────────────────────────
+
+        [TestMethod]
+        public void Normalize_TokenWithNoFileName_UsesFallback()
+        {
+            // Token that has ContentType but no FileName
+            string token = EncodeToken(new { ContentType = "image/png" });
+            string normalized = AgentAttachmentPromptFormatter.Normalize($"[[egroo-file:{token}]]");
+            StringAssert.Contains(normalized, "[Attached image: Encrypted file]");
+        }
+
+        [TestMethod]
+        public void Normalize_TokenWithNoContentType_ReturnsFile()
+        {
+            // Token with FileName but no ContentType → not image → "Attached file"
+            string token = EncodeToken(new { FileName = "readme.txt" });
+            string normalized = AgentAttachmentPromptFormatter.Normalize($"[[egroo-file:{token}]]");
+            StringAssert.Contains(normalized, "[Attached file: readme.txt]");
+        }
     }
 }

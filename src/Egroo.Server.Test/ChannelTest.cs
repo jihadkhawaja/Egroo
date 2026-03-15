@@ -165,5 +165,118 @@ namespace Egroo.Server.Test
 
             Assert.IsFalse(deleted, "DeleteChannel should return false for a non-existent channel.");
         }
+
+        // ── AddChannelUsers / RemoveChannelUser ─────────────────────────────────────
+
+        [TestMethod]
+        public async Task AddChannelUsers_ValidUsername_ReturnsTrue()
+        {
+            // Sign up a second user
+            var anonServices = TestServiceProvider.Build(dbName: DbName);
+            using var signUpScope = anonServices.CreateScope();
+            await signUpScope.ServiceProvider.GetRequiredService<IAuth>()
+                             .SignUp("channeladd1", "ValidP@ss1!");
+
+            // Create channel and add the second user
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var addScope = _authenticatedServices.CreateScope();
+            bool added = await addScope.ServiceProvider.GetRequiredService<IChannel>()
+                                       .AddChannelUsers(channel.Id, "channeladd1");
+
+            Assert.IsTrue(added, "AddChannelUsers should succeed for a valid user.");
+        }
+
+        [TestMethod]
+        public async Task GetChannelUsers_ReturnsMembers()
+        {
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var getScope = _authenticatedServices.CreateScope();
+            var users = await getScope.ServiceProvider.GetRequiredService<IChannel>()
+                                      .GetChannelUsers(channel.Id);
+
+            Assert.IsNotNull(users);
+            Assert.IsTrue(users.Length > 0, "Should have at least the creator.");
+        }
+
+        [TestMethod]
+        public async Task RemoveChannelUser_ValidUser_ReturnsTrue()
+        {
+            // Sign up a second user
+            var anonServices = TestServiceProvider.Build(dbName: DbName);
+            using var signUpScope = anonServices.CreateScope();
+            var signUp = await signUpScope.ServiceProvider.GetRequiredService<IAuth>()
+                                          .SignUp("channelrem1", "ValidP@ss1!");
+
+            using var signInScope = anonServices.CreateScope();
+            var signIn = await signInScope.ServiceProvider.GetRequiredService<IAuth>()
+                                          .SignIn("channelrem1", "ValidP@ss1!");
+            Assert.IsTrue(signIn.Success);
+
+            // Create channel and add the second user
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester", "channelrem1");
+            Assert.IsNotNull(channel);
+
+            using var removeScope = _authenticatedServices.CreateScope();
+            bool removed = await removeScope.ServiceProvider.GetRequiredService<IChannel>()
+                                            .RemoveChannelUser(channel.Id, signIn.UserId!.Value);
+
+            Assert.IsTrue(removed, "RemoveChannelUser should succeed.");
+        }
+
+        [TestMethod]
+        public async Task LeaveChannel_ReturnsTrue()
+        {
+            using var createScope = _authenticatedServices.CreateScope();
+            var channel = await createScope.ServiceProvider.GetRequiredService<IChannel>()
+                                           .CreateChannel("channeltester");
+            Assert.IsNotNull(channel);
+
+            using var leaveScope = _authenticatedServices.CreateScope();
+            bool left = await leaveScope.ServiceProvider.GetRequiredService<IChannel>()
+                                        .LeaveChannel(channel.Id);
+
+            Assert.IsTrue(left, "LeaveChannel should succeed.");
+        }
+
+        [TestMethod]
+        public async Task SearchPublicChannels_NoPublicChannels_ReturnsEmpty()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var results = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                     .SearchPublicChannels("randomsearch");
+
+            // No public channels exist so result should be empty or null
+            Assert.IsTrue(results == null || results.Length == 0);
+        }
+
+        [TestMethod]
+        public async Task ChannelContainUser_NonExistentChannel_ReturnsFalse()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            bool contains = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                       .ChannelContainUser(Guid.NewGuid(), _userId);
+
+            Assert.IsFalse(contains);
+        }
+
+        [TestMethod]
+        public async Task IsChannelAdmin_NonExistentChannel_ReturnsFalse()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            bool isAdmin = await scope.ServiceProvider.GetRequiredService<IChannel>()
+                                      .IsChannelAdmin(Guid.NewGuid(), _userId);
+
+            Assert.IsFalse(isAdmin);
+        }
     }
 }

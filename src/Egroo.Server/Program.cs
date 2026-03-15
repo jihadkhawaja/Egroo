@@ -217,6 +217,13 @@ public partial class Program
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+
+        if (db.Database.ProviderName == "Microsoft.EntityFrameworkCore.InMemory")
+        {
+            await db.Database.EnsureCreatedAsync();
+            return;
+        }
+
         await db.Database.MigrateAsync();
     }
 

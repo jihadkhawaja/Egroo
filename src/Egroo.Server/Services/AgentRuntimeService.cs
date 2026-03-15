@@ -403,10 +403,7 @@ namespace Egroo.Server.Services
             }
 
             // Add scoped agent interaction tools (search agents, add friend, add to channel)
-            var scopedToolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "search_published_agents", "add_agent_friend", "add_agent_to_channel"
-            };
+            var scopedToolNames = BuiltinTools.GetScopedToolNames();
 
             var enabledScopedTools = toolDefs
                 .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))

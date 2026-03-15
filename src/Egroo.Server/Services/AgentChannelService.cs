@@ -765,10 +765,7 @@ namespace Egroo.Server.Services
                 }
             }
 
-            var scopedToolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "search_published_agents", "add_agent_friend", "add_agent_to_channel"
-            };
+            var scopedToolNames = BuiltinTools.GetScopedToolNames();
 
             var enabledScopedTools = toolDefs
                 .Where(t => t.Source == AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
