@@ -70,6 +70,14 @@ namespace Egroo.Server.Database
                 .HasIndex(x => new { x.AgentDefinitionId, x.MessageId })
                 .IsUnique(true);
 
+            modelBuilder.Entity<UserEncryptionKey>()
+                .HasIndex(x => x.UserId)
+                .IsUnique(false);
+
+            modelBuilder.Entity<UserEncryptionKey>()
+                .HasIndex(x => new { x.UserId, x.KeyId })
+                .IsUnique(true);
+
             modelBuilder.Entity<ChannelAgent>()
                 .HasIndex(x => new { x.ChannelId, x.AgentDefinitionId })
                 .IsUnique(true);
@@ -97,6 +105,7 @@ namespace Egroo.Server.Database
         public DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
         public DbSet<ChannelAgent> ChannelAgents { get; set; }
         public DbSet<UserAgentFriend> UserAgentFriends { get; set; }
+        public DbSet<UserEncryptionKey> UserEncryptionKeys { get; set; }
     }
 
     internal class LowerCaseNamingConvention : IModelFinalizingConvention

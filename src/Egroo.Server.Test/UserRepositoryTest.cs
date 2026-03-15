@@ -1,5 +1,4 @@
 using Egroo.Server.Database;
-using Egroo.Server.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Test
@@ -609,6 +608,199 @@ namespace Egroo.Server.Test
             var requests = await repo.GetUserFriendRequests(_currentUserId);
             Assert.IsNotNull(requests);
             Assert.AreEqual(0, requests.Length);
+        }
+
+        // ── Multi-device encryption key management ────────────────────────────────
+
+        [TestMethod]
+        public async Task AddEncryptionKey_AddsMultipleDeviceKeys()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-device-1", "kid-1", "Chrome on Windows"));
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-device-2", "kid-2", "Safari on iPhone"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(2, keys.Length);
+            Assert.IsTrue(keys.Any(k => k.KeyId == "kid-1" && k.DeviceLabel == "Chrome on Windows"));
+            Assert.IsTrue(keys.Any(k => k.KeyId == "kid-2" && k.DeviceLabel == "Safari on iPhone"));
+        }
+
+        [TestMethod]
+        public async Task AddEncryptionKey_SameKeyId_UpdatesExisting()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-original", "kid-1", "Device A"));
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-updated", "kid-1", "Device A Updated"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(1, keys.Length);
+            Assert.AreEqual("pk-updated", keys[0].PublicKey);
+            Assert.AreEqual("Device A Updated", keys[0].DeviceLabel);
+        }
+
+        [TestMethod]
+        public async Task AddEncryptionKey_UpdatesLegacyFieldsOnUser()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-device-1", "kid-1", null));
+
+            var profile = await repo.GetUserPrivateDetails();
+            Assert.IsNotNull(profile);
+            Assert.AreEqual("pk-device-1", profile.EncryptionPublicKey);
+            Assert.AreEqual("kid-1", profile.EncryptionKeyId);
+            Assert.IsNotNull(profile.EncryptionKeyUpdatedOn);
+        }
+
+        [TestMethod]
+        public async Task AddEncryptionKey_MaxTenKeys_RejectsFurther()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.IsTrue(await repo.AddEncryptionKey($"pk-{i}", $"kid-{i}", $"Device {i}"));
+            }
+
+            Assert.IsFalse(await repo.AddEncryptionKey("pk-11", "kid-11", "Device 11"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(10, keys.Length);
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_SoftDeletesKey()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-1", "kid-1", "Device 1"));
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-2", "kid-2", "Device 2"));
+
+            Assert.IsTrue(await repo.RemoveEncryptionKey("kid-1"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(1, keys.Length);
+            Assert.AreEqual("kid-2", keys[0].KeyId);
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_UpdatesLegacyFieldsToRemainingKey()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-1", "kid-1", null));
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-2", "kid-2", null));
+
+            Assert.IsTrue(await repo.RemoveEncryptionKey("kid-2"));
+
+            var profile = await repo.GetUserPrivateDetails();
+            Assert.IsNotNull(profile);
+            Assert.AreEqual("pk-1", profile.EncryptionPublicKey);
+            Assert.AreEqual("kid-1", profile.EncryptionKeyId);
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_LastKey_ClearsLegacyFields()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-1", "kid-1", null));
+            Assert.IsTrue(await repo.RemoveEncryptionKey("kid-1"));
+
+            var profile = await repo.GetUserPrivateDetails();
+            Assert.IsNotNull(profile);
+            Assert.IsNull(profile.EncryptionPublicKey);
+            Assert.IsNull(profile.EncryptionKeyId);
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_NonExistentKey_ReturnsFalse()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsFalse(await repo.RemoveEncryptionKey("doesnt-exist"));
+        }
+
+        [TestMethod]
+        public async Task AddEncryptionKey_Unauthenticated_ReturnsFalse()
+        {
+            var anonServices = TestServiceProvider.Build(_dbName);
+            using var scope = anonServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsFalse(await repo.AddEncryptionKey("pk", "kid", null));
+        }
+
+        [TestMethod]
+        public async Task GetEncryptionKeys_Unauthenticated_ReturnsNull()
+        {
+            var anonServices = TestServiceProvider.Build(_dbName);
+            using var scope = anonServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsNull(await repo.GetEncryptionKeys());
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_Unauthenticated_ReturnsFalse()
+        {
+            var anonServices = TestServiceProvider.Build(_dbName);
+            using var scope = anonServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsFalse(await repo.RemoveEncryptionKey("kid"));
+        }
+
+        [TestMethod]
+        public async Task UpdateEncryptionKey_LegacyAddsKeyToCollection()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            Assert.IsTrue(await repo.UpdateEncryptionKey("pk-legacy", "kid-legacy"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(1, keys.Length);
+            Assert.AreEqual("pk-legacy", keys[0].PublicKey);
+            Assert.AreEqual("kid-legacy", keys[0].KeyId);
+        }
+
+        [TestMethod]
+        public async Task RemoveEncryptionKey_RemovedKeyAllowsSlotForNewKey()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+
+            // Fill up 10 keys
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.IsTrue(await repo.AddEncryptionKey($"pk-{i}", $"kid-{i}", null));
+            }
+
+            // Remove one
+            Assert.IsTrue(await repo.RemoveEncryptionKey("kid-5"));
+
+            // Now can add a new one
+            Assert.IsTrue(await repo.AddEncryptionKey("pk-new", "kid-new", "New Device"));
+
+            var keys = await repo.GetEncryptionKeys();
+            Assert.IsNotNull(keys);
+            Assert.AreEqual(10, keys.Length);
         }
 
         private async Task CreateAcceptedFriendshipAsync()

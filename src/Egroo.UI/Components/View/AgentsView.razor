@@ -36,10 +36,10 @@ else
         }
         else
         {
-            <MudGrid>
+            <MudGrid Spacing="3">
                 @foreach (var agent in agents)
                 {
-                    <MudItem xs="12" sm="6" md="4">
+                    <MudItem xs="12" sm="6" md="6" lg="4" xl="3">
                         <MudCard Elevation="4" Class="rounded-lg" Style="height: 100%;">
                             <MudCardHeader>
                                 <CardHeaderAvatar>
@@ -65,7 +65,7 @@ else
                                         @agent.Description
                                     </MudText>
                                 }
-                                <MudStack Row Spacing="1" Class="mt-2">
+                                <MudStack Row Wrap="Wrap.Wrap" Spacing="1" Class="mt-2">
                                     @if (agent.IsActive)
                                     {
                                         <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Active</MudChip>

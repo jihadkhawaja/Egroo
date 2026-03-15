@@ -123,6 +123,24 @@ namespace jihadkhawaja.chat.server.Hubs
         }
 
         [Authorize]
+        public Task<bool> AddEncryptionKey(string publicKey, string keyId, string? deviceLabel)
+        {
+            return _userRepository.AddEncryptionKey(publicKey, keyId, deviceLabel);
+        }
+
+        [Authorize]
+        public Task<bool> RemoveEncryptionKey(string keyId)
+        {
+            return _userRepository.RemoveEncryptionKey(keyId);
+        }
+
+        [Authorize]
+        public Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys()
+        {
+            return _userRepository.GetEncryptionKeys();
+        }
+
+        [Authorize]
         public Task<bool> UpdateAvatar(string? avatarBase64)
         {
             return _userRepository.UpdateAvatar(avatarBase64);

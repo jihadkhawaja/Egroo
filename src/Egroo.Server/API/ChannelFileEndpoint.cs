@@ -1,6 +1,5 @@
 using Egroo.Server.Services;
 using jihadkhawaja.chat.shared.Interfaces;
-using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 
 namespace Egroo.Server.API

@@ -1,7 +1,8 @@
+using Egroo.Server.Security;
 using Egroo.Server.Services;
+using Egroo.Server.Tools;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
-using Egroo.Server.Security;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
@@ -474,6 +475,18 @@ namespace Egroo.Server.API
             {
                 var success = await repo.DeleteConversation(conversationId);
                 return success ? Results.Ok() : Results.NotFound();
+            });
+
+            group.MapPost("/conversations/{conversationId:guid}/clear-memory", async (IAgentRepository repo, Guid conversationId) =>
+            {
+                var success = await repo.UpdateConversationSessionState(conversationId, null);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            group.MapDelete("/{agentId:guid}/conversations", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var deleted = await repo.DeleteAllConversations(agentId);
+                return Results.Ok(new { deleted });
             });
 
             // ── Messages ─────────────────────────────────────────────────

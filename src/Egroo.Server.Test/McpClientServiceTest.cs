@@ -1,7 +1,7 @@
-using System.Net;
-using System.Text.Json;
 using Egroo.Server.Services;
 using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Text.Json;
 
 namespace Egroo.Server.Test;
 

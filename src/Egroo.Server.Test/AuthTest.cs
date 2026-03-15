@@ -35,7 +35,7 @@ namespace Egroo.Server.Test
 
             Assert.IsTrue(result.Success, $"SignUp failed: {result.Message}");
             Assert.IsNotNull(result.UserId, "Expected a UserId in the response.");
-            Assert.IsNotNull(result.Token,  "Expected a JWT token in the response.");
+            Assert.IsNotNull(result.Token, "Expected a JWT token in the response.");
         }
 
         [TestMethod]
@@ -90,7 +90,7 @@ namespace Egroo.Server.Test
                                        .SignIn("signinuser", "ValidP@ss1!");
 
             Assert.IsTrue(result.Success, $"SignIn failed: {result.Message}");
-            Assert.IsNotNull(result.Token,  "Expected a JWT token.");
+            Assert.IsNotNull(result.Token, "Expected a JWT token.");
             Assert.IsNotNull(result.UserId, "Expected a UserId.");
         }
 

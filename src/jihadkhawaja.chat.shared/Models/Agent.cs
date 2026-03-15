@@ -115,12 +115,12 @@ namespace jihadkhawaja.chat.shared.Models
         /// <summary>
         /// Controls who can add this published agent.
         /// </summary>
-        public AgentAddPermission AddPermission { get; set; } = AgentAddPermission.OwnerAndOthers;
+        public AgentAddPermission AddPermission { get; set; } = AgentAddPermission.OwnerOnly;
 
         /// <summary>
         /// Temperature setting for LLM responses (0.0 - 1.0).
         /// </summary>
-        public float? Temperature { get; set; }
+        public float? Temperature { get; set; } = 1f;
 
         /// <summary>
         /// Max tokens for LLM responses.

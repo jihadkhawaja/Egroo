@@ -1,8 +1,8 @@
+using jihadkhawaja.chat.shared.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using jihadkhawaja.chat.shared.Models;
 
 namespace Egroo.Server.Security
 {
@@ -46,6 +46,11 @@ namespace Egroo.Server.Security
                 return string.Empty;
             }
 
+            if (TryParsePayloadV2(payload, out var envelopeV2))
+            {
+                return DecryptV2Envelope(envelopeV2, privateKeyBase64);
+            }
+
             if (!TryParsePayload(payload, out var envelope))
             {
                 return payload;
@@ -56,14 +61,46 @@ namespace Egroo.Server.Security
                 return null;
             }
 
+            return DecryptWrappedKey(envelope.WrappedKey, envelope.Iv, envelope.CipherText, privateKeyBase64);
+        }
+
+        private static string? DecryptV2Envelope(EncryptionEnvelopeV2 envelope, string? privateKeyBase64)
+        {
+            if (string.IsNullOrWhiteSpace(privateKeyBase64))
+            {
+                return null;
+            }
+
+            // Try decrypting with each wrapped key entry
+            foreach (var keyEntry in envelope.Keys)
+            {
+                try
+                {
+                    var result = DecryptWrappedKey(keyEntry.Wk, envelope.Iv, envelope.Ct, privateKeyBase64);
+                    if (result is not null)
+                    {
+                        return result;
+                    }
+                }
+                catch
+                {
+                    // This key entry doesn't match, try next
+                }
+            }
+
+            return null;
+        }
+
+        private static string? DecryptWrappedKey(string wrappedKeyBase64, string ivBase64, string cipherTextBase64, string privateKeyBase64)
+        {
             try
             {
                 using var rsa = RSA.Create();
                 rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(privateKeyBase64), out _);
 
-                byte[] rawAesKey = rsa.Decrypt(Convert.FromBase64String(envelope.WrappedKey), RSAEncryptionPadding.OaepSHA256);
-                byte[] cipherText = Convert.FromBase64String(envelope.CipherText);
-                byte[] iv = Convert.FromBase64String(envelope.Iv);
+                byte[] rawAesKey = rsa.Decrypt(Convert.FromBase64String(wrappedKeyBase64), RSAEncryptionPadding.OaepSHA256);
+                byte[] cipherText = Convert.FromBase64String(cipherTextBase64);
+                byte[] iv = Convert.FromBase64String(ivBase64);
 
                 byte[] plainBytes = new byte[cipherText.Length - 16];
                 byte[] tag = cipherText[^16..];
@@ -104,7 +141,7 @@ namespace Egroo.Server.Security
                 .ToArray();
 
             string[] missingUsers = distinctUsers
-                .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey))
+                .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey) && (x.EncryptionKeys is null || x.EncryptionKeys.Count == 0))
                 .Select(x => x.Username ?? x.Id.ToString("D"))
                 .ToArray();
 
@@ -136,10 +173,23 @@ namespace Egroo.Server.Security
                 agentCipher = EncryptPlaintext(resolvedAgentPlaintext, out agentKey, out agentIv);
             }
 
-            var userContents = distinctUsers.Select(user => new MessageRecipientContent
+            var userContents = distinctUsers.Select(user =>
             {
-                UserId = user.Id,
-                Content = BuildPayload(user.EncryptionPublicKey!, user.EncryptionKeyId, userKey, userIv, userCipher)
+                var keys = user.EncryptionKeys?.Where(k => !string.IsNullOrWhiteSpace(k.PublicKey)).ToList();
+                if (keys is not null && keys.Count > 0)
+                {
+                    return new MessageRecipientContent
+                    {
+                        UserId = user.Id,
+                        Content = BuildPayloadV2(keys, userKey, userIv, userCipher)
+                    };
+                }
+
+                return new MessageRecipientContent
+                {
+                    UserId = user.Id,
+                    Content = BuildPayload(user.EncryptionPublicKey!, user.EncryptionKeyId, userKey, userIv, userCipher)
+                };
             }).ToList();
 
             var agentContents = distinctAgents.Select(agent => new MessageAgentRecipientContent
@@ -187,6 +237,27 @@ namespace Egroo.Server.Security
             return JsonSerializer.Serialize(payload);
         }
 
+        private static string BuildPayloadV2(List<UserEncryptionKeyInfo> keys, byte[] rawAesKey, byte[] iv, byte[] cipherBytes)
+        {
+            var wrappedKeys = new List<WrappedKeyEntry>();
+            foreach (var key in keys)
+            {
+                using var rsa = RSA.Create();
+                rsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(key.PublicKey), out _);
+                byte[] wrappedKey = rsa.Encrypt(rawAesKey, RSAEncryptionPadding.OaepSHA256);
+                wrappedKeys.Add(new WrappedKeyEntry(key.KeyId, Convert.ToBase64String(wrappedKey)));
+            }
+
+            var payload = new EncryptionEnvelopeV2(
+                2,
+                "RSA-OAEP-256/A256GCM",
+                Convert.ToBase64String(iv),
+                Convert.ToBase64String(cipherBytes),
+                wrappedKeys);
+
+            return JsonSerializer.Serialize(payload);
+        }
+
         private static bool TryParsePayload(string payload, out EncryptionEnvelope envelope)
         {
             envelope = default!;
@@ -195,6 +266,27 @@ namespace Egroo.Server.Security
             {
                 var parsed = JsonSerializer.Deserialize<EncryptionEnvelope>(payload);
                 if (parsed is null || parsed.V != 1 || string.IsNullOrWhiteSpace(parsed.WrappedKey) || string.IsNullOrWhiteSpace(parsed.Iv) || string.IsNullOrWhiteSpace(parsed.CipherText))
+                {
+                    return false;
+                }
+
+                envelope = parsed;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool TryParsePayloadV2(string payload, out EncryptionEnvelopeV2 envelope)
+        {
+            envelope = default!;
+
+            try
+            {
+                var parsed = JsonSerializer.Deserialize<EncryptionEnvelopeV2>(payload);
+                if (parsed is null || parsed.V != 2 || string.IsNullOrWhiteSpace(parsed.Iv) || string.IsNullOrWhiteSpace(parsed.Ct) || parsed.Keys is not { Count: > 0 })
                 {
                     return false;
                 }
@@ -225,5 +317,16 @@ namespace Egroo.Server.Security
             public string WrappedKey => Wk;
             public string CipherText => Ct;
         }
+
+        private sealed record WrappedKeyEntry(
+            [property: JsonPropertyName("kid")] string Kid,
+            [property: JsonPropertyName("wk")] string Wk);
+
+        private sealed record EncryptionEnvelopeV2(
+            [property: JsonPropertyName("v")] int V,
+            [property: JsonPropertyName("alg")] string Alg,
+            [property: JsonPropertyName("iv")] string Iv,
+            [property: JsonPropertyName("ct")] string Ct,
+            [property: JsonPropertyName("keys")] List<WrappedKeyEntry> Keys);
     }
 }

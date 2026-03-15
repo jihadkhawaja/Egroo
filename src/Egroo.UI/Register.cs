@@ -19,6 +19,7 @@ namespace Egroo.UI
             services.AddScoped<SessionStorage>();
             services.AddScoped<StorageService>();
             services.AddScoped<EndToEndEncryptionService>();
+            services.AddScoped<VoiceCallSessionService>();
 
             services.AddBlazorDexie();
             services.AddScoped<EgrooDB>();

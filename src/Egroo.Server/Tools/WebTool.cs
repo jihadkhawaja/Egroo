@@ -1,11 +1,10 @@
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Egroo.Server.Services
+namespace Egroo.Server.Tools
 {
     internal static class WebTool
     {

@@ -7,35 +7,49 @@ namespace jihadkhawaja.chat.client.Core
     [ExcludeFromCodeCoverage]
     public static class ChatSignalR
     {
+        public static readonly TimeSpan[] AutomaticReconnectDelays =
+        [
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(10),
+            TimeSpan.FromSeconds(30)
+        ];
+
         public static HubConnection? HubConnection { get; private set; }
+
+        public static TimeSpan GetAutomaticReconnectElapsedDelay(int retryCount)
+        {
+            if (retryCount <= 0)
+            {
+                return TimeSpan.Zero;
+            }
+
+            long totalTicks = 0;
+            int appliedRetryCount = Math.Min(retryCount, AutomaticReconnectDelays.Length);
+
+            for (int index = 0; index < appliedRetryCount; index++)
+            {
+                totalTicks += AutomaticReconnectDelays[index].Ticks;
+            }
+
+            return TimeSpan.FromTicks(totalTicks);
+        }
 
         public static void Initialize(string url, string? token = "")
         {
-            if (string.IsNullOrWhiteSpace(token))
-            {
-                // No token: use cookie-based auth (BFF pattern).
-                // Skip the HTTP negotiate step and go straight to WebSockets so
-                // the browser sends its session cookie on the WS upgrade request.
-                HubConnection = new HubConnectionBuilder()
-                    .WithAutomaticReconnect()
-                    .WithUrl(url, options =>
+            HubConnection = new HubConnectionBuilder()
+                .WithAutomaticReconnect(AutomaticReconnectDelays)
+                .WithUrl(url, options =>
+                {
+                    options.Transports = HttpTransportType.WebSockets;
+                    options.SkipNegotiation = true;
+
+                    if (!string.IsNullOrWhiteSpace(token))
                     {
-                        options.Transports = HttpTransportType.WebSockets;
-                        options.SkipNegotiation = true;
-                    })
-                    .Build();
-            }
-            else
-            {
-                HubConnection = new HubConnectionBuilder()
-                    .WithAutomaticReconnect()
-                    .WithUrl(string.Format("{0}?access_token={1}", url, token), options =>
-                    {
-                        options.Transports = HttpTransportType.WebSockets;
-                        options.SkipNegotiation = true;
-                    })
-                    .Build();
-            }
+                        options.AccessTokenProvider = () => Task.FromResult<string?>(token);
+                    }
+                })
+                .Build();
         }
     }
 }

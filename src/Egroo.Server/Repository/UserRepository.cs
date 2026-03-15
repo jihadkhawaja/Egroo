@@ -112,6 +112,21 @@ namespace Egroo.Server.Repository
 
         public async Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId)
         {
+            if (string.IsNullOrWhiteSpace(publicKey) || string.IsNullOrWhiteSpace(keyId))
+            {
+                return await ClearAllEncryptionKeys();
+            }
+
+            return await AddEncryptionKey(publicKey.Trim(), keyId.Trim(), null);
+        }
+
+        public async Task<bool> AddEncryptionKey(string publicKey, string keyId, string? deviceLabel)
+        {
+            if (string.IsNullOrWhiteSpace(publicKey) || string.IsNullOrWhiteSpace(keyId))
+            {
+                return false;
+            }
+
             Guid? connectorUserId = GetConnectorUserId();
             if (connectorUserId is null)
             {
@@ -124,19 +139,172 @@ namespace Egroo.Server.Repository
                 return false;
             }
 
-            user.EncryptionPublicKey = string.IsNullOrWhiteSpace(publicKey) ? null : publicKey.Trim();
-            user.EncryptionKeyId = string.IsNullOrWhiteSpace(keyId) ? null : keyId.Trim();
-            user.EncryptionKeyUpdatedOn = user.EncryptionPublicKey is null ? null : DateTimeOffset.UtcNow;
+            string trimmedKey = publicKey.Trim();
+            string trimmedKeyId = keyId.Trim();
 
             try
             {
+                var existingKeys = await _dbContext.UserEncryptionKeys
+                    .Where(x => x.UserId == connectorUserId.Value && x.DateDeleted == null)
+                    .ToListAsync();
+
+                // Limit to 10 device keys per user
+                if (existingKeys.Count >= 10)
+                {
+                    return false;
+                }
+
+                // If key with same keyId already exists, update it
+                var existingKey = existingKeys.FirstOrDefault(x => x.KeyId == trimmedKeyId);
+                if (existingKey is not null)
+                {
+                    existingKey.PublicKey = trimmedKey;
+                    existingKey.DeviceLabel = deviceLabel?.Trim();
+                    existingKey.DateUpdated = DateTimeOffset.UtcNow;
+                    _dbContext.UserEncryptionKeys.Update(existingKey);
+                }
+                else
+                {
+                    var newKey = new UserEncryptionKey
+                    {
+                        UserId = connectorUserId.Value,
+                        PublicKey = trimmedKey,
+                        KeyId = trimmedKeyId,
+                        DeviceLabel = deviceLabel?.Trim(),
+                        DateCreated = DateTimeOffset.UtcNow,
+                    };
+                    await _dbContext.UserEncryptionKeys.AddAsync(newKey);
+                }
+
+                // Update legacy single-key fields on User to latest key for backward compat
+                user.EncryptionPublicKey = trimmedKey;
+                user.EncryptionKeyId = trimmedKeyId;
+                user.EncryptionKeyUpdatedOn = DateTimeOffset.UtcNow;
                 _dbContext.Users.Update(user);
+
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update encryption key for user {UserId}", connectorUserId.Value);
+                _logger.LogError(ex, "Failed to add encryption key for user {UserId}", connectorUserId.Value);
+                return false;
+            }
+        }
+
+        public async Task<bool> RemoveEncryptionKey(string keyId)
+        {
+            if (string.IsNullOrWhiteSpace(keyId))
+            {
+                return false;
+            }
+
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var key = await _dbContext.UserEncryptionKeys
+                    .FirstOrDefaultAsync(x => x.UserId == connectorUserId.Value
+                        && x.KeyId == keyId.Trim()
+                        && x.DateDeleted == null);
+
+                if (key is null)
+                {
+                    return false;
+                }
+
+                key.DateDeleted = DateTimeOffset.UtcNow;
+                key.DeletedBy = connectorUserId.Value;
+                _dbContext.UserEncryptionKeys.Update(key);
+
+                // Update legacy fields to the latest remaining key
+                var remainingKey = await _dbContext.UserEncryptionKeys
+                    .Where(x => x.UserId == connectorUserId.Value && x.DateDeleted == null && x.Id != key.Id)
+                    .OrderByDescending(x => x.DateCreated)
+                    .FirstOrDefaultAsync();
+
+                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
+                if (user is not null)
+                {
+                    user.EncryptionPublicKey = remainingKey?.PublicKey;
+                    user.EncryptionKeyId = remainingKey?.KeyId;
+                    user.EncryptionKeyUpdatedOn = remainingKey is not null ? DateTimeOffset.UtcNow : null;
+                    _dbContext.Users.Update(user);
+                }
+
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to remove encryption key for user {UserId}", connectorUserId.Value);
+                return false;
+            }
+        }
+
+        public async Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys()
+        {
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId is null)
+            {
+                return null;
+            }
+
+            var keys = await _dbContext.UserEncryptionKeys
+                .Where(x => x.UserId == connectorUserId.Value && x.DateDeleted == null)
+                .OrderByDescending(x => x.DateCreated)
+                .ToListAsync();
+
+            return keys.Select(k => new UserEncryptionKeyInfo
+            {
+                PublicKey = k.PublicKey,
+                KeyId = k.KeyId,
+                DeviceLabel = k.DeviceLabel,
+                DateCreated = k.DateCreated,
+            }).ToArray();
+        }
+
+        private async Task<bool> ClearAllEncryptionKeys()
+        {
+            Guid? connectorUserId = GetConnectorUserId();
+            if (connectorUserId is null)
+            {
+                return false;
+            }
+
+            User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
+            if (user is null)
+            {
+                return false;
+            }
+
+            try
+            {
+                var activeKeys = await _dbContext.UserEncryptionKeys
+                    .Where(x => x.UserId == connectorUserId.Value && x.DateDeleted == null)
+                    .ToListAsync();
+
+                foreach (var key in activeKeys)
+                {
+                    key.DateDeleted = DateTimeOffset.UtcNow;
+                    key.DeletedBy = connectorUserId.Value;
+                }
+
+                user.EncryptionPublicKey = null;
+                user.EncryptionKeyId = null;
+                user.EncryptionKeyUpdatedOn = null;
+                _dbContext.Users.Update(user);
+
+                await _dbContext.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to clear encryption keys for user {UserId}", connectorUserId.Value);
                 return false;
             }
         }

@@ -34,10 +34,10 @@
       "type": "image/png"
     },
     {
-      "src": "_content/Egroo.UI/android-chrome-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "src": "_content/Egroo.UI/android-chrome-monochrome.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "monochrome"
     }
   ]
 }

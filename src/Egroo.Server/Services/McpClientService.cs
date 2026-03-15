@@ -1,8 +1,8 @@
+using Microsoft.Extensions.AI;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Diagnostics.CodeAnalysis;
-using Microsoft.Extensions.AI;
 
 namespace Egroo.Server.Services
 {

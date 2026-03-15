@@ -1,8 +1,7 @@
 using jihadkhawaja.chat.shared.Models;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
@@ -258,6 +257,22 @@ namespace jihadkhawaja.chat.client.Services
             var response = await HttpClient.DeleteAsync($"{BasePath}/conversations/{conversationId}");
             return response.IsSuccessStatusCode;
         }
+
+        public async Task<bool> ClearConversationMemory(Guid conversationId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/conversations/{conversationId}/clear-memory", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<int> DeleteAllConversations(Guid agentId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/{agentId}/conversations");
+            if (!response.IsSuccessStatusCode) return 0;
+            var result = await response.Content.ReadFromJsonAsync<DeleteAllResult>(JsonOptions);
+            return result?.Deleted ?? 0;
+        }
+
+        private sealed class DeleteAllResult { public int Deleted { get; set; } }
 
         // ── Messages ─────────────────────────────────────────────────
 

@@ -52,8 +52,8 @@ namespace Egroo.Server.Test
             var message = new Message
             {
                 ChannelId = _channelId,
-                SenderId  = _userId,
-                Content   = "Hello from the in-memory test!",
+                SenderId = _userId,
+                Content = "Hello from the in-memory test!",
             };
 
             using var scope = _authenticatedServices.CreateScope();
@@ -70,8 +70,8 @@ namespace Egroo.Server.Test
             var message = new Message
             {
                 ChannelId = _channelId,
-                SenderId  = _userId,
-                Content   = "",
+                SenderId = _userId,
+                Content = "",
             };
 
             using var scope = _authenticatedServices.CreateScope();
@@ -87,8 +87,8 @@ namespace Egroo.Server.Test
             var message = new Message
             {
                 ChannelId = _channelId,
-                SenderId  = _userId,
-                Content   = null,
+                SenderId = _userId,
+                Content = null,
             };
 
             using var scope = _authenticatedServices.CreateScope();
@@ -158,8 +158,8 @@ namespace Egroo.Server.Test
             var message = new Message
             {
                 ChannelId = _channelId,
-                SenderId  = _userId,
-                Content   = "Persisted message",
+                SenderId = _userId,
+                Content = "Persisted message",
             };
 
             using var sendScope = _authenticatedServices.CreateScope();
@@ -172,9 +172,9 @@ namespace Egroo.Server.Test
                                          .GetMessageById(message.Id);
 
             Assert.IsNotNull(fetched, "GetMessageById should return the persisted message row.");
-            Assert.AreEqual(message.Id,        fetched.Id);
+            Assert.AreEqual(message.Id, fetched.Id);
             Assert.AreEqual(message.ChannelId, fetched.ChannelId);
-            Assert.AreEqual(message.SenderId,  fetched.SenderId);
+            Assert.AreEqual(message.SenderId, fetched.SenderId);
         }
 
         [TestMethod]
@@ -194,9 +194,9 @@ namespace Egroo.Server.Test
         {
             var original = new Message
             {
-                ChannelId   = _channelId,
-                SenderId    = _userId,
-                Content     = "Original content",
+                ChannelId = _channelId,
+                SenderId = _userId,
+                Content = "Original content",
                 ReferenceId = Guid.NewGuid(),
             };
 
@@ -206,9 +206,9 @@ namespace Egroo.Server.Test
 
             var updated = new Message
             {
-                Id          = original.Id,
+                Id = original.Id,
                 ReferenceId = original.ReferenceId,
-                Content     = "Updated content",
+                Content = "Updated content",
             };
 
             using var updateScope = _authenticatedServices.CreateScope();
@@ -227,8 +227,8 @@ namespace Egroo.Server.Test
             var message = new Message
             {
                 ChannelId = _channelId,
-                SenderId  = _userId,
-                Content   = "Pending test message",
+                SenderId = _userId,
+                Content = "Pending test message",
             };
 
             using var sendScope = _authenticatedServices.CreateScope();
@@ -237,10 +237,10 @@ namespace Egroo.Server.Test
 
             var pending = new UserPendingMessage
             {
-                Id        = Guid.NewGuid(),
-                UserId    = _userId,
+                Id = Guid.NewGuid(),
+                UserId = _userId,
                 MessageId = message.Id,
-                Content   = message.Content,
+                Content = message.Content,
             };
 
             using var addScope = _authenticatedServices.CreateScope();

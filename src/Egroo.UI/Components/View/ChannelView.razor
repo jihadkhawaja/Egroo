@@ -30,6 +30,7 @@
 @inject AgentService AgentService
 @inject ChannelFileService ChannelFileService
 @inject EndToEndEncryptionService EndToEndEncryptionService
+@inject VoiceCallSessionService VoiceCallSession
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-0" Style="height: calc(100vh - 64px); display: flex; flex-direction: column;">
     <!-- Header -->
@@ -87,10 +88,10 @@
                         }
                     </MudAvatarGroup>
                 }
-                <MudTooltip Text="@(IsInCall ? "Leave Voice Call" : "Join Voice Call")">
+                <MudTooltip Text="@GetCallButtonTooltip()">
                     <MudIconButton Icon="@(IsInCall ? Icons.Material.Filled.CallEnd : Icons.Material.Filled.Call)"
                                    Size="Size.Medium"
-                                   Color="@(IsInCall ? Color.Error : Color.Default)"
+                                   Color="@(IsInCall ? Color.Error : VoiceCallSession.IsInCall ? Color.Warning : Color.Default)"
                                    OnClick="OnCallButtonClicked" />
                 </MudTooltip>
             </MudStack>
@@ -320,40 +321,6 @@
         </MudStack>
     }
 
-    <!-- Voice Call Bar (shown when in call) -->
-    @if (IsInCall)
-    {
-        <MudPaper Elevation="0" Class="px-4 py-2"
-                  Style="flex-shrink: 0; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(76,175,80,0.08);">
-            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-                <MudStack Row AlignItems="AlignItems.Center" Spacing="2">
-                    <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" Size="Size.Small" />
-                    <MudText Typo="Typo.body2" Color="Color.Success">
-                        Voice Connected &mdash; @CallParticipantIds.Count participant@(CallParticipantIds.Count != 1 ? "s" : "")
-                    </MudText>
-                    @if (CallDuration is not null)
-                    {
-                        <MudText Typo="Typo.body2" Color="Color.Default">@CallDuration</MudText>
-                    }
-                </MudStack>
-                <MudStack Row Spacing="2">
-                    <MudTooltip Text="@(IsMuted ? "Unmute" : "Mute")">
-                        <MudIconButton Icon="@(IsMuted ? Icons.Material.Filled.MicOff : Icons.Material.Filled.Mic)"
-                                       Color="@(IsMuted ? Color.Error : Color.Default)"
-                                       OnClick="ToggleMute" />
-                    </MudTooltip>
-                    <MudTooltip Text="Leave Call">
-                        <MudIconButton Icon="@Icons.Material.Filled.CallEnd"
-                                       Color="Color.Error"
-                                       OnClick="LeaveCall" />
-                    </MudTooltip>
-                </MudStack>
-            </MudStack>
-        </MudPaper>
-    }
-
-    <!-- Hidden container for dynamically created remote audio elements -->
-    <div id="remote-audio-container" style="display:none;"></div>
 </MudContainer>
 
 @code {
@@ -388,12 +355,30 @@
     // Voice call state
     private bool IsInCall { get; set; } = false;
     private bool IsMuted { get; set; } = false;
+    private bool IsNoiseSuppressionEnabled { get; set; } = true;
+    private bool IsNoiseSuppressionSupported { get; set; } = true;
+    private bool IsEchoCancellationEnabled { get; set; } = true;
+    private bool IsEchoCancellationSupported { get; set; } = true;
+    private bool IsAutoGainControlEnabled { get; set; } = true;
+    private bool IsAutoGainControlSupported { get; set; } = true;
     private HashSet<Guid> CallParticipantIds { get; set; } = new();
     private Dictionary<Guid, UserDto> CallParticipantUsers { get; set; } = new();
     private DotNetObjectReference<ChannelView>? dotNetRef;
     private System.Timers.Timer? callTimer;
     private DateTime? callStartTime;
     private string? CallDuration { get; set; }
+    private bool _callParticipantBroadcastRegistered;
+
+    private sealed class AudioProcessingState
+    {
+        public bool IsNoiseSuppressionSupported { get; set; }
+        public bool IsNoiseSuppressionEnabled { get; set; }
+        public bool IsEchoCancellationSupported { get; set; }
+        public bool IsEchoCancellationEnabled { get; set; }
+        public bool IsAutoGainControlSupported { get; set; }
+        public bool IsAutoGainControlEnabled { get; set; }
+        public bool WasApplied { get; set; }
+    }
 
     // Disposal tracking
     private bool _disposed;
@@ -437,30 +422,41 @@
     protected override async Task OnAccessAsync()
     {
         IsBusy = true;
-        RegisterMessagingEvents();
-        RegisterCallEvents();
-        CacheDB = new EgrooDB(BlazorDexieOptions);
-        Messages = new();
-        TypingParticipants.Clear();
-
-        // Register DotNet object reference for JS interop callbacks
-        dotNetRef = DotNetObjectReference.Create(this);
-        await JSRuntime.InvokeVoidAsync("webrtcInterop.registerDotNetObject", dotNetRef);
-
-        // Check if there's an existing call in this channel and show participant count
-        await RefreshCallParticipants();
-
-        await RefreshChannelPeopleAsync(GetChannelId());
-
         try
         {
-            CurrentUserProfile = await ChatUserService.GetUserPrivateDetails() ?? SessionStorage.User;
-            await RefreshEncryptionStateAsync();
+            RegisterMessagingEvents();
+            CacheDB = new EgrooDB(BlazorDexieOptions);
+            Messages = new();
+            TypingParticipants.Clear();
+
+            dotNetRef?.Dispose();
+            dotNetRef = DotNetObjectReference.Create(this);
+            VoiceCallSession.StateChanged += HandleVoiceCallSessionChanged;
+            await VoiceCallSession.EnsureInitializedAsync();
+            RegisterCallParticipantBroadcast();
+            SyncCallStateFromService();
+
+            // Check if there's an existing call in this channel and show participant count
+            await RefreshCallParticipants();
+
+            await RefreshChannelPeopleAsync(GetChannelId());
+
+            try
+            {
+                CurrentUserProfile = await ChatUserService.GetUserPrivateDetails() ?? SessionStorage.User;
+                await RefreshEncryptionStateAsync();
+            }
+            catch
+            {
+                IsEndToEndReady = false;
+                EncryptionWarning = "Unable to initialize end-to-end encryption on this device.";
+            }
         }
-        catch
+        catch (Exception ex)
         {
-            IsEndToEndReady = false;
-            EncryptionWarning = "Unable to initialize end-to-end encryption on this device.";
+            IsBusy = false;
+            Snackbar.Add($"Unable to initialize the channel. {ex.Message}", Severity.Warning);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -477,6 +473,10 @@
         {
             IsAdmin = await ChatChannelService.IsChannelAdmin(channelId, SessionStorage.User.Id);
         }
+
+        VoiceCallSession.UpdateCallMetadata(channelId, Title);
+        SyncCallStateFromService();
+        await RefreshCallParticipants();
     }
 
     private async Task RefreshChannelPeopleAsync(Guid channelId)
@@ -519,19 +519,36 @@
     {
         if (firstRender)
         {
-            await ChatMessageService.SendPendingMessages();
-            var messages = (await CacheDB.Messages
-                .Where(nameof(Message.ChannelId))
-                .IsEqual(GetChannelId())
-                .Limit(50).ToList()) ?? new List<Message>();
-            foreach (var message in messages)
+            try
             {
-                await PrepareMessageForDisplayAsync(message);
+                if (ChatSignalR.HubConnection?.State == HubConnectionState.Connected)
+                {
+                    await ChatMessageService.SendPendingMessages();
+                }
+
+                var messages = (await CacheDB.Messages
+                    .Where(nameof(Message.ChannelId))
+                    .IsEqual(GetChannelId())
+                    .Limit(50).ToList()) ?? new List<Message>();
+
+                foreach (var message in messages)
+                {
+                    await PrepareMessageForDisplayAsync(message);
+                }
+
+                Messages = DeduplicateMessages(messages);
+                _ = UpdateUnseenMessages();
             }
-            Messages = DeduplicateMessages(messages);
-            _ = UpdateUnseenMessages();
-            IsBusy = false;
-            await InvokeAsync(StateHasChanged);
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Unable to finish loading the channel. {ex.Message}", Severity.Warning);
+            }
+            finally
+            {
+                IsBusy = false;
+                await InvokeAsync(StateHasChanged);
+            }
+
             await Task.Yield();
             ScrollToMessagesEnd();
         }
@@ -1744,6 +1761,13 @@
 
     private async Task OnCallButtonClicked()
     {
+        var channelId = GetChannelId();
+        if (VoiceCallSession.IsInCall && !VoiceCallSession.IsCurrentChannel(channelId))
+        {
+            Snackbar.Add("Leave your current voice call before joining another channel.", Severity.Warning);
+            return;
+        }
+
         if (IsInCall)
         {
             await LeaveCall();
@@ -1759,71 +1783,185 @@
         var channelId = GetChannelId();
         if (channelId == Guid.Empty) return;
 
-        try
+        bool joined = await VoiceCallSession.JoinCallAsync(channelId, Title);
+        if (joined)
         {
-            // Acquire microphone and initialize WebRTC
-            bool acquired = await JSRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString());
-            if (!acquired)
-            {
-                Snackbar.Add("Could not access microphone. Please check permissions.", Severity.Error);
-                return;
-            }
-
-            // Join the channel call via SignalR
-            await ChatCallService.JoinChannelCall(channelId);
-
-            IsInCall = true;
-            CallParticipantIds.Add(SessionStorage.User!.Id);
-            await FetchAndCacheParticipant(SessionStorage.User.Id);
-            StartCallTimer();
-            Snackbar.Add("Joined voice call", Severity.Success);
+            SyncCallStateFromService();
             await InvokeAsync(StateHasChanged);
         }
-        catch (Exception ex)
+    }
+
+    private string GetCallButtonTooltip()
+    {
+        var channelId = GetChannelId();
+        if (IsInCall)
         {
-            Snackbar.Add($"Failed to join call: {ex.Message}", Severity.Error);
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
+            return "Leave Voice Call";
         }
+
+        if (VoiceCallSession.IsInCall && !VoiceCallSession.IsCurrentChannel(channelId))
+        {
+            return "Already in another voice call";
+        }
+
+        return "Join Voice Call";
     }
 
     private async Task LeaveCall()
     {
-        var channelId = GetChannelId();
-        try
-        {
-            await ChatCallService.LeaveChannelCall(channelId);
-        }
-        catch { /* ignore signalr errors during cleanup */ }
-
-        await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
-
-        IsInCall = false;
-        IsMuted = false;
-        CallParticipantIds.Clear();
-        CallParticipantUsers.Clear();
-        StopCallTimer();
-        Snackbar.Add("Left voice call", Severity.Info);
+        await VoiceCallSession.LeaveCallAsync();
+        SyncCallStateFromService();
+        await RefreshCallParticipants();
         await InvokeAsync(StateHasChanged);
     }
 
     private async Task ToggleMute()
     {
-        IsMuted = await JSRuntime.InvokeAsync<bool>("webrtcInterop.toggleMute");
+        await VoiceCallSession.ToggleMuteAsync();
+        SyncCallStateFromService();
         await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleNoiseSuppression(bool enabled)
+    {
+        await VoiceCallSession.UpdateAudioProcessingSettingAsync("noiseSuppression", enabled, "Noise suppression");
+        SyncCallStateFromService();
+    }
+
+    private async Task ToggleEchoCancellation(bool enabled)
+    {
+        await VoiceCallSession.UpdateAudioProcessingSettingAsync("echoCancellation", enabled, "Echo cancellation");
+        SyncCallStateFromService();
+    }
+
+    private async Task ToggleAutoGainControl(bool enabled)
+    {
+        await VoiceCallSession.UpdateAudioProcessingSettingAsync("autoGainControl", enabled, "Auto gain control");
+        SyncCallStateFromService();
+    }
+
+    private async Task UpdateAudioProcessingSetting(string settingName, bool enabled, string displayName)
+    {
+        var state = await JSRuntime.InvokeAsync<AudioProcessingState>("webrtcInterop.setAudioProcessingSetting", settingName, enabled);
+        ApplyAudioProcessingState(state);
+
+        if (state?.WasApplied == false)
+        {
+            Snackbar.Add($"{displayName} could not be changed on this browser/device.", Severity.Warning);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SyncAudioProcessingState()
+    {
+        var state = await JSRuntime.InvokeAsync<AudioProcessingState>("webrtcInterop.getAudioProcessingState");
+        ApplyAudioProcessingState(state);
+    }
+
+    private void ApplyAudioProcessingState(AudioProcessingState? state)
+    {
+        IsNoiseSuppressionSupported = state?.IsNoiseSuppressionSupported ?? false;
+        IsNoiseSuppressionEnabled = state?.IsNoiseSuppressionEnabled ?? IsNoiseSuppressionEnabled;
+        IsEchoCancellationSupported = state?.IsEchoCancellationSupported ?? false;
+        IsEchoCancellationEnabled = state?.IsEchoCancellationEnabled ?? IsEchoCancellationEnabled;
+        IsAutoGainControlSupported = state?.IsAutoGainControlSupported ?? false;
+        IsAutoGainControlEnabled = state?.IsAutoGainControlEnabled ?? IsAutoGainControlEnabled;
     }
 
     private async Task RefreshCallParticipants()
     {
+        if (VoiceCallSession.IsCurrentChannel(GetChannelId()))
+        {
+            SyncCallStateFromService();
+            return;
+        }
+
         try
         {
             var participants = await ChatCallService.GetChannelCallParticipants(GetChannelId());
-            if (participants != null && participants.Length > 0)
+            if (participants != null)
             {
                 CallParticipantIds = new HashSet<Guid>(participants);
                 await FetchParticipantUsers(participants);
             }
         }
         catch { /* ignore */ }
+    }
+
+    private void SyncCallStateFromService()
+    {
+        var channelId = GetChannelId();
+        bool isCurrentChannelCall = VoiceCallSession.IsCurrentChannel(channelId);
+
+        IsInCall = isCurrentChannelCall;
+        IsMuted = isCurrentChannelCall && VoiceCallSession.IsMuted;
+        IsNoiseSuppressionEnabled = VoiceCallSession.IsNoiseSuppressionEnabled;
+        IsNoiseSuppressionSupported = VoiceCallSession.IsNoiseSuppressionSupported;
+        IsEchoCancellationEnabled = VoiceCallSession.IsEchoCancellationEnabled;
+        IsEchoCancellationSupported = VoiceCallSession.IsEchoCancellationSupported;
+        IsAutoGainControlEnabled = VoiceCallSession.IsAutoGainControlEnabled;
+        IsAutoGainControlSupported = VoiceCallSession.IsAutoGainControlSupported;
+        CallDuration = isCurrentChannelCall ? VoiceCallSession.CallDuration : null;
+
+        if (isCurrentChannelCall)
+        {
+            CallParticipantIds = new HashSet<Guid>(VoiceCallSession.ParticipantIds);
+            CallParticipantUsers = VoiceCallSession.ParticipantUsers.ToDictionary(x => x.Key, x => x.Value);
+        }
+    }
+
+    private void HandleVoiceCallSessionChanged()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            SyncCallStateFromService();
+            await RefreshCallParticipants();
+            StateHasChanged();
+        });
+    }
+
+    private void RegisterCallParticipantBroadcast()
+    {
+        if (_callParticipantBroadcastRegistered)
+        {
+            return;
+        }
+
+        _onChannelCallParticipantsChanged = async (channelId, participantIds) =>
+        {
+            if (_disposed || channelId != GetChannelId())
+            {
+                return;
+            }
+
+            if (VoiceCallSession.IsCurrentChannel(channelId))
+            {
+                SyncCallStateFromService();
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+
+            CallParticipantIds = new HashSet<Guid>(participantIds);
+            await FetchParticipantUsers(participantIds);
+
+            try
+            {
+                if (!_disposed)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+            catch (ObjectDisposedException) { }
+        };
+
+        ChatCallService.OnChannelCallParticipantsChanged += _onChannelCallParticipantsChanged;
+        _callParticipantBroadcastRegistered = true;
     }
 
     private async Task FetchParticipantUsers(IEnumerable<Guid> userIds)
@@ -2001,28 +2139,6 @@
         };
         ChatCallService.OnReceiveIceCandidate += _onReceiveIceCandidate;
 
-        // When the full participant list changes (broadcast to all channel members, not just call participants)
-        _onChannelCallParticipantsChanged = async (channelId, participantIds) =>
-        {
-            if (_disposed || channelId != GetChannelId()) return;
-
-            // Only update the UI avatar list; do NOT touch WebRTC connections here
-            CallParticipantIds = new HashSet<Guid>(participantIds);
-
-            // Sync the user cache: add new, remove gone
-            var currentSet = new HashSet<Guid>(participantIds);
-            var staleKeys = CallParticipantUsers.Keys.Where(k => !currentSet.Contains(k)).ToList();
-            foreach (var key in staleKeys) CallParticipantUsers.Remove(key);
-            foreach (var pid in participantIds)
-            {
-                if (_disposed) return;
-                await FetchAndCacheParticipant(pid);
-            }
-
-            try { if (!_disposed) await InvokeAsync(StateHasChanged); }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnChannelCallParticipantsChanged += _onChannelCallParticipantsChanged;
     }
 
     private void StartCallTimer()
@@ -2099,18 +2215,7 @@
         if (_onChannelCallParticipantsChanged is not null)
             ChatCallService.OnChannelCallParticipantsChanged -= _onChannelCallParticipantsChanged;
 
-        // Clean up call resources
-        StopCallTimer();
-
-        try
-        {
-            if (IsInCall)
-            {
-                await JSRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
-            }
-        }
-        catch (JSDisconnectedException) { }
-        catch (ObjectDisposedException) { }
+        VoiceCallSession.StateChanged -= HandleVoiceCallSessionChanged;
 
         dotNetRef?.Dispose();
     }

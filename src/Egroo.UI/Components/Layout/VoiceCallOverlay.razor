@@ -1,0 +1,165 @@
+@implements IDisposable
+
+@inject VoiceCallSessionService VoiceCallSession
+@inject NavigationManager NavigationManager
+
+@if (VoiceCallSession.IsInCall)
+{
+    <MudPaper Elevation="10"
+              Class="pa-3"
+              Style="position: fixed; right: 16px; bottom: 16px; z-index: 1350; width: min(420px, calc(100vw - 32px)); background: rgba(20,20,20,0.96); border: 1px solid rgba(242,89,34,0.28); backdrop-filter: blur(12px);">
+        <MudStack Spacing="2">
+            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <MudStack Spacing="0">
+                    <MudText Typo="Typo.caption" Style="text-transform: uppercase; letter-spacing: 0.08em; color: #f2b591;">
+                        Voice call active
+                    </MudText>
+                    <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                        @VoiceCallSession.CurrentChannelTitle
+                    </MudText>
+                </MudStack>
+                <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
+                    @VoiceCallSession.ParticipantIds.Count participant@(VoiceCallSession.ParticipantIds.Count == 1 ? string.Empty : "s")
+                </MudChip>
+            </MudStack>
+
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" Size="Size.Small" />
+                <MudText Typo="Typo.body2">@VoiceCallSession.CallDuration</MudText>
+                <MudText Typo="Typo.caption" Style="opacity: 0.72;">
+                    @(VoiceCallSession.HasUnavailableAudioProcessingFeatures
+                        ? "Some microphone filters depend on browser support."
+                        : "Microphone filter preferences are saved.")
+                </MudText>
+            </MudStack>
+
+            @if (VoiceCallSession.ParticipantUsers.Count > 0)
+            {
+                <MudAvatarGroup Max="4" Spacing="2" MaxColor="Color.Primary" MaxSize="Size.Small">
+                    @foreach (var participant in VoiceCallSession.ParticipantUsers.Values.Take(4))
+                    {
+                        @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
+                        {
+                            <MudTooltip Text="@participant.Username">
+                                <MudAvatar Size="Size.Small">
+                                    <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
+                                </MudAvatar>
+                            </MudTooltip>
+                        }
+                        else
+                        {
+                            <MudTooltip Text="@participant.Username">
+                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                    @participant.Username?.ToUpper()[0]
+                                </MudAvatar>
+                            </MudTooltip>
+                        }
+                    }
+                </MudAvatarGroup>
+            }
+
+            <MudStack Spacing="0">
+                <MudTooltip Text="@(VoiceCallSession.IsNoiseSuppressionSupported ? "Reduce background noise from your microphone" : "Noise suppression is not supported by this browser or device")">
+                    <div>
+                        <MudSwitch T="bool"
+                                   Value="@VoiceCallSession.IsNoiseSuppressionEnabled"
+                                   ValueChanged="ToggleNoiseSuppression"
+                                   Disabled="@(!VoiceCallSession.IsNoiseSuppressionSupported)"
+                                   Color="Color.Success"
+                                   Size="Size.Small">
+                            Noise suppression
+                        </MudSwitch>
+                    </div>
+                </MudTooltip>
+                <MudTooltip Text="@(VoiceCallSession.IsEchoCancellationSupported ? "Reduce feedback and speaker echo from your microphone input" : "Echo cancellation is not supported by this browser or device")">
+                    <div>
+                        <MudSwitch T="bool"
+                                   Value="@VoiceCallSession.IsEchoCancellationEnabled"
+                                   ValueChanged="ToggleEchoCancellation"
+                                   Disabled="@(!VoiceCallSession.IsEchoCancellationSupported)"
+                                   Color="Color.Success"
+                                   Size="Size.Small">
+                            Echo cancellation
+                        </MudSwitch>
+                    </div>
+                </MudTooltip>
+                <MudTooltip Text="@(VoiceCallSession.IsAutoGainControlSupported ? "Normalize microphone gain automatically as your input volume changes" : "Auto gain control is not supported by this browser or device")">
+                    <div>
+                        <MudSwitch T="bool"
+                                   Value="@VoiceCallSession.IsAutoGainControlEnabled"
+                                   ValueChanged="ToggleAutoGainControl"
+                                   Disabled="@(!VoiceCallSession.IsAutoGainControlSupported)"
+                                   Color="Color.Success"
+                                   Size="Size.Small">
+                            Auto gain
+                        </MudSwitch>
+                    </div>
+                </MudTooltip>
+            </MudStack>
+
+            <MudStack Row Spacing="1" Justify="Justify.FlexEnd">
+                <MudButton Variant="Variant.Outlined"
+                           Color="@(VoiceCallSession.IsMuted ? Color.Error : Color.Default)"
+                           StartIcon="@(VoiceCallSession.IsMuted ? Icons.Material.Filled.MicOff : Icons.Material.Filled.Mic)"
+                           OnClick="ToggleMute">
+                    @(VoiceCallSession.IsMuted ? "Unmute" : "Mute")
+                </MudButton>
+                <MudButton Variant="Variant.Outlined"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.OpenInNew"
+                           OnClick="OpenCallChannel">
+                    Open call
+                </MudButton>
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Error"
+                           StartIcon="@Icons.Material.Filled.CallEnd"
+                           OnClick="LeaveCall">
+                    Leave
+                </MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        VoiceCallSession.StateChanged += HandleVoiceCallStateChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await VoiceCallSession.EnsureInitializedAsync();
+        }
+    }
+
+    private void HandleVoiceCallStateChanged()
+    {
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private Task ToggleMute() => VoiceCallSession.ToggleMuteAsync();
+
+    private Task LeaveCall() => VoiceCallSession.LeaveCallAsync();
+
+    private Task ToggleNoiseSuppression(bool enabled)
+        => VoiceCallSession.UpdateAudioProcessingSettingAsync("noiseSuppression", enabled, "Noise suppression");
+
+    private Task ToggleEchoCancellation(bool enabled)
+        => VoiceCallSession.UpdateAudioProcessingSettingAsync("echoCancellation", enabled, "Echo cancellation");
+
+    private Task ToggleAutoGainControl(bool enabled)
+        => VoiceCallSession.UpdateAudioProcessingSettingAsync("autoGainControl", enabled, "Auto gain control");
+
+    private void OpenCallChannel()
+    {
+        NavigationManager.NavigateTo(VoiceCallSession.GetCallNavigationUri());
+    }
+
+    public void Dispose()
+    {
+        VoiceCallSession.StateChanged -= HandleVoiceCallStateChanged;
+    }
+}

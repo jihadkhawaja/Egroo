@@ -1,13 +1,13 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
+using Egroo.Server.Tools;
+using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
-using jihadkhawaja.chat.server.Hubs;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
-using OpenAI;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 

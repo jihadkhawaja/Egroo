@@ -1,3 +1,86 @@
+(() => {
+    if (window.__egrooConsoleSanitizerInstalled) {
+        return;
+    }
+
+    window.__egrooConsoleSanitizerInstalled = true;
+
+    const originalConsole = {
+        info: console.info.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console),
+        log: console.log.bind(console)
+    };
+
+    const debugHotkeyPattern = /^Debugging hotkey: Shift\+(Alt|Cmd)\+D \(when application has focus\)$/;
+
+    function redactAccessToken(text) {
+        return text.replace(/access_token=([^&'"\s]+)/gi, 'access_token=[redacted]');
+    }
+
+    function sanitizeText(text) {
+        if (debugHotkeyPattern.test(text)) {
+            return null;
+        }
+
+        let sanitizedText = redactAccessToken(text);
+
+        if (sanitizedText.includes('MONO_WASM: WebSocket error')) {
+            return '[SignalR] WebSocket transport error.';
+        }
+
+        if (sanitizedText.includes('WebSocket connection to') && sanitizedText.includes('/chathub')) {
+            sanitizedText = sanitizedText.replace(
+                /WebSocket connection to '([^']+)' failed:?/i,
+                (_, url) => `[SignalR] WebSocket connection failed: ${url}`);
+        }
+
+        if (sanitizedText.includes('Error invoking CallOnBlurredAsync, possibly disposed:')) {
+            return '[MudBlazor] Ignored blur callback after component disposal.';
+        }
+
+        return sanitizedText;
+    }
+
+    function sanitizeArgument(argument) {
+        if (typeof argument === 'string') {
+            return sanitizeText(argument);
+        }
+
+        if (argument instanceof Error && typeof argument.message === 'string') {
+            argument.message = redactAccessToken(argument.message);
+        }
+
+        return argument;
+    }
+
+    function wrapConsoleMethod(methodName) {
+        console[methodName] = (...args) => {
+            const sanitizedArgs = [];
+
+            for (const arg of args) {
+                const sanitizedArg = sanitizeArgument(arg);
+                if (sanitizedArg === null) {
+                    continue;
+                }
+
+                sanitizedArgs.push(sanitizedArg);
+            }
+
+            if (sanitizedArgs.length === 0) {
+                return;
+            }
+
+            originalConsole[methodName](...sanitizedArgs);
+        };
+    }
+
+    wrapConsoleMethod('info');
+    wrapConsoleMethod('warn');
+    wrapConsoleMethod('error');
+    wrapConsoleMethod('log');
+})();
+
 function scrollToEnd(id) {
     let el = document.getElementById(id);
     if (el) {

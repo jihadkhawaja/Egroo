@@ -7,11 +7,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
-using System.Security.Claims;
 using System.Collections.Concurrent;
+using System.Security.Claims;
 
 namespace Egroo.Server.Test
 {
@@ -26,8 +26,8 @@ namespace Egroo.Server.Test
 
         // 32-char AES key and 16-char IV used across all tests
         public const string EncryptionKey = "TestEncryptKey_32BytesLong!!!!!!";
-        public const string EncryptionIV  = "TestEncryptIV16!";
-        public const string JwtSecret     = "super-secret-test-jwt-key-for-egroo-library-tests-32+!";
+        public const string EncryptionIV = "TestEncryptIV16!";
+        public const string JwtSecret = "super-secret-test-jwt-key-for-egroo-library-tests-32+!";
 
         public static IServiceProvider Build(string dbName = "EgrooTestDb", Guid? authenticatedUserId = null)
         {
@@ -37,9 +37,9 @@ namespace Egroo.Server.Test
             IConfiguration config = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
-                    ["Secrets:Jwt"]    = JwtSecret,
+                    ["Secrets:Jwt"] = JwtSecret,
                     ["Encryption:Key"] = EncryptionKey,
-                    ["Encryption:IV"]  = EncryptionIV,
+                    ["Encryption:IV"] = EncryptionIV,
                 })
                 .Build();
 
@@ -98,9 +98,9 @@ namespace Egroo.Server.Test
                 new(ClaimTypes.Name, "testuser"),
                 new(ClaimTypes.Role, "Member"),
             };
-            var identity  = new ClaimsIdentity(claims, "TestAuth");
+            var identity = new ClaimsIdentity(claims, "TestAuth");
             var principal = new ClaimsPrincipal(identity);
-            var context   = new DefaultHttpContext { User = principal };
+            var context = new DefaultHttpContext { User = principal };
 
             return new HttpContextAccessor { HttpContext = context };
         }

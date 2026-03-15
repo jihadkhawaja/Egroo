@@ -1,4 +1,4 @@
-using Egroo.Server.Services;
+using Egroo.Server.Tools;
 using Microsoft.Extensions.AI;
 
 namespace Egroo.Server.Test
@@ -267,57 +267,57 @@ namespace Egroo.Server.Test
             StringAssert.Contains(result.ToString()!, "No timezones found");
         }
 
-                // ── Web Search / Fetch ─────────────────────────────────────────────────────
+        // ── Web Search / Fetch ─────────────────────────────────────────────────────
 
-                [TestMethod]
-                public async Task SearchWeb_WithoutQuery_ReturnsValidationError()
-                {
-                        var tools = BuiltinTools.CreateTools();
-                        var tool = tools.OfType<AIFunction>().First(t => t.Name == "search_web");
+        [TestMethod]
+        public async Task SearchWeb_WithoutQuery_ReturnsValidationError()
+        {
+            var tools = BuiltinTools.CreateTools();
+            var tool = tools.OfType<AIFunction>().First(t => t.Name == "search_web");
 
-                        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
-                        {
-                                ["query"] = ""
-                        }));
+            var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["query"] = ""
+            }));
 
-                        Assert.IsNotNull(result);
-                        StringAssert.Contains(result.ToString()!, "required");
-                }
+            Assert.IsNotNull(result);
+            StringAssert.Contains(result.ToString()!, "required");
+        }
 
-                [TestMethod]
-                public async Task FetchWebPage_WithInvalidScheme_ReturnsValidationError()
-                {
-                        var tools = BuiltinTools.CreateTools();
-                        var tool = tools.OfType<AIFunction>().First(t => t.Name == "fetch_web_page");
+        [TestMethod]
+        public async Task FetchWebPage_WithInvalidScheme_ReturnsValidationError()
+        {
+            var tools = BuiltinTools.CreateTools();
+            var tool = tools.OfType<AIFunction>().First(t => t.Name == "fetch_web_page");
 
-                        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
-                        {
-                                ["url"] = "file:///secret.txt"
-                        }));
+            var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["url"] = "file:///secret.txt"
+            }));
 
-                        Assert.IsNotNull(result);
-                        StringAssert.Contains(result.ToString()!, "HTTP or HTTPS");
-                }
+            Assert.IsNotNull(result);
+            StringAssert.Contains(result.ToString()!, "HTTP or HTTPS");
+        }
 
-                [TestMethod]
-                public async Task FetchWebPage_WithLocalhost_ReturnsValidationError()
-                {
-                        var tools = BuiltinTools.CreateTools();
-                        var tool = tools.OfType<AIFunction>().First(t => t.Name == "fetch_web_page");
+        [TestMethod]
+        public async Task FetchWebPage_WithLocalhost_ReturnsValidationError()
+        {
+            var tools = BuiltinTools.CreateTools();
+            var tool = tools.OfType<AIFunction>().First(t => t.Name == "fetch_web_page");
 
-                        var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
-                        {
-                                ["url"] = "http://localhost:8080"
-                        }));
+            var result = await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?>
+            {
+                ["url"] = "http://localhost:8080"
+            }));
 
-                        Assert.IsNotNull(result);
-                        StringAssert.Contains(result.ToString()!, "public internet URLs");
-                }
+            Assert.IsNotNull(result);
+            StringAssert.Contains(result.ToString()!, "public internet URLs");
+        }
 
-                [TestMethod]
-                public void ParseDuckDuckGoResults_ExtractsTitleUrlAndSnippet()
-                {
-                        const string html = """
+        [TestMethod]
+        public void ParseDuckDuckGoResults_ExtractsTitleUrlAndSnippet()
+        {
+            const string html = """
                                 <html>
                                     <body>
                                         <div class="results">
@@ -328,18 +328,18 @@ namespace Egroo.Server.Test
                                 </html>
                                 """;
 
-                        var results = BuiltinTools.ParseDuckDuckGoResults(html, 5);
+            var results = BuiltinTools.ParseDuckDuckGoResults(html, 5);
 
-                        Assert.AreEqual(1, results.Count);
-                        Assert.AreEqual("Example Result", results[0].Title);
-                        Assert.AreEqual("https://example.com/article", results[0].Url);
-                        StringAssert.Contains(results[0].Snippet, "example snippet");
-                }
+            Assert.AreEqual(1, results.Count);
+            Assert.AreEqual("Example Result", results[0].Title);
+            Assert.AreEqual("https://example.com/article", results[0].Url);
+            StringAssert.Contains(results[0].Snippet, "example snippet");
+        }
 
-                [TestMethod]
-                public void ExtractReadableContentFromHtml_StripsMarkupAndTruncates()
-                {
-                        const string html = """
+        [TestMethod]
+        public void ExtractReadableContentFromHtml_StripsMarkupAndTruncates()
+        {
+            const string html = """
                                 <html>
                                     <head>
                                         <title>Example Page</title>
@@ -354,23 +354,23 @@ namespace Egroo.Server.Test
                                 </html>
                                 """;
 
-                        var content = BuiltinTools.ExtractReadableContentFromHtml(html, 60);
+            var content = BuiltinTools.ExtractReadableContentFromHtml(html, 60);
 
-                        Assert.AreEqual("Example Page", content.Title);
-                        StringAssert.Contains(content.Content, "Headline");
-                        StringAssert.Contains(content.Content, "First paragraph");
-                        Assert.IsTrue(content.WasTruncated);
-                        Assert.IsFalse(content.Content.Contains("console.log", StringComparison.Ordinal));
-                }
+            Assert.AreEqual("Example Page", content.Title);
+            StringAssert.Contains(content.Content, "Headline");
+            StringAssert.Contains(content.Content, "First paragraph");
+            Assert.IsTrue(content.WasTruncated);
+            Assert.IsFalse(content.Content.Contains("console.log", StringComparison.Ordinal));
+        }
 
-                [TestMethod]
-                public async Task ValidatePublicInternetUrlAsync_RejectsPrivateIp()
-                {
-                        var result = await BuiltinTools.ValidatePublicInternetUrlAsync(new Uri("http://192.168.1.10/test"));
+        [TestMethod]
+        public async Task ValidatePublicInternetUrlAsync_RejectsPrivateIp()
+        {
+            var result = await BuiltinTools.ValidatePublicInternetUrlAsync(new Uri("http://192.168.1.10/test"));
 
-                        Assert.IsNotNull(result);
-                        StringAssert.Contains(result, "public internet URLs");
-                }
+            Assert.IsNotNull(result);
+            StringAssert.Contains(result, "public internet URLs");
+        }
 
         // ── CreateScopedTools ──────────────────────────────────────────────────────
 

@@ -1,5 +1,4 @@
 using jihadkhawaja.chat.shared.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
 
 namespace Egroo.Server.Services
