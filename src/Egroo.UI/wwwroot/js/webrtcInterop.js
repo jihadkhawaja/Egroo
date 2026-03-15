@@ -8,6 +8,7 @@ window.webrtcInterop = {
     localStream: null,
     dotNetObject: null,
     channelId: null,
+    selfUserId: null,
     statsInterval: null,
     isMuted: false,
     audioProcessingStorageKey: "egroo.voice.audioProcessing",
@@ -76,8 +77,9 @@ window.webrtcInterop = {
      * Start participating in a channel call. Acquires mic and sets channel context.
      * Returns true if microphone was successfully acquired.
      */
-    joinCall: async function (channelId) {
+    joinCall: async function (channelId, selfUserId) {
         this.channelId = channelId;
+        this.selfUserId = selfUserId || null;
         this._loadPersistedAudioProcessingPreferences();
         const acquired = await this.acquireLocalStream();
         if (!acquired) return false;
@@ -170,10 +172,19 @@ window.webrtcInterop = {
         peerData.activeOfferSdp = sdpOffer;
 
         try {
-            // Glare handling: if we have a pending local offer, rollback before accepting the remote offer
+            // Perfect negotiation: if we have a pending local offer, determine polite/impolite
             if (pc.signalingState === "have-local-offer") {
-                console.log("[WebRTC] Glare detected for peer", peerId, "- rolling back local offer");
-                await pc.setLocalDescription({ type: "rollback" });
+                // The peer with the smaller ID is "polite" (will rollback).
+                // The peer with the larger ID is "impolite" (keeps own offer, ignores incoming).
+                const isPolite = this.selfUserId && peerId && (this.selfUserId < peerId);
+                if (isPolite) {
+                    console.log("[WebRTC] Glare: polite peer rolling back local offer for peer", peerId);
+                    await pc.setLocalDescription({ type: "rollback" });
+                } else {
+                    console.log("[WebRTC] Glare: impolite peer ignoring incoming offer from peer", peerId);
+                    peerData.offerInFlight = false;
+                    return null;
+                }
             }
 
             const isNewOffer = !pc.remoteDescription
@@ -309,8 +320,9 @@ window.webrtcInterop = {
      * Leave the call entirely: close all peer connections and release microphone.
      */
     leaveCall: function () {
-        // Close all peer connections
-        for (const [peerId] of this.peers) {
+        // Collect peer IDs first to avoid mutating the map during iteration
+        const peerIds = Array.from(this.peers.keys());
+        for (const peerId of peerIds) {
             this.removePeer(peerId);
         }
         this.peers.clear();
@@ -335,6 +347,7 @@ window.webrtcInterop = {
         }
 
         this.channelId = null;
+        this.selfUserId = null;
         this.isMuted = false;
         console.log("[WebRTC] Left call.");
     },
@@ -449,16 +462,37 @@ window.webrtcInterop = {
             audioEl.srcObject = stream;
             audioEl.muted = false;
             audioEl.volume = 1.0;
-            audioEl.play().catch(err => console.error("[WebRTC] Error playing remote audio from peer", peerId, err));
+            audioEl.play().then(() => {
+                console.log("[WebRTC] Audio playing for peer", peerId);
+            }).catch(err => {
+                console.warn("[WebRTC] Autoplay blocked for peer", peerId, err);
+                // Retry audio playback on next user interaction
+                const resumeAudio = () => {
+                    audioEl.play().then(() => {
+                        console.log("[WebRTC] Audio resumed for peer", peerId, "after user interaction");
+                    }).catch(() => {});
+                };
+                document.addEventListener("click", resumeAudio, { once: true });
+                document.addEventListener("keydown", resumeAudio, { once: true });
+            });
         };
 
         pc.oniceconnectionstatechange = () => {
             console.log("[WebRTC] Peer", peerId, "ICE state:", pc.iceConnectionState);
-            if (pc.iceConnectionState === "disconnected" || pc.iceConnectionState === "failed") {
-                console.warn("[WebRTC] Peer", peerId, "connection lost.");
-                if (this.dotNetObject) {
-                    this.dotNetObject.invokeMethodAsync('OnPeerDisconnected', peerId);
-                }
+            if (pc.iceConnectionState === "failed") {
+                console.warn("[WebRTC] Peer", peerId, "ICE connection failed. Attempting ICE restart...");
+                pc.restartIce();
+                // Allow a grace period for the restart before declaring the peer dead
+                setTimeout(() => {
+                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "closed") {
+                        console.error("[WebRTC] Peer", peerId, "ICE restart failed. Removing peer.");
+                        if (this.dotNetObject) {
+                            this.dotNetObject.invokeMethodAsync('OnPeerDisconnected', peerId);
+                        }
+                    }
+                }, 5000);
+            } else if (pc.iceConnectionState === "disconnected") {
+                console.warn("[WebRTC] Peer", peerId, "ICE temporarily disconnected (may recover).");
             }
         };
 

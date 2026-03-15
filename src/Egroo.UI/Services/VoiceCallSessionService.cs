@@ -131,7 +131,8 @@ namespace Egroo.UI.Services
 
             try
             {
-                bool acquired = await _jsRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString());
+                string selfUserId = _sessionStorage.User?.Id.ToString() ?? string.Empty;
+                bool acquired = await _jsRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString(), selfUserId);
                 if (!acquired)
                 {
                     _snackbar.Add("Could not access microphone. Please check permissions.", Severity.Error);
@@ -313,16 +314,17 @@ namespace Egroo.UI.Services
                     return;
                 }
 
-                try
+                foreach (var participantId in participantIds)
                 {
-                    foreach (var participantId in participantIds)
+                    if (_disposed)
                     {
-                        if (_disposed)
-                        {
-                            return;
-                        }
+                        return;
+                    }
 
-                        _participantIds.Add(participantId);
+                    _participantIds.Add(participantId);
+
+                    try
+                    {
                         await FetchAndCacheParticipantAsync(participantId);
 
                         string? offerSdp = await _jsRuntime.InvokeAsync<string?>(
@@ -333,10 +335,10 @@ namespace Egroo.UI.Services
                             await _chatCallService.SendOfferToUser(channelId, participantId, offerSdp);
                         }
                     }
-
-                    NotifyStateChanged();
+                    catch { }
                 }
-                catch { }
+
+                NotifyStateChanged();
             };
             _chatCallService.OnExistingCallParticipants += _onExistingCallParticipants;
 
