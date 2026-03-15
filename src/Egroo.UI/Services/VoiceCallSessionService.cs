@@ -497,6 +497,21 @@ namespace Egroo.UI.Services
             }
         }
 
+        [JSInvokable]
+        public async Task OnOfferGenerated(string peerId, string offerSdp)
+        {
+            if (_disposed || !IsInCall || !Guid.TryParse(peerId, out Guid targetUserId) || string.IsNullOrWhiteSpace(offerSdp))
+            {
+                return;
+            }
+
+            try
+            {
+                await _chatCallService.SendOfferToUser(CurrentChannelId, targetUserId, offerSdp);
+            }
+            catch { }
+        }
+
         private async Task SyncAudioProcessingStateAsync()
         {
             var state = await _jsRuntime.InvokeAsync<AudioProcessingState>("webrtcInterop.getAudioProcessingState");

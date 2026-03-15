@@ -41,7 +41,16 @@ window.webrtcInterop = {
                 : this._getDefaultIceServers()
         };
 
-        console.log("[WebRTC] ICE servers configured:", this.config.iceServers.map(server => ({ urls: server.urls })));
+        console.log("[WebRTC] ICE servers configured:", this.config.iceServers.map(server => ({
+            urls: server.urls,
+            hasCredential: !!server.credential,
+            hasUsername: !!server.username,
+            supportsRelay: this._serverSupportsRelay(server)
+        })));
+
+        if (!this._hasRelayIceServer()) {
+            console.warn("[WebRTC] No TURN server configured. Calls may fail across NATs/firewalls outside local testing.");
+        }
     },
 
     /**
@@ -248,6 +257,7 @@ window.webrtcInterop = {
 
         try {
             await peerData.pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdpAnswer }));
+            peerData.restartOfferInFlight = false;
             console.log("[WebRTC] Set remote answer for peer", peerId);
             // Flush queued ICE candidates
             await this._flushIceCandidates(peerId);
@@ -431,10 +441,20 @@ window.webrtcInterop = {
         }
 
         const pc = new RTCPeerConnection(this.config);
-        const peerData = { pc: pc, iceCandidateQueue: [], offerInFlight: false, activeOfferSdp: null };
+        const peerData = {
+            pc: pc,
+            iceCandidateQueue: [],
+            offerInFlight: false,
+            activeOfferSdp: null,
+            restartOfferInFlight: false,
+            iceRestartAttempts: 0,
+            disconnectTimer: null
+        };
 
         pc.onicecandidate = (event) => {
             if (event.candidate && this.dotNetObject && this.channelId) {
+                const summary = this._parseIceCandidate(event.candidate.candidate);
+                console.log("[WebRTC] Local ICE candidate for peer", peerId, summary);
                 this.dotNetObject.invokeMethodAsync(
                     'OnIceCandidateGenerated',
                     peerId,
@@ -479,20 +499,19 @@ window.webrtcInterop = {
 
         pc.oniceconnectionstatechange = () => {
             console.log("[WebRTC] Peer", peerId, "ICE state:", pc.iceConnectionState);
-            if (pc.iceConnectionState === "failed") {
-                console.warn("[WebRTC] Peer", peerId, "ICE connection failed. Attempting ICE restart...");
-                pc.restartIce();
-                // Allow a grace period for the restart before declaring the peer dead
-                setTimeout(() => {
-                    if (pc.iceConnectionState === "failed" || pc.iceConnectionState === "closed") {
-                        console.error("[WebRTC] Peer", peerId, "ICE restart failed. Removing peer.");
-                        if (this.dotNetObject) {
-                            this.dotNetObject.invokeMethodAsync('OnPeerDisconnected', peerId);
-                        }
-                    }
-                }, 5000);
+            if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+                peerData.iceRestartAttempts = 0;
+                peerData.restartOfferInFlight = false;
+                this._clearDisconnectTimer(peerData);
+            } else if (pc.iceConnectionState === "failed") {
+                this._clearDisconnectTimer(peerData);
+                console.warn("[WebRTC] Peer", peerId, "ICE connection failed. Attempting ICE restart renegotiation...");
+                this._restartIceForPeer(peerId, "failed");
             } else if (pc.iceConnectionState === "disconnected") {
                 console.warn("[WebRTC] Peer", peerId, "ICE temporarily disconnected (may recover).");
+                this._scheduleDisconnectRecovery(peerId, peerData);
+            } else if (pc.iceConnectionState === "closed") {
+                this._clearDisconnectTimer(peerData);
             }
         };
 
@@ -524,6 +543,25 @@ window.webrtcInterop = {
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" }
         ];
+    },
+
+    _serverSupportsRelay: function (server) {
+        if (!server) {
+            return false;
+        }
+
+        const urls = Array.isArray(server.urls)
+            ? server.urls
+            : typeof server.urls === "string"
+                ? [server.urls]
+                : [];
+
+        return urls.some(url => typeof url === "string" && /^turns?:/i.test(url));
+    },
+
+    _hasRelayIceServer: function () {
+        return Array.isArray(this.config.iceServers)
+            && this.config.iceServers.some(server => this._serverSupportsRelay(server));
     },
 
     _normalizeIceServer: function (server) {
@@ -574,6 +612,94 @@ window.webrtcInterop = {
         }
 
         return normalizedServer;
+    },
+
+    _clearDisconnectTimer: function (peerData) {
+        if (peerData && peerData.disconnectTimer) {
+            clearTimeout(peerData.disconnectTimer);
+            peerData.disconnectTimer = null;
+        }
+    },
+
+    _scheduleDisconnectRecovery: function (peerId, peerData) {
+        if (!peerData || peerData.disconnectTimer) {
+            return;
+        }
+
+        peerData.disconnectTimer = setTimeout(() => {
+            peerData.disconnectTimer = null;
+
+            if (!this.peers.has(peerId)) {
+                return;
+            }
+
+            const currentPeerData = this.peers.get(peerId);
+            if (!currentPeerData) {
+                return;
+            }
+
+            const state = currentPeerData.pc.iceConnectionState;
+            if (state === "disconnected" || state === "failed") {
+                console.warn("[WebRTC] Peer", peerId, "did not recover from disconnect. Attempting ICE restart renegotiation...");
+                this._restartIceForPeer(peerId, "disconnected");
+            }
+        }, 3000);
+    },
+
+    _restartIceForPeer: async function (peerId, reason) {
+        const peerData = this.peers.get(peerId);
+        if (!peerData || !peerData.pc || !this.dotNetObject || !this.channelId) {
+            return;
+        }
+
+        if (peerData.restartOfferInFlight) {
+            console.log("[WebRTC] ICE restart already in flight for peer", peerId);
+            return;
+        }
+
+        if (peerData.pc.signalingState !== "stable") {
+            console.warn("[WebRTC] Cannot ICE-restart peer", peerId, "while signaling state is", peerData.pc.signalingState);
+            return;
+        }
+
+        if (peerData.iceRestartAttempts >= 2) {
+            console.error("[WebRTC] Peer", peerId, "exceeded ICE restart attempts. Removing peer.");
+            this.dotNetObject.invokeMethodAsync('OnPeerDisconnected', peerId);
+            return;
+        }
+
+        try {
+            peerData.restartOfferInFlight = true;
+            peerData.iceRestartAttempts += 1;
+
+            const offer = await peerData.pc.createOffer({ iceRestart: true });
+            await peerData.pc.setLocalDescription(offer);
+
+            console.log("[WebRTC] Created ICE restart offer for peer", peerId, "| Attempt:", peerData.iceRestartAttempts, "| Reason:", reason);
+            await this.dotNetObject.invokeMethodAsync('OnOfferGenerated', peerId, offer.sdp);
+        } catch (err) {
+            peerData.restartOfferInFlight = false;
+            console.error("[WebRTC] Error creating ICE restart offer for peer", peerId, err);
+        }
+    },
+
+    _parseIceCandidate: function (candidateLine) {
+        if (typeof candidateLine !== "string") {
+            return { type: "unknown" };
+        }
+
+        const parts = candidateLine.trim().split(/\s+/);
+        const typeIndex = parts.indexOf("typ");
+        const protocol = parts.length > 2 ? parts[2].toLowerCase() : "unknown";
+        const candidateType = typeIndex >= 0 && parts.length > typeIndex + 1
+            ? parts[typeIndex + 1].toLowerCase()
+            : "unknown";
+
+        return {
+            protocol: protocol,
+            type: candidateType,
+            candidate: candidateLine
+        };
     },
 
     _buildTrackConstraints: function () {
