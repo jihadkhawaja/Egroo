@@ -22,5 +22,6 @@ namespace Egroo.Server.Database
         DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
         DbSet<ChannelAgent> ChannelAgents { get; set; }
         DbSet<UserAgentFriend> UserAgentFriends { get; set; }
+        DbSet<UserEncryptionKey> UserEncryptionKeys { get; set; }
     }
 }

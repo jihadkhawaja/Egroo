@@ -476,6 +476,18 @@ namespace Egroo.Server.API
                 return success ? Results.Ok() : Results.NotFound();
             });
 
+            group.MapPost("/conversations/{conversationId:guid}/clear-memory", async (IAgentRepository repo, Guid conversationId) =>
+            {
+                var success = await repo.UpdateConversationSessionState(conversationId, null);
+                return success ? Results.Ok() : Results.NotFound();
+            });
+
+            group.MapDelete("/{agentId:guid}/conversations", async (IAgentRepository repo, Guid agentId) =>
+            {
+                var deleted = await repo.DeleteAllConversations(agentId);
+                return Results.Ok(new { deleted });
+            });
+
             // ── Messages ─────────────────────────────────────────────────
 
             group.MapGet("/conversations/{conversationId:guid}/messages", async (IAgentRepository repo, Guid conversationId, int? skip, int? take) =>

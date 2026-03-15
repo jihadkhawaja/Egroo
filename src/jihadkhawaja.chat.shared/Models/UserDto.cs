@@ -22,6 +22,8 @@ namespace jihadkhawaja.chat.shared.Models
         public string? EncryptionPublicKey { get; set; }
         public string? EncryptionKeyId { get; set; }
         public DateTimeOffset? EncryptionKeyUpdatedOn { get; set; }
+        [NotMapped]
+        public List<UserEncryptionKeyInfo>? EncryptionKeys { get; set; }
         public UserDetail? UserDetail { get; set; }
         public UserStorage? UserStorage { get; set; }
         public ICollection<UserFeedback> UserFeedbacks { get; } = new List<UserFeedback>();

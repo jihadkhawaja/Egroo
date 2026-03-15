@@ -130,6 +130,9 @@ public class ChatHubTest
         public Task<bool> DeleteUser() => Task.FromResult(false);
         public Task<bool> UpdateDetails(string? d, string? e, string? f, string? l) => Task.FromResult(false);
         public Task<bool> UpdateEncryptionKey(string? pk, string? ki) => Task.FromResult(false);
+        public Task<bool> AddEncryptionKey(string pk, string ki, string? dl) => Task.FromResult(false);
+        public Task<bool> RemoveEncryptionKey(string ki) => Task.FromResult(false);
+        public Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys() => Task.FromResult<UserEncryptionKeyInfo[]?>(null);
         public Task<bool> UpdateAvatar(string? a) => Task.FromResult(false);
         public Task<bool> UpdateCover(string? c) => Task.FromResult(false);
         public Task<bool> SendFeedback(string text) => Task.FromResult(false);

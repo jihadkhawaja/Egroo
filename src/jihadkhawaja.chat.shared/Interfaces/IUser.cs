@@ -23,6 +23,9 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<bool> DeleteUser();
         Task<bool> UpdateDetails(string? displayname, string? email, string? firstname, string? lastname);
         Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId);
+        Task<bool> AddEncryptionKey(string publicKey, string keyId, string? deviceLabel);
+        Task<bool> RemoveEncryptionKey(string keyId);
+        Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys();
         Task<bool> UpdateAvatar(string? avatarBase64);
         Task<bool> UpdateCover(string? coverBase64);
         Task<bool> SendFeedback(string text);

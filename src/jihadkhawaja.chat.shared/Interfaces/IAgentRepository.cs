@@ -47,6 +47,7 @@ namespace jihadkhawaja.chat.shared.Interfaces
         Task<AgentConversation[]?> GetUserConversations(Guid agentId);
         Task<bool> UpdateConversationSessionState(Guid conversationId, string? sessionState);
         Task<bool> DeleteConversation(Guid conversationId);
+        Task<int> DeleteAllConversations(Guid agentId);
 
         // ── Messages ─────────────────────────────────────────────────────
         Task<AgentConversationMessage?> AddMessage(AgentConversationMessage message);

@@ -270,7 +270,7 @@ namespace Egroo.Server.Test
             var agent = new AgentDefinition();
             Assert.IsTrue(agent.IsActive);
             Assert.IsFalse(agent.IsPublished);
-            Assert.AreEqual(AgentAddPermission.OwnerAndOthers, agent.AddPermission);
+            Assert.AreEqual(AgentAddPermission.OwnerOnly, agent.AddPermission);
             Assert.AreEqual(string.Empty, agent.Name);
             Assert.AreEqual(string.Empty, agent.Model);
         }

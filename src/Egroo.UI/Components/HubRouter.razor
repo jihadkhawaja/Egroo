@@ -9,6 +9,7 @@
 @using System.Text.Json
 
 @using jihadkhawaja.chat.shared.Models
+@implements IDisposable
 
 @inject SessionStorage SessionStorage
 @inject StorageService StorageService
@@ -20,7 +21,7 @@
 @if (IsBusy)
 {
     <div class="app-init-overlay">
-        <img src="_content/Egroo.UI/icon-128.png" class="app-init-logo" alt="Egroo" />
+        <img src="@IconAssetUrl" class="app-init-logo" alt="Egroo" />
         <MudProgressLinear Indeterminate Color="Color.Primary" Style="width:180px;" />
     </div>
 }
@@ -28,6 +29,43 @@ else
 {
     <div class="app-content-ready">
         @ChildContent
+
+        @if (ShowReconnectOverlay)
+        {
+            <div class="signalr-reconnect-overlay" role="alert" aria-live="assertive">
+                <div class="signalr-reconnect-card">
+                    <div class="signalr-reconnect-badge" aria-hidden="true">
+                        <img src="@IconAssetUrl" class="signalr-reconnect-logo" alt="" />
+                    </div>
+
+                    @if (IsReconnectRetrying)
+                    {
+                        <MudProgressCircular Indeterminate Color="Color.Primary" Size="Size.Large" Class="signalr-reconnect-spinner" />
+                    }
+
+                    <MudText Typo="Typo.caption" Class="signalr-reconnect-kicker">Live chat connection</MudText>
+                    <MudText Typo="Typo.h6" Class="signalr-reconnect-title">@ReconnectTitle</MudText>
+                    <MudText Typo="Typo.body2" Class="signalr-reconnect-copy">@ReconnectMessage</MudText>
+
+                    @if (!string.IsNullOrWhiteSpace(ReconnectErrorDetail))
+                    {
+                        <MudText Typo="Typo.caption" Class="signalr-reconnect-detail">@ReconnectErrorDetail</MudText>
+                    }
+
+                    @if (IsReconnectFailed)
+                    {
+                        <div class="signalr-reconnect-actions">
+                            <MudButton OnClick="RetrySignalRConnectionAsync"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Disabled="_retryingConnection">
+                                @(_retryingConnection ? "Retrying..." : "Retry connection")
+                            </MudButton>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
     </div>
 }
 
@@ -36,6 +74,20 @@ else
     [Parameter] public EventCallback OnRoutingCompleted { get; set; }
 
     private bool IsBusy { get; set; } = true;
+    private HubConnection? _observedConnection;
+    private Func<Exception?, Task>? _reconnectingHandler;
+    private Func<string?, Task>? _reconnectedHandler;
+    private Func<Exception?, Task>? _closedHandler;
+    private bool _suppressConnectionOverlay;
+    private bool _retryingConnection;
+
+    private bool IsReconnectRetrying { get; set; }
+    private bool IsReconnectFailed { get; set; }
+    private string ReconnectTitle { get; set; } = string.Empty;
+    private string ReconnectMessage { get; set; } = string.Empty;
+    private string? ReconnectErrorDetail { get; set; }
+    private bool ShowReconnectOverlay => IsReconnectRetrying || IsReconnectFailed;
+    private string IconAssetUrl => $"{NavigationManager.BaseUri.TrimEnd('/')}/_content/Egroo.UI/icon-128.png";
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -44,11 +96,27 @@ else
 
         try
         {
+            bool needsSessionRestore = !string.IsNullOrWhiteSpace(SessionStorage.Token) && SessionStorage.User is null;
+
             // If the connection is already established, update UI and exit.
             if (ChatSignalR.HubConnection is not null)
             {
-                if (ChatSignalR.HubConnection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+                if (needsSessionRestore)
                 {
+                    await ChatSignalR.HubConnection.DisposeAsync();
+                    ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+                }
+
+                AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection);
+
+                if (!needsSessionRestore &&
+                    (ChatSignalR.HubConnection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting))
+                {
+                    if (ChatSignalR.HubConnection.State is HubConnectionState.Reconnecting)
+                    {
+                        SetReconnectRetryingState("Trying to restore your chat session.", null);
+                    }
+
                     IsBusy = false;
                     await InvokeAsync(StateHasChanged);
                     return;
@@ -108,42 +176,19 @@ else
     {
         // Initialize and start the SignalR connection using the current token.
         ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection!);
         await SetAppStateAsync(AppState.ESTABLISHING_CONNECTION);
         await ChatSignalR.HubConnection!.StartAsync();
 
         // If a token exists, update HttpClient with the cached token and refresh the session.
         if (!string.IsNullOrEmpty(SessionStorage.Token))
         {
-            // Update the HttpClient's Authorization header with the cached token.
-            ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization = 
-                new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
+            bool restored = await RestoreSessionFromTokenAsync();
 
-            var refreshResponse = await ChatAuthService.RefreshSession();
-
-            if (!refreshResponse.Success || string.IsNullOrWhiteSpace(refreshResponse.Token))
+            if (!restored)
             {
-                await SignOutAsync();
                 return;
             }
-
-            // Update token if it has changed.
-            if (SessionStorage.Token != refreshResponse.Token)
-            {
-                SessionStorage.Token = refreshResponse.Token;
-                // Update HttpClient with the new token.
-                ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization = 
-                    new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
-                await RestartSignalRConnectionAsync();
-                await UpdateTokenStorageAsync(SessionStorage.Token);
-            }
-
-            // Update the user info in session.
-            SessionStorage.User = new UserDto
-            {
-                Id = refreshResponse.UserId ?? Guid.Empty,
-                Username = await ChatUserService.GetCurrentUserUsername() ?? string.Empty,
-                ConnectionId = ChatSignalR.HubConnection.ConnectionId
-            };
         }
     }
 
@@ -154,11 +199,21 @@ else
     {
         if (ChatSignalR.HubConnection is not null)
         {
-            await ChatSignalR.HubConnection.StopAsync();
-            await ChatSignalR.HubConnection.DisposeAsync();
+            _suppressConnectionOverlay = true;
+
+            try
+            {
+                await ChatSignalR.HubConnection.StopAsync();
+                await ChatSignalR.HubConnection.DisposeAsync();
+            }
+            finally
+            {
+                _suppressConnectionOverlay = false;
+            }
         }
 
         ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection!);
         SessionStorage.AppState = AppState.CREATING_SESSION;
         await InvokeAsync(StateHasChanged);
         if (ChatSignalR.HubConnection is null)
@@ -203,6 +258,8 @@ else
     /// </summary>
     private async Task SignOutAsync()
     {
+        _suppressConnectionOverlay = true;
+
         switch (ClientModel.CurrentFrameworkPlatform)
         {
             case FrameworkPlatform.MAUI:
@@ -219,6 +276,281 @@ else
 
         SessionStorage.User = null;
         NavigationManager.NavigateTo("/", true);
+    }
+
+    private void AttachConnectionLifecycleHandlers(HubConnection connection)
+    {
+        if (ReferenceEquals(_observedConnection, connection))
+        {
+            return;
+        }
+
+        DetachConnectionLifecycleHandlers();
+
+        _reconnectingHandler = exception => OnHubReconnectingAsync(connection, exception);
+        _reconnectedHandler = connectionId => OnHubReconnectedAsync(connection, connectionId);
+        _closedHandler = exception => OnHubClosedAsync(connection, exception);
+
+        connection.Reconnecting += _reconnectingHandler;
+        connection.Reconnected += _reconnectedHandler;
+        connection.Closed += _closedHandler;
+
+        _observedConnection = connection;
+    }
+
+    private void DetachConnectionLifecycleHandlers()
+    {
+        if (_observedConnection is null)
+        {
+            return;
+        }
+
+        if (_reconnectingHandler is not null)
+        {
+            _observedConnection.Reconnecting -= _reconnectingHandler;
+        }
+
+        if (_reconnectedHandler is not null)
+        {
+            _observedConnection.Reconnected -= _reconnectedHandler;
+        }
+
+        if (_closedHandler is not null)
+        {
+            _observedConnection.Closed -= _closedHandler;
+        }
+
+        _observedConnection = null;
+        _reconnectingHandler = null;
+        _reconnectedHandler = null;
+        _closedHandler = null;
+    }
+
+    private Task OnHubReconnectingAsync(HubConnection connection, Exception? exception)
+    {
+        if (_suppressConnectionOverlay || !ReferenceEquals(_observedConnection, connection))
+        {
+            return Task.CompletedTask;
+        }
+
+        SetReconnectRetryingState("Trying to restore your chat session.", exception);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnHubReconnectedAsync(HubConnection connection, string? connectionId)
+    {
+        if (!ReferenceEquals(_observedConnection, connection))
+        {
+            return Task.CompletedTask;
+        }
+
+        ClearReconnectState();
+
+        if (SessionStorage.User is not null)
+        {
+            SessionStorage.User.ConnectionId = connectionId;
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnHubClosedAsync(HubConnection connection, Exception? exception)
+    {
+        if (_suppressConnectionOverlay || !ReferenceEquals(_observedConnection, connection))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (ChatSignalR.HubConnection is not null &&
+            !ReferenceEquals(ChatSignalR.HubConnection, connection) &&
+            ChatSignalR.HubConnection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+        {
+            return Task.CompletedTask;
+        }
+
+        IsReconnectRetrying = false;
+        IsReconnectFailed = true;
+        ReconnectTitle = "Chat connection lost";
+        ReconnectMessage = "We couldn't reconnect to the server automatically. Retry to restore live messages and presence.";
+        ReconnectErrorDetail = ToReconnectErrorDetail(exception);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void SetReconnectRetryingState(string message, Exception? exception)
+    {
+        IsReconnectRetrying = true;
+        IsReconnectFailed = false;
+        ReconnectTitle = "Reconnecting to chat";
+        ReconnectMessage = message;
+        ReconnectErrorDetail = ToReconnectErrorDetail(exception);
+    }
+
+    private void ClearReconnectState()
+    {
+        IsReconnectRetrying = false;
+        IsReconnectFailed = false;
+        ReconnectTitle = string.Empty;
+        ReconnectMessage = string.Empty;
+        ReconnectErrorDetail = null;
+        _retryingConnection = false;
+    }
+
+    private static string? ToReconnectErrorDetail(Exception? exception)
+    {
+        if (exception is null || string.IsNullOrWhiteSpace(exception.Message))
+        {
+            return null;
+        }
+
+        return exception.Message;
+    }
+
+    private async Task RetrySignalRConnectionAsync()
+    {
+        if (_retryingConnection)
+        {
+            return;
+        }
+
+        _retryingConnection = true;
+        SetReconnectRetryingState("Retrying the connection now.", null);
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            EnsureSignalRConnectionInitialized();
+
+            Operation.Response? refreshResponse = null;
+            bool tokenChanged = false;
+
+            if (!string.IsNullOrWhiteSpace(SessionStorage.Token))
+            {
+                refreshResponse = await RefreshAuthenticatedSessionAsync();
+
+                if (refreshResponse is null)
+                {
+                    return;
+                }
+
+                tokenChanged = !string.Equals(SessionStorage.Token, refreshResponse.Token, StringComparison.Ordinal);
+
+                if (tokenChanged)
+                {
+                    SessionStorage.Token = refreshResponse.Token;
+                    ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
+                    await UpdateTokenStorageAsync(SessionStorage.Token);
+                }
+            }
+
+            if (tokenChanged)
+            {
+                await RestartSignalRConnectionAsync();
+            }
+            else if (ChatSignalR.HubConnection!.State == HubConnectionState.Disconnected)
+            {
+                await ChatSignalR.HubConnection.StartAsync();
+            }
+
+            if (refreshResponse is not null)
+            {
+                await UpdateCurrentUserSessionAsync(refreshResponse);
+            }
+            else if (SessionStorage.User is not null)
+            {
+                SessionStorage.User.ConnectionId = ChatSignalR.HubConnection?.ConnectionId;
+            }
+
+            await SetAppStateAsync(AppState.CONNECTED);
+            ClearReconnectState();
+        }
+        catch (Exception ex)
+        {
+            IsReconnectRetrying = false;
+            IsReconnectFailed = true;
+            ReconnectTitle = "Retry failed";
+            ReconnectMessage = "The chat server is still unavailable. Check the server and try again.";
+            ReconnectErrorDetail = ToReconnectErrorDetail(ex);
+        }
+        finally
+        {
+            _retryingConnection = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void EnsureSignalRConnectionInitialized()
+    {
+        if (ChatSignalR.HubConnection is not null)
+        {
+            AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection);
+            return;
+        }
+
+        ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
+        AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection!);
+    }
+
+    private async Task<Operation.Response?> RefreshAuthenticatedSessionAsync()
+    {
+        ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
+
+        var refreshResponse = await ChatAuthService.RefreshSession();
+
+        if (!refreshResponse.Success || string.IsNullOrWhiteSpace(refreshResponse.Token))
+        {
+            await SignOutAsync();
+            return null;
+        }
+
+        return refreshResponse;
+    }
+
+    private async Task<bool> RestoreSessionFromTokenAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SessionStorage.Token))
+        {
+            return true;
+        }
+
+        var refreshResponse = await RefreshAuthenticatedSessionAsync();
+
+        if (refreshResponse is null)
+        {
+            return false;
+        }
+
+        bool tokenChanged = !string.Equals(SessionStorage.Token, refreshResponse.Token, StringComparison.Ordinal);
+
+        if (tokenChanged)
+        {
+            SessionStorage.Token = refreshResponse.Token;
+            ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
+            await UpdateTokenStorageAsync(SessionStorage.Token);
+            await RestartSignalRConnectionAsync();
+        }
+
+        await UpdateCurrentUserSessionAsync(refreshResponse);
+        return true;
+    }
+
+    private async Task UpdateCurrentUserSessionAsync(Operation.Response refreshResponse)
+    {
+        string username = SessionStorage.User?.Username ?? string.Empty;
+
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            username = await ChatUserService.GetCurrentUserUsername() ?? string.Empty;
+        }
+
+        SessionStorage.User = new UserDto
+        {
+            Id = refreshResponse.UserId ?? SessionStorage.User?.Id ?? Guid.Empty,
+            Username = username,
+            ConnectionId = ChatSignalR.HubConnection?.ConnectionId
+        };
     }
 
     /// <summary>
@@ -253,5 +585,10 @@ else
         ";
         Console.WriteLine(log);
 #endif
+    }
+
+    public void Dispose()
+    {
+        DetachConnectionLifecycleHandlers();
     }
 }

@@ -259,6 +259,22 @@ namespace jihadkhawaja.chat.client.Services
             return response.IsSuccessStatusCode;
         }
 
+        public async Task<bool> ClearConversationMemory(Guid conversationId)
+        {
+            var response = await HttpClient.PostAsync($"{BasePath}/conversations/{conversationId}/clear-memory", null);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<int> DeleteAllConversations(Guid agentId)
+        {
+            var response = await HttpClient.DeleteAsync($"{BasePath}/{agentId}/conversations");
+            if (!response.IsSuccessStatusCode) return 0;
+            var result = await response.Content.ReadFromJsonAsync<DeleteAllResult>(JsonOptions);
+            return result?.Deleted ?? 0;
+        }
+
+        private sealed class DeleteAllResult { public int Deleted { get; set; } }
+
         // ── Messages ─────────────────────────────────────────────────
 
         public async Task<AgentConversationMessage[]?> GetMessages(Guid conversationId, int skip = 0, int take = 50)

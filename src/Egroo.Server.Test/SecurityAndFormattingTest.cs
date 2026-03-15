@@ -672,5 +672,159 @@ namespace Egroo.Server.Test
             string normalized = AgentAttachmentPromptFormatter.Normalize($"[[egroo-file:{token}]]");
             StringAssert.Contains(normalized, "[Attached file: readme.txt]");
         }
+
+        // ── Multi-device v2 envelope tests ──────────────────────────────────────────
+
+        [TestMethod]
+        public void EndToEndEncryptionService_EncryptsWithMultiDeviceKeys_V2Envelope()
+        {
+            var service = CreateEndToEndService();
+            var device1 = service.GenerateAgentIdentity();
+            var device2 = service.GenerateAgentIdentity();
+
+            var userId = Guid.NewGuid();
+            var user = new UserDto
+            {
+                Id = userId,
+                Username = "multidevice-user",
+                EncryptionPublicKey = device1.PublicKey,
+                EncryptionKeyId = device1.KeyId,
+                EncryptionKeys = new List<UserEncryptionKeyInfo>
+                {
+                    new() { PublicKey = device1.PublicKey, KeyId = device1.KeyId },
+                    new() { PublicKey = device2.PublicKey, KeyId = device2.KeyId },
+                }
+            };
+
+            var result = service.EncryptForChannelRecipients(
+                "hello multi-device",
+                new[] { user },
+                Array.Empty<AgentDefinition>());
+
+            Assert.AreEqual(1, result.UserRecipientContents.Count);
+
+            // Decrypt with device 1 private key
+            string? pk1 = service.DecryptAgentPrivateKey(device1.EncryptedPrivateKey);
+            string? plaintext1 = service.DecryptTransportContent(result.UserRecipientContents[0].Content, pk1);
+            Assert.AreEqual("hello multi-device", plaintext1);
+
+            // Decrypt with device 2 private key
+            string? pk2 = service.DecryptAgentPrivateKey(device2.EncryptedPrivateKey);
+            string? plaintext2 = service.DecryptTransportContent(result.UserRecipientContents[0].Content, pk2);
+            Assert.AreEqual("hello multi-device", plaintext2);
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_V2Envelope_WrongKey_ReturnsNull()
+        {
+            var service = CreateEndToEndService();
+            var device1 = service.GenerateAgentIdentity();
+            var device2 = service.GenerateAgentIdentity();
+            var wrongDevice = service.GenerateAgentIdentity();
+
+            var userId = Guid.NewGuid();
+            var user = new UserDto
+            {
+                Id = userId,
+                Username = "multidevice-user",
+                EncryptionPublicKey = device1.PublicKey,
+                EncryptionKeyId = device1.KeyId,
+                EncryptionKeys = new List<UserEncryptionKeyInfo>
+                {
+                    new() { PublicKey = device1.PublicKey, KeyId = device1.KeyId },
+                    new() { PublicKey = device2.PublicKey, KeyId = device2.KeyId },
+                }
+            };
+
+            var result = service.EncryptForChannelRecipients(
+                "secret message",
+                new[] { user },
+                Array.Empty<AgentDefinition>());
+
+            // Decrypt with wrong private key should fail
+            string? wrongPk = service.DecryptAgentPrivateKey(wrongDevice.EncryptedPrivateKey);
+            string? plaintext = service.DecryptTransportContent(result.UserRecipientContents[0].Content, wrongPk);
+            Assert.IsNull(plaintext);
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_FallsBackToV1_WhenNoEncryptionKeysCollection()
+        {
+            var service = CreateEndToEndService();
+            var identity = service.GenerateAgentIdentity();
+
+            var user = new UserDto
+            {
+                Id = Guid.NewGuid(),
+                Username = "legacy-user",
+                EncryptionPublicKey = identity.PublicKey,
+                EncryptionKeyId = identity.KeyId,
+                // No EncryptionKeys collection set → falls back to v1 single-key
+            };
+
+            var result = service.EncryptForChannelRecipients(
+                "legacy message",
+                new[] { user },
+                Array.Empty<AgentDefinition>());
+
+            string? pk = service.DecryptAgentPrivateKey(identity.EncryptedPrivateKey);
+            string? plaintext = service.DecryptTransportContent(result.UserRecipientContents[0].Content, pk);
+            Assert.AreEqual("legacy message", plaintext);
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_V2Envelope_DecryptTransportContent_NullPrivateKey_ReturnsNull()
+        {
+            var service = CreateEndToEndService();
+            var device1 = service.GenerateAgentIdentity();
+
+            var user = new UserDto
+            {
+                Id = Guid.NewGuid(),
+                Username = "v2-user",
+                EncryptionPublicKey = device1.PublicKey,
+                EncryptionKeyId = device1.KeyId,
+                EncryptionKeys = new List<UserEncryptionKeyInfo>
+                {
+                    new() { PublicKey = device1.PublicKey, KeyId = device1.KeyId },
+                }
+            };
+
+            var result = service.EncryptForChannelRecipients(
+                "test",
+                new[] { user },
+                Array.Empty<AgentDefinition>());
+
+            // Decrypt with null private key
+            string? plaintext = service.DecryptTransportContent(result.UserRecipientContents[0].Content, null);
+            Assert.IsNull(plaintext);
+        }
+
+        [TestMethod]
+        public void EndToEndEncryptionService_UserWithMultiDeviceKeys_NoLegacyKey_StillEncrypts()
+        {
+            var service = CreateEndToEndService();
+            var device1 = service.GenerateAgentIdentity();
+
+            var user = new UserDto
+            {
+                Id = Guid.NewGuid(),
+                Username = "keys-only-user",
+                // EncryptionPublicKey is null, but has EncryptionKeys
+                EncryptionKeys = new List<UserEncryptionKeyInfo>
+                {
+                    new() { PublicKey = device1.PublicKey, KeyId = device1.KeyId },
+                }
+            };
+
+            var result = service.EncryptForChannelRecipients(
+                "keys-only message",
+                new[] { user },
+                Array.Empty<AgentDefinition>());
+
+            string? pk = service.DecryptAgentPrivateKey(device1.EncryptedPrivateKey);
+            string? plaintext = service.DecryptTransportContent(result.UserRecipientContents[0].Content, pk);
+            Assert.AreEqual("keys-only message", plaintext);
+        }
     }
 }

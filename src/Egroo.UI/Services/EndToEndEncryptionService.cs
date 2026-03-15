@@ -48,31 +48,59 @@ namespace Egroo.UI.Services
         {
             var localIdentity = await GetLocalIdentityAsync();
 
+            // No local key and no server keys → generate new key and register it
             if (localIdentity is null && string.IsNullOrWhiteSpace(currentUser?.EncryptionPublicKey))
             {
                 localIdentity = await GenerateAndPublishIdentityAsync();
                 return EncryptionReadiness.Ready(localIdentity);
             }
 
+            // Have local key but it's not on server yet → register it as a new device key
             if (localIdentity is not null && string.IsNullOrWhiteSpace(currentUser?.EncryptionPublicKey))
             {
-                bool published = await _chatUserService.UpdateEncryptionKey(localIdentity.PublicKey, localIdentity.KeyId);
+                bool published = await _chatUserService.AddEncryptionKey(localIdentity.PublicKey, localIdentity.KeyId, null);
                 return published
                     ? EncryptionReadiness.Ready(localIdentity)
                     : EncryptionReadiness.NotReady("Unable to publish this device's encryption key.");
             }
 
+            // No local key but server has keys → this is a new device, generate and add
             if (localIdentity is null)
             {
-                return EncryptionReadiness.NotReady("This device does not have your private key. Open Settings and regenerate encryption for this device.");
+                localIdentity = await GenerateAndPublishIdentityAsync();
+                return EncryptionReadiness.Ready(localIdentity);
             }
 
-            if (!string.Equals(localIdentity.KeyId, currentUser?.EncryptionKeyId, StringComparison.Ordinal))
+            // Have local key — check if it's registered on server (multi-device: check against all keys)
+            bool isRegistered = IsKeyRegisteredOnServer(localIdentity, currentUser);
+            if (!isRegistered)
             {
-                return EncryptionReadiness.NotReady("This device is out of sync with your current encryption key. Regenerate encryption in Settings to continue.");
+                // Local key exists but not registered on server — register it as a new device key
+                bool published = await _chatUserService.AddEncryptionKey(localIdentity.PublicKey, localIdentity.KeyId, null);
+                return published
+                    ? EncryptionReadiness.Ready(localIdentity)
+                    : EncryptionReadiness.NotReady("Unable to publish this device's encryption key.");
             }
 
             return EncryptionReadiness.Ready(localIdentity);
+        }
+
+        private static bool IsKeyRegisteredOnServer(EncryptionIdentity localIdentity, UserDto? currentUser)
+        {
+            if (currentUser is null)
+            {
+                return false;
+            }
+
+            // Check multi-device keys first
+            if (currentUser.EncryptionKeys is { Count: > 0 })
+            {
+                return currentUser.EncryptionKeys.Any(k =>
+                    string.Equals(k.KeyId, localIdentity.KeyId, StringComparison.Ordinal));
+            }
+
+            // Fallback to legacy single key
+            return string.Equals(localIdentity.KeyId, currentUser.EncryptionKeyId, StringComparison.Ordinal);
         }
 
         public async Task<EncryptionIdentity> RegenerateIdentityAsync()
@@ -99,7 +127,7 @@ namespace Egroo.UI.Services
                 .ToArray();
 
             string[] missingRecipients = userRecipientRequests
-                .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey))
+                .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey) && (x.EncryptionKeys is null || x.EncryptionKeys.Count == 0))
                 .Select(x => x.Username ?? x.Id.ToString("D"))
                 .Concat(agentRecipientRequests
                     .Where(x => string.IsNullOrWhiteSpace(x.EncryptionPublicKey))
@@ -120,7 +148,7 @@ namespace Egroo.UI.Services
                 : await EncryptRecipientPayloadsAsync(
                     plaintext,
                     userRecipientRequests
-                        .Select(x => new EncryptionRecipientRequest(x.Id, null, x.EncryptionPublicKey!, x.EncryptionKeyId))
+                        .Select(x => BuildRecipientRequest(x))
                         .ToArray());
 
             var agentPayloads = agentRecipientRequests.Length == 0
@@ -128,7 +156,7 @@ namespace Egroo.UI.Services
                 : await EncryptRecipientPayloadsAsync(
                     resolvedAgentPlaintext,
                     agentRecipientRequests
-                        .Select(x => new EncryptionRecipientRequest(null, x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId))
+                        .Select(x => new EncryptionRecipientRequest(null, x.Id, x.EncryptionPublicKey!, x.EncryptionKeyId, null))
                         .ToArray());
 
             return new ChannelEncryptedPayload(
@@ -231,7 +259,7 @@ namespace Egroo.UI.Services
             var identity = await _jsRuntime.InvokeAsync<EncryptionIdentity>("egrooCrypto.generateIdentity");
             await SaveLocalIdentityAsync(identity);
 
-            bool published = await _chatUserService.UpdateEncryptionKey(identity.PublicKey, identity.KeyId);
+            bool published = await _chatUserService.AddEncryptionKey(identity.PublicKey, identity.KeyId, null);
             if (!published)
             {
                 throw new InvalidOperationException("Unable to publish the generated encryption key.");
@@ -294,7 +322,28 @@ namespace Egroo.UI.Services
             List<MessageRecipientContent> UserRecipientContents,
             List<MessageAgentRecipientContent> AgentRecipientContents);
 
-        private sealed record EncryptionRecipientRequest(Guid? UserId, Guid? AgentDefinitionId, string PublicKey, string? KeyId);
+        private static EncryptionRecipientRequest BuildRecipientRequest(UserDto user)
+        {
+            // Multi-device: pass all device keys for v2 envelope
+            if (user.EncryptionKeys is { Count: > 0 })
+            {
+                var keys = user.EncryptionKeys
+                    .Where(k => !string.IsNullOrWhiteSpace(k.PublicKey))
+                    .Select(k => new RecipientKeyEntry(k.PublicKey, k.KeyId))
+                    .ToArray();
+
+                if (keys.Length > 0)
+                {
+                    return new EncryptionRecipientRequest(user.Id, null, null, null, keys);
+                }
+            }
+
+            // Fallback to legacy single key
+            return new EncryptionRecipientRequest(user.Id, null, user.EncryptionPublicKey, user.EncryptionKeyId, null);
+        }
+
+        private sealed record EncryptionRecipientRequest(Guid? UserId, Guid? AgentDefinitionId, string? PublicKey, string? KeyId, RecipientKeyEntry[]? Keys);
+        private sealed record RecipientKeyEntry(string PublicKey, string KeyId);
         private sealed record EncryptedRecipientPayload(Guid? UserId, Guid? AgentDefinitionId, string Content);
         private sealed record BrowserDecryptionResult(string Status, string? Plaintext);
         private sealed record BrowserEncryptedFile(string EncryptedBase64, string KeyBase64, string IvBase64);

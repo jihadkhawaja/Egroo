@@ -31,7 +31,21 @@ namespace jihadkhawaja.chat.client.Services
             => await HubConnection.InvokeAsync<bool>(nameof(ChannelContainUser), channelId, userId);
 
         public async Task<bool> IsChannelAdmin(Guid channelId, Guid userId)
-            => await HubConnection.InvokeAsync<bool>(nameof(IsChannelAdmin), channelId, userId);
+        {
+            if (HubConnection.State != HubConnectionState.Connected)
+            {
+                return false;
+            }
+
+            try
+            {
+                return await HubConnection.InvokeAsync<bool>(nameof(IsChannelAdmin), channelId, userId);
+            }
+            catch (InvalidOperationException)
+            {
+                return false;
+            }
+        }
 
         public async Task<bool> DeleteChannel(Guid channelId)
             => await HubConnection.InvokeAsync<bool>(nameof(DeleteChannel), channelId);

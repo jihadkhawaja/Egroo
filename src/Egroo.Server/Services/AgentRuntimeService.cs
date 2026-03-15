@@ -130,8 +130,9 @@ namespace Egroo.Server.Services
             await dbContext.AgentConversationMessages.AddAsync(userMsg);
             await dbContext.SaveChangesAsync();
 
-            // Create session and run the agent with full conversation history
-            AgentSession session = await agent.CreateSessionAsync();
+            // Create or restore session from persisted state
+            AgentSession session = await RestoreSessionAsync(agent, conversation.SessionState)
+                ?? await agent.CreateSessionAsync();
 
             AgentResponse agentResponse;
             try
@@ -157,7 +158,8 @@ namespace Egroo.Server.Services
             };
             await dbContext.AgentConversationMessages.AddAsync(assistantMsg);
 
-            // Update conversation timestamp
+            // Persist session state and update conversation timestamp
+            conversation.SessionState = await SerializeSessionAsync(agent, session);
             conversation.DateUpdated = DateTimeOffset.UtcNow;
             dbContext.AgentConversations.Update(conversation);
 
@@ -247,7 +249,8 @@ namespace Egroo.Server.Services
             await dbContext.AgentConversationMessages.AddAsync(userMsg);
             await dbContext.SaveChangesAsync();
 
-            AgentSession session = await agent.CreateSessionAsync();
+            AgentSession session = await RestoreSessionAsync(agent, conversation.SessionState)
+                ?? await agent.CreateSessionAsync();
 
             // Stream response — collect full text for DB storage
             var fullResponse = new System.Text.StringBuilder();
@@ -262,7 +265,7 @@ namespace Egroo.Server.Services
                 }
             }
 
-            // Store assistant response
+            // Store assistant response and persist session state
             var assistantMsg = new AgentConversationMessage
             {
                 Id = Guid.NewGuid(),
@@ -272,10 +275,53 @@ namespace Egroo.Server.Services
                 DateCreated = DateTimeOffset.UtcNow
             };
             await dbContext.AgentConversationMessages.AddAsync(assistantMsg);
+
+            conversation.SessionState = await SerializeSessionAsync(agent, session);
+            conversation.DateUpdated = DateTimeOffset.UtcNow;
+            dbContext.AgentConversations.Update(conversation);
+
             await dbContext.SaveChangesAsync();
         }
 
         // ── Private helpers ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Restore an AgentSession from persisted JSON state, or return null if no state exists.
+        /// </summary>
+        private static async Task<AgentSession?> RestoreSessionAsync(AIAgent agent, string? serializedState)
+        {
+            if (string.IsNullOrWhiteSpace(serializedState))
+                return null;
+
+            try
+            {
+                var jsonElement = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(serializedState);
+                return await agent.DeserializeSessionAsync(jsonElement);
+            }
+            catch
+            {
+                // Corrupted state — start fresh
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Serialize an AgentSession's state to a JSON string for DB storage.
+        /// </summary>
+        private static async Task<string?> SerializeSessionAsync(AIAgent agent, AgentSession session)
+        {
+            try
+            {
+                var jsonElement = await agent.SerializeSessionAsync(session);
+                var serialized = jsonElement.GetRawText();
+                // Don't persist empty state
+                return serialized is "{}" or "null" ? null : serialized;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         /// <summary>
         /// Build conversation history as ChatMessage objects from stored DB messages.

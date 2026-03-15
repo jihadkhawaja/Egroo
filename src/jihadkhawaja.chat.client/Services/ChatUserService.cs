@@ -74,6 +74,15 @@ namespace jihadkhawaja.chat.client.Services
         public async Task<bool> UpdateEncryptionKey(string? publicKey, string? keyId)
             => await HubConnection.InvokeAsync<bool>(nameof(UpdateEncryptionKey), publicKey, keyId);
 
+        public async Task<bool> AddEncryptionKey(string publicKey, string keyId, string? deviceLabel)
+            => await HubConnection.InvokeAsync<bool>(nameof(AddEncryptionKey), publicKey, keyId, deviceLabel);
+
+        public async Task<bool> RemoveEncryptionKey(string keyId)
+            => await HubConnection.InvokeAsync<bool>(nameof(RemoveEncryptionKey), keyId);
+
+        public async Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys()
+            => await HubConnection.InvokeAsync<UserEncryptionKeyInfo[]?>(nameof(GetEncryptionKeys));
+
         public async Task<bool> UpdateAvatar(string? avatarBase64)
             => await HubConnection.InvokeAsync<bool>(nameof(UpdateAvatar), avatarBase64);
 

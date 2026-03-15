@@ -981,6 +981,43 @@ namespace Egroo.Server.Repository
             }
         }
 
+        public async Task<int> DeleteAllConversations(Guid agentId)
+        {
+            var userId = GetConnectorUserId();
+            if (userId is null)
+            {
+                return 0;
+            }
+
+            var conversations = await _dbContext.AgentConversations
+                .Where(x => x.AgentDefinitionId == agentId && x.UserId == userId.Value && x.DateDeleted == null)
+                .ToListAsync();
+
+            if (conversations.Count == 0)
+            {
+                return 0;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            foreach (var conv in conversations)
+            {
+                conv.DateDeleted = now;
+                conv.DeletedBy = userId.Value;
+            }
+
+            try
+            {
+                _dbContext.AgentConversations.UpdateRange(conversations);
+                await _dbContext.SaveChangesAsync();
+                return conversations.Count;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to delete all agent conversations");
+                return 0;
+            }
+        }
+
         // ── Messages ─────────────────────────────────────────────────────
 
         public async Task<AgentConversationMessage?> AddMessage(AgentConversationMessage message)

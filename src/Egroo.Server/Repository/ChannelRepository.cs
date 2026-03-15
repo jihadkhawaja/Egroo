@@ -1,4 +1,5 @@
 using Egroo.Server.Database;
+using Egroo.Server.Models;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.EntityFrameworkCore;
@@ -181,6 +182,31 @@ namespace Egroo.Server.Repository
                 EncryptionKeyId = user.EncryptionKeyId,
                 EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn,
             }).ToArray();
+
+            // Load all device encryption keys for channel users
+            var userIds = users.Select(u => u.Id).ToArray();
+            var allKeys = await _dbContext.UserEncryptionKeys
+                .Where(k => userIds.Contains(k.UserId) && k.DateDeleted == null)
+                .ToListAsync();
+
+            foreach (var user in users)
+            {
+                var userKeys = allKeys
+                    .Where(k => k.UserId == user.Id)
+                    .Select(k => new UserEncryptionKeyInfo
+                    {
+                        PublicKey = k.PublicKey,
+                        KeyId = k.KeyId,
+                        DeviceLabel = k.DeviceLabel,
+                        DateCreated = k.DateCreated,
+                    })
+                    .ToList();
+
+                if (userKeys.Count > 0)
+                {
+                    user.EncryptionKeys = userKeys;
+                }
+            }
 
             return users;
         }
