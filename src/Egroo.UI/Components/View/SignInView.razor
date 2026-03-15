@@ -4,8 +4,6 @@
 @using Egroo.UI.Constants
 @using Egroo.UI.Models
 @using jihadkhawaja.chat.client
-@using jihadkhawaja.chat.client.Core
-
 @using jihadkhawaja.chat.shared.Models
 
 @inject StorageService StorageService
@@ -39,7 +37,7 @@
                                   Required="true"
                                   Validation="@(new Func<string, IEnumerable<string>>(NotEmpty))"
                                   Label="Password" InputType="InputType.Password" Variant="Variant.Outlined" />
-                    <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
+                    <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Button"
                                Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth
                                Style="border-radius: 12px; height: 48px; font-size: 0.95rem; text-transform: none;">
                         @if (IsBusy)
@@ -148,17 +146,8 @@
                     Username = Username // Optionally, update with a server-provided username.
                 };
 
-            // Initialize and start the SignalR connection.
-            ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-            if (ChatSignalR.HubConnection is null)
-            {
-                throw new InvalidOperationException("SignalR connection was not initialized.");
-            }
-
-            await ChatSignalR.HubConnection.StartAsync();
-
-            // Navigate to the channels page.
-            NavigationManager.NavigateTo("/channels", true);
+            // Navigate within the active circuit. HubRouter will rebuild the authenticated session once.
+            NavigationManager.NavigateTo("/channels");
         }
         catch (Exception ex)
         {

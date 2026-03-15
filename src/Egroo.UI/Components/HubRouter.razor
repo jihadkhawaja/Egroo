@@ -100,11 +100,13 @@ else
         try
         {
             bool needsSessionRestore = !string.IsNullOrWhiteSpace(SessionStorage.Token) && SessionStorage.User is null;
+            bool hasTokenMismatch = ChatSignalR.HubConnection is not null &&
+                !string.Equals(ChatSignalR.CurrentToken, SessionStorage.Token, StringComparison.Ordinal);
 
             // If the connection is already established, update UI and exit.
             if (ChatSignalR.HubConnection is not null)
             {
-                if (needsSessionRestore)
+                if (needsSessionRestore || hasTokenMismatch)
                 {
                     await ChatSignalR.HubConnection.DisposeAsync();
                     ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
@@ -112,7 +114,7 @@ else
 
                 AttachConnectionLifecycleHandlers(ChatSignalR.HubConnection);
 
-                if (!needsSessionRestore &&
+                if (!needsSessionRestore && !hasTokenMismatch &&
                     (ChatSignalR.HubConnection.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting))
                 {
                     if (ChatSignalR.HubConnection.State is HubConnectionState.Reconnecting)
@@ -488,10 +490,11 @@ else
 
                 if (tokenChanged)
                 {
-                    SessionStorage.Token = refreshResponse.Token;
+                    string refreshedToken = refreshResponse.Token!;
+                    SessionStorage.Token = refreshedToken;
                     ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
-                    await UpdateTokenStorageAsync(SessionStorage.Token);
+                        new AuthenticationHeaderValue("Bearer", refreshedToken);
+                    await UpdateTokenStorageAsync(refreshedToken);
                 }
             }
 
@@ -577,10 +580,11 @@ else
 
         if (tokenChanged)
         {
-            SessionStorage.Token = refreshResponse.Token;
+            string refreshedToken = refreshResponse.Token!;
+            SessionStorage.Token = refreshedToken;
             ChatAuthService.HttpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", SessionStorage.Token);
-            await UpdateTokenStorageAsync(SessionStorage.Token);
+                new AuthenticationHeaderValue("Bearer", refreshedToken);
+            await UpdateTokenStorageAsync(refreshedToken);
             await RestartSignalRConnectionAsync();
         }
 

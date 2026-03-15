@@ -5,8 +5,6 @@
 @using Egroo.UI.Components.Layout
 @using Egroo.UI.Models
 @using jihadkhawaja.chat.client
-@using jihadkhawaja.chat.client.Core
-
 @using jihadkhawaja.chat.shared.Models
 
 @inject StorageService StorageService
@@ -55,7 +53,7 @@
                                   Validation="@( (Func<string, string>)(x => PasswordMatch(x)) )"
                                   Required />
 
-                    <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Submit"
+                    <MudButton OnClick="Submit" Disabled="@IsBusy" ButtonType="ButtonType.Button"
                                Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth
                                Style="border-radius: 12px; height: 48px; font-size: 0.95rem; text-transform: none;">
                         @if (IsBusy)
@@ -185,15 +183,7 @@
                 SessionStorage.Token = token;
                 SessionStorage.User = user;
 
-                ChatSignalR.Initialize(Source.HubConnectionURL, SessionStorage.Token);
-                if (ChatSignalR.HubConnection is null)
-                {
-                    throw new InvalidOperationException("SignalR connection was not initialized.");
-                }
-
-                await ChatSignalR.HubConnection.StartAsync();
-
-                NavigationManager.NavigateTo("/channels", true);
+                NavigationManager.NavigateTo("/channels");
             }
             else
             {

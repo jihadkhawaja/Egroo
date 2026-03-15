@@ -16,6 +16,7 @@ namespace jihadkhawaja.chat.client.Core
         ];
 
         public static HubConnection? HubConnection { get; private set; }
+        public static string? CurrentToken { get; private set; }
 
         public static TimeSpan GetAutomaticReconnectElapsedDelay(int retryCount)
         {
@@ -37,6 +38,8 @@ namespace jihadkhawaja.chat.client.Core
 
         public static void Initialize(string url, string? token = "")
         {
+            CurrentToken = token;
+
             HubConnection = new HubConnectionBuilder()
                 .WithAutomaticReconnect(AutomaticReconnectDelays)
                 .WithUrl(url, options =>
