@@ -5,59 +5,57 @@
 
 @if (VoiceCallSession.IsInCall)
 {
-    <MudPaper Elevation="10"
-              Class="pa-3"
-              Style="position: fixed; right: 16px; bottom: 16px; z-index: 1350; width: min(420px, calc(100vw - 32px)); background: rgba(20,20,20,0.96); border: 1px solid rgba(242,89,34,0.28); backdrop-filter: blur(12px);">
-        <MudStack Spacing="2">
-            <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+    <MudPaper Elevation="0"
+              Class="pa-2 px-4"
+              Style="position: sticky; top: 0; z-index: 1100; background: rgba(20,20,20,0.97); border-bottom: 1px solid rgba(242,89,34,0.28); backdrop-filter: blur(12px);">
+        <MudStack Row AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="flex-wrap: wrap; row-gap: 6px;">
+            @* Left: call info *@
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="3">
                 <MudStack Spacing="0">
-                    <MudText Typo="Typo.caption" Style="text-transform: uppercase; letter-spacing: 0.08em; color: #f2b591;">
+                    <MudText Typo="Typo.caption" Style="text-transform: uppercase; letter-spacing: 0.08em; color: #f2b591; line-height: 1.2;">
                         Voice call active
                     </MudText>
-                    <MudText Typo="Typo.body1" Style="font-weight: 600;">
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">
                         @VoiceCallSession.CurrentChannelTitle
                     </MudText>
                 </MudStack>
+
+                <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" Size="Size.Small" />
+                    <MudText Typo="Typo.body2">@VoiceCallSession.CallDuration</MudText>
+                </MudStack>
+
                 <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">
                     @VoiceCallSession.ParticipantIds.Count participant@(VoiceCallSession.ParticipantIds.Count == 1 ? string.Empty : "s")
                 </MudChip>
+
+                @if (VoiceCallSession.ParticipantUsers.Count > 0)
+                {
+                    <MudAvatarGroup Max="4" Spacing="2" MaxColor="Color.Primary" MaxSize="Size.Small">
+                        @foreach (var participant in VoiceCallSession.ParticipantUsers.Values.Take(4))
+                        {
+                            @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
+                            {
+                                <MudTooltip Text="@participant.Username">
+                                    <MudAvatar Size="Size.Small">
+                                        <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
+                                    </MudAvatar>
+                                </MudTooltip>
+                            }
+                            else
+                            {
+                                <MudTooltip Text="@participant.Username">
+                                    <MudAvatar Color="Color.Secondary" Size="Size.Small">
+                                        @participant.Username?.ToUpper()[0]
+                                    </MudAvatar>
+                                </MudTooltip>
+                            }
+                        }
+                    </MudAvatarGroup>
+                }
             </MudStack>
 
-            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
-                <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Color="Color.Success" Size="Size.Small" />
-                <MudText Typo="Typo.body2">@VoiceCallSession.CallDuration</MudText>
-                <MudText Typo="Typo.caption" Style="opacity: 0.72;">
-                    @(VoiceCallSession.HasUnavailableAudioProcessingFeatures
-                        ? "Some microphone filters depend on browser support."
-                        : "Microphone filter preferences are saved.")
-                </MudText>
-            </MudStack>
-
-            @if (VoiceCallSession.ParticipantUsers.Count > 0)
-            {
-                <MudAvatarGroup Max="4" Spacing="2" MaxColor="Color.Primary" MaxSize="Size.Small">
-                    @foreach (var participant in VoiceCallSession.ParticipantUsers.Values.Take(4))
-                    {
-                        @if (!string.IsNullOrWhiteSpace(participant.AvatarPreview))
-                        {
-                            <MudTooltip Text="@participant.Username">
-                                <MudAvatar Size="Size.Small">
-                                    <MudImage Src="@participant.AvatarPreview" Alt="@participant.Username" />
-                                </MudAvatar>
-                            </MudTooltip>
-                        }
-                        else
-                        {
-                            <MudTooltip Text="@participant.Username">
-                                <MudAvatar Color="Color.Secondary" Size="Size.Small">
-                                    @participant.Username?.ToUpper()[0]
-                                </MudAvatar>
-                            </MudTooltip>
-                        }
-                    }
-                </MudAvatarGroup>
-            }
-
+            @* Center: audio filters *@
             <MudStack Row AlignItems="AlignItems.Center" Spacing="3" Style="flex-wrap: wrap; row-gap: 4px;">
                 <MudTooltip Text="@(VoiceCallSession.IsNoiseSuppressionSupported ? "Reduce background noise from your microphone" : "Noise suppression is not supported by this browser or device")">
                     <div style="display: inline-flex; align-items: center; gap: 2px;">
@@ -106,20 +104,29 @@
                 </MudTooltip>
             </MudStack>
 
-            <MudStack Row Spacing="1" Justify="Justify.FlexEnd">
+            @* Right: action buttons *@
+            <MudStack Row Spacing="1" AlignItems="AlignItems.Center">
+                <MudTooltip Text="@(VoiceCallSession.HasUnavailableAudioProcessingFeatures
+                    ? "Some microphone filters depend on browser support."
+                    : "Microphone filter preferences are saved.")">
+                    <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Style="opacity: 0.5;" />
+                </MudTooltip>
                 <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
                            Color="@(VoiceCallSession.IsMuted ? Color.Error : Color.Default)"
                            StartIcon="@(VoiceCallSession.IsMuted ? Icons.Material.Filled.MicOff : Icons.Material.Filled.Mic)"
                            OnClick="ToggleMute">
                     @(VoiceCallSession.IsMuted ? "Unmute" : "Mute")
                 </MudButton>
                 <MudButton Variant="Variant.Outlined"
+                           Size="Size.Small"
                            Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.OpenInNew"
                            OnClick="OpenCallChannel">
                     Open call
                 </MudButton>
                 <MudButton Variant="Variant.Filled"
+                           Size="Size.Small"
                            Color="Color.Error"
                            StartIcon="@Icons.Material.Filled.CallEnd"
                            OnClick="LeaveCall">
