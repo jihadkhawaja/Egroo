@@ -268,8 +268,8 @@ Contributions should be small, reviewable, and aligned with the existing archite
 
 Before opening a pull request:
 
-1. Read the [Contributing Guide](https://github.com/jihadkhawaja/Egroo/blob/main/docs/CONTRIBUTING.md).
-2. Check the [Code of Conduct](https://github.com/jihadkhawaja/Egroo/blob/main/docs/CODE_OF_CONDUCT.md).
+1. Read the [Contributing Guide](CONTRIBUTING.md).
+2. Check the [Code of Conduct](CODE_OF_CONDUCT.md).
 3. Discuss larger changes through an issue first.
 4. Keep documentation updated when behavior or setup changes.
 5. Run tests before submitting your branch.
