@@ -83,8 +83,6 @@ window.webrtcInterop = {
         try {
             this._loadPersistedAudioProcessingPreferences();
             this.localStream = await navigator.mediaDevices.getUserMedia(this._buildUserMediaConstraints());
-            this._syncAudioProcessingFromTrack(this._getPrimaryAudioTrack());
-            this._persistAudioProcessingPreferences();
             console.log("[WebRTC] Local audio stream acquired:", this.localStream.getAudioTracks().length, "audio tracks");
             return true;
         } catch (err) {
@@ -332,8 +330,6 @@ window.webrtcInterop = {
     getAudioProcessingState: function () {
         this._loadPersistedAudioProcessingPreferences();
         this._refreshAudioProcessingSupport();
-        this._syncAudioProcessingFromTrack(this._getPrimaryAudioTrack());
-        this._persistAudioProcessingPreferences();
         return this._createAudioProcessingState(true);
     },
 
@@ -370,7 +366,6 @@ window.webrtcInterop = {
         try {
             const track = await this._recreateLocalAudioTrack();
             const wasApplied = this._verifyAudioProcessingSetting(track, settingName, this[enabledProperty]);
-            this._persistAudioProcessingPreferences();
             return this._createAudioProcessingState(wasApplied);
         } catch (err) {
             this[enabledProperty] = previousEnabled;
@@ -882,7 +877,6 @@ window.webrtcInterop = {
         await Promise.all(replaceOperations);
 
         this.localStream = newStream;
-        this._syncAudioProcessingFromTrack(newTrack);
 
         if (previousStream) {
             previousStream.getTracks().forEach(track => {

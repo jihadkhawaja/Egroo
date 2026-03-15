@@ -58,40 +58,49 @@
                 </MudAvatarGroup>
             }
 
-            <MudStack Spacing="0">
+            <MudStack Row AlignItems="AlignItems.Center" Spacing="3" Style="flex-wrap: wrap; row-gap: 4px;">
                 <MudTooltip Text="@(VoiceCallSession.IsNoiseSuppressionSupported ? "Reduce background noise from your microphone" : "Noise suppression is not supported by this browser or device")">
-                    <div>
+                    <div style="display: inline-flex; align-items: center; gap: 2px;">
+                        <MudIcon Icon="@Icons.Material.Filled.SettingsVoice" Size="Size.Small"
+                                 Color="@(VoiceCallSession.IsNoiseSuppressionEnabled && VoiceCallSession.IsNoiseSuppressionSupported ? Color.Success : Color.Default)"
+                                 Style="@(!VoiceCallSession.IsNoiseSuppressionSupported ? "opacity: 0.38;" : "")" />
                         <MudSwitch T="bool"
                                    Value="@VoiceCallSession.IsNoiseSuppressionEnabled"
                                    ValueChanged="ToggleNoiseSuppression"
                                    Disabled="@(!VoiceCallSession.IsNoiseSuppressionSupported)"
                                    Color="Color.Success"
                                    Size="Size.Small">
-                            Noise suppression
+                            Noise
                         </MudSwitch>
                     </div>
                 </MudTooltip>
                 <MudTooltip Text="@(VoiceCallSession.IsEchoCancellationSupported ? "Reduce feedback and speaker echo from your microphone input" : "Echo cancellation is not supported by this browser or device")">
-                    <div>
+                    <div style="display: inline-flex; align-items: center; gap: 2px;">
+                        <MudIcon Icon="@Icons.Material.Filled.SurroundSound" Size="Size.Small"
+                                 Color="@(VoiceCallSession.IsEchoCancellationEnabled && VoiceCallSession.IsEchoCancellationSupported ? Color.Success : Color.Default)"
+                                 Style="@(!VoiceCallSession.IsEchoCancellationSupported ? "opacity: 0.38;" : "")" />
                         <MudSwitch T="bool"
                                    Value="@VoiceCallSession.IsEchoCancellationEnabled"
                                    ValueChanged="ToggleEchoCancellation"
                                    Disabled="@(!VoiceCallSession.IsEchoCancellationSupported)"
                                    Color="Color.Success"
                                    Size="Size.Small">
-                            Echo cancellation
+                            Echo
                         </MudSwitch>
                     </div>
                 </MudTooltip>
                 <MudTooltip Text="@(VoiceCallSession.IsAutoGainControlSupported ? "Normalize microphone gain automatically as your input volume changes" : "Auto gain control is not supported by this browser or device")">
-                    <div>
+                    <div style="display: inline-flex; align-items: center; gap: 2px;">
+                        <MudIcon Icon="@Icons.Material.Filled.GraphicEq" Size="Size.Small"
+                                 Color="@(VoiceCallSession.IsAutoGainControlEnabled && VoiceCallSession.IsAutoGainControlSupported ? Color.Success : Color.Default)"
+                                 Style="@(!VoiceCallSession.IsAutoGainControlSupported ? "opacity: 0.38;" : "")" />
                         <MudSwitch T="bool"
                                    Value="@VoiceCallSession.IsAutoGainControlEnabled"
                                    ValueChanged="ToggleAutoGainControl"
                                    Disabled="@(!VoiceCallSession.IsAutoGainControlSupported)"
                                    Color="Color.Success"
                                    Size="Size.Small">
-                            Auto gain
+                            Gain
                         </MudSwitch>
                     </div>
                 </MudTooltip>
