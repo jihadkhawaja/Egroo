@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -32,13 +33,21 @@ public class EndpointIntegrationTest
     /// <summary>
     /// Creates a WebApplicationFactory that swaps PostgreSQL for InMemory.
     /// </summary>
-    private static WebApplicationFactory<Program> CreateFactory(string dbName)
+    private static WebApplicationFactory<Program> CreateFactory(string dbName, IDictionary<string, string?>? configurationOverrides = null)
     {
         ApplyTestConfigurationToProcessEnvironment();
 
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
+                if (configurationOverrides is not null)
+                {
+                    builder.ConfigureAppConfiguration((_, configBuilder) =>
+                    {
+                        configBuilder.AddInMemoryCollection(configurationOverrides);
+                    });
+                }
+
                 builder.ConfigureServices(services =>
                 {
                     // Remove all EF Core DataContext-related registrations (Npgsql)
@@ -201,6 +210,71 @@ public class EndpointIntegrationTest
         var body = await response.Content.ReadAsStringAsync();
         // Should return null result (no token)
         Assert.IsTrue(body == "null" || body.Contains("null"));
+    }
+
+    [TestMethod]
+    public async Task Voice_Config_WithoutOverrides_ReturnsDefaultStunServers()
+    {
+        using var factory = CreateFactory($"voice_default_{Guid.NewGuid():N}");
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/Voice/config");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync())?.AsObject();
+        var servers = body?["iceServers"]?.AsArray();
+        Assert.IsNotNull(servers);
+        Assert.AreEqual(1, servers.Count);
+
+        var urls = servers[0]?["urls"]?.AsArray();
+        Assert.IsNotNull(urls);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302"
+            },
+            urls.Select(url => url?.GetValue<string>()).ToArray());
+    }
+
+    [TestMethod]
+    public async Task Voice_Config_WithOverrides_ReturnsConfiguredIceServers()
+    {
+        var overrides = new Dictionary<string, string?>
+        {
+            ["VoiceCall:IceServers:0:Urls:0"] = "turn:turn.example.com:3478?transport=udp",
+            ["VoiceCall:IceServers:0:Urls:1"] = "turns:turn.example.com:5349",
+            ["VoiceCall:IceServers:0:Username"] = "voice-user",
+            ["VoiceCall:IceServers:0:Credential"] = "voice-pass"
+        };
+
+        using var factory = CreateFactory($"voice_override_{Guid.NewGuid():N}", overrides);
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/v1/Voice/config");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+        var body = JsonNode.Parse(await response.Content.ReadAsStringAsync())?.AsObject();
+        var servers = body?["iceServers"]?.AsArray();
+        Assert.IsNotNull(servers);
+        Assert.AreEqual(1, servers.Count);
+
+        var server = servers[0]?.AsObject();
+        Assert.IsNotNull(server);
+        Assert.AreEqual("voice-user", server["username"]?.GetValue<string>());
+        Assert.AreEqual("voice-pass", server["credential"]?.GetValue<string>());
+
+        var urls = server["urls"]?.AsArray();
+        Assert.IsNotNull(urls);
+        CollectionAssert.AreEqual(
+            new[]
+            {
+                "turn:turn.example.com:3478?transport=udp",
+                "turns:turn.example.com:5349"
+            },
+            urls.Select(url => url?.GetValue<string>()).ToArray());
     }
 
     [TestMethod]

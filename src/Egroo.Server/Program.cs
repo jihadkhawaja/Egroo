@@ -259,5 +259,6 @@ public partial class Program
         app.MapAuthentication();
         app.MapAgents();
         app.MapChannelFiles();
+        app.MapVoiceCall();
     }
 }

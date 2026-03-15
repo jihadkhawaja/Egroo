@@ -26,6 +26,23 @@ window.webrtcInterop = {
         ]
     },
 
+    configureIceServers: function (iceServers) {
+        const normalizedServers = Array.isArray(iceServers)
+            ? iceServers
+                .map(server => this._normalizeIceServer(server))
+                .filter(server => server !== null)
+            : [];
+
+        this.config = {
+            ...this.config,
+            iceServers: normalizedServers.length > 0
+                ? normalizedServers
+                : this._getDefaultIceServers()
+        };
+
+        console.log("[WebRTC] ICE servers configured:", this.config.iceServers.map(server => ({ urls: server.urls })));
+    },
+
     /**
      * Register the DotNet object reference for callbacks into Blazor.
      */
@@ -400,6 +417,63 @@ window.webrtcInterop = {
             audio: audioConstraints,
             video: false
         };
+    },
+
+    _getDefaultIceServers: function () {
+        return [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+        ];
+    },
+
+    _normalizeIceServer: function (server) {
+        if (!server) {
+            return null;
+        }
+
+        const urls = Array.isArray(server.urls)
+            ? server.urls
+            : Array.isArray(server.Urls)
+                ? server.Urls
+                : typeof server.urls === "string"
+                    ? [server.urls]
+                    : typeof server.Urls === "string"
+                        ? [server.Urls]
+                        : [];
+
+        const normalizedUrls = urls
+            .filter(url => typeof url === "string" && url.trim().length > 0)
+            .map(url => url.trim());
+
+        if (normalizedUrls.length === 0) {
+            return null;
+        }
+
+        const normalizedServer = {
+            urls: normalizedUrls.length === 1 ? normalizedUrls[0] : normalizedUrls
+        };
+
+        const username = typeof server.username === "string"
+            ? server.username.trim()
+            : typeof server.Username === "string"
+                ? server.Username.trim()
+                : "";
+
+        const credential = typeof server.credential === "string"
+            ? server.credential.trim()
+            : typeof server.Credential === "string"
+                ? server.Credential.trim()
+                : "";
+
+        if (username.length > 0) {
+            normalizedServer.username = username;
+        }
+
+        if (credential.length > 0) {
+            normalizedServer.credential = credential;
+        }
+
+        return normalizedServer;
     },
 
     _buildTrackConstraints: function () {

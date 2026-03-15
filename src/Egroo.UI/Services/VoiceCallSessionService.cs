@@ -3,6 +3,7 @@ using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.JSInterop;
 using MudBlazor;
+using System.Net.Http.Json;
 
 namespace Egroo.UI.Services
 {
@@ -11,6 +12,7 @@ namespace Egroo.UI.Services
         private readonly SessionStorage _sessionStorage;
         private readonly ChatCallService _chatCallService;
         private readonly IUser _chatUserService;
+        private readonly HttpClient _httpClient;
         private readonly IJSRuntime _jsRuntime;
         private readonly ISnackbar _snackbar;
 
@@ -21,6 +23,7 @@ namespace Egroo.UI.Services
         private System.Timers.Timer? _callTimer;
         private DateTime? _callStartTime;
         private bool _initialized;
+        private bool _iceConfigurationLoaded;
         private bool _disposed;
 
         private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
@@ -35,12 +38,14 @@ namespace Egroo.UI.Services
             SessionStorage sessionStorage,
             ChatCallService chatCallService,
             IUser chatUserService,
+            HttpClient httpClient,
             IJSRuntime jsRuntime,
             ISnackbar snackbar)
         {
             _sessionStorage = sessionStorage;
             _chatCallService = chatCallService;
             _chatUserService = chatUserService;
+            _httpClient = httpClient;
             _jsRuntime = jsRuntime;
             _snackbar = snackbar;
         }
@@ -71,6 +76,7 @@ namespace Egroo.UI.Services
                 return;
             }
 
+            await ConfigureIceServersAsync();
             _dotNetRef = DotNetObjectReference.Create(this);
             await _jsRuntime.InvokeVoidAsync("webrtcInterop.registerDotNetObject", _dotNetRef);
             RegisterCallEvents();
@@ -469,6 +475,26 @@ namespace Egroo.UI.Services
             catch { }
         }
 
+        private async Task ConfigureIceServersAsync()
+        {
+            if (_iceConfigurationLoaded || _disposed)
+            {
+                return;
+            }
+
+            _iceConfigurationLoaded = true;
+
+            try
+            {
+                var configuration = await _httpClient.GetFromJsonAsync<VoiceCallConfigurationResponse>("api/v1/Voice/config");
+                await _jsRuntime.InvokeVoidAsync("webrtcInterop.configureIceServers", configuration?.IceServers ?? Array.Empty<VoiceCallIceServerResponse>());
+            }
+            catch
+            {
+                await _jsRuntime.InvokeVoidAsync("webrtcInterop.configureIceServers", Array.Empty<VoiceCallIceServerResponse>());
+            }
+        }
+
         private async Task SyncAudioProcessingStateAsync()
         {
             var state = await _jsRuntime.InvokeAsync<AudioProcessingState>("webrtcInterop.getAudioProcessingState");
@@ -540,6 +566,18 @@ namespace Egroo.UI.Services
             public bool IsAutoGainControlSupported { get; set; }
             public bool IsAutoGainControlEnabled { get; set; }
             public bool WasApplied { get; set; }
+        }
+
+        private sealed class VoiceCallConfigurationResponse
+        {
+            public VoiceCallIceServerResponse[] IceServers { get; set; } = [];
+        }
+
+        private sealed class VoiceCallIceServerResponse
+        {
+            public string[] Urls { get; set; } = [];
+            public string? Username { get; set; }
+            public string? Credential { get; set; }
         }
     }
 }
