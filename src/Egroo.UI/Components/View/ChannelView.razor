@@ -364,8 +364,6 @@
     private HashSet<Guid> CallParticipantIds { get; set; } = new();
     private Dictionary<Guid, UserDto> CallParticipantUsers { get; set; } = new();
     private DotNetObjectReference<ChannelView>? dotNetRef;
-    private System.Timers.Timer? callTimer;
-    private DateTime? callStartTime;
     private string? CallDuration { get; set; }
     private bool _callParticipantBroadcastRegistered;
 
@@ -411,12 +409,6 @@
     private Func<Message, Task>? _onMessageUpdated;
     private Func<ChannelTypingState, Task>? _onTypingStarted;
     private Func<ChannelTypingState, Task>? _onTypingStopped;
-    private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
-    private Func<Guid, Guid, Task>? _onUserJoinedCall;
-    private Func<Guid, Guid, Task>? _onUserLeftCall;
-    private Func<Guid, Guid, string, Task>? _onReceiveOffer;
-    private Func<Guid, Guid, string, Task>? _onReceiveAnswer;
-    private Func<Guid, Guid, string, Task>? _onReceiveIceCandidate;
     private Func<Guid, Guid[], Task>? _onChannelCallParticipantsChanged;
 
     protected override async Task OnAccessAsync()
@@ -2001,174 +1993,6 @@
         catch { /* ignore fetch errors */ }
     }
 
-    // JS Interop callbacks
-
-    /// <summary>Called from JS when a local ICE candidate is generated for a specific peer.</summary>
-    [JSInvokable]
-    public async Task OnIceCandidateGenerated(string peerId, string candidateJson)
-    {
-        if (Guid.TryParse(peerId, out Guid targetUserId))
-        {
-            await ChatCallService.SendIceCandidateToUser(GetChannelId(), targetUserId, candidateJson);
-        }
-    }
-
-    /// <summary>Called from JS when a peer connection is lost.</summary>
-    [JSInvokable]
-    public async Task OnPeerDisconnected(string peerId)
-    {
-        if (Guid.TryParse(peerId, out Guid userId))
-        {
-            CallParticipantIds.Remove(userId);
-            CallParticipantUsers.Remove(userId);
-            await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", peerId);
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private void RegisterCallEvents()
-    {
-        // When we join a call, receive the list of existing participants to create offers for
-        _onExistingCallParticipants = async (channelId, participantIds) =>
-        {
-            if (_disposed || channelId != GetChannelId()) return;
-
-            try
-            {
-                foreach (var participantId in participantIds)
-                {
-                    if (_disposed) return;
-                    CallParticipantIds.Add(participantId);
-                    await FetchAndCacheParticipant(participantId);
-
-                    // Create a WebRTC offer for each existing participant
-                    string? offerSdp = await JSRuntime.InvokeAsync<string?>(
-                        "webrtcInterop.createOfferForPeer", participantId.ToString());
-
-                    if (!string.IsNullOrEmpty(offerSdp) && !_disposed)
-                    {
-                        await ChatCallService.SendOfferToUser(channelId, participantId, offerSdp);
-                    }
-                }
-                if (!_disposed) await InvokeAsync(StateHasChanged);
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnExistingCallParticipants += _onExistingCallParticipants;
-
-        // When a new user joins the call (they will send us an offer)
-        _onUserJoinedCall = async (channelId, userId) =>
-        {
-            if (_disposed || channelId != GetChannelId()) return;
-
-            CallParticipantIds.Add(userId);
-            await FetchAndCacheParticipant(userId);
-            try { if (!_disposed) await InvokeAsync(StateHasChanged); }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnUserJoinedCall += _onUserJoinedCall;
-
-        // When a user leaves the call
-        _onUserLeftCall = async (channelId, userId) =>
-        {
-            if (_disposed || channelId != GetChannelId()) return;
-
-            CallParticipantIds.Remove(userId);
-            CallParticipantUsers.Remove(userId);
-            try
-            {
-                if (!_disposed)
-                {
-                    await JSRuntime.InvokeVoidAsync("webrtcInterop.removePeer", userId.ToString());
-                    await InvokeAsync(StateHasChanged);
-                }
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnUserLeftCall += _onUserLeftCall;
-
-        // When receiving an SDP offer from a peer (we need to create an answer)
-        _onReceiveOffer = async (channelId, fromUserId, offerSdp) =>
-        {
-            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
-
-            try
-            {
-                string? answerSdp = await JSRuntime.InvokeAsync<string?>(
-                    "webrtcInterop.handleOfferFromPeer", fromUserId.ToString(), offerSdp);
-
-                if (!string.IsNullOrEmpty(answerSdp) && !_disposed)
-                {
-                    await ChatCallService.SendAnswerToUser(channelId, fromUserId, answerSdp);
-                }
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnReceiveOffer += _onReceiveOffer;
-
-        // When receiving an SDP answer from a peer
-        _onReceiveAnswer = async (channelId, fromUserId, answerSdp) =>
-        {
-            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
-
-            try
-            {
-                await JSRuntime.InvokeVoidAsync(
-                    "webrtcInterop.handleAnswerFromPeer", fromUserId.ToString(), answerSdp);
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnReceiveAnswer += _onReceiveAnswer;
-
-        // When receiving an ICE candidate from a peer
-        _onReceiveIceCandidate = async (channelId, fromUserId, candidateJson) =>
-        {
-            if (_disposed || channelId != GetChannelId() || !IsInCall) return;
-
-            try
-            {
-                await JSRuntime.InvokeVoidAsync(
-                    "webrtcInterop.addIceCandidateForPeer", fromUserId.ToString(), candidateJson);
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        };
-        ChatCallService.OnReceiveIceCandidate += _onReceiveIceCandidate;
-
-    }
-
-    private void StartCallTimer()
-    {
-        callStartTime = DateTime.UtcNow;
-        CallDuration = "00:00";
-        callTimer = new System.Timers.Timer(1000);
-        callTimer.Elapsed += (_, _) =>
-        {
-            if (callStartTime.HasValue)
-            {
-                var elapsed = DateTime.UtcNow - callStartTime.Value;
-                CallDuration = elapsed.TotalHours >= 1
-                    ? elapsed.ToString(@"hh\:mm\:ss")
-                    : elapsed.ToString(@"mm\:ss");
-                InvokeAsync(StateHasChanged);
-            }
-        };
-        callTimer.Start();
-    }
-
-    private void StopCallTimer()
-    {
-        callTimer?.Stop();
-        callTimer?.Dispose();
-        callTimer = null;
-        callStartTime = null;
-        CallDuration = null;
-    }
-
     #endregion
 
     private void EditChannel()
@@ -2200,18 +2024,6 @@
             ChatMessageService.OnTypingStopped -= _onTypingStopped;
 
         // Unsubscribe all event handlers
-        if (_onExistingCallParticipants is not null)
-            ChatCallService.OnExistingCallParticipants -= _onExistingCallParticipants;
-        if (_onUserJoinedCall is not null)
-            ChatCallService.OnUserJoinedCall -= _onUserJoinedCall;
-        if (_onUserLeftCall is not null)
-            ChatCallService.OnUserLeftCall -= _onUserLeftCall;
-        if (_onReceiveOffer is not null)
-            ChatCallService.OnReceiveOffer -= _onReceiveOffer;
-        if (_onReceiveAnswer is not null)
-            ChatCallService.OnReceiveAnswer -= _onReceiveAnswer;
-        if (_onReceiveIceCandidate is not null)
-            ChatCallService.OnReceiveIceCandidate -= _onReceiveIceCandidate;
         if (_onChannelCallParticipantsChanged is not null)
             ChatCallService.OnChannelCallParticipantsChanged -= _onChannelCallParticipantsChanged;
 

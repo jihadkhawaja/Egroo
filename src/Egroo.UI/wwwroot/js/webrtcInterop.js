@@ -134,6 +134,18 @@ window.webrtcInterop = {
         const peerData = this._getOrCreatePeer(peerId);
         const pc = peerData.pc;
 
+        if (peerData.offerInFlight && peerData.activeOfferSdp === sdpOffer) {
+            console.log("[WebRTC] Ignoring duplicate in-flight offer from peer", peerId);
+            return null;
+        }
+
+        if (pc.localDescription?.type === "answer"
+            && pc.remoteDescription?.type === "offer"
+            && pc.remoteDescription.sdp === sdpOffer) {
+            console.log("[WebRTC] Reusing existing answer for duplicate offer from peer", peerId);
+            return pc.localDescription.sdp ?? null;
+        }
+
         // Add local audio tracks
         this.localStream.getAudioTracks().forEach(track => {
             const senders = pc.getSenders();
@@ -142,11 +154,30 @@ window.webrtcInterop = {
             }
         });
 
+        peerData.offerInFlight = true;
+        peerData.activeOfferSdp = sdpOffer;
+
         try {
-            await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
+            const isNewOffer = !pc.remoteDescription
+                || pc.remoteDescription.type !== "offer"
+                || pc.remoteDescription.sdp !== sdpOffer;
+
+            if (isNewOffer) {
+                await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
+            }
 
             // Flush queued ICE candidates
             await this._flushIceCandidates(peerId);
+
+            if (pc.signalingState !== "have-remote-offer") {
+                if (pc.localDescription?.type === "answer") {
+                    console.log("[WebRTC] Offer from peer", peerId, "was already answered during re-entry.");
+                    return pc.localDescription.sdp ?? null;
+                }
+
+                console.warn("[WebRTC] Skipping answer creation for peer", peerId, "because signaling state is", pc.signalingState);
+                return null;
+            }
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
@@ -154,7 +185,19 @@ window.webrtcInterop = {
             return answer.sdp;
         } catch (err) {
             console.error("[WebRTC] Error handling offer from peer", peerId, err);
+
+            if (pc.localDescription?.type === "answer"
+                && pc.remoteDescription?.type === "offer"
+                && pc.remoteDescription.sdp === sdpOffer) {
+                console.log("[WebRTC] Returning existing answer after duplicate-offer error for peer", peerId);
+                return pc.localDescription.sdp ?? null;
+            }
+
             return null;
+        } finally {
+            if (peerData.activeOfferSdp === sdpOffer) {
+                peerData.offerInFlight = false;
+            }
         }
     },
 
@@ -273,7 +316,6 @@ window.webrtcInterop = {
     },
 
     /**
-     * Toggle microphone mute state.
      * Returns true if now muted, false if now unmuted.
      */
     toggleMute: function () {
@@ -352,7 +394,7 @@ window.webrtcInterop = {
         }
 
         const pc = new RTCPeerConnection(this.config);
-        const peerData = { pc: pc, iceCandidateQueue: [] };
+        const peerData = { pc: pc, iceCandidateQueue: [], offerInFlight: false, activeOfferSdp: null };
 
         pc.onicecandidate = (event) => {
             if (event.candidate && this.dotNetObject && this.channelId) {
