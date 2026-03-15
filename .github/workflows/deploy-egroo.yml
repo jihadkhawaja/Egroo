@@ -45,9 +45,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create appsettings
         env:
-          APPSETTINGS_JSON: ${{ secrets.APPSETTINGS_PROD }}
+            APPSETTINGS_JSON: "${{ secrets.APPSETTINGS_PROD }}"
         run: |
-              printf '%s' "$APPSETTINGS_JSON" > src/Egroo.Server/appsettings.json
+            printf '%s' "$APPSETTINGS_JSON" > src/Egroo.Server/appsettings.json
       - name: build docker image
         run: docker build -t jihadkhawaja/egroo-server-prod:${IMAGE_TAG} -t jihadkhawaja/egroo-server-prod:latest -f src/Egroo.Server/Dockerfile .
       - name: save docker image
