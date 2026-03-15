@@ -21,6 +21,7 @@ On first sign-in, the client can generate and publish a device encryption key us
 | Page | Use it for |
 |---|---|
 | [Getting Started](Getting-Started) | Fastest successful local run |
+| [Showcase](Showcase) | Product tour with screenshots of chat, agents, and voice calling |
 | [Installation](Installation) | Full setup choices, including Docker tradeoffs |
 | [Configuration](Configuration) | Database, JWT, encryption, CORS, logging, and client URL settings |
 | [Development Setup](Development-Setup) | Contributor workflow, build, tests, migrations, and repo layout |

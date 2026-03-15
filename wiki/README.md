@@ -7,6 +7,7 @@ This folder contains the markdown source for the Egroo GitHub wiki.
 | File | Purpose |
 |---|---|
 | `Home.md` | Landing page and navigation for the wiki |
+| `Showcase.md` | Visual product tour for chat, agents, multimodal prompts, and voice calls |
 | `Getting-Started.md` | Fastest path to a working local environment |
 | `Installation.md` | Setup options and Docker caveats |
 | `Configuration.md` | Runtime settings and environment overrides |

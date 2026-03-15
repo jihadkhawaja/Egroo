@@ -35,6 +35,39 @@ It combines a Blazor web experience, a SignalR-first real-time backend, per-reci
 | AI agents | User-owned agents powered by OpenAI, Azure OpenAI, Anthropic, or Ollama |
 | Self-hosting | Full control over deployment, configuration, and data |
 
+## Quick Visual Tour
+
+Egroo centers on a fast, modern chat workspace with built-in support for AI agents, multimodal prompts, agent session control, and group voice calls.
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
+        <img src="docs/images/agent-mention.png" alt="Agent mention inside a conversation" />
+      </a>
+    </td>
+    <td width="50%">
+      <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
+        <img src="docs/images/agent-response.png" alt="Agent response rendered inside the conversation timeline" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
+        <img src="docs/images/agent-sessions-monitor.png" alt="Agent session monitoring screen" />
+      </a>
+    </td>
+    <td width="50%">
+      <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
+        <img src="docs/images/group-chat-voice-call.png" alt="Group chat with an active voice call" />
+      </a>
+    </td>
+  </tr>
+</table>
+
+Want the full walkthrough with captions? See the [Product Showcase](https://github.com/jihadkhawaja/Egroo/wiki/Showcase).
+
 ## System Overview
 
 At a high level, Egroo separates the web host, the API server, shared UI libraries, chat libraries, and database storage.
@@ -233,6 +266,7 @@ The README is the entry point. The wiki is where installation, deployment, and d
 | If you want to... | Go here |
 |---|---|
 | Get the app running quickly | [Getting Started](https://github.com/jihadkhawaja/Egroo/wiki/Getting-Started) |
+| Take a quick product tour | [Product Showcase](https://github.com/jihadkhawaja/Egroo/wiki/Showcase) |
 | Install with more detail | [Installation Guide](https://github.com/jihadkhawaja/Egroo/wiki/Installation) |
 | Configure database, JWT, encryption, and CORS | [Configuration](https://github.com/jihadkhawaja/Egroo/wiki/Configuration) |
 | Set up a contributor workstation | [Development Setup](https://github.com/jihadkhawaja/Egroo/wiki/Development-Setup) |
@@ -240,6 +274,7 @@ The README is the entry point. The wiki is where installation, deployment, and d
 | Understand the backend and runtime design | [Architecture Overview](https://github.com/jihadkhawaja/Egroo/wiki/Architecture) |
 | Explore API and SignalR surface area | [API Documentation](https://github.com/jihadkhawaja/Egroo/wiki/API-Documentation) |
 | Debug common setup issues | [Troubleshooting](https://github.com/jihadkhawaja/Egroo/wiki/Troubleshooting) |
+
 
 ## Local Development At A Glance
 
