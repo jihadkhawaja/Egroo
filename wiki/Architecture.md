@@ -75,33 +75,52 @@ flowchart TD
 
 ## End-To-End Encryption
 
-Egroo can send per-recipient encrypted message payloads. The server stores and relays ciphertext, while the receiving device decrypts with its local private key.
+Egroo can send per-recipient encrypted message payloads using a hybrid transport scheme. Each user device generates an RSA key pair locally. The private key stays in browser storage. The public key and `keyId` are published to the server so senders can target that device.
+
+For each outbound message, the plaintext is encrypted once with a fresh random AES-GCM key and IV. That AES key is then wrapped with RSA-OAEP-SHA256 for each recipient key. The resulting transport payload is delivered as recipient-specific ciphertext rather than as shared plaintext.
 
 ```mermaid
 sequenceDiagram
     actor Sender as Sender Device
     participant UI as Egroo.UI
+    participant Keys as Published Recipient Keys
     participant Hub as ChatHub
     participant Store as Pending Storage
     actor Recipient as Recipient Device
 
-    Sender->>UI: Load recipient public keys
-    UI->>UI: Encrypt payload for each recipient
+    Sender->>UI: Ensure local identity exists
+    UI->>Keys: Load recipient keys
+    UI->>UI: Generate AES key and IV
+    UI->>UI: Encrypt plaintext with AES-GCM
+    UI->>UI: Wrap AES key per recipient key
     UI->>Hub: Send metadata + encrypted payloads
     Hub->>Store: Store ciphertext until delivery
     Hub-->>Recipient: Relay encrypted payload
     Recipient->>Recipient: Decrypt with local private key
+    Recipient-->>Hub: UpdatePendingMessage(messageId)
+    Hub->>Store: Delete pending ciphertext for that recipient
 
     Note over Hub,Store: Server handles ciphertext and delivery state
 ```
 
 ### Encryption Model
 
-- users can publish `EncryptionPublicKey` and `EncryptionKeyId`
-- device private keys stay in client storage
-- `Message.Content` is not stored in the `Messages` table
-- recipient-specific ciphertext is stored temporarily in pending-message tables until acknowledged
-- server-side `EncryptionService` still protects other encrypted server records such as encrypted agent private keys
+- each device can register its own public key and `keyId`
+- user profiles still expose legacy single-key fields for backward compatibility, but the active model supports multiple device keys per user
+- multi-device recipients use a v2 envelope that carries multiple wrapped AES keys for a single ciphertext payload
+- device private keys stay in client storage and are not persisted in PostgreSQL
+- `Message.Content` is not stored in the `Messages` table for encrypted delivery
+- recipient-specific ciphertext is stored temporarily in `UserPendingMessage` records until acknowledged
+- agent recipients use the same transport model, but their private keys are stored server-side in encrypted form
+- server-side `EncryptionService` is separate from end-to-end transport and still protects other encrypted server records such as agent API keys and agent private keys
+
+### Key Lifecycle
+
+- a new device generates a local identity and publishes it through the hub
+- `AddEncryptionKey` registers an additional device key for the current user
+- `GetEncryptionKeys` returns the current device-key set so the user can manage active devices
+- `RemoveEncryptionKey` soft-deletes one device key and updates the legacy single-key profile fields
+- the repository currently limits each user to 10 active device keys
 
 ## Message Delivery Flow
 
@@ -115,6 +134,7 @@ sequenceDiagram
     participant Recipient as Recipient Client
 
     User->>UI: Send message
+    UI->>UI: Build recipient-specific transport payloads
     UI->>Client: SendMessage(message)
     Client->>Hub: SignalR invocation
     Hub->>Repo: Save metadata
@@ -126,22 +146,36 @@ sequenceDiagram
 
 ## Voice Channel Calls
 
-Voice calls use WebRTC mesh networking. SignalR manages room membership and signaling, but the media path stays peer to peer.
+Voice calls use channel-scoped WebRTC mesh networking. The client session initializes by requesting `/api/v1/Voice/config`, normalizes the returned ICE servers, and then joins a channel call over SignalR after microphone access is granted locally.
+
+On the server side, `JoinChannelCall` verifies that the caller belongs to the channel. The new joiner receives `ExistingCallParticipants`, existing members receive `UserJoinedCall`, and all online channel members receive `ChannelCallParticipantsChanged` so the UI can keep participant avatars and call state in sync. SDP offers, answers, and ICE candidates are relayed through `ChatHub`, while the media path stays peer to peer.
+
+Operationally, TURN configuration matters in production. If relay-capable ICE servers are returned, the browser forces relay transport on production-like hosts. If no TURN server is configured, the client falls back to STUN-only behavior and warns because calls may fail across NATs or firewalls.
 
 ```mermaid
 sequenceDiagram
+    participant Voice as Voice Config API
     actor A as Participant A
     participant Hub as SignalR Hub
     actor B as Participant B
 
+    A->>Voice: GET /api/v1/Voice/config
+    Voice-->>A: ICE servers
+    A->>A: Acquire microphone
     A->>Hub: JoinChannelCall(channelId)
+    Hub-->>A: ExistingCallParticipants([])
     Hub-->>A: ChannelCallParticipantsChanged([A])
 
+    B->>Voice: GET /api/v1/Voice/config
+    Voice-->>B: ICE servers
+    B->>B: Acquire microphone
     B->>Hub: JoinChannelCall(channelId)
+    Hub-->>A: UserJoinedCall(channelId, B)
+    Hub-->>B: ExistingCallParticipants([A])
     Hub-->>A: ChannelCallParticipantsChanged([A, B])
     Hub-->>B: ChannelCallParticipantsChanged([A, B])
 
-    Note over B: New participant creates offers for existing members
+    Note over B: New joiner creates offers for existing call members
     B->>Hub: SendOfferToUser(A, offerSdp)
     Hub-->>A: ReceiveOffer(B, offerSdp)
 
@@ -149,8 +183,11 @@ sequenceDiagram
     Hub-->>B: ReceiveAnswer(A, answerSdp)
 
     Note over A,B: ICE candidates are exchanged through the hub
-    B->>Hub: SendIceCandidateToUser(A, candidate)
-    Hub-->>A: ReceiveIceCandidate(B, candidate)
+    A->>Hub: SendIceCandidateToUser(B, candidate)
+    Hub-->>B: ReceiveIceCandidate(A, candidate)
+
+    Note over A,B: Audio stays peer-to-peer
+    Note over A,Hub: Signaling stays on the hub
 ```
 
 ## AI Agents In Channels

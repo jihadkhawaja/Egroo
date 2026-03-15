@@ -489,16 +489,16 @@ namespace Egroo.UI.Services
             try
             {
                 var configuration = await _httpClient.GetFromJsonAsync<VoiceCallConfigurationResponse>("api/v1/Voice/config");
-                
+
                 await _jsRuntime.InvokeVoidAsync(
-                    "webrtcInterop.configureIceServers", 
+                    "webrtcInterop.configureIceServers",
                     new object[] { configuration?.IceServers ?? Array.Empty<VoiceCallIceServerResponse>() }
                 );
             }
             catch
             {
                 await _jsRuntime.InvokeVoidAsync(
-                    "webrtcInterop.configureIceServers", 
+                    "webrtcInterop.configureIceServers",
                     new object[] { Array.Empty<VoiceCallIceServerResponse>() }
                 );
             }
@@ -602,10 +602,10 @@ namespace Egroo.UI.Services
         {
             [System.Text.Json.Serialization.JsonPropertyName("urls")]
             public string[] Urls { get; set; } = [];
-            
+
             [System.Text.Json.Serialization.JsonPropertyName("username")]
             public string? Username { get; set; }
-            
+
             [System.Text.Json.Serialization.JsonPropertyName("credential")]
             public string? Credential { get; set; }
         }

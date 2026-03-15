@@ -1,6 +1,5 @@
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Models;
 using Egroo.UI.Components.Base;
+using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.JSInterop;

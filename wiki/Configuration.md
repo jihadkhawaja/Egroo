@@ -94,6 +94,55 @@ Operational notes:
 - clearing browser storage can remove the local private key for that device
 - if a device key is missing or stale, the client may need to regenerate and republish it from the app settings
 
+### Voice Call Settings
+
+Voice calling works without extra configuration for local experimentation, but production deployments should provide relay-capable ICE servers.
+
+Example configuration:
+
+```json
+{
+  "VoiceCall": {
+    "CloudflareTurn": {
+      "TokenId": "your-cloudflare-turn-token-id",
+      "ApiToken": "your-cloudflare-turn-api-token"
+    },
+    "IceServers": [
+      {
+        "Urls": [
+          "stun:stun.cloudflare.com:3478",
+          "turn:turn.example.com:3478?transport=udp",
+          "turns:turn.example.com:5349?transport=tcp"
+        ],
+        "Username": "voice-user",
+        "Credential": "voice-password"
+      }
+    ]
+  }
+}
+```
+
+Environment variable form:
+
+```bash
+VoiceCall__CloudflareTurn__TokenId=your-cloudflare-turn-token-id
+VoiceCall__CloudflareTurn__ApiToken=your-cloudflare-turn-api-token
+VoiceCall__IceServers__0__Urls__0=stun:stun.cloudflare.com:3478
+VoiceCall__IceServers__0__Urls__1=turn:turn.example.com:3478?transport=udp
+VoiceCall__IceServers__0__Urls__2=turns:turn.example.com:5349?transport=tcp
+VoiceCall__IceServers__0__Username=voice-user
+VoiceCall__IceServers__0__Credential=voice-password
+```
+
+Runtime behavior:
+
+- the client requests `/api/v1/Voice/config` before joining a voice call
+- the server first tries to generate temporary Cloudflare TURN credentials when `VoiceCall:CloudflareTurn` is configured
+- if Cloudflare TURN is unavailable, the server falls back to `VoiceCall:IceServers`
+- if nothing is configured, the server returns a default STUN server so local development still works
+- on production-like hosts, when TURN is available, the browser forces relay transport instead of trying direct candidates first
+- without TURN, calls may work on simple networks but can fail across NAT or firewall boundaries
+
 ### Allowed Origins
 
 Optional production setting:
@@ -189,6 +238,7 @@ public const string HubConnectionURL = ConnectionURL + HubName;
 
 - JWT is accepted in the `Authorization` header for REST endpoints
 - the SignalR hub also accepts JWT through the `access_token` query string
+- `GET /api/v1/Voice/config` is anonymous because the browser needs ICE server details before call setup
 - rate limiting is applied under the `Api` policy at 100 requests per minute
 - the API automatically applies pending EF Core migrations on startup
 - the client release build still uses the API base URL compiled into `src/Egroo.UI/Constants/Source.cs`
@@ -206,6 +256,12 @@ public const string HubConnectionURL = ConnectionURL + HubName;
   "Encryption": {
     "Key": "replace-with-32-char-secret-value",
     "IV": "replace-with-16-char"
+  },
+  "VoiceCall": {
+    "CloudflareTurn": {
+      "TokenId": "replace-with-your-turn-token-id",
+      "ApiToken": "replace-with-your-turn-api-token"
+    }
   },
   "Api": {
     "AllowedOrigins": [
@@ -225,6 +281,7 @@ Before blaming the code, confirm these first:
 4. The client is pointing at the correct API base URL for the environment you are running.
 5. Production origins are explicitly set if the API is not running in debug.
 6. If encrypted messages cannot be read, verify the device has the current private key and published key id.
+7. For production voice calling, verify `VoiceCall` returns at least one relay-capable TURN URL.
 
 ### Staging
 ```json

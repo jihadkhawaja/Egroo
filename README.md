@@ -2,9 +2,9 @@
 
 <img src="https://raw.githubusercontent.com/jihadkhawaja/Egroo/refs/heads/main/docs/icon.png" alt="Egroo Icon" width="128"/>
 
-Egroo is a self-hosted real-time chat platform built with Blazor, ASP.NET Core, SignalR, and PostgreSQL. It is designed for teams that want modern chat, voice, end-to-end encrypted messaging, and AI-assisted collaboration without giving up control of their infrastructure or data.
+Egroo is a self-hosted real-time chat platform built with Blazor, ASP.NET Core, SignalR, and PostgreSQL. It is designed for teams that want modern chat, channel voice, end-to-end encrypted messaging, and AI-assisted collaboration without giving up control of their infrastructure or data.
 
-It combines a Blazor web experience, a SignalR-first real-time backend, per-recipient end-to-end encrypted messaging with ephemeral delivery, channel voice calls over WebRTC, and optional AI agents that can participate in conversations when mentioned.
+It combines a Blazor web experience, a SignalR-first real-time backend, per-recipient end-to-end encrypted messaging with ephemeral delivery, channel voice calls over WebRTC, server-provided ICE configuration for call setup, and optional AI agents that can participate in conversations when mentioned.
 
 ## Build Status
 
@@ -30,7 +30,7 @@ It combines a Blazor web experience, a SignalR-first real-time backend, per-reci
 | Real-time chat | Fast message delivery over SignalR WebSockets |
 | End-to-end encrypted messaging | Per-recipient payloads are encrypted with recipient public keys and decrypted on the receiving device |
 | Privacy-first delivery | Message metadata is stored separately and encrypted pending content is removed after recipients acknowledge delivery |
-| Voice channels | Peer-to-peer channel audio using WebRTC signaling through the hub |
+| Voice channels | In-channel WebRTC audio with SignalR membership and signaling plus API-delivered ICE/TURN configuration |
 | Blazor UI | Shared Razor components across server and WebAssembly experiences |
 | AI agents | User-owned agents powered by OpenAI, Azure OpenAI, Anthropic, or Ollama |
 | Self-hosting | Full control over deployment, configuration, and data |
@@ -189,44 +189,73 @@ sequenceDiagram
 
 ## How End-To-End Encryption Works
 
-Egroo encrypts message payloads for each recipient using published public keys. The server relays and temporarily stores ciphertext, while recipients decrypt on their own device with the matching private key.
+Egroo uses device-managed public key encryption for message transport. Each browser or device can generate its own RSA key pair locally, keep the private key in local storage, and publish only the public key plus a `keyId` to the server. The server never receives the device private key.
+
+When a message is sent, the client or server-side encryption pipeline creates a random AES message key, encrypts the plaintext with AES-GCM, and then wraps that AES key separately for each intended recipient public key. The server stores message metadata in the `Message` record, stores the recipient-specific ciphertext in pending-message tables, and delivers only the matching encrypted payload to each recipient.
+
+For users with multiple registered devices, Egroo can build a v2 transport envelope that contains multiple wrapped AES keys for the same ciphertext, one per device key. That lets any registered device for that user decrypt the same delivered message.
 
 ```mermaid
 sequenceDiagram
   actor Sender as Sender Device
   participant UI as Egroo.UI
+  participant Keys as Recipient Public Keys
   participant Hub as ChatHub
   participant Store as Pending Storage
   actor Recipient as Recipient Device
 
-  Sender->>UI: Load recipient public keys
-  UI->>UI: Encrypt payload for each recipient
+  Sender->>UI: Ensure local device key exists
+  UI->>Keys: Load recipient public keys and key ids
+  UI->>UI: Generate random AES key + IV
+  UI->>UI: Encrypt plaintext with AES-GCM
+  UI->>UI: Wrap AES key for each recipient key
   UI->>Hub: Send metadata + encrypted payloads
   Hub->>Store: Store ciphertext until delivery
   Hub-->>Recipient: Relay encrypted payload
   Recipient->>Recipient: Decrypt with local private key
+  Recipient-->>Hub: UpdatePendingMessage(messageId)
+  Hub->>Store: Delete recipient pending ciphertext
 
   Note over Hub,Store: Server handles ciphertext and delivery state
 ```
 
+Important points:
+
+- The server does not persist `Message.Content` for encrypted delivery in the main message table.
+- Recipient-specific ciphertext lives in pending-message storage until the recipient acknowledges delivery.
+- Clearing browser storage removes the local private key for that device, so previously delivered encrypted messages may become unreadable there.
+- AI agents can also participate in the encrypted recipient model with their own public/private key identity, but agent private keys are server-protected rather than browser-held.
+
 ## How Voice Channel Calls Work
 
-Voice calls in channels use a WebRTC mesh network. SignalR manages membership and relays WebRTC signaling, while the audio stream stays peer-to-peer between participants.
+Voice calls are channel-scoped WebRTC audio sessions. Before joining, the client loads ICE server configuration from `/api/v1/Voice/config`, acquires the local microphone in the browser, and then joins the channel call through SignalR.
+
+The hub validates channel membership, sends `ExistingCallParticipants` to the new joiner, sends `UserJoinedCall` to the existing call members, and broadcasts `ChannelCallParticipantsChanged` to online channel members so the UI can render live call presence. SDP offers, answers, and ICE candidates move through SignalR, while audio stays peer-to-peer between browsers.
 
 ```mermaid
 sequenceDiagram
+  participant Voice as Voice Config API
   actor A as Participant A
   participant Hub as SignalR Hub
   actor B as Participant B
 
+  A->>Voice: GET /api/v1/Voice/config
+  Voice-->>A: ICE servers
+  A->>A: Acquire microphone
   A->>Hub: JoinChannelCall(channelId)
+  Hub-->>A: ExistingCallParticipants([])
   Hub-->>A: ChannelCallParticipantsChanged([A])
 
+  B->>Voice: GET /api/v1/Voice/config
+  Voice-->>B: ICE servers
+  B->>B: Acquire microphone
   B->>Hub: JoinChannelCall(channelId)
+  Hub-->>A: UserJoinedCall(channelId, B)
+  Hub-->>B: ExistingCallParticipants([A])
   Hub-->>A: ChannelCallParticipantsChanged([A, B])
   Hub-->>B: ChannelCallParticipantsChanged([A, B])
 
-  Note over B: New participant creates WebRTC offers for existing members
+  Note over B: New joiner creates offers for existing call members
   B->>Hub: SendOfferToUser(A, offerSdp)
   Hub-->>A: ReceiveOffer(B, offerSdp)
 
@@ -234,11 +263,14 @@ sequenceDiagram
   Hub-->>B: ReceiveAnswer(A, answerSdp)
 
   Note over A,B: ICE candidates are exchanged through the hub
-  B->>Hub: SendIceCandidateToUser(A, candidate)
-  Hub-->>A: ReceiveIceCandidate(B, candidate)
+  A->>Hub: SendIceCandidateToUser(B, candidate)
+  Hub-->>B: ReceiveIceCandidate(A, candidate)
 
-  Note over A,B: Peer-to-peer encrypted audio stream established
+  Note over A,B: Audio stays peer-to-peer
+  Note over A,Hub: Signaling stays on the hub
 ```
+
+For production deployments, configure TURN through `VoiceCall:CloudflareTurn` or `VoiceCall:IceServers`. Without relay-capable ICE servers, calls may still work on local networks but can fail across NAT or firewall boundaries.
 
 ## AI Agents in Channels
 

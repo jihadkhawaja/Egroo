@@ -156,7 +156,10 @@ The SignalR hub supports a maximum message size of **10 MB**.
 | `GetCurrentUserUsername()` | Required | `string?` | Current user's username |
 | `IsUsernameAvailable(string username)` | Anonymous | `bool` | Check username availability |
 | `UpdateDetails(string? displayname, string? email, string? firstname, string? lastname)` | Required | `bool` | Update profile fields |
-| `UpdateEncryptionKey(string? publicKey, string? keyId)` | Required | `bool` | Publish or replace the current device public key used for end-to-end encrypted message delivery |
+| `UpdateEncryptionKey(string? publicKey, string? keyId)` | Required | `bool` | Legacy-compatible way to publish or replace the current device public key. Internally this routes through device-key management. |
+| `AddEncryptionKey(string publicKey, string keyId, string? deviceLabel)` | Required | `bool` | Register a device key for end-to-end encrypted delivery |
+| `RemoveEncryptionKey(string keyId)` | Required | `bool` | Soft-delete one registered device key |
+| `GetEncryptionKeys()` | Required | `UserEncryptionKeyInfo[]?` | List active encryption keys for the authenticated user |
 | `UpdateAvatar(string? avatarBase64)` | Required | `bool` | Update avatar image |
 | `UpdateCover(string? coverBase64)` | Required | `bool` | Update cover image |
 | `GetAvatar(Guid userId)` | Anonymous | `MediaResult?` | Get avatar for any user |
@@ -217,7 +220,29 @@ The SignalR hub supports a maximum message size of **10 MB**.
 Notes:
 
 - a `Message` can carry plain `Content` or recipient-specific `RecipientContents`
-- encrypted clients typically publish a device key with `UpdateEncryptionKey` before participating in encrypted delivery
+- encrypted clients typically publish a device key before participating in encrypted delivery
+- multi-device users can register more than one key; the server can emit a v2 envelope that contains multiple wrapped AES keys for the same ciphertext
+- `SendPendingMessages()` replays undelivered ciphertext for the authenticated user after reconnect
+- `UpdatePendingMessage(messageId)` deletes the authenticated user's pending ciphertext once the device has received and processed it
+- agent replies can also include encrypted `AgentRecipientContents` for agent-side processing
+
+### 🔐 End-to-end encryption flow
+
+Egroo uses hybrid encryption for message transport:
+
+1. A sender-side encryption pipeline generates a fresh random AES key and IV for the message plaintext.
+2. The plaintext is encrypted with AES-GCM.
+3. The AES key is wrapped with RSA-OAEP-SHA256 for each recipient public key.
+4. The resulting envelope is attached to `RecipientContents` or `AgentRecipientContents`.
+5. The server stores ciphertext in pending-message tables until each recipient acknowledges delivery.
+6. The recipient device decrypts the AES key with its local private key and then decrypts the message body locally.
+
+Practical notes:
+
+- v1 payloads contain one wrapped key for one recipient key
+- v2 payloads contain multiple wrapped keys for one ciphertext so a user can decrypt on any registered device
+- if a device loses its private key, that device can no longer decrypt old ciphertext sent to that key
+- plaintext can still appear in memory on the sender or recipient client, but encrypted transport content is what the server persists for delivery
 
 **Example — send a message:**
 ```csharp
@@ -233,28 +258,33 @@ bool ok = await connection.InvokeAsync<bool>("SendMessage", message);
 
 ---
 
-### 📞 Call Methods (WebRTC)
+### 📞 Voice Configuration (REST)
 
-The SignalR hub acts as a signaling server for peer-to-peer WebRTC voice/video calls.
+The browser loads ICE server settings from the API before joining a channel call.
 
-**Direct Calling Methods:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/Voice/config` | Anonymous | Returns normalized ICE server configuration for WebRTC. The server tries Cloudflare TURN credentials first, then configured `VoiceCall:IceServers`, then a default STUN server. |
+
+### 📞 Channel Voice Call Methods (SignalR)
+
+The SignalR hub acts as the membership and signaling plane for channel voice calls. Clients exchange WebRTC offers, answers, and ICE candidates through the hub after joining the same channel call.
+
 | Method | Auth | Description |
 |--------|------|-------------|
-| `CallUser(UserDto targetUser, string sdpOffer)` | Required | Initiate a call with SDP offer |
-| `AnswerCall(bool acceptCall, UserDto caller, string sdpAnswer)` | Required | Accept or decline a call |
-| `HangUp()` | Required | End the active call |
-| `SendSignal(string signal, string targetConnectionId)` | Required | Forward a WebRTC signal |
-| `SendIceCandidateToPeer(string candidateJson)` | Required | Forward an ICE candidate |
+| `JoinChannelCall(Guid channelId)` | Required | Join a channel voice call. If the call is not active yet, the first participant creates it. |
+| `LeaveChannelCall(Guid channelId)` | Required | Leave the current channel voice call and notify remaining participants. |
+| `GetChannelCallParticipants(Guid channelId)` | Required | Get the current participant user IDs for a channel voice call. |
+| `SendOfferToUser(Guid channelId, Guid targetUserId, string offerSdp)` | Required | Send an SDP offer to a specific participant already in the same channel call. |
+| `SendAnswerToUser(Guid channelId, Guid targetUserId, string answerSdp)` | Required | Send an SDP answer to a specific participant already in the same channel call. |
+| `SendIceCandidateToUser(Guid channelId, Guid targetUserId, string candidateJson)` | Required | Forward an ICE candidate to a specific participant already in the same channel call. |
 
-**Channel Voice Call Methods:**
-| Method | Auth | Description |
-|--------|------|-------------|
-| `JoinChannelCall(Guid channelId)` | Required | Join an active voice call in a channel |
-| `LeaveChannelCall(Guid channelId)` | Required | Leave the current channel voice call |
-| `GetChannelCallParticipants(Guid channelId)` | Required | Get current participants in a channel voice call |
-| `SendOfferToUser(Guid channelId, Guid targetUserId, string offerSdp)` | Required | Send SDP offer to a specific user in a channel call |
-| `SendAnswerToUser(Guid channelId, Guid targetUserId, string answerSdp)` | Required | Send SDP answer to a specific user in a channel call |
-| `SendIceCandidateToUser(Guid channelId, Guid targetUserId, string candidateJson)` | Required | Forward an ICE candidate in a channel call |
+Notes:
+
+- `JoinChannelCall` succeeds only when the caller belongs to the channel.
+- The joining client receives `ExistingCallParticipants` and is responsible for creating offers to those peers.
+- Existing participants receive `UserJoinedCall` when a new user joins.
+- `ChannelCallParticipantsChanged` is broadcast to all online channel members, not only the users already in the call.
 
 ---
 
@@ -268,11 +298,9 @@ These events are pushed from the server to connected clients.
 | `ChannelChange` | `Guid channelId` | Channel was created, modified, or deleted |
 | `ReceiveMessage` | `Message message` | A new message was delivered |
 | `UpdateMessage` | `Message message` | A message was edited |
-| `IncomingCall` | `UserDto caller, string sdpOffer` | Incoming WebRTC P2P call offer |
-| `CallDeclined` | `UserDto user, string reason` | Called user declined P2P call |
-| `CallAccepted` | `UserDto callee, string sdpAnswer` | Called user accepted with SDP answer |
-| `CallEnded` | `Guid userId, string reason` | Other party ended the P2P call |
-| `ReceiveSignal` | `Guid senderId, string signal` | WebRTC signal forwarded from peer |
+| `ExistingCallParticipants` | `Guid channelId, Guid[] participantIds` | Sent to the joining caller with the participants already in the channel call |
+| `UserJoinedCall` | `Guid channelId, Guid userId` | Sent to existing call participants when a new user joins |
+| `UserLeftCall` | `Guid channelId, Guid userId` | Sent to remaining call participants when a user leaves or disconnects |
 | `ChannelCallParticipantsChanged` | `Guid channelId, Guid[] currentParticipants` | The list of participants in a channel call updated |
 | `ReceiveOffer` | `Guid channelId, Guid senderId, string offerSdp` | Received WebRTC SDP offer from a peer in a channel call |
 | `ReceiveAnswer` | `Guid channelId, Guid senderId, string answerSdp` | Received WebRTC SDP answer from a peer in a channel call |

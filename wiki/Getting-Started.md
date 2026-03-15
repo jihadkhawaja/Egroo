@@ -116,6 +116,16 @@ Create an account and sign in.
 
 Current chat delivery can use per-recipient end-to-end encrypted payloads. On first sign-in, the client can generate a device key pair locally and publish the public key to the server. The private key stays on the device.
 
+What happens next:
+
+1. Your browser creates a local key pair.
+2. The public key and `keyId` are published to the server for this device.
+3. Senders encrypt message content for your published key.
+4. Your device decrypts received ciphertext locally.
+5. After delivery succeeds, the client acknowledges the pending message so the server can remove the stored ciphertext for that recipient.
+
+If you sign in from another browser or device, that device can publish its own key too. Egroo supports multiple active device keys for one user so encrypted delivery can work across devices.
+
 If you later clear browser storage or move to another device, you may need to regenerate or republish the device key from the app settings before encrypted messages can be decrypted on that device.
 
 ## 7. Verify The Setup

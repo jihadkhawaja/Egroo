@@ -4,7 +4,6 @@ using Egroo.UI;
 using Egroo.UI.Constants;
 using Egroo.UI.Helpers;
 using Egroo.UI.Models;
-using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
