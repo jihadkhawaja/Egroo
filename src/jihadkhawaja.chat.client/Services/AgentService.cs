@@ -1,8 +1,7 @@
 using jihadkhawaja.chat.shared.Models;
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Json;
 using System.Text.Json;
-using System.Text;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {

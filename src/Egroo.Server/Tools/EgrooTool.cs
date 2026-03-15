@@ -3,7 +3,7 @@ using Microsoft.Extensions.AI;
 using System.ComponentModel;
 using System.Text;
 
-namespace Egroo.Server.Services
+namespace Egroo.Server.Tools
 {
     internal static class EgrooTool
     {

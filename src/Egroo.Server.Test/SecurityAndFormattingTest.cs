@@ -1,10 +1,9 @@
-using System.Text;
-using System.Text.Json;
 using Egroo.Server.Helpers;
 using Egroo.Server.Security;
 using Egroo.Server.Services;
-using jihadkhawaja.chat.shared.Models;
 using Microsoft.Extensions.AI;
+using System.Text;
+using System.Text.Json;
 
 namespace Egroo.Server.Test
 {

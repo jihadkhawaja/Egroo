@@ -1,3 +1,9 @@
+using Egroo.Server.Database;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
@@ -5,14 +11,6 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Nodes;
-using Egroo.Server.Database;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
 
 namespace Egroo.Server.Test;
 
@@ -74,13 +72,13 @@ public class EndpointIntegrationTest
             });
     }
 
-        private static void ApplyTestConfigurationToProcessEnvironment()
-        {
-            Environment.SetEnvironmentVariable("Secrets__Jwt", JwtSecret);
-            Environment.SetEnvironmentVariable("Encryption__Key", EncryptionKey);
-            Environment.SetEnvironmentVariable("Encryption__IV", EncryptionIV);
-            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", FakeConnectionString);
-        }
+    private static void ApplyTestConfigurationToProcessEnvironment()
+    {
+        Environment.SetEnvironmentVariable("Secrets__Jwt", JwtSecret);
+        Environment.SetEnvironmentVariable("Encryption__Key", EncryptionKey);
+        Environment.SetEnvironmentVariable("Encryption__IV", EncryptionIV);
+        Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", FakeConnectionString);
+    }
 
     /// <summary>
     /// Generates a valid JWT for the given userId, matching the test JWT secret.

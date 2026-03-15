@@ -1,5 +1,5 @@
-using System.ComponentModel.DataAnnotations;
 using jihadkhawaja.chat.shared.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace Egroo.Server.Models
 {

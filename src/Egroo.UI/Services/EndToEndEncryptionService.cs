@@ -1,9 +1,8 @@
-using System.Text;
-using System.Text.Json;
-using Egroo.UI.Models;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.JSInterop;
+using System.Text;
+using System.Text.Json;
 
 namespace Egroo.UI.Services
 {

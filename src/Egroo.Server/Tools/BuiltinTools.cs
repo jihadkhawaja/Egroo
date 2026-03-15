@@ -1,6 +1,6 @@
 using Microsoft.Extensions.AI;
 
-namespace Egroo.Server.Services
+namespace Egroo.Server.Tools
 {
     /// <summary>
     /// Aggregates built-in tool groups into a single catalog used by the API and runtime.

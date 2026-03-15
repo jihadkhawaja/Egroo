@@ -1,11 +1,11 @@
 using Egroo.Server.Database;
+using Egroo.Server.Services;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 using System.Text;
-using System.Threading;
 
-namespace Egroo.Server.Services
+namespace Egroo.Server.Tools
 {
     internal static class A2ATool
     {

@@ -1,7 +1,7 @@
-using System.Net;
-using System.Text.RegularExpressions;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.Extensions.AI;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace Egroo.Server.Services
 {

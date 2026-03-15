@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Egroo.Server.Services
+namespace Egroo.Server.Tools
 {
     /// <summary>
     /// Definition of a built-in tool for seeding/display purposes.

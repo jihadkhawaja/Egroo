@@ -1,10 +1,8 @@
-using System.Security.Claims;
 using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.server.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 
 namespace Egroo.Server.Test;
 

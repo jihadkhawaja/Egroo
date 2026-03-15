@@ -1,5 +1,4 @@
 using Egroo.Server.Database;
-using Egroo.Server.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Test

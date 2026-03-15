@@ -1,8 +1,8 @@
+using jihadkhawaja.chat.shared.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using jihadkhawaja.chat.shared.Models;
 
 namespace Egroo.Server.Security
 {

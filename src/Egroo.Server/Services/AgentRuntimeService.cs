@@ -1,5 +1,6 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
+using Egroo.Server.Tools;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;

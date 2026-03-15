@@ -1,5 +1,5 @@
-using Microsoft.Agents.AI;
 using jihadkhawaja.chat.shared.Models;
+using Microsoft.Agents.AI;
 
 namespace Egroo.Server.Services
 {
@@ -165,7 +165,7 @@ namespace Egroo.Server.Services
 
         private static bool UsesRunLocationBase(string path)
         {
-                var normalized = path.Replace('\\', '/').TrimStart('.', '/');
+            var normalized = path.Replace('\\', '/').TrimStart('.', '/');
             return normalized.Equals("skills", StringComparison.OrdinalIgnoreCase)
                 || normalized.StartsWith("skills/", StringComparison.OrdinalIgnoreCase);
         }
