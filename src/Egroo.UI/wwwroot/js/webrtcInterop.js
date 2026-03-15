@@ -124,6 +124,12 @@ window.webrtcInterop = {
         const peerData = this._getOrCreatePeer(peerId);
         const pc = peerData.pc;
 
+        // Guard against concurrent offer creation (async race)
+        if (peerData.creatingOffer) {
+            console.log("[WebRTC] Offer creation already in progress for peer", peerId);
+            return null;
+        }
+
         // If we already have a pending local offer, reuse it
         if (pc.signalingState === "have-local-offer" && pc.localDescription) {
             console.log("[WebRTC] Reusing existing local offer for peer", peerId);
@@ -136,16 +142,17 @@ window.webrtcInterop = {
             return null;
         }
 
-        // Add local audio tracks
-        this.localStream.getAudioTracks().forEach(track => {
-            // Avoid duplicate tracks
-            const senders = pc.getSenders();
-            if (!senders.find(s => s.track === track)) {
-                pc.addTrack(track, this.localStream);
-            }
-        });
-
+        peerData.creatingOffer = true;
         try {
+            // Add local audio tracks
+            this.localStream.getAudioTracks().forEach(track => {
+                // Avoid duplicate tracks
+                const senders = pc.getSenders();
+                if (!senders.find(s => s.track === track)) {
+                    pc.addTrack(track, this.localStream);
+                }
+            });
+
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             console.log("[WebRTC] Created offer for peer", peerId);
@@ -153,6 +160,8 @@ window.webrtcInterop = {
         } catch (err) {
             console.error("[WebRTC] Error creating offer for peer", peerId, err);
             return null;
+        } finally {
+            peerData.creatingOffer = false;
         }
     },
 
@@ -260,12 +269,19 @@ window.webrtcInterop = {
             return;
         }
 
+        // Guard against concurrent answer application (async race)
+        if (peerData.applyingAnswer) {
+            console.log("[WebRTC] Answer application already in progress for peer", peerId);
+            return;
+        }
+
         // Can only apply an answer when we have a pending local offer
         if (peerData.pc.signalingState !== "have-local-offer") {
             console.log("[WebRTC] Ignoring answer from peer", peerId, "- signaling state:", peerData.pc.signalingState);
             return;
         }
 
+        peerData.applyingAnswer = true;
         try {
             await peerData.pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdpAnswer }));
             peerData.restartOfferInFlight = false;
@@ -274,6 +290,8 @@ window.webrtcInterop = {
             await this._flushIceCandidates(peerId);
         } catch (err) {
             console.error("[WebRTC] Error setting answer for peer", peerId, err);
+        } finally {
+            peerData.applyingAnswer = false;
         }
     },
 
@@ -460,7 +478,9 @@ window.webrtcInterop = {
             restartOfferInFlight: false,
             iceRestartAttempts: 0,
             disconnectTimer: null,
-            selectedCandidatePairLogged: false
+            selectedCandidatePairLogged: false,
+            creatingOffer: false,
+            applyingAnswer: false
         };
 
         pc.onicecandidate = (event) => {
