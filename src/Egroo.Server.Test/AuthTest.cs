@@ -12,14 +12,15 @@ namespace Egroo.Server.Test
     [TestClass]
     public class AuthTest
     {
-        // Unique DB per class so auth tests are fully isolated.
-        private const string DbName = "AuthTestDb";
+        private string _dbName = null!;
         private IServiceProvider _services = null!;
+        public TestContext TestContext { get; set; } = null!;
 
         [TestInitialize]
         public void Initialize()
         {
-            _services = TestServiceProvider.Build(dbName: DbName);
+            _dbName = $"AuthTestDb_{TestContext.TestName}_{Guid.NewGuid():N}";
+            _services = TestServiceProvider.Build(dbName: _dbName);
         }
 
         // ── Sign-up ─────────────────────────────────────────────────────────────────
@@ -129,7 +130,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("changepwuser", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success, $"SignUp failed: {signUp.Message}");
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             using var scope = authenticatedServices.CreateScope();
             var authSvc = scope.ServiceProvider.GetRequiredService<IAuth>();
 
@@ -145,7 +146,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("changepwwrong", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success, $"SignUp failed: {signUp.Message}");
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             using var scope = authenticatedServices.CreateScope();
             var authSvc = scope.ServiceProvider.GetRequiredService<IAuth>();
 
@@ -171,7 +172,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("changepwverify", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success);
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             using var changeScope = authenticatedServices.CreateScope();
             var changePw = await changeScope.ServiceProvider.GetRequiredService<IAuth>()
                 .ChangePassword("ValidP@ss1!", "NewValidP@ss2!");
@@ -291,7 +292,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("encprofile", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success, $"SignUp failed: {signUp.Message}");
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
 
             using var updateScope = authenticatedServices.CreateScope();
             var userRepo = updateScope.ServiceProvider.GetRequiredService<IUser>();
@@ -318,7 +319,7 @@ namespace Egroo.Server.Test
             Assert.IsTrue(signUp.Success);
             Assert.IsNotNull(signUp.Token);
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             // Set the Authorization header with the JWT token
             var accessor = authenticatedServices.GetRequiredService<IHttpContextAccessor>();
             accessor.HttpContext!.Request.Headers["Authorization"] = $"Bearer {signUp.Token}";
@@ -339,7 +340,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("refreshmalformed", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success);
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             // Set a malformed Authorization header (not "Bearer <token>")
             var accessor = authenticatedServices.GetRequiredService<IHttpContextAccessor>();
             accessor.HttpContext!.Request.Headers["Authorization"] = "Basic some-credentials";
@@ -359,7 +360,7 @@ namespace Egroo.Server.Test
             var signUp = await auth.SignUp("refreshinvalid", "ValidP@ss1!");
             Assert.IsTrue(signUp.Success);
 
-            var authenticatedServices = TestServiceProvider.Build(dbName: DbName, authenticatedUserId: signUp.UserId);
+            var authenticatedServices = TestServiceProvider.Build(dbName: _dbName, authenticatedUserId: signUp.UserId);
             // Set a completely invalid token that can't be parsed as JWT
             var accessor = authenticatedServices.GetRequiredService<IHttpContextAccessor>();
             accessor.HttpContext!.Request.Headers["Authorization"] = "Bearer not-a-jwt-token";

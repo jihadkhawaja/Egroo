@@ -22,28 +22,25 @@ public class EndpointIntegrationTest
     private const string JwtSecret = "super-secret-test-jwt-key-for-egroo-integration-tests-32+!";
     private const string EncryptionKey = "TestEncryptKey_32BytesLong!!!!!!";
     private const string EncryptionIV = "TestEncryptIV16!";
+    private const string FakeConnectionString = "Host=localhost;Database=fake";
 
     private static readonly InMemoryDatabaseRoot DatabaseRoot = new();
+
+    static EndpointIntegrationTest()
+    {
+        ApplyTestConfigurationToProcessEnvironment();
+    }
 
     /// <summary>
     /// Creates a WebApplicationFactory that swaps PostgreSQL for InMemory.
     /// </summary>
     private static WebApplicationFactory<Program> CreateFactory(string dbName)
     {
+        ApplyTestConfigurationToProcessEnvironment();
+
         return new WebApplicationFactory<Program>()
             .WithWebHostBuilder(builder =>
             {
-                builder.ConfigureAppConfiguration((context, config) =>
-                {
-                    config.AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Secrets:Jwt"] = JwtSecret,
-                        ["Encryption:Key"] = EncryptionKey,
-                        ["Encryption:IV"] = EncryptionIV,
-                        ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=fake",
-                    });
-                });
-
                 builder.ConfigureServices(services =>
                 {
                     // Remove all EF Core DataContext-related registrations (Npgsql)
@@ -76,6 +73,14 @@ public class EndpointIntegrationTest
                 });
             });
     }
+
+        private static void ApplyTestConfigurationToProcessEnvironment()
+        {
+            Environment.SetEnvironmentVariable("Secrets__Jwt", JwtSecret);
+            Environment.SetEnvironmentVariable("Encryption__Key", EncryptionKey);
+            Environment.SetEnvironmentVariable("Encryption__IV", EncryptionIV);
+            Environment.SetEnvironmentVariable("ConnectionStrings__DefaultConnection", FakeConnectionString);
+        }
 
     /// <summary>
     /// Generates a valid JWT for the given userId, matching the test JWT secret.
