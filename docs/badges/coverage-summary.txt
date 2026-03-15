@@ -1,26 +1,26 @@
 Summary - Egroo Server Coverage
-  Generated on: 03/15/2026 - 08:18:10
-  Coverage date: 03/15/2026 - 08:17:57
+  Generated on: 03/15/2026 - 13:22:52
+  Coverage date: 03/15/2026 - 13:22:47
   Parser: Cobertura
   Assemblies: 3
   Classes: 34
   Files: 35
-  Line coverage: 85.7%
-  Covered lines: 1755
-  Uncovered lines: 292
-  Coverable lines: 2047
-  Total lines: 9297
-  Branch coverage: 73.3% (407 of 555)
-  Covered branches: 407
-  Total branches: 555
-  Method coverage: 85.9% (183 of 213)
-  Full method coverage: 76% (162 of 213)
-  Covered methods: 183
-  Fully covered methods: 162
-  Total methods: 213
+  Line coverage: 86%
+  Covered lines: 1827
+  Uncovered lines: 297
+  Coverable lines: 2124
+  Total lines: 9715
+  Branch coverage: 74.3% (429 of 577)
+  Covered branches: 429
+  Total branches: 577
+  Method coverage: 85.1% (189 of 222)
+  Full method coverage: 75.2% (167 of 222)
+  Covered methods: 189
+  Fully covered methods: 167
+  Total methods: 222
 
-Egroo.Server                                                    84.8%
-  Egroo.Server.API.AgentEndpoint                                97.4%
+Egroo.Server                                                    85.2%
+  Egroo.Server.API.AgentEndpoint                                97.5%
   Egroo.Server.API.AuthEndpoint                                  100%
   Egroo.Server.API.ChannelFileEndpoint                           100%
   Egroo.Server.Database.DataContext                              100%
@@ -33,8 +33,7 @@ Egroo.Server                                                    84.8%
   Egroo.Server.Repository.MessageRepository                      100%
   Egroo.Server.Repository.UserRepository                         100%
   Egroo.Server.Security.EncryptionService                        100%
-  Egroo.Server.Security.EndToEndEncryptionService               99.1%
-  Egroo.Server.Services.A2ATool                                 82.3%
+  Egroo.Server.Security.EndToEndEncryptionService               98.3%
   Egroo.Server.Services.AgentAttachmentPromptFormatter           100%
   Egroo.Server.Services.AgentChannelService                        0%
   Egroo.Server.Services.AgentChatMessageFactory                 89.2%
@@ -42,15 +41,16 @@ Egroo.Server                                                    84.8%
   Egroo.Server.Services.AgentManagedSkillsService               94.8%
   Egroo.Server.Services.AgentRuntimeService                        0%
   Egroo.Server.Services.AgentSkillsService                      87.6%
-  Egroo.Server.Services.BuiltinTools                              84%
   Egroo.Server.Services.ChannelFileStorageService                 93%
-  Egroo.Server.Services.EgrooTool                               75.4%
   Egroo.Server.Services.McpClientService                         100%
-  Egroo.Server.Services.TimeTool                                97.5%
-  Egroo.Server.Services.WebTool                                 87.2%
+  Egroo.Server.Tools.A2ATool                                    82.3%
+  Egroo.Server.Tools.BuiltinTools                                 84%
+  Egroo.Server.Tools.EgrooTool                                  75.4%
+  Egroo.Server.Tools.TimeTool                                   97.5%
+  Egroo.Server.Tools.WebTool                                    87.2%
 
-jihadkhawaja.chat.server                                          97%
-  jihadkhawaja.chat.server.Hubs.ChatHub                         95.5%
+jihadkhawaja.chat.server                                        94.1%
+  jihadkhawaja.chat.server.Hubs.ChatHub                         91.5%
   jihadkhawaja.chat.server.Services.InMemoryConnectionTracker    100%
 
 jihadkhawaja.chat.shared                                         100%
