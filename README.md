@@ -43,24 +43,24 @@ Egroo centers on a fast, modern chat workspace with built-in support for AI agen
   <tr>
     <td width="50%">
       <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
-        <img src="docs/images/agent-mention.png" alt="Agent mention inside a conversation" />
+        <img src="docs/raw/agent-mention.png" alt="Agent mention inside a conversation" />
       </a>
     </td>
     <td width="50%">
       <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
-        <img src="docs/images/agent-response.png" alt="Agent response rendered inside the conversation timeline" />
+        <img src="docs/raw/agent-response.png" alt="Agent response rendered inside the conversation timeline" />
       </a>
     </td>
   </tr>
   <tr>
     <td width="50%">
       <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
-        <img src="docs/images/agent-sessions-monitor.png" alt="Agent session monitoring screen" />
+        <img src="docs/raw/agent-sessions-monitor.png" alt="Agent session monitoring screen" />
       </a>
     </td>
     <td width="50%">
       <a href="https://github.com/jihadkhawaja/Egroo/wiki/Showcase">
-        <img src="docs/images/group-chat-voice-call.png" alt="Group chat with an active voice call" />
+        <img src="docs/raw/group-chat-voice-call.png" alt="Group chat with an active voice call" />
       </a>
     </td>
   </tr>
