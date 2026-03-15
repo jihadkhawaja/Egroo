@@ -21,6 +21,7 @@ window.webrtcInterop = {
     isAutoGainControlSupported: false,
 
     config: {
+        iceTransportPolicy: "all",
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" }
@@ -34,11 +35,15 @@ window.webrtcInterop = {
                 .filter(server => server !== null)
             : [];
 
+        const resolvedIceServers = normalizedServers.length > 0
+            ? normalizedServers
+            : this._getDefaultIceServers();
+        const relayConfigured = resolvedIceServers.some(server => this._serverSupportsRelay(server));
+
         this.config = {
             ...this.config,
-            iceServers: normalizedServers.length > 0
-                ? normalizedServers
-                : this._getDefaultIceServers()
+            iceServers: resolvedIceServers,
+            iceTransportPolicy: this._shouldForceRelayTransport(relayConfigured) ? "relay" : "all"
         };
 
         console.log("[WebRTC] ICE servers configured:", this.config.iceServers.map(server => ({
@@ -47,9 +52,15 @@ window.webrtcInterop = {
             hasUsername: !!server.username,
             supportsRelay: this._serverSupportsRelay(server)
         })));
+        console.log("[WebRTC] ICE transport policy:", this.config.iceTransportPolicy);
 
         if (!this._hasRelayIceServer()) {
-            console.warn("[WebRTC] No TURN server configured. Calls may fail across NATs/firewalls outside local testing.");
+            const message = "[WebRTC] No TURN server configured. Calls may fail across NATs/firewalls outside local testing.";
+            if (this._isProductionLikeHost()) {
+                console.error(message);
+            } else {
+                console.warn(message);
+            }
         }
     },
 
@@ -440,7 +451,7 @@ window.webrtcInterop = {
             return this.peers.get(peerId);
         }
 
-        const pc = new RTCPeerConnection(this.config);
+        const pc = new RTCPeerConnection(this._buildPeerConnectionConfig());
         const peerData = {
             pc: pc,
             iceCandidateQueue: [],
@@ -448,7 +459,8 @@ window.webrtcInterop = {
             activeOfferSdp: null,
             restartOfferInFlight: false,
             iceRestartAttempts: 0,
-            disconnectTimer: null
+            disconnectTimer: null,
+            selectedCandidatePairLogged: false
         };
 
         pc.onicecandidate = (event) => {
@@ -461,6 +473,16 @@ window.webrtcInterop = {
                     JSON.stringify(event.candidate)
                 );
             }
+        };
+
+        pc.onicecandidateerror = (event) => {
+            console.error("[WebRTC] ICE candidate error for peer", peerId, {
+                address: event.address,
+                port: event.port,
+                url: event.url,
+                errorCode: event.errorCode,
+                errorText: event.errorText
+            });
         };
 
         pc.ontrack = (event) => {
@@ -503,6 +525,7 @@ window.webrtcInterop = {
                 peerData.iceRestartAttempts = 0;
                 peerData.restartOfferInFlight = false;
                 this._clearDisconnectTimer(peerData);
+                this._logSelectedCandidatePair(peerId, peerData);
             } else if (pc.iceConnectionState === "failed") {
                 this._clearDisconnectTimer(peerData);
                 console.warn("[WebRTC] Peer", peerId, "ICE connection failed. Attempting ICE restart renegotiation...");
@@ -512,6 +535,15 @@ window.webrtcInterop = {
                 this._scheduleDisconnectRecovery(peerId, peerData);
             } else if (pc.iceConnectionState === "closed") {
                 this._clearDisconnectTimer(peerData);
+            }
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log("[WebRTC] Peer", peerId, "connection state:", pc.connectionState);
+            if (pc.connectionState === "connected") {
+                this._logSelectedCandidatePair(peerId, peerData);
+            } else if (pc.connectionState === "failed") {
+                this._restartIceForPeer(peerId, "connection-failed");
             }
         };
 
@@ -543,6 +575,34 @@ window.webrtcInterop = {
             { urls: "stun:stun.l.google.com:19302" },
             { urls: "stun:stun1.l.google.com:19302" }
         ];
+    },
+
+    _buildPeerConnectionConfig: function () {
+        return {
+            ...this.config,
+            iceServers: Array.isArray(this.config.iceServers)
+                ? this.config.iceServers.map(server => ({ ...server }))
+                : []
+        };
+    },
+
+    _isProductionLikeHost: function () {
+        const hostname = window.location && typeof window.location.hostname === "string"
+            ? window.location.hostname.toLowerCase()
+            : "";
+
+        if (!hostname) {
+            return false;
+        }
+
+        return hostname !== "localhost"
+            && hostname !== "127.0.0.1"
+            && hostname !== "::1"
+            && !hostname.endsWith(".local");
+    },
+
+    _shouldForceRelayTransport: function (relayConfigured) {
+        return relayConfigured && this._isProductionLikeHost();
     },
 
     _serverSupportsRelay: function (server) {
@@ -700,6 +760,66 @@ window.webrtcInterop = {
             type: candidateType,
             candidate: candidateLine
         };
+    },
+
+    _logSelectedCandidatePair: function (peerId, peerData) {
+        if (!peerData || peerData.selectedCandidatePairLogged || !peerData.pc || typeof peerData.pc.getStats !== "function") {
+            return;
+        }
+
+        peerData.selectedCandidatePairLogged = true;
+
+        peerData.pc.getStats(null)
+            .then(stats => {
+                let selectedPair = null;
+                let localCandidate = null;
+                let remoteCandidate = null;
+
+                stats.forEach(report => {
+                    if (!selectedPair && report.type === "transport" && report.selectedCandidatePairId) {
+                        selectedPair = stats.get(report.selectedCandidatePairId) || null;
+                    }
+
+                    if (!selectedPair && report.type === "candidate-pair" && report.nominated && report.state === "succeeded") {
+                        selectedPair = report;
+                    }
+                });
+
+                if (!selectedPair) {
+                    console.warn("[WebRTC] No selected candidate pair found for peer", peerId);
+                    return;
+                }
+
+                if (selectedPair.localCandidateId) {
+                    localCandidate = stats.get(selectedPair.localCandidateId) || null;
+                }
+
+                if (selectedPair.remoteCandidateId) {
+                    remoteCandidate = stats.get(selectedPair.remoteCandidateId) || null;
+                }
+
+                console.log("[WebRTC] Selected candidate pair for peer", peerId, {
+                    local: localCandidate ? {
+                        candidateType: localCandidate.candidateType,
+                        protocol: localCandidate.protocol,
+                        relayProtocol: localCandidate.relayProtocol,
+                        url: localCandidate.url
+                    } : null,
+                    remote: remoteCandidate ? {
+                        candidateType: remoteCandidate.candidateType,
+                        protocol: remoteCandidate.protocol,
+                        relayProtocol: remoteCandidate.relayProtocol,
+                        url: remoteCandidate.url
+                    } : null,
+                    state: selectedPair.state,
+                    nominated: selectedPair.nominated,
+                    currentRoundTripTime: selectedPair.currentRoundTripTime
+                });
+            })
+            .catch(err => {
+                peerData.selectedCandidatePairLogged = false;
+                console.error("[WebRTC] Error retrieving selected candidate pair for peer", peerId, err);
+            });
     },
 
     _buildTrackConstraints: function () {
