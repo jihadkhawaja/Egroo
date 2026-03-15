@@ -189,6 +189,14 @@ window.webrtcInterop = {
             return pc.localDescription.sdp ?? null;
         }
 
+        // Guard against concurrent offer handling (async race)
+        if (peerData.handlingOffer) {
+            console.log("[WebRTC] Offer handling already in progress for peer", peerId);
+            return null;
+        }
+
+        peerData.handlingOffer = true;
+
         // Add local audio tracks
         this.localStream.getAudioTracks().forEach(track => {
             const senders = pc.getSenders();
@@ -253,6 +261,7 @@ window.webrtcInterop = {
 
             return null;
         } finally {
+            peerData.handlingOffer = false;
             if (peerData.activeOfferSdp === sdpOffer) {
                 peerData.offerInFlight = false;
             }
@@ -480,7 +489,8 @@ window.webrtcInterop = {
             disconnectTimer: null,
             selectedCandidatePairLogged: false,
             creatingOffer: false,
-            applyingAnswer: false
+            applyingAnswer: false,
+            handlingOffer: false
         };
 
         pc.onicecandidate = (event) => {
