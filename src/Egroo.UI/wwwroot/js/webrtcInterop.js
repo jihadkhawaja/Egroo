@@ -122,31 +122,23 @@ window.webrtcInterop = {
         }
 
         const peerData = this._getOrCreatePeer(peerId);
-        const pc = peerData.pc;
+        return this._withPeerSignalingQueue(peerData, async () => {
+            const pc = peerData.pc;
 
-        // Guard against concurrent offer creation (async race)
-        if (peerData.creatingOffer) {
-            console.log("[WebRTC] Offer creation already in progress for peer", peerId);
-            return null;
-        }
+            // If we already have a pending local offer, reuse it
+            if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+                console.log("[WebRTC] Reusing existing local offer for peer", peerId);
+                return pc.localDescription.sdp;
+            }
 
-        // If we already have a pending local offer, reuse it
-        if (pc.signalingState === "have-local-offer" && pc.localDescription) {
-            console.log("[WebRTC] Reusing existing local offer for peer", peerId);
-            return pc.localDescription.sdp;
-        }
+            // If we already have a remote offer, skip (the other side is the offerer)
+            if (pc.signalingState === "have-remote-offer") {
+                console.log("[WebRTC] Skipping offer for peer", peerId, "- already processing their offer");
+                return null;
+            }
 
-        // If we already have a remote offer (glare handled elsewhere), skip
-        if (pc.signalingState === "have-remote-offer") {
-            console.log("[WebRTC] Skipping offer for peer", peerId, "- already processing their offer");
-            return null;
-        }
-
-        peerData.creatingOffer = true;
-        try {
             // Add local audio tracks
             this.localStream.getAudioTracks().forEach(track => {
-                // Avoid duplicate tracks
                 const senders = pc.getSenders();
                 if (!senders.find(s => s.track === track)) {
                     pc.addTrack(track, this.localStream);
@@ -157,12 +149,7 @@ window.webrtcInterop = {
             await pc.setLocalDescription(offer);
             console.log("[WebRTC] Created offer for peer", peerId);
             return offer.sdp;
-        } catch (err) {
-            console.error("[WebRTC] Error creating offer for peer", peerId, err);
-            return null;
-        } finally {
-            peerData.creatingOffer = false;
-        }
+        });
     },
 
     /**
@@ -175,97 +162,36 @@ window.webrtcInterop = {
         }
 
         const peerData = this._getOrCreatePeer(peerId);
-        const pc = peerData.pc;
+        return this._withPeerSignalingQueue(peerData, async () => {
+            const pc = peerData.pc;
 
-        if (peerData.offerInFlight && peerData.activeOfferSdp === sdpOffer) {
-            console.log("[WebRTC] Ignoring duplicate in-flight offer from peer", peerId);
-            return null;
-        }
+            // Add local audio tracks
+            this.localStream.getAudioTracks().forEach(track => {
+                const senders = pc.getSenders();
+                if (!senders.find(s => s.track === track)) {
+                    pc.addTrack(track, this.localStream);
+                }
+            });
 
-        if (pc.localDescription?.type === "answer"
-            && pc.remoteDescription?.type === "offer"
-            && pc.remoteDescription.sdp === sdpOffer) {
-            console.log("[WebRTC] Reusing existing answer for duplicate offer from peer", peerId);
-            return pc.localDescription.sdp ?? null;
-        }
-
-        // Guard against concurrent offer handling (async race)
-        if (peerData.handlingOffer) {
-            console.log("[WebRTC] Offer handling already in progress for peer", peerId);
-            return null;
-        }
-
-        peerData.handlingOffer = true;
-
-        // Add local audio tracks
-        this.localStream.getAudioTracks().forEach(track => {
-            const senders = pc.getSenders();
-            if (!senders.find(s => s.track === track)) {
-                pc.addTrack(track, this.localStream);
-            }
-        });
-
-        peerData.offerInFlight = true;
-        peerData.activeOfferSdp = sdpOffer;
-
-        try {
-            // Perfect negotiation: if we have a pending local offer, determine polite/impolite
+            // Glare: if we have a pending local offer, use perfect negotiation
             if (pc.signalingState === "have-local-offer") {
-                // The peer with the smaller ID is "polite" (will rollback).
-                // The peer with the larger ID is "impolite" (keeps own offer, ignores incoming).
                 const isPolite = this.selfUserId && peerId && (this.selfUserId < peerId);
                 if (isPolite) {
                     console.log("[WebRTC] Glare: polite peer rolling back local offer for peer", peerId);
                     await pc.setLocalDescription({ type: "rollback" });
                 } else {
                     console.log("[WebRTC] Glare: impolite peer ignoring incoming offer from peer", peerId);
-                    peerData.offerInFlight = false;
                     return null;
                 }
             }
 
-            const isNewOffer = !pc.remoteDescription
-                || pc.remoteDescription.type !== "offer"
-                || pc.remoteDescription.sdp !== sdpOffer;
-
-            if (isNewOffer) {
-                await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
-            }
-
-            // Flush queued ICE candidates
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: sdpOffer }));
             await this._flushIceCandidates(peerId);
-
-            if (pc.signalingState !== "have-remote-offer") {
-                if (pc.localDescription?.type === "answer") {
-                    console.log("[WebRTC] Offer from peer", peerId, "was already answered during re-entry.");
-                    return pc.localDescription.sdp ?? null;
-                }
-
-                console.warn("[WebRTC] Skipping answer creation for peer", peerId, "because signaling state is", pc.signalingState);
-                return null;
-            }
-
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             console.log("[WebRTC] Created answer for peer", peerId);
             return answer.sdp;
-        } catch (err) {
-            console.error("[WebRTC] Error handling offer from peer", peerId, err);
-
-            if (pc.localDescription?.type === "answer"
-                && pc.remoteDescription?.type === "offer"
-                && pc.remoteDescription.sdp === sdpOffer) {
-                console.log("[WebRTC] Returning existing answer after duplicate-offer error for peer", peerId);
-                return pc.localDescription.sdp ?? null;
-            }
-
-            return null;
-        } finally {
-            peerData.handlingOffer = false;
-            if (peerData.activeOfferSdp === sdpOffer) {
-                peerData.offerInFlight = false;
-            }
-        }
+        });
     },
 
     /**
@@ -278,30 +204,20 @@ window.webrtcInterop = {
             return;
         }
 
-        // Guard against concurrent answer application (async race)
-        if (peerData.applyingAnswer) {
-            console.log("[WebRTC] Answer application already in progress for peer", peerId);
-            return;
-        }
+        await this._withPeerSignalingQueue(peerData, async () => {
+            const pc = peerData.pc;
 
-        // Can only apply an answer when we have a pending local offer
-        if (peerData.pc.signalingState !== "have-local-offer") {
-            console.log("[WebRTC] Ignoring answer from peer", peerId, "- signaling state:", peerData.pc.signalingState);
-            return;
-        }
+            // Can only apply an answer when we have a pending local offer
+            if (pc.signalingState !== "have-local-offer") {
+                console.log("[WebRTC] Ignoring answer from peer", peerId, "- signaling state:", pc.signalingState);
+                return;
+            }
 
-        peerData.applyingAnswer = true;
-        try {
-            await peerData.pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdpAnswer }));
+            await pc.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: sdpAnswer }));
             peerData.restartOfferInFlight = false;
             console.log("[WebRTC] Set remote answer for peer", peerId);
-            // Flush queued ICE candidates
             await this._flushIceCandidates(peerId);
-        } catch (err) {
-            console.error("[WebRTC] Error setting answer for peer", peerId, err);
-        } finally {
-            peerData.applyingAnswer = false;
-        }
+        });
     },
 
     /**
@@ -482,15 +398,11 @@ window.webrtcInterop = {
         const peerData = {
             pc: pc,
             iceCandidateQueue: [],
-            offerInFlight: false,
-            activeOfferSdp: null,
             restartOfferInFlight: false,
             iceRestartAttempts: 0,
             disconnectTimer: null,
             selectedCandidatePairLogged: false,
-            creatingOffer: false,
-            applyingAnswer: false,
-            handlingOffer: false
+            signalQueue: Promise.resolve()
         };
 
         pc.onicecandidate = (event) => {
@@ -584,6 +496,22 @@ window.webrtcInterop = {
         this.peers.set(peerId, peerData);
         console.log("[WebRTC] Created peer connection for", peerId, "| Total peers:", this.peers.size);
         return peerData;
+    },
+
+    /**
+     * Serialize async signaling operations per-peer using a Promise queue.
+     * Prevents concurrent setLocalDescription / setRemoteDescription calls
+     * that cause InvalidStateError.
+     */
+    _withPeerSignalingQueue: function (peerData, fn) {
+        const next = peerData.signalQueue
+            .then(fn)
+            .catch(err => {
+                console.error("[WebRTC] Signaling queue error:", err);
+                return null;
+            });
+        peerData.signalQueue = next;
+        return next;
     },
 
     _buildUserMediaConstraints: function () {
