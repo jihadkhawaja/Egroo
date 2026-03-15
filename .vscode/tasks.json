@@ -108,6 +108,46 @@
             }
         },
         {
+            "label": "test: Egroo.Server.Test (coverage)",
+            "command": "dotnet",
+            "type": "shell",
+            "args": [
+                "test",
+                "${workspaceFolder}/src/Egroo.Server.Test/Egroo.Server.Test.csproj",
+                "--verbosity",
+                "normal",
+                "/p:CollectCoverage=true",
+                "/p:CoverletOutputFormat=cobertura",
+                "/p:CoverletOutput=TestResults/Coverage/coverage"
+            ],
+            "group": "test",
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
+            "label": "coverage: Egroo.Server.Test",
+            "type": "shell",
+            "command": "pwsh",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/scripts/generate-coverage-report.ps1"
+            ],
+            "dependsOn": [
+                "test: Egroo.Server.Test (coverage)"
+            ],
+            "dependsOrder": "sequence",
+            "group": "test",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always"
+            }
+        },
+        {
             "label": "watch: Egroo (Blazor)",
             "command": "dotnet",
             "type": "shell",

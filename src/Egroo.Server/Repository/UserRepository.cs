@@ -153,7 +153,7 @@ namespace Egroo.Server.Repository
             {
                 return false;
             }
-            User? currentUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
+            User? currentUser = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
             if (currentUser == null)
             {
                 return false;
@@ -202,7 +202,7 @@ namespace Egroo.Server.Repository
             }
             friendusername = friendusername.ToLower();
 
-            User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
+            User? user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
             if (user == null)
             {
                 return false;
@@ -317,7 +317,7 @@ namespace Egroo.Server.Repository
             }
 
             User[]? users = await _dbContext.Users
-                .Where(x => x.Username.ToLower().Contains(query.ToLower()) && x.Id != connectorUserId)
+                .Where(x => x.Username.ToLower().Contains(query.ToLower()) && x.Id != connectorUserId.Value)
                 .OrderBy(x => x.Username)
                 .Take(maxResult)
                 .ToArrayAsync();
@@ -351,7 +351,7 @@ namespace Egroo.Server.Repository
             }
 
             var friendIds = friendRecords
-                .Select(fr => fr.UserId == connectorUserId ? fr.FriendUserId : fr.UserId)
+                .Select(fr => fr.UserId == connectorUserId.Value ? fr.FriendUserId : fr.UserId)
                 .Distinct()
                 .ToList();
 
@@ -399,56 +399,12 @@ namespace Egroo.Server.Repository
 
             try
             {
-                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId);
-                if (user != null)
-                {
-                    _dbContext.Users.Remove(user);
-                }
-
-                var userFriends = await _dbContext.UsersFriends
-                    .Where(x => x.UserId == connectorUserId || x.FriendUserId == connectorUserId)
-                    .ToListAsync();
-                if (userFriends.Any())
-                {
-                    _dbContext.UsersFriends.RemoveRange(userFriends);
-                }
-
-                var messages = await _dbContext.Messages
-                    .Where(x => x.SenderId == connectorUserId)
-                    .ToListAsync();
-                if (messages.Any())
-                {
-                    _dbContext.Messages.RemoveRange(messages);
-                }
-
-                var pendingMessages = await _dbContext.UsersPendingMessages
-                    .Where(x => x.UserId == connectorUserId)
-                    .ToListAsync();
-                if (pendingMessages.Any())
-                {
-                    _dbContext.UsersPendingMessages.RemoveRange(pendingMessages);
-                }
-
-                var userChannelUsers = await _dbContext.ChannelUsers
-                    .Where(x => x.UserId == connectorUserId)
-                    .ToListAsync();
-                if (userChannelUsers.Any())
-                {
-                    foreach (var cu in userChannelUsers)
-                    {
-                        int channelUserCount = await _dbContext.ChannelUsers
-                            .CountAsync(x => x.ChannelId == cu.ChannelId);
-                        if (channelUserCount == 1)
-                        {
-                            var channel = await _dbContext.Channels.FirstOrDefaultAsync(x => x.Id == cu.ChannelId);
-                            if (channel != null)
-                            {
-                                _dbContext.Channels.Remove(channel);
-                            }
-                        }
-                    }
-                    _dbContext.ChannelUsers.RemoveRange(userChannelUsers);
-                }
+                var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == connectorUserId.Value);
+                RemoveUserEntity(user);
+                await RemoveFriendRelationsAsync(connectorUserId.Value);
+                await RemoveMessagesAsync(connectorUserId.Value);
+                await RemovePendingMessagesAsync(connectorUserId.Value);
+                await RemoveChannelMembershipsAsync(connectorUserId.Value);
 
                 await _dbContext.SaveChangesAsync();
                 return true;
@@ -466,15 +422,107 @@ namespace Egroo.Server.Repository
                 .Include(x => x.UserStorage)
                 .FirstOrDefaultAsync(x => x.Id == userId);
 
-            if (user == null || string.IsNullOrWhiteSpace(user.Username)
-                || user.UserStorage is null
-                || string.IsNullOrWhiteSpace(user.UserStorage?.AvatarContentType)
-                || string.IsNullOrWhiteSpace(user.UserStorage?.AvatarImageBase64))
+            if (!HasAvatar(user))
             {
                 return null;
             }
 
-            return new MediaResult(user.UserStorage.AvatarContentType, user.UserStorage.AvatarImageBase64);
+            return new MediaResult(user!.UserStorage!.AvatarContentType!, user.UserStorage.AvatarImageBase64!);
+        }
+
+        private void RemoveUserEntity(User? user)
+        {
+            if (user is not null)
+            {
+                _dbContext.Users.Remove(user);
+            }
+        }
+
+        private async Task RemoveFriendRelationsAsync(Guid userId)
+        {
+            var userFriends = await _dbContext.UsersFriends
+                .Where(x => x.UserId == userId || x.FriendUserId == userId)
+                .ToListAsync();
+
+            RemoveRangeIfAny(userFriends, items => _dbContext.UsersFriends.RemoveRange(items));
+        }
+
+        private async Task RemoveMessagesAsync(Guid userId)
+        {
+            var messages = await _dbContext.Messages
+                .Where(x => x.SenderId == userId)
+                .ToListAsync();
+
+            RemoveRangeIfAny(messages, items => _dbContext.Messages.RemoveRange(items));
+        }
+
+        private async Task RemovePendingMessagesAsync(Guid userId)
+        {
+            var pendingMessages = await _dbContext.UsersPendingMessages
+                .Where(x => x.UserId == userId)
+                .ToListAsync();
+
+            RemoveRangeIfAny(pendingMessages, items => _dbContext.UsersPendingMessages.RemoveRange(items));
+        }
+
+        private async Task RemoveChannelMembershipsAsync(Guid userId)
+        {
+            var userChannelUsers = await _dbContext.ChannelUsers
+                .Where(x => x.UserId == userId)
+                .ToListAsync();
+
+            if (userChannelUsers.Count == 0)
+            {
+                return;
+            }
+
+            await RemoveOrphanedChannelsAsync(userChannelUsers);
+            _dbContext.ChannelUsers.RemoveRange(userChannelUsers);
+        }
+
+        private async Task RemoveOrphanedChannelsAsync(IEnumerable<ChannelUser> channelUsers)
+        {
+            var singleUserChannelIds = new List<Guid>();
+            foreach (var channelUser in channelUsers)
+            {
+                if (await IsSingleUserChannelAsync(channelUser.ChannelId))
+                {
+                    singleUserChannelIds.Add(channelUser.ChannelId);
+                }
+            }
+
+            if (singleUserChannelIds.Count == 0)
+            {
+                return;
+            }
+
+            var orphanedChannels = await _dbContext.Channels
+                .Where(x => singleUserChannelIds.Contains(x.Id))
+                .ToListAsync();
+
+            RemoveRangeIfAny(orphanedChannels, items => _dbContext.Channels.RemoveRange(items));
+        }
+
+        private async Task<bool> IsSingleUserChannelAsync(Guid channelId)
+        {
+            return await _dbContext.ChannelUsers.CountAsync(x => x.ChannelId == channelId) == 1;
+        }
+
+        private static void RemoveRangeIfAny<T>(ICollection<T> items, Action<ICollection<T>> remove)
+        {
+            if (items.Count > 0)
+            {
+                remove(items);
+            }
+        }
+
+        private static bool HasAvatar(User? user)
+        {
+            return user is not null
+                && !string.IsNullOrWhiteSpace(user.Username)
+                && user.UserStorage is not null
+                && !string.IsNullOrWhiteSpace(user.UserStorage.AvatarContentType)
+                && !string.IsNullOrWhiteSpace(user.UserStorage.AvatarImageBase64);
         }
 
         public async Task<MediaResult?> GetCover(Guid userId)

@@ -190,82 +190,27 @@ namespace Egroo.Server.Repository
 
         public async Task<Operation.Response> RefreshSession()
         {
-            var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
-            if (string.IsNullOrEmpty(authHeader))
+            var bearerToken = GetBearerToken();
+            if (bearerToken is null)
             {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "Authorization header is missing."
-                };
+                return CreateFailureResponse("Authorization header is missing.");
             }
 
-            var parts = authHeader.Split(' ');
-            if (parts.Length != 2 || !parts[0].Equals("Bearer", StringComparison.OrdinalIgnoreCase))
+            if (!TryReadUserIdFromToken(bearerToken, out var userId, out var tokenError))
             {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "Invalid Authorization header format."
-                };
-            }
-
-            var userToken = parts[1];
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-            JwtSecurityToken jwtToken;
-
-            try
-            {
-                jwtToken = tokenHandler.ReadJwtToken(userToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to read JWT token.");
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "Invalid token format."
-                };
-            }
-
-            var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (!Guid.TryParse(userIdClaim, out Guid userId) || userId == Guid.Empty)
-            {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "Invalid token claims."
-                };
+                return CreateFailureResponse(tokenError);
             }
 
             var user = await _dbContext.Users.FirstOrDefaultAsync(x => x.Id == userId);
             if (user == null)
             {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "User not found."
-                };
+                return CreateFailureResponse("User not found.");
             }
 
-            if (_configuration == null)
+            var jwtSecret = GetJwtSecret();
+            if (jwtSecret is null)
             {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "Server configuration not available."
-                };
-            }
-
-            var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
-            if (string.IsNullOrEmpty(jwtSecret))
-            {
-                return new Operation.Response
-                {
-                    Success = false,
-                    Message = "JWT configuration is missing."
-                };
+                return CreateFailureResponse("JWT configuration is missing.");
             }
 
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
@@ -295,6 +240,65 @@ namespace Egroo.Server.Repository
                     Message = "Failed to update user."
                 };
             }
+        }
+
+        private string? GetBearerToken()
+        {
+            var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(authHeader))
+            {
+                return null;
+            }
+
+            var parts = authHeader.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 2 || !parts[0].Equals("Bearer", StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return parts[1];
+        }
+
+        private bool TryReadUserIdFromToken(string bearerToken, out Guid userId, out string errorMessage)
+        {
+            userId = Guid.Empty;
+            errorMessage = bearerToken.Length == 0
+                ? "Invalid Authorization header format."
+                : "Invalid token claims.";
+
+            if (bearerToken.Length == 0)
+            {
+                return false;
+            }
+
+            JwtSecurityToken jwtToken;
+            try
+            {
+                jwtToken = new JwtSecurityTokenHandler().ReadJwtToken(bearerToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read JWT token.");
+                errorMessage = "Invalid token format.";
+                return false;
+            }
+
+            var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
+            return Guid.TryParse(userIdClaim, out userId) && userId != Guid.Empty;
+        }
+
+        private string? GetJwtSecret()
+        {
+            return _configuration?.GetSection("Secrets")["Jwt"];
+        }
+
+        private static Operation.Response CreateFailureResponse(string message)
+        {
+            return new Operation.Response
+            {
+                Success = false,
+                Message = message
+            };
         }
 
         public async Task<Operation.Result> ChangePassword(string oldpassword, string newpassword)

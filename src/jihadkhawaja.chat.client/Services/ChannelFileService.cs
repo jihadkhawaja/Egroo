@@ -2,9 +2,11 @@ using jihadkhawaja.chat.shared.Models;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
+    [ExcludeFromCodeCoverage]
     public class ChannelFileService
     {
         private const string BasePath = "api/v1/ChannelFiles";

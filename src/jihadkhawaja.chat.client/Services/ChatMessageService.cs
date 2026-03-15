@@ -2,9 +2,11 @@
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Microsoft.AspNetCore.SignalR.Client;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {
+    [ExcludeFromCodeCoverage]
     public class ChatMessageService : IMessageHub, IDisposable
     {
         private readonly List<IDisposable> _subscriptions = new();

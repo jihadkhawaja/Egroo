@@ -79,6 +79,8 @@ namespace Egroo.Server.Test
             services.AddSingleton<AgentSkillsService>();
             services.AddSingleton<AgentManagedSkillsService>();
             services.AddHttpClient("McpClient");
+            services.AddSingleton<McpClientService>();
+            services.AddSingleton<AgentRuntimeService>();
 
             // ── Logging ────────────────────────────────────────────────────────────────
             services.AddLogging(lb => lb.AddConsole());

@@ -632,7 +632,7 @@
         if (currentUser is null)
             return;
 
-        if (!IsEndToEndReady || CurrentUserProfile is null)
+        if (!await EnsureComposerEncryptionReadyAsync())
         {
             Snackbar.Add(EncryptionWarning ?? "End-to-end encryption is not ready on this device.", Severity.Warning);
             return;
@@ -671,19 +671,30 @@
         {
             Snackbar.Add(ex.Message, Severity.Warning);
             InputDisabled = false;
-            await inputMudTextField.FocusAsync();
+            await FocusComposerAsync();
             return;
         }
 
         if (await ChatMessageService.SendMessage(message))
         {
+            message.Content = message.RecipientContents?.FirstOrDefault(x => x.UserId == currentUser.Id)?.Content;
+            message.DecryptedContent = plainContent;
+            message.DateSent ??= DateTimeOffset.UtcNow;
+
+            RemoveTypingParticipantForMessage(message);
+            MergeVisibleMessage(message);
+            UpsertCachedMessage(message);
+            RefreshSearchResultsFromCache();
+            await CacheDB.Messages.Put(CreateCacheRecord(message), message.ReferenceId);
+            _needsScrollToBottom = true;
+
             InputContent = string.Empty;
             stagedAttachment = null;
             showMentionPopup = false;
             filteredMentionCandidates.Clear();
             selectedMentionIndex = -1;
-            await inputMudTextField.ClearAsync();
             await ClearPendingAttachmentSelectionAsync();
+            await InvokeAsync(StateHasChanged);
         }
         else
         {
@@ -692,7 +703,44 @@
 
         InputDisabled = false;
 
-        await inputMudTextField.FocusAsync();
+        await FocusComposerAsync();
+    }
+
+    private async Task<bool> EnsureComposerEncryptionReadyAsync()
+    {
+        try
+        {
+            CurrentUserProfile = await ChatUserService.GetUserPrivateDetails() ?? CurrentUserProfile ?? SessionStorage.User;
+            await RefreshEncryptionStateAsync();
+            await RefreshChannelPeopleAsync(GetChannelId());
+            return IsEndToEndReady && CurrentUserProfile is not null;
+        }
+        catch
+        {
+            IsEndToEndReady = false;
+            EncryptionWarning = "Unable to initialize end-to-end encryption on this device.";
+            return false;
+        }
+    }
+
+    private async Task FocusComposerAsync()
+    {
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
+
+            if (!_disposed)
+            {
+                await inputMudTextField.FocusAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private void ScrollToMessagesEnd()
@@ -1388,6 +1436,9 @@
             AgentDefinitionId = source.AgentDefinitionId,
             DisplayName = source.DisplayName,
             Content = source.Content,
+            DecryptedContent = source.DecryptedContent,
+            RecipientContents = source.RecipientContents,
+            AgentRecipientContents = source.AgentRecipientContents,
         };
     }
 
@@ -1411,8 +1462,18 @@
 
             if (Messages.Any(x => x.Id == message.Id || (x.ReferenceId != Guid.Empty && x.ReferenceId == message.ReferenceId)))
             {
+                await PrepareMessageForDisplayAsync(message);
+                RemoveTypingParticipantForMessage(message);
                 MergeVisibleMessage(message);
+                UpsertCachedMessage(message);
+                RefreshSearchResultsFromCache();
+                await CacheDB.Messages.Put(CreateCacheRecord(message), message.ReferenceId);
                 await ChatMessageService.UpdatePendingMessage(message.Id);
+                if (message.SenderId == SessionStorage.User?.Id)
+                    _needsScrollToBottom = true;
+                else
+                    _needsScrollToBottomIfNearBottom = true;
+                await InvokeAsync(StateHasChanged);
                 return;
             }
 

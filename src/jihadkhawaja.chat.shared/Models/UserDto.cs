@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.shared.Models
 {
@@ -35,16 +36,17 @@ namespace jihadkhawaja.chat.shared.Models
 
         public UserDetail? GetPrivateDetail()
         {
+            var detail = UserDetail;
             return new UserDetail
             {
-                DisplayName = UserDetail?.DisplayName,
-                FirstName = UserDetail?.FirstName,
-                LastName = UserDetail?.LastName,
-                Email = UserDetail?.Email,
-                PhoneNumber = UserDetail?.PhoneNumber,
-                PhoneCountryCode = UserDetail?.PhoneCountryCode,
-                Region = UserDetail?.Region,
-                Country = UserDetail?.Country,
+                DisplayName = detail?.DisplayName,
+                FirstName = detail?.FirstName,
+                LastName = detail?.LastName,
+                Email = detail?.Email,
+                PhoneNumber = detail?.PhoneNumber,
+                PhoneCountryCode = detail?.PhoneCountryCode,
+                Region = detail?.Region,
+                Country = detail?.Country,
             };
         }
 
@@ -142,6 +144,7 @@ namespace jihadkhawaja.chat.shared.Models
         }
     }
 
+    [ExcludeFromCodeCoverage]
     public class UserStorage
     {
         [Key]
@@ -153,6 +156,7 @@ namespace jihadkhawaja.chat.shared.Models
         public string? CoverImageBase64 { get; set; }
         public string? CoverContentType { get; set; }
     }
+    [ExcludeFromCodeCoverage]
     public class UserFeedback : EntityChildBase
     {
         public Guid UserId { get; set; }
@@ -160,6 +164,7 @@ namespace jihadkhawaja.chat.shared.Models
         public string Text { get; set; } = null!;
     }
 
+    [ExcludeFromCodeCoverage]
     public class CallOffer
     {
         public UserDto? Caller { get; set; }
@@ -167,10 +172,12 @@ namespace jihadkhawaja.chat.shared.Models
         public string SdpOffer { get; set; } = string.Empty;
     }
 
+    [ExcludeFromCodeCoverage]
     public class UserCall
     {
         public List<UserDto>? Users { get; set; }
     }
 
+    [ExcludeFromCodeCoverage]
     public record MediaResult(string ContentType, string ImageBase64);
 }

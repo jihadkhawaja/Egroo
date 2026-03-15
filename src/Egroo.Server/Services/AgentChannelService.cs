@@ -119,60 +119,8 @@ namespace Egroo.Server.Services
             {
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
-
-                // Get all agents in this channel
-                var channelAgents = await dbContext.ChannelAgents
-                    .Where(x => x.ChannelId == message.ChannelId && x.DateDeleted == null)
-                    .Select(x => x.AgentDefinitionId)
-                    .ToListAsync();
-
-                if (channelAgents.Count == 0)
-                {
-                    return;
-                }
-
-                var agentDefs = await dbContext.AgentDefinitions
-                    .Where(x => channelAgents.Contains(x.Id) && x.IsActive && x.DateDeleted == null)
-                    .ToListAsync();
-
-                if (agentDefs.Count == 0)
-                {
-                    return;
-                }
-
-                // Find mentioned agents by @name or @<name> pattern (case-insensitive)
-                var mentionedAgents = new List<(AgentDefinition Agent, string TriggerContent)>();
-                foreach (var agent in agentDefs)
-                {
-                    string? triggerContent = GetAgentMessageContent(message, agent);
-                    if (string.IsNullOrWhiteSpace(triggerContent))
-                    {
-                        continue;
-                    }
-
-                    string readableTriggerContent = AgentAttachmentPromptFormatter.Normalize(triggerContent);
-
-                    // Match @<Agent Name> (bracket syntax for names with spaces) or @AgentName (no spaces)
-                    var escapedName = Regex.Escape(agent.Name);
-                    var bracketPattern = $@"@<{escapedName}>";
-                    var plainPattern = $@"@{escapedName}(?:\b|$)";
-                    if (Regex.IsMatch(readableTriggerContent, bracketPattern, RegexOptions.IgnoreCase)
-                        || Regex.IsMatch(readableTriggerContent, plainPattern, RegexOptions.IgnoreCase))
-                    {
-                        mentionedAgents.Add((agent, triggerContent));
-                    }
-                }
-
-                if (mentionedAgents.Count == 0)
-                {
-                    return;
-                }
-
-                // Process each mentioned agent (fire-and-forget per agent)
-                foreach (var mentionedAgent in mentionedAgents)
-                {
-                    _ = Task.Run(() => GenerateAgentResponseAsync(mentionedAgent.Agent, message, mentionedAgent.TriggerContent));
-                }
+                var mentionedAgents = await GetMentionedAgentsAsync(dbContext, message);
+                QueueAgentResponses(mentionedAgents, message);
             }
             catch (Exception ex)
             {
@@ -188,145 +136,30 @@ namespace Egroo.Server.Services
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<DataContext>();
 
-                typingState = new ChannelTypingState
-                {
-                    ChannelId = triggerMessage.ChannelId,
-                    UserId = agentDef.UserId,
-                    AgentDefinitionId = agentDef.Id,
-                    DisplayName = agentDef.Name,
-                    IsAgent = true
-                };
-
+                typingState = CreateTypingState(agentDef, triggerMessage.ChannelId);
                 await StartTypingAsync(dbContext, typingState);
 
-                // Decrypt API key
-                string? apiKey = null;
-                if (!string.IsNullOrWhiteSpace(agentDef.ApiKey))
+                var runContext = await BuildAgentRunContextAsync(dbContext, agentDef, triggerMessage);
+                if (runContext is null)
                 {
-                    try
-                    {
-                        apiKey = _encryptionService.Decrypt(agentDef.ApiKey);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to decrypt API key for agent {AgentId}", agentDef.Id);
-                        return;
-                    }
-                }
-
-                // Build instructions with knowledge
-                string instructions = await BuildInstructions(dbContext, agentDef);
-
-                // Add channel context to instructions
-                instructions += "\n\n## Channel Context\n";
-                instructions += "You are participating in a group chat channel. ";
-                instructions += "You were mentioned with @" + agentDef.Name + ". ";
-                instructions += "Respond naturally to the conversation. Keep your response concise and relevant.";
-
-                string? agentPrivateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agentDef.EncryptionPrivateKey);
-                if (string.IsNullOrWhiteSpace(agentPrivateKey) && triggerMessage.AgentRecipientContents is not null)
-                {
-                    _logger.LogWarning("Agent {AgentId} has no private key available for encrypted channel processing.", agentDef.Id);
                     return;
                 }
 
-                // Build tools
-                var tools = await BuildTools(dbContext, agentDef.Id, agentDef.UserId);
-
-                var skillDirectories = await dbContext.AgentSkillDirectories
-                    .Where(x => x.AgentDefinitionId == agentDef.Id && x.IsEnabled && x.DateDeleted == null)
-                    .OrderBy(x => x.DateCreated)
-                    .ToListAsync();
-
-                var contextProviders = _agentSkillsService.CreateContextProviders(skillDirectories, agentDef.SkillsInstructionPrompt);
-
-                // Create agent
-                AIAgent agent;
-                try
+                var agent = TryCreateRuntimeAgent(agentDef, runContext);
+                if (agent is null)
                 {
-                    agent = AgentRuntimeService.CreateAgentStatic(agentDef, apiKey, instructions, tools, contextProviders, _loggerFactory, _serviceProvider);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to create agent for channel mention {AgentId}", agentDef.Id);
                     return;
                 }
 
-                // Build context from recent channel messages
-                var recentMessages = await dbContext.Messages
-                    .Where(x => x.ChannelId == triggerMessage.ChannelId && x.DateDeleted == null)
-                    .OrderByDescending(x => x.DateSent)
-                    .Take(20)
-                    .OrderBy(x => x.DateSent)
-                    .ToListAsync();
-
-                var chatMessages = new List<ChatMessage>();
-                foreach (var msg in recentMessages)
-                {
-                    string? content = msg.Id == triggerMessage.Id
-                        ? triggerContent
-                        : await GetContentForAgentAsync(dbContext, msg, agentDef, agentPrivateKey);
-
-                    if (string.IsNullOrWhiteSpace(content))
-                    {
-                        continue;
-                    }
-
-                    // Determine sender name
-                    string senderName;
-                    if (msg.AgentDefinitionId.HasValue)
-                    {
-                        var senderAgent = await dbContext.AgentDefinitions
-                            .FirstOrDefaultAsync(x => x.Id == msg.AgentDefinitionId.Value);
-                        senderName = senderAgent?.Name ?? "Agent";
-                        chatMessages.Add(AgentChatMessageFactory.CreateChannelMessage(ChatRole.Assistant, senderName, content));
-                    }
-                    else
-                    {
-                        var sender = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == msg.SenderId);
-                        senderName = sender?.Username ?? "Unknown";
-                        chatMessages.Add(AgentChatMessageFactory.CreateChannelMessage(ChatRole.User, senderName, content));
-                    }
-                }
-
-                // Run the agent
-                AgentSession session = await agent.CreateSessionAsync();
-                AgentResponse agentResponse;
-                try
-                {
-                    agentResponse = await agent.RunAsync(chatMessages, session);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Agent run failed for channel mention {AgentId}", agentDef.Id);
-                    return;
-                }
-
-                string responseText = NormalizeAgentReply(agentResponse.Text, agentDef.Name);
+                var chatMessages = await BuildChannelChatMessagesAsync(dbContext, triggerMessage, triggerContent, agentDef, runContext.AgentPrivateKey);
+                string responseText = await RunChannelAgentAsync(agent, chatMessages, agentDef.Name, agentDef.Id);
                 if (string.IsNullOrWhiteSpace(responseText))
                 {
                     return;
                 }
 
-                // Create the response message
-                var responseMessage = new Message
-                {
-                    Id = Guid.NewGuid(),
-                    SenderId = agentDef.UserId, // Agent owner's user ID for compatibility
-                    ChannelId = triggerMessage.ChannelId,
-                    ReferenceId = Guid.NewGuid(),
-                    DateSent = DateTimeOffset.UtcNow,
-                    DateCreated = DateTimeOffset.UtcNow,
-                    AgentDefinitionId = agentDef.Id,
-                    Content = responseText,
-                    DisplayName = agentDef.Name
-                };
-
-                // Save to database
-                await dbContext.Messages.AddAsync(responseMessage);
-                await dbContext.SaveChangesAsync();
-
-                await BroadcastAgentMessage(dbContext, responseMessage);
+                var responseMessage = CreateAgentResponseMessage(agentDef, triggerMessage.ChannelId, responseText);
+                await SaveAndBroadcastAgentMessageAsync(dbContext, responseMessage);
             }
             catch (Exception ex)
             {
@@ -349,6 +182,274 @@ namespace Egroo.Server.Services
                     }
                 }
             }
+        }
+
+        private async Task<List<(AgentDefinition Agent, string TriggerContent)>> GetMentionedAgentsAsync(DataContext dbContext, Message message)
+        {
+            var agentDefs = await GetActiveChannelAgentsAsync(dbContext, message.ChannelId);
+            if (agentDefs.Count == 0)
+            {
+                return [];
+            }
+
+            var mentionedAgents = new List<(AgentDefinition Agent, string TriggerContent)>();
+            foreach (var agent in agentDefs)
+            {
+                var triggerContent = GetAgentMessageContent(message, agent);
+                if (!IsAgentMentioned(agent, triggerContent, out var normalizedContent))
+                {
+                    continue;
+                }
+
+                mentionedAgents.Add((agent, normalizedContent));
+            }
+
+            return mentionedAgents;
+        }
+
+        private async Task<List<AgentDefinition>> GetActiveChannelAgentsAsync(DataContext dbContext, Guid channelId)
+        {
+            var channelAgentIds = await dbContext.ChannelAgents
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .Select(x => x.AgentDefinitionId)
+                .ToListAsync();
+
+            if (channelAgentIds.Count == 0)
+            {
+                return [];
+            }
+
+            return await dbContext.AgentDefinitions
+                .Where(x => channelAgentIds.Contains(x.Id) && x.IsActive && x.DateDeleted == null)
+                .ToListAsync();
+        }
+
+        private static bool IsAgentMentioned(AgentDefinition agent, string? triggerContent, out string normalizedContent)
+        {
+            normalizedContent = string.Empty;
+            if (string.IsNullOrWhiteSpace(triggerContent))
+            {
+                return false;
+            }
+
+            normalizedContent = triggerContent;
+            string readableTriggerContent = AgentAttachmentPromptFormatter.Normalize(triggerContent);
+            var escapedName = Regex.Escape(agent.Name);
+
+            return Regex.IsMatch(readableTriggerContent, $@"@<{escapedName}>", RegexOptions.IgnoreCase)
+                || Regex.IsMatch(readableTriggerContent, $@"@{escapedName}(?:\b|$)", RegexOptions.IgnoreCase);
+        }
+
+        private void QueueAgentResponses(IEnumerable<(AgentDefinition Agent, string TriggerContent)> mentionedAgents, Message message)
+        {
+            foreach (var mentionedAgent in mentionedAgents)
+            {
+                _ = Task.Run(() => GenerateAgentResponseAsync(mentionedAgent.Agent, message, mentionedAgent.TriggerContent));
+            }
+        }
+
+        private static ChannelTypingState CreateTypingState(AgentDefinition agentDef, Guid channelId)
+        {
+            return new ChannelTypingState
+            {
+                ChannelId = channelId,
+                UserId = agentDef.UserId,
+                AgentDefinitionId = agentDef.Id,
+                DisplayName = agentDef.Name,
+                IsAgent = true
+            };
+        }
+
+        private async Task<AgentRunContext?> BuildAgentRunContextAsync(DataContext dbContext, AgentDefinition agentDef, Message triggerMessage)
+        {
+            var apiKey = TryDecryptAgentApiKey(agentDef);
+            if (agentDef.ApiKey is not null && apiKey is null)
+            {
+                return null;
+            }
+
+            var agentPrivateKey = GetAgentPrivateKey(agentDef, triggerMessage.AgentRecipientContents is not null);
+            if (triggerMessage.AgentRecipientContents is not null && string.IsNullOrWhiteSpace(agentPrivateKey))
+            {
+                return null;
+            }
+
+            var instructions = await BuildChannelInstructionsAsync(dbContext, agentDef);
+            var tools = await BuildTools(dbContext, agentDef.Id, agentDef.UserId);
+            var contextProviders = await BuildContextProvidersAsync(dbContext, agentDef.Id, agentDef.SkillsInstructionPrompt);
+
+            return new AgentRunContext(apiKey, agentPrivateKey, instructions, tools, contextProviders);
+        }
+
+        private string? TryDecryptAgentApiKey(AgentDefinition agentDef)
+        {
+            if (string.IsNullOrWhiteSpace(agentDef.ApiKey))
+            {
+                return null;
+            }
+
+            try
+            {
+                return _encryptionService.Decrypt(agentDef.ApiKey);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to decrypt API key for agent {AgentId}", agentDef.Id);
+                return null;
+            }
+        }
+
+        private string? GetAgentPrivateKey(AgentDefinition agentDef, bool requiresKey)
+        {
+            string? agentPrivateKey = _endToEndEncryptionService.DecryptAgentPrivateKey(agentDef.EncryptionPrivateKey);
+            if (requiresKey && string.IsNullOrWhiteSpace(agentPrivateKey))
+            {
+                _logger.LogWarning("Agent {AgentId} has no private key available for encrypted channel processing.", agentDef.Id);
+            }
+
+            return agentPrivateKey;
+        }
+
+        private async Task<string> BuildChannelInstructionsAsync(DataContext dbContext, AgentDefinition agentDef)
+        {
+            var instructions = await BuildInstructions(dbContext, agentDef);
+            return string.Concat(
+                instructions,
+                "\n\n## Channel Context\n",
+                "You are participating in a group chat channel. ",
+                "You were mentioned with @", agentDef.Name, ". ",
+                "Respond naturally to the conversation. Keep your response concise and relevant.");
+        }
+
+        private async Task<IReadOnlyList<AIContextProvider>> BuildContextProvidersAsync(DataContext dbContext, Guid agentId, string? skillsInstructionPrompt)
+        {
+            var skillDirectories = await dbContext.AgentSkillDirectories
+                .Where(x => x.AgentDefinitionId == agentId && x.IsEnabled && x.DateDeleted == null)
+                .OrderBy(x => x.DateCreated)
+                .ToListAsync();
+
+            return _agentSkillsService.CreateContextProviders(skillDirectories, skillsInstructionPrompt);
+        }
+
+        private AIAgent? TryCreateRuntimeAgent(AgentDefinition agentDef, AgentRunContext runContext)
+        {
+            try
+            {
+                return AgentRuntimeService.CreateAgentStatic(
+                    agentDef,
+                    runContext.ApiKey,
+                    runContext.Instructions,
+                    runContext.Tools,
+                    runContext.ContextProviders,
+                    _loggerFactory,
+                    _serviceProvider);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create agent for channel mention {AgentId}", agentDef.Id);
+                return null;
+            }
+        }
+
+        private async Task<List<ChatMessage>> BuildChannelChatMessagesAsync(
+            DataContext dbContext,
+            Message triggerMessage,
+            string triggerContent,
+            AgentDefinition agentDef,
+            string? agentPrivateKey)
+        {
+            var recentMessages = await dbContext.Messages
+                .Where(x => x.ChannelId == triggerMessage.ChannelId && x.DateDeleted == null)
+                .OrderByDescending(x => x.DateSent)
+                .Take(20)
+                .OrderBy(x => x.DateSent)
+                .ToListAsync();
+
+            var chatMessages = new List<ChatMessage>();
+            foreach (var message in recentMessages)
+            {
+                var chatMessage = await BuildChatMessageAsync(dbContext, message, triggerMessage, triggerContent, agentDef, agentPrivateKey);
+                if (chatMessage is not null)
+                {
+                    chatMessages.Add(chatMessage);
+                }
+            }
+
+            return chatMessages;
+        }
+
+        private async Task<ChatMessage?> BuildChatMessageAsync(
+            DataContext dbContext,
+            Message message,
+            Message triggerMessage,
+            string triggerContent,
+            AgentDefinition agentDef,
+            string? agentPrivateKey)
+        {
+            string? content = message.Id == triggerMessage.Id
+                ? triggerContent
+                : await GetContentForAgentAsync(dbContext, message, agentDef, agentPrivateKey);
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return null;
+            }
+
+            return message.AgentDefinitionId.HasValue
+                ? await CreateAssistantChatMessageAsync(dbContext, message.AgentDefinitionId.Value, content)
+                : await CreateUserChatMessageAsync(dbContext, message.SenderId, content);
+        }
+
+        private async Task<ChatMessage> CreateAssistantChatMessageAsync(DataContext dbContext, Guid agentDefinitionId, string content)
+        {
+            var senderAgent = await dbContext.AgentDefinitions.FirstOrDefaultAsync(x => x.Id == agentDefinitionId);
+            var senderName = senderAgent?.Name ?? "Agent";
+            return AgentChatMessageFactory.CreateChannelMessage(ChatRole.Assistant, senderName, content);
+        }
+
+        private async Task<ChatMessage> CreateUserChatMessageAsync(DataContext dbContext, Guid senderId, string content)
+        {
+            var sender = await dbContext.Users.FirstOrDefaultAsync(x => x.Id == senderId);
+            var senderName = sender?.Username ?? "Unknown";
+            return AgentChatMessageFactory.CreateChannelMessage(ChatRole.User, senderName, content);
+        }
+
+        private async Task<string> RunChannelAgentAsync(AIAgent agent, IEnumerable<ChatMessage> chatMessages, string agentName, Guid agentId)
+        {
+            try
+            {
+                AgentSession session = await agent.CreateSessionAsync();
+                var response = await agent.RunAsync(chatMessages.ToList(), session);
+                return NormalizeAgentReply(response.Text, agentName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Agent run failed for channel mention {AgentId}", agentId);
+                return string.Empty;
+            }
+        }
+
+        private static Message CreateAgentResponseMessage(AgentDefinition agentDef, Guid channelId, string responseText)
+        {
+            return new Message
+            {
+                Id = Guid.NewGuid(),
+                SenderId = agentDef.UserId,
+                ChannelId = channelId,
+                ReferenceId = Guid.NewGuid(),
+                DateSent = DateTimeOffset.UtcNow,
+                DateCreated = DateTimeOffset.UtcNow,
+                AgentDefinitionId = agentDef.Id,
+                Content = responseText,
+                DisplayName = agentDef.Name
+            };
+        }
+
+        private async Task SaveAndBroadcastAgentMessageAsync(DataContext dbContext, Message responseMessage)
+        {
+            await dbContext.Messages.AddAsync(responseMessage);
+            await dbContext.SaveChangesAsync();
+            await BroadcastAgentMessage(dbContext, responseMessage);
         }
 
         private async Task BroadcastAgentMessage(DataContext dbContext, Message message)
@@ -664,10 +765,7 @@ namespace Egroo.Server.Services
                 }
             }
 
-            var scopedToolNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "search_published_agents", "add_agent_friend", "add_agent_to_channel"
-            };
+            var scopedToolNames = BuiltinTools.GetScopedToolNames();
 
             var enabledScopedTools = toolDefs
                 .Where(t => t.Source == AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
@@ -682,5 +780,12 @@ namespace Egroo.Server.Services
 
             return tools;
         }
+
+        private sealed record AgentRunContext(
+            string? ApiKey,
+            string? AgentPrivateKey,
+            string Instructions,
+            IList<AITool> Tools,
+            IReadOnlyList<AIContextProvider> ContextProviders);
     }
 }

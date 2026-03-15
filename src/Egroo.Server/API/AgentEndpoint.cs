@@ -2,6 +2,7 @@ using Egroo.Server.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using jihadkhawaja.chat.shared.Models;
 using Egroo.Server.Security;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Egroo.Server.API
@@ -658,6 +659,7 @@ namespace Egroo.Server.API
 
     // ── Request DTOs ─────────────────────────────────────────────────────
 
+    [ExcludeFromCodeCoverage]
     public record CreateAgentRequest(
         string Name,
         string? Description,
@@ -672,6 +674,7 @@ namespace Egroo.Server.API
         int? MaxTokens,
         string? SkillsInstructionPrompt);
 
+    [ExcludeFromCodeCoverage]
     public record UpdateAgentRequest(
         string Name,
         string? Description,
@@ -687,32 +690,38 @@ namespace Egroo.Server.API
         int? MaxTokens,
         string? SkillsInstructionPrompt);
 
+    [ExcludeFromCodeCoverage]
     public record CreateSkillDirectoryRequest(
         string Name,
         string Path,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record UpdateSkillDirectoryRequest(
         string Name,
         string Path,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record CreateManagedSkillRequest(
         string Name,
         string Content,
         string? FileName = null,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record CreateKnowledgeRequest(
         string Title,
         string Content,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record UpdateKnowledgeRequest(
         string Title,
         string Content,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record CreateToolRequest(
         string Name,
         string Description,
@@ -721,22 +730,26 @@ namespace Egroo.Server.API
         AgentToolSource Source = AgentToolSource.Builtin,
         Guid? McpServerId = null);
 
+    [ExcludeFromCodeCoverage]
     public record UpdateToolRequest(
         string Name,
         string Description,
         string? ParametersSchema,
         bool IsEnabled = true);
 
+    [ExcludeFromCodeCoverage]
     public record CreateMcpServerRequest(
         string Name,
         string Endpoint,
         string? ApiKey);
 
+    [ExcludeFromCodeCoverage]
     public record UpdateMcpServerRequest(
         string Name,
         string Endpoint,
         string? ApiKey,
         bool IsActive = true);
 
+    [ExcludeFromCodeCoverage]
     public record CreateConversationRequest(string? Title);
 }

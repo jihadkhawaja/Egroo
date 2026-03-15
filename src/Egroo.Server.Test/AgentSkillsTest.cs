@@ -192,6 +192,249 @@ namespace Egroo.Server.Test
             }
         }
 
+        // ── CreateContextProviders ──────────────────────────────────────────────
+
+        [TestMethod]
+        public void CreateContextProviders_NoEnabledSkills_ReturnsEmpty()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var result = service.CreateContextProviders(Array.Empty<AgentSkillDirectory>(), null);
+                Assert.AreEqual(0, result.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void CreateContextProviders_WithSkillsAndPlaceholderPrompt_ReturnsProvider()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "my-skill");
+            Directory.CreateDirectory(skillDir);
+            File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), "# Test skill");
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var result = service.CreateContextProviders(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "My Skill", Path = "my-skill", IsEnabled = true }
+                }, "Available skills:\n{0}");
+
+                Assert.AreEqual(1, result.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void CreateContextProviders_PromptWithoutPlaceholder_StillReturnsProvider()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "my-skill2");
+            Directory.CreateDirectory(skillDir);
+            File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), "# Test");
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var result = service.CreateContextProviders(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Skill", Path = "my-skill2", IsEnabled = true }
+                }, "No placeholder here");
+
+                Assert.AreEqual(1, result.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void CreateContextProviders_NullPrompt_ReturnsProvider()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "my-skill3");
+            Directory.CreateDirectory(skillDir);
+            File.WriteAllText(Path.Combine(skillDir, "SKILL.md"), "# Test");
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var result = service.CreateContextProviders(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Skill", Path = "my-skill3", IsEnabled = true }
+                }, null);
+
+                Assert.AreEqual(1, result.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        // ── ResolveSkillPaths edge cases ────────────────────────────────────────────
+
+        [TestMethod]
+        public void ResolveSkillPaths_DisabledDirectory_IsExcluded()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "disabled-skill");
+            Directory.CreateDirectory(skillDir);
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var resolved = service.ResolveSkillPaths(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Disabled", Path = "disabled-skill", IsEnabled = false }
+                });
+
+                Assert.AreEqual(0, resolved.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void ResolveSkillPaths_EmptyPath_IsExcluded()
+        {
+            IConfiguration config = new ConfigurationBuilder().AddInMemoryCollection().Build();
+            var env = new TestEnvironment { ContentRootPath = Path.GetTempPath() };
+            var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+            var resolved = service.ResolveSkillPaths(new[]
+            {
+                new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Empty", Path = "", IsEnabled = true },
+                new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Whitespace", Path = "   ", IsEnabled = true }
+            });
+
+            Assert.AreEqual(0, resolved.Count);
+        }
+
+        [TestMethod]
+        public void ResolveSkillPaths_DuplicatePaths_AreDeduped()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "shared-skill");
+            Directory.CreateDirectory(skillDir);
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var resolved = service.ResolveSkillPaths(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Skill A", Path = "shared-skill", IsEnabled = true },
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Skill B", Path = "shared-skill", IsEnabled = true }
+                });
+
+                Assert.AreEqual(1, resolved.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void ResolveSkillPaths_NonexistentDirectory_IsExcluded()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempRoot);
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?> { ["AgentSkills:AllowedRootPaths:0"] = tempRoot })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var resolved = service.ResolveSkillPaths(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Absent", Path = "this-does-not-exist", IsEnabled = true }
+                });
+
+                Assert.AreEqual(0, resolved.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void ResolveSkillPaths_NoAllowedRoots_AcceptsAnyValidPath()
+        {
+            var tempRoot = Path.Combine(Path.GetTempPath(), "egroo-skills-test", Guid.NewGuid().ToString("N"));
+            var skillDir = Path.Combine(tempRoot, "any-skill");
+            Directory.CreateDirectory(skillDir);
+            try
+            {
+                // Empty config = no AllowedRootPaths restriction
+                IConfiguration config = new ConfigurationBuilder().AddInMemoryCollection().Build();
+                var env = new TestEnvironment { ContentRootPath = tempRoot };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var resolved = service.ResolveSkillPaths(new[]
+                {
+                    new AgentSkillDirectory { AgentDefinitionId = Guid.NewGuid(), Name = "Any", Path = "any-skill", IsEnabled = true }
+                });
+
+                Assert.AreEqual(1, resolved.Count);
+            }
+            finally { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, true); }
+        }
+
+        [TestMethod]
+        public void ResolveSkillPaths_SkillsPrefix_UsesRunLocationBase()
+        {
+            // Create a skills directory under AppContext.BaseDirectory (run location)
+            var skillDir = Path.Combine(AppContext.BaseDirectory, "skills", "test-skill-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(skillDir);
+            try
+            {
+                IConfiguration config = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["AgentSkills:AllowedRootPaths:0"] = Path.Combine(AppContext.BaseDirectory, "skills")
+                    })
+                    .Build();
+                var env = new TestEnvironment { ContentRootPath = Path.GetTempPath() };
+                var service = new AgentSkillsService(config, env, NullLoggerFactory.Instance, NullLogger<AgentSkillsService>.Instance);
+
+                var resolved = service.ResolveSkillPaths(new[]
+                {
+                    new AgentSkillDirectory
+                    {
+                        AgentDefinitionId = Guid.NewGuid(),
+                        Name = "Run Skill",
+                        Path = "skills/" + Path.GetFileName(skillDir),
+                        IsEnabled = true
+                    }
+                });
+
+                Assert.AreEqual(1, resolved.Count);
+                StringAssert.Contains(resolved[0], "skills");
+            }
+            finally { if (Directory.Exists(skillDir)) Directory.Delete(skillDir, true); }
+        }
+
         private sealed class TestEnvironment : IWebHostEnvironment
         {
             public string ApplicationName { get; set; } = "Egroo.Server.Test";
@@ -200,6 +443,203 @@ namespace Egroo.Server.Test
             public string EnvironmentName { get; set; } = "Development";
             public string ContentRootPath { get; set; } = string.Empty;
             public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        }
+
+        // ── AgentManagedSkillsService branch tests ──────────────────────────────────
+
+        private static AgentManagedSkillsService CreateManagedService()
+        {
+            var env = new TestEnvironment { ContentRootPath = Path.GetTempPath() };
+            return new AgentManagedSkillsService(env, NullLogger<AgentManagedSkillsService>.Instance);
+        }
+
+        [TestMethod]
+        public void ManagedSkills_EmptyContent_Throws()
+        {
+            var svc = CreateManagedService();
+            Assert.ThrowsExactly<ArgumentException>(() => svc.CreateManagedSkill(Guid.NewGuid(), "name", ""));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_WhitespaceContent_Throws()
+        {
+            var svc = CreateManagedService();
+            Assert.ThrowsExactly<ArgumentException>(() => svc.CreateManagedSkill(Guid.NewGuid(), "name", "   "));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_OversizedContent_Throws()
+        {
+            var svc = CreateManagedService();
+            var bigContent = new string('x', 256 * 1024 + 1);
+            Assert.ThrowsExactly<ArgumentException>(() => svc.CreateManagedSkill(Guid.NewGuid(), "name", bigContent));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_IsManagedSkillPath_NullOrEmpty_ReturnsFalse()
+        {
+            var svc = CreateManagedService();
+            Assert.IsFalse(svc.IsManagedSkillPath(null));
+            Assert.IsFalse(svc.IsManagedSkillPath(""));
+            Assert.IsFalse(svc.IsManagedSkillPath("   "));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_IsManagedSkillPath_NonManagedPath_ReturnsFalse()
+        {
+            var svc = CreateManagedService();
+            Assert.IsFalse(svc.IsManagedSkillPath("some/other/path"));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_IsManagedSkillPath_ValidPath_ReturnsTrue()
+        {
+            var svc = CreateManagedService();
+            Assert.IsTrue(svc.IsManagedSkillPath("skills/managed/agents/something"));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_DeleteManagedSkillDirectory_NonManaged_NoOp()
+        {
+            var svc = CreateManagedService();
+            // Should not throw for non-managed path — just returns
+            svc.DeleteManagedSkillDirectory("not/a/managed/path");
+        }
+
+        [TestMethod]
+        public void ManagedSkills_DeleteManagedSkillDirectory_NonExistentDir_NoOp()
+        {
+            var svc = CreateManagedService();
+            svc.DeleteManagedSkillDirectory("skills/managed/agents/nonexistent-" + Guid.NewGuid().ToString("N"));
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithContentHeading_UsesHeadingName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                result = svc.CreateManagedSkill(agentId, "skill", "# My Cool Skill\n\nContent here");
+                Assert.AreEqual("My Cool Skill", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithFrontMatterName_UsesFrontMatterName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                var content = "---\nname: my-front-skill\ndescription: test\n---\n\n# Heading\n\nBody";
+                result = svc.CreateManagedSkill(agentId, "skill", content);
+                Assert.AreEqual("my-front-skill", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithFileName_UsesFileName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                result = svc.CreateManagedSkill(agentId, "", "Some content", "my-skill-file.md");
+                Assert.AreEqual("my skill file", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithFrontMatterEmptyName_FallsBackToSkillName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                var content = "---\nname:   \n---\n\nBody text";
+                result = svc.CreateManagedSkill(agentId, "MySkill", content);
+                Assert.AreEqual("MySkill", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithFrontMatterNoNameField_FallsBackToSkillName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                var content = "---\ndescription: only desc\n---\n\nBody text";
+                result = svc.CreateManagedSkill(agentId, "FallbackSkill", content);
+                Assert.AreEqual("FallbackSkill", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
+        }
+
+        [TestMethod]
+        public void ManagedSkills_CreateWithNoHeadingNoFrontMatter_UsesSkillName()
+        {
+            var svc = CreateManagedService();
+            var agentId = Guid.NewGuid();
+            ManagedSkillFile? result = null;
+            try
+            {
+                result = svc.CreateManagedSkill(agentId, "DirectName", "Just plain body text without any heading");
+                Assert.AreEqual("DirectName", result.DisplayName);
+            }
+            finally
+            {
+                if (result is not null)
+                {
+                    var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, result.RelativeDirectoryPath.Replace('/', Path.DirectorySeparatorChar)));
+                    if (Directory.Exists(dir)) Directory.Delete(dir, true);
+                }
+            }
         }
     }
 }

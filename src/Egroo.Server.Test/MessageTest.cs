@@ -274,5 +274,92 @@ namespace Egroo.Server.Test
 
             Assert.AreEqual(plain, decrypted);
         }
+
+        [TestMethod]
+        public async Task GetMessageByReferenceId_AfterSend_ReturnsMessage()
+        {
+            var refId = Guid.NewGuid();
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId = _userId,
+                Content = "Reference test",
+                ReferenceId = refId,
+            };
+
+            using var sendScope = _authenticatedServices.CreateScope();
+            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                           .SendMessage(message);
+
+            using var readScope = _authenticatedServices.CreateScope();
+            var fetched = await readScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                         .GetMessageByReferenceId(refId);
+
+            Assert.IsNotNull(fetched);
+            Assert.AreEqual(refId, fetched.ReferenceId);
+        }
+
+        [TestMethod]
+        public async Task GetMessageByReferenceId_NonExistent_ReturnsNull()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var fetched = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .GetMessageByReferenceId(Guid.NewGuid());
+
+            Assert.IsNull(fetched);
+        }
+
+        [TestMethod]
+        public async Task UpdatePendingMessage_RemovesPending()
+        {
+            var message = new Message
+            {
+                ChannelId = _channelId,
+                SenderId = _userId,
+                Content = "Pending update test",
+            };
+
+            using var sendScope = _authenticatedServices.CreateScope();
+            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                           .SendMessage(message);
+
+            var pending = new UserPendingMessage
+            {
+                Id = Guid.NewGuid(),
+                UserId = _userId,
+                MessageId = message.Id,
+                Content = message.Content,
+            };
+
+            using var addScope = _authenticatedServices.CreateScope();
+            await addScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                          .AddPendingMessage(pending);
+
+            using var updateScope = _authenticatedServices.CreateScope();
+            await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                             .UpdatePendingMessage(message.Id);
+
+            using var queryScope = _authenticatedServices.CreateScope();
+            var remainingPending = await queryScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                                    .GetPendingMessagesForUser(_userId);
+            Assert.IsFalse(remainingPending.Any(p => p.MessageId == message.Id),
+                "Pending message should be removed after UpdatePendingMessage.");
+        }
+
+        [TestMethod]
+        public async Task UpdateMessage_NonExistentId_ReturnsFalse()
+        {
+            var updated = new Message
+            {
+                Id = Guid.NewGuid(),
+                Content = "Won't update",
+            };
+
+            using var scope = _authenticatedServices.CreateScope();
+            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                     .UpdateMessage(updated);
+
+            Assert.IsFalse(result);
+        }
     }
 }

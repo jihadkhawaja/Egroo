@@ -66,7 +66,7 @@ For the first local run, manual .NET plus PostgreSQL setup is the most predictab
 
 - GitHub issues: [Report bugs or request features](https://github.com/jihadkhawaja/Egroo/issues)
 - Discord: [Join the community server](https://discord.gg/9KMAM2RKVC)
-- Contribution guide: [docs/CONTRIBUTING.md](https://github.com/jihadkhawaja/Egroo/blob/main/docs/CONTRIBUTING.md)
+- Contribution guide: [CONTRIBUTING.md](https://github.com/jihadkhawaja/Egroo/blob/main/CONTRIBUTING.md)
 
 ## License
 
