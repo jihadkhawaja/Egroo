@@ -102,6 +102,18 @@ window.webrtcInterop = {
         const peerData = this._getOrCreatePeer(peerId);
         const pc = peerData.pc;
 
+        // If we already have a pending local offer, reuse it
+        if (pc.signalingState === "have-local-offer" && pc.localDescription) {
+            console.log("[WebRTC] Reusing existing local offer for peer", peerId);
+            return pc.localDescription.sdp;
+        }
+
+        // If we already have a remote offer (glare handled elsewhere), skip
+        if (pc.signalingState === "have-remote-offer") {
+            console.log("[WebRTC] Skipping offer for peer", peerId, "- already processing their offer");
+            return null;
+        }
+
         // Add local audio tracks
         this.localStream.getAudioTracks().forEach(track => {
             // Avoid duplicate tracks
@@ -158,6 +170,12 @@ window.webrtcInterop = {
         peerData.activeOfferSdp = sdpOffer;
 
         try {
+            // Glare handling: if we have a pending local offer, rollback before accepting the remote offer
+            if (pc.signalingState === "have-local-offer") {
+                console.log("[WebRTC] Glare detected for peer", peerId, "- rolling back local offer");
+                await pc.setLocalDescription({ type: "rollback" });
+            }
+
             const isNewOffer = !pc.remoteDescription
                 || pc.remoteDescription.type !== "offer"
                 || pc.remoteDescription.sdp !== sdpOffer;
@@ -208,6 +226,12 @@ window.webrtcInterop = {
         const peerData = this.peers.get(peerId);
         if (!peerData) {
             console.warn("[WebRTC] No peer connection for", peerId, "to set answer on.");
+            return;
+        }
+
+        // Can only apply an answer when we have a pending local offer
+        if (peerData.pc.signalingState !== "have-local-offer") {
+            console.log("[WebRTC] Ignoring answer from peer", peerId, "- signaling state:", peerData.pc.signalingState);
             return;
         }
 
