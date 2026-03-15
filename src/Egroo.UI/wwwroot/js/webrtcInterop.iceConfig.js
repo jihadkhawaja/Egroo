@@ -21,15 +21,7 @@ Object.assign(window.webrtcInterop, {
             iceTransportPolicy: this._shouldForceRelayTransport(relayConfigured) ? "relay" : "all"
         };
 
-        console.log("[WebRTC] ICE servers configured:", this.config.iceServers.map(server => ({
-            urls: server.urls,
-            hasCredential: !!server.credential,
-            hasUsername: !!server.username,
-            supportsRelay: this._serverSupportsRelay(server)
-        })));
-        console.log("[WebRTC] ICE transport policy:", this.config.iceTransportPolicy);
-
-        if (!this._hasRelayIceServer()) {
+        if (!relayConfigured) {
             const message = "[WebRTC] No TURN server configured. Calls may fail across NATs/firewalls outside local testing.";
             if (this._isProductionLikeHost()) {
                 console.error(message);
@@ -41,8 +33,7 @@ Object.assign(window.webrtcInterop, {
 
     _getDefaultIceServers: function () {
         return [
-            { urls: "stun:stun.l.google.com:19302" },
-            { urls: "stun:stun1.l.google.com:19302" }
+            { urls: "stun:stun.cloudflare.com:3478" }
         ];
     },
 

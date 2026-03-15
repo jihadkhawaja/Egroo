@@ -32,7 +32,10 @@ Object.assign(window.webrtcInterop, {
         };
 
         pc.onicecandidateerror = (event) => {
-            console.error("[WebRTC] ICE candidate error for peer", peerId, {
+            // Error 701 (STUN host lookup failure) is common for IPv6 interfaces
+            // that lack connectivity to the STUN server — benign in practice.
+            const logFn = event.errorCode === 701 ? console.debug : console.error;
+            logFn("[WebRTC] ICE candidate error for peer", peerId, {
                 address: event.address,
                 port: event.port,
                 url: event.url,

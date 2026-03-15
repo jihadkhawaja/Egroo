@@ -489,11 +489,18 @@ namespace Egroo.UI.Services
             try
             {
                 var configuration = await _httpClient.GetFromJsonAsync<VoiceCallConfigurationResponse>("api/v1/Voice/config");
-                await _jsRuntime.InvokeVoidAsync("webrtcInterop.configureIceServers", configuration?.IceServers ?? Array.Empty<VoiceCallIceServerResponse>());
+                
+                await _jsRuntime.InvokeVoidAsync(
+                    "webrtcInterop.configureIceServers", 
+                    new object[] { configuration?.IceServers ?? Array.Empty<VoiceCallIceServerResponse>() }
+                );
             }
             catch
             {
-                await _jsRuntime.InvokeVoidAsync("webrtcInterop.configureIceServers", Array.Empty<VoiceCallIceServerResponse>());
+                await _jsRuntime.InvokeVoidAsync(
+                    "webrtcInterop.configureIceServers", 
+                    new object[] { Array.Empty<VoiceCallIceServerResponse>() }
+                );
             }
         }
 
@@ -587,13 +594,19 @@ namespace Egroo.UI.Services
 
         private sealed class VoiceCallConfigurationResponse
         {
+            [System.Text.Json.Serialization.JsonPropertyName("iceServers")]
             public VoiceCallIceServerResponse[] IceServers { get; set; } = [];
         }
 
         private sealed class VoiceCallIceServerResponse
         {
+            [System.Text.Json.Serialization.JsonPropertyName("urls")]
             public string[] Urls { get; set; } = [];
+            
+            [System.Text.Json.Serialization.JsonPropertyName("username")]
             public string? Username { get; set; }
+            
+            [System.Text.Json.Serialization.JsonPropertyName("credential")]
             public string? Credential { get; set; }
         }
     }

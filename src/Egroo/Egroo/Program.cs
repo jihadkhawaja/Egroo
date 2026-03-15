@@ -4,11 +4,14 @@ using Egroo.UI;
 using Egroo.UI.Constants;
 using Egroo.UI.Helpers;
 using Egroo.UI.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-ClientLoggingConfiguration.Configure(builder.Logging);
+ClientLoggingConfiguration.Configure(
+    builder.Logging,
+    builder.Environment.IsDevelopment() ? LogLevel.Information : LogLevel.Warning);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
