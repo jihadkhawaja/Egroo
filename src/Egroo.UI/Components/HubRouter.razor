@@ -73,11 +73,14 @@ else
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public EventCallback OnRoutingCompleted { get; set; }
 
+    private const int ReconnectOverlayRetryThreshold = 2;
+
     private bool IsBusy { get; set; } = true;
     private HubConnection? _observedConnection;
     private Func<Exception?, Task>? _reconnectingHandler;
     private Func<string?, Task>? _reconnectedHandler;
     private Func<Exception?, Task>? _closedHandler;
+    private CancellationTokenSource? _reconnectOverlayDelayCts;
     private bool _suppressConnectionOverlay;
     private bool _retryingConnection;
 
@@ -114,7 +117,7 @@ else
                 {
                     if (ChatSignalR.HubConnection.State is HubConnectionState.Reconnecting)
                     {
-                        SetReconnectRetryingState("Trying to restore your chat session.", null);
+                        ScheduleReconnectOverlay(ChatSignalR.HubConnection, "Trying to restore your chat session.", null);
                     }
 
                     IsBusy = false;
@@ -333,8 +336,8 @@ else
             return Task.CompletedTask;
         }
 
-        SetReconnectRetryingState("Trying to restore your chat session.", exception);
-        return InvokeAsync(StateHasChanged);
+        ScheduleReconnectOverlay(connection, "Trying to restore your chat session.", exception);
+        return Task.CompletedTask;
     }
 
     private Task OnHubReconnectedAsync(HubConnection connection, string? connectionId)
@@ -368,12 +371,60 @@ else
             return Task.CompletedTask;
         }
 
+        CancelReconnectOverlay();
         IsReconnectRetrying = false;
         IsReconnectFailed = true;
         ReconnectTitle = "Chat connection lost";
         ReconnectMessage = "We couldn't reconnect to the server automatically. Retry to restore live messages and presence.";
         ReconnectErrorDetail = ToReconnectErrorDetail(exception);
         return InvokeAsync(StateHasChanged);
+    }
+
+    private void ScheduleReconnectOverlay(HubConnection connection, string message, Exception? exception)
+    {
+        CancelReconnectOverlay();
+
+        var overlayDelay = ChatSignalR.GetAutomaticReconnectElapsedDelay(ReconnectOverlayRetryThreshold);
+
+        if (overlayDelay <= TimeSpan.Zero)
+        {
+            SetReconnectRetryingState(message, exception);
+            _ = InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        _reconnectOverlayDelayCts = new CancellationTokenSource();
+        _ = ShowReconnectOverlayAfterDelayAsync(connection, message, exception, overlayDelay, _reconnectOverlayDelayCts.Token);
+    }
+
+    private async Task ShowReconnectOverlayAfterDelayAsync(HubConnection connection, string message, Exception? exception, TimeSpan overlayDelay, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(overlayDelay, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (cancellationToken.IsCancellationRequested ||
+            _suppressConnectionOverlay ||
+            !ReferenceEquals(_observedConnection, connection) ||
+            connection.State is not HubConnectionState.Reconnecting)
+        {
+            return;
+        }
+
+        SetReconnectRetryingState(message, exception);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void CancelReconnectOverlay()
+    {
+        _reconnectOverlayDelayCts?.Cancel();
+        _reconnectOverlayDelayCts?.Dispose();
+        _reconnectOverlayDelayCts = null;
     }
 
     private void SetReconnectRetryingState(string message, Exception? exception)
@@ -387,6 +438,7 @@ else
 
     private void ClearReconnectState()
     {
+        CancelReconnectOverlay();
         IsReconnectRetrying = false;
         IsReconnectFailed = false;
         ReconnectTitle = string.Empty;
@@ -578,17 +630,29 @@ else
     private void PrintStateLog()
     {
 #if DEBUG
-        var log = $@"
-        [State]         {SessionStorage.AppState}
-        [Framework]     {ClientModel.CurrentFrameworkPlatform}
-        [ConnectionId]  {SessionStorage.User?.ConnectionId}
-        ";
+        var log = $"[Egroo] Connection ready | state={SessionStorage.AppState} | framework={ClientModel.CurrentFrameworkPlatform} | connection={FormatConnectionId(SessionStorage.User?.ConnectionId)}";
         Console.WriteLine(log);
 #endif
     }
 
+    private static string FormatConnectionId(string? connectionId)
+    {
+        if (string.IsNullOrWhiteSpace(connectionId))
+        {
+            return "n/a";
+        }
+
+        if (connectionId.Length <= 8)
+        {
+            return connectionId;
+        }
+
+        return $"{connectionId[..4]}...{connectionId[^4..]}";
+    }
+
     public void Dispose()
     {
+        CancelReconnectOverlay();
         DetachConnectionLifecycleHandlers();
     }
 }

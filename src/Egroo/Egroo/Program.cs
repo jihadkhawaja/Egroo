@@ -2,10 +2,13 @@ using Egroo.Client;
 using Egroo.Components;
 using Egroo.UI;
 using Egroo.UI.Constants;
+using Egroo.UI.Helpers;
 using Egroo.UI.Models;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+ClientLoggingConfiguration.Configure(builder.Logging);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
