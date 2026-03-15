@@ -1,28 +1,29 @@
 Summary - Egroo Server Coverage
-  Generated on: 03/15/2026 - 13:57:45
-  Coverage date: 03/15/2026 - 13:57:40
+  Generated on: 03/15/2026 - 15:18:43
+  Coverage date: 03/15/2026 - 15:18:36
   Parser: Cobertura
   Assemblies: 3
-  Classes: 34
-  Files: 35
-  Line coverage: 86%
-  Covered lines: 1827
+  Classes: 35
+  Files: 36
+  Line coverage: 86.3%
+  Covered lines: 1876
   Uncovered lines: 297
-  Coverable lines: 2124
-  Total lines: 9715
-  Branch coverage: 74.3% (429 of 577)
-  Covered branches: 429
-  Total branches: 577
-  Method coverage: 85.1% (189 of 222)
-  Full method coverage: 75.2% (167 of 222)
-  Covered methods: 189
-  Fully covered methods: 167
-  Total methods: 222
+  Coverable lines: 2173
+  Total lines: 9811
+  Branch coverage: 74.7% (442 of 591)
+  Covered branches: 442
+  Total branches: 591
+  Method coverage: 85.3% (193 of 226)
+  Full method coverage: 75.6% (171 of 226)
+  Covered methods: 193
+  Fully covered methods: 171
+  Total methods: 226
 
-Egroo.Server                                                    85.2%
+Egroo.Server                                                    85.6%
   Egroo.Server.API.AgentEndpoint                                97.5%
   Egroo.Server.API.AuthEndpoint                                  100%
   Egroo.Server.API.ChannelFileEndpoint                           100%
+  Egroo.Server.API.VoiceCallEndpoint                             100%
   Egroo.Server.Database.DataContext                              100%
   Egroo.Server.Database.LowerCaseNamingConvention                100%
   Egroo.Server.Helpers.CryptographyHelper                        100%
