@@ -1,5 +1,5 @@
-using jihadkhawaja.chat.shared.Interfaces;
 using System.Collections.Concurrent;
+using jihadkhawaja.chat.shared.Interfaces;
 
 namespace jihadkhawaja.chat.server.Services
 {

@@ -1,7 +1,7 @@
-﻿using jihadkhawaja.chat.client.Core;
+﻿using System.Diagnostics.CodeAnalysis;
+using jihadkhawaja.chat.client.Core;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Services
 {

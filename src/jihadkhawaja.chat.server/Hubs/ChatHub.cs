@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.SignalR;
-using System.Security.Claims;
 
 namespace jihadkhawaja.chat.server.Hubs
 {

@@ -1,11 +1,11 @@
-﻿using jihadkhawaja.chat.server.Hubs;
+﻿using System.Diagnostics.CodeAnalysis;
+using jihadkhawaja.chat.server.Hubs;
 using jihadkhawaja.chat.server.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.server
 {

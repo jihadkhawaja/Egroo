@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Http.Connections;
+﻿using System.Diagnostics.CodeAnalysis;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client.Core
 {

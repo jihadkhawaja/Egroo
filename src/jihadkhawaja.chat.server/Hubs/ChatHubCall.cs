@@ -1,7 +1,7 @@
+using System.Collections.Concurrent;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using System.Collections.Concurrent;
 
 namespace jihadkhawaja.chat.server.Hubs
 {

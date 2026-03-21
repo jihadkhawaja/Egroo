@@ -1,7 +1,7 @@
-﻿using jihadkhawaja.chat.client.Services;
+﻿using System.Diagnostics.CodeAnalysis;
+using jihadkhawaja.chat.client.Services;
 using jihadkhawaja.chat.shared.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
-using System.Diagnostics.CodeAnalysis;
 
 namespace jihadkhawaja.chat.client
 {
