@@ -70,7 +70,7 @@ jobs:
             | sed 's/-$//')"
 
           VERSION_TAG="${SAFE_REF}-${GITHUB_RUN_ID}"
-          IMAGE="${{ inputs.registry }}/${REPO_NAME}:${VERSION_TAG}"
+          IMAGE="${{ secrets.registry }}/${REPO_NAME}:${VERSION_TAG}"
 
           echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
           echo "tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
@@ -92,7 +92,7 @@ jobs:
       - name: Log in to registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ inputs.registry }}
+          registry: ${{ secrets.registry }}
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
