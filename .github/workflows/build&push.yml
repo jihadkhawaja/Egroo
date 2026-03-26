@@ -8,7 +8,7 @@ on:
 
 jobs:
   docker-egroo-api:
-    uses: jihadkhawaja/Egroo/.github/workflows/docker-build-push.yml@main
+    uses: ./.github/workflows/docker-build-push.yml
     with:
       image_name: egroo-api
       context: .
@@ -22,7 +22,7 @@ jobs:
       registry: ${{ secrets.REGISTRY_HOST }}
 
   docker-egroo-web:
-    uses: jihadkhawaja/Egroo/.github/workflows/docker-build-push.yml@main
+    uses: ./.github/workflows/docker-build-push.yml
     needs: [docker-egroo-api]
     with:
       image_name: egroo-web
