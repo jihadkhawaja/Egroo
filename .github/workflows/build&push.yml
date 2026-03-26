@@ -8,7 +8,7 @@ on:
 
 jobs:
   docker-egroo-api:
-    uses: jihadkhawaja/pipelines/.github/workflows/docker-build-push.yml@main
+    uses: jihadkhawaja/Egroo/.github/workflows/docker-build-push.yml@main
     with:
       image_name: egroo-api
       context: .
@@ -19,9 +19,10 @@ jobs:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
       APP_SETTINGS: ${{ secrets.APPSETTINGS_PROD }}
+      registry: ${{ secrets.REGISTRY_HOST }}
 
   docker-egroo-web:
-    uses: jihadkhawaja/pipelines/.github/workflows/docker-build-push.yml@main
+    uses: jihadkhawaja/Egroo/.github/workflows/docker-build-push.yml@main
     needs: [docker-egroo-api]
     with:
       image_name: egroo-web
@@ -30,6 +31,7 @@ jobs:
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      registry: ${{ secrets.REGISTRY_HOST }}
 
   update-gitops:
     runs-on: ubuntu-latest
