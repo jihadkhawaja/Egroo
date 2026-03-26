@@ -13,7 +13,6 @@ jobs:
       image_name: egroo-api
       context: .
       dockerfile: src/Egroo.Server/Dockerfile
-      registry: ${{ secrets.REGISTRY_HOST }}
       pre_build_script: |
         printf '%s' "$APP_SETTINGS" > src/Egroo.Server/appsettings.Production.json
     secrets:
@@ -28,7 +27,6 @@ jobs:
       image_name: egroo-web
       context: .
       dockerfile: src/Egroo/Egroo/Dockerfile
-      registry: ${{ secrets.REGISTRY_HOST }}
     secrets:
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
