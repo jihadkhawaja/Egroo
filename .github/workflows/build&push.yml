@@ -1,0 +1,77 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  docker-egroo-api:
+    uses: jihadkhawaja/pipelines/.github/workflows/docker-build-push.yml@main
+    with:
+      image_name: egroo-api
+      context: .
+      dockerfile: src/Egroo.Server/Dockerfile
+      pre_build_script: |
+        printf '%s' "$APP_SETTINGS" > src/Egroo.Server/appsettings.Production.json
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      APP_SETTINGS: ${{ secrets.APPSETTINGS_PROD }}
+
+  docker-egroo-web:
+    uses: jihadkhawaja/pipelines/.github/workflows/docker-build-push.yml@main
+    needs: [docker-egroo-api]
+    with:
+      image_name: egroo-web
+      context: .
+      dockerfile: src/Egroo/Egroo/Dockerfile
+    secrets:
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+
+  update-gitops:
+    runs-on: ubuntu-latest
+    needs:
+      - docker-egroo-api
+      - docker-egroo-web
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: youssofkhawaja/platform-gitops
+          ref: main
+          token: ${{ secrets.GITOPS_PAT }}
+          path: gitops
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Update image tags
+        shell: bash
+        run: |
+          FILE="gitops/apps/egroo/values.yaml"
+
+          yq -i '.api.image.tag = "${{ needs.docker-egroo-api.outputs.tag }}"' "$FILE"
+          yq -i '.web.image.tag = "${{ needs.docker-egroo-web.outputs.tag }}"' "$FILE"
+
+          cat "$FILE"
+
+      - name: Commit and push
+        shell: bash
+        run: |
+          cd gitops
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add apps/egroo/values.yaml
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+
+          git commit -m "Update egroo image tags"
+          git push origin main
