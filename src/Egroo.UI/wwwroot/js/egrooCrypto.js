@@ -24,19 +24,6 @@
         return bytes;
     }
 
-    function base64UrlToText(base64Url) {
-        let padded = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        while (padded.length % 4 !== 0) {
-            padded += "=";
-        }
-
-        return textDecoder.decode(base64ToBytes(padded));
-    }
-
-    function parseEncryptedFileMetadata(tokenBase64Url) {
-        return JSON.parse(base64UrlToText(tokenBase64Url));
-    }
-
     async function importPublicKey(publicKeyBase64) {
         return crypto.subtle.importKey(
             "spki",
@@ -60,97 +47,6 @@
         return Array.from(new Uint8Array(digest))
             .map(value => value.toString(16).padStart(2, "0"))
             .join("");
-    }
-
-    async function decryptEncryptedFileToBlob(tokenBase64Url) {
-        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
-        const jwt = localStorage.getItem("token");
-
-        if (!jwt) {
-            throw new Error("Missing access token.");
-        }
-
-        const response = await fetch(metadata.Url, {
-            headers: {
-                Authorization: `Bearer ${jwt}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to download encrypted file: ${response.status}`);
-        }
-
-        const cipherBytes = new Uint8Array(await response.arrayBuffer());
-        const aesKey = await crypto.subtle.importKey(
-            "raw",
-            base64ToBytes(metadata.Key),
-            { name: "AES-GCM" },
-            false,
-            ["decrypt"]);
-
-        const plainBuffer = await crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: base64ToBytes(metadata.Iv) },
-            aesKey,
-            cipherBytes);
-
-        return new Blob([plainBuffer], { type: metadata.ContentType || "application/octet-stream" });
-    }
-
-    async function downloadEncryptedFile(tokenBase64Url) {
-        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
-        const blob = await decryptEncryptedFileToBlob(tokenBase64Url);
-        const objectUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = objectUrl;
-        anchor.download = metadata.FileName || "download";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(objectUrl);
-    }
-
-    async function renderEncryptedImage(imageElement) {
-        if (!(imageElement instanceof HTMLImageElement)) {
-            return;
-        }
-
-        const token = imageElement.getAttribute("data-egroo-file");
-        if (!token || imageElement.dataset.egrooLoaded === "true") {
-            return;
-        }
-
-        imageElement.dataset.egrooLoaded = "loading";
-
-        try {
-            const metadata = parseEncryptedFileMetadata(token);
-            const blob = await decryptEncryptedFileToBlob(token);
-            const objectUrl = URL.createObjectURL(blob);
-            const previousObjectUrl = imageElement.dataset.egrooObjectUrl;
-
-            if (previousObjectUrl) {
-                URL.revokeObjectURL(previousObjectUrl);
-            }
-
-            imageElement.src = objectUrl;
-            imageElement.alt = metadata.FileName || imageElement.alt || "Encrypted image";
-            imageElement.dataset.egrooObjectUrl = objectUrl;
-            imageElement.dataset.egrooLoaded = "true";
-        }
-        catch (error) {
-            imageElement.dataset.egrooLoaded = "error";
-            imageElement.alt = imageElement.alt || "Failed to load image";
-            console.error(error);
-        }
-    }
-
-    function hydrateEncryptedImages(root) {
-        if (!(root instanceof Element || root instanceof Document)) {
-            return;
-        }
-
-        root.querySelectorAll(".egroo-encrypted-image[data-egroo-file]").forEach(element => {
-            renderEncryptedImage(element).catch(console.error);
-        });
     }
 
     window.egrooCrypto = {
@@ -319,42 +215,12 @@
             };
         },
 
-        downloadEncryptedFile
+        async decryptFile({ encryptedBase64, keyBase64, ivBase64 }) {
+            const key = await crypto.subtle.importKey("raw", base64ToBytes(keyBase64), "AES-GCM", false, ["decrypt"]);
+            const bytes = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: base64ToBytes(ivBase64) }, key, base64ToBytes(encryptedBase64));
+            return bytesToBase64(new Uint8Array(bytes));
+        }
     };
 
-    hydrateEncryptedImages(document);
-
-    const observer = new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-            mutation.addedNodes.forEach(node => {
-                if (node instanceof Element) {
-                    if (node.matches(".egroo-encrypted-image[data-egroo-file]")) {
-                        renderEncryptedImage(node).catch(console.error);
-                    }
-
-                    hydrateEncryptedImages(node);
-                }
-            });
-        }
-    });
-
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-
-    document.addEventListener("click", function (event) {
-        const target = event.target instanceof Element
-            ? event.target.closest(".egroo-encrypted-file")
-            : null;
-
-        if (!target) {
-            return;
-        }
-
-        event.preventDefault();
-        const token = target.getAttribute("data-egroo-file");
-        if (!token) {
-            return;
-        }
-
-        downloadEncryptedFile(token).catch(console.error);
-    });
 })();

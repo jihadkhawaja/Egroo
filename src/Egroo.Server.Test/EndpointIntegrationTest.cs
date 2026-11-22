@@ -25,6 +25,20 @@ public class EndpointIntegrationTest
 
     private static readonly InMemoryDatabaseRoot DatabaseRoot = new();
 
+    [TestMethod]
+    public async Task ClientRuntimeAssetsAreServedWithoutAuthentication()
+    {
+        using var factory = CreateFactory(nameof(ClientRuntimeAssetsAreServedWithoutAuthentication));
+        using var client = factory.CreateClient();
+        using var page = await client.GetAsync("/runtime/index.html");
+        Assert.AreEqual(HttpStatusCode.OK, page.StatusCode);
+        StringAssert.Contains(await page.Content.ReadAsStringAsync(), "clientRuntime.js");
+
+        using var script = await client.GetAsync("/runtime/clientRuntime.js");
+        Assert.AreEqual(HttpStatusCode.OK, script.StatusCode);
+        StringAssert.Contains(await script.Content.ReadAsStringAsync(), "globalThis.egrooRuntime");
+    }
+
     static EndpointIntegrationTest()
     {
         ApplyTestConfigurationToProcessEnvironment();

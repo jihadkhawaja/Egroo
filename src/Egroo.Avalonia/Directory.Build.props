@@ -1,0 +1,11 @@
+<Project>
+  <Import Project="../../Directory.Build.props" />
+  <PropertyGroup>
+    <AvaloniaVersion>12.1.4</AvaloniaVersion>
+    <AvaloniaWebViewVersion>12.1.2</AvaloniaWebViewVersion>
+    <EgrooApiUrl Condition="'$(EgrooApiUrl)' == ''">https://api.egroo.org/</EgrooApiUrl>
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

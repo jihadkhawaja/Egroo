@@ -2,7 +2,7 @@
 
 This wiki is the practical reference for running, extending, and deploying Egroo.
 
-Egroo is a self-hosted real-time chat platform built with .NET 10, Blazor Auto, ASP.NET Core, SignalR, and PostgreSQL. It supports channel chat, WebRTC voice calls, AI agents, and per-recipient end-to-end encrypted message delivery.
+Egroo is a self-hosted real-time chat platform built with .NET 10, Avalonia, ASP.NET Core, SignalR, and PostgreSQL. It supports channel chat, WebRTC voice calls, AI agents, and per-recipient end-to-end encrypted message delivery.
 
 ## Read This First
 
@@ -11,8 +11,8 @@ If you want the shortest path to a working local environment:
 1. Install .NET 10 SDK and PostgreSQL.
 2. Configure `src/Egroo.Server/appsettings.Development.json` with database, JWT, and encryption settings.
 3. Run `dotnet watch --project src/Egroo.Server/Egroo.Server.csproj`.
-4. Run `dotnet watch --project src/Egroo/Egroo/Egroo.csproj`.
-5. Open `http://localhost:5068`, create an account, and sign in.
+4. Run `dotnet run --project src/Egroo.Avalonia/Desktop`.
+5. Open the Avalonia window, create an account, and sign in.
 
 On first sign-in, the client can generate and publish a device encryption key used for end-to-end message decryption on that device.
 
@@ -34,7 +34,7 @@ On first sign-in, the client can generate and publish a device encryption key us
 
 - .NET 10 SDK
 - PostgreSQL
-- Two local terminals for the API and web host
+- Two local terminals for the API and desktop client
 - A modern browser with WebSocket and WebAssembly support
 
 Optional tools:
@@ -48,7 +48,7 @@ Optional tools:
 Egroo runs as separate development processes:
 
 - `src/Egroo.Server` hosts the API and SignalR backend on `http://localhost:5175`
-- `src/Egroo/Egroo` hosts the Blazor web app on `http://localhost:5068`
+- `src/Egroo.Avalonia/Browser` publishes the static WebAssembly client
 - `src/Egroo.UI/Constants/Source.cs` controls the UI's API base URL
 
 The API applies pending EF Core migrations on startup.

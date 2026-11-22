@@ -61,7 +61,7 @@ Edit `src/Egroo.Server/appsettings.Development.json`.
 dotnet build src/Egroo.slnx --configuration Debug
 ```
 
-### 5. Start The API And Web App
+### 5. Start the API and desktop client
 
 Terminal 1:
 
@@ -72,12 +72,12 @@ dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
 Terminal 2:
 
 ```bash
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
 ### 6. Open The App
 
-- Web app: `http://localhost:5068`
+- The desktop client opens in its own window.
 - API Swagger: `http://localhost:5175/swagger`
 
 After sign-in, the client can publish a device encryption key for end-to-end encrypted message delivery. If you clear browser storage later, regenerate the device key from the app settings on that device.
@@ -136,7 +136,7 @@ From the repository root:
 
 ```bash
 docker build -f src/Egroo.Server/Dockerfile -t egroo-server .
-docker build -f src/Egroo/Egroo/Dockerfile -t egroo-web .
+docker build -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-web .
 ```
 
 This is useful when you want local images without pulling from a registry.
@@ -147,7 +147,7 @@ Your setup is ready when all of these are true:
 
 1. PostgreSQL is reachable with the connection string you configured.
 2. `http://localhost:5175/swagger` opens in development.
-3. `http://localhost:5068` loads the UI.
+3. The Avalonia window loads the UI.
 4. You can sign up and sign in.
 5. You can send a message successfully after sign-in.
 

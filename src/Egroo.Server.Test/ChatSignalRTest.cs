@@ -1,4 +1,4 @@
-using jihadkhawaja.chat.client.Core;
+using Egroo.Client.Core;
 
 namespace Egroo.Server.Test
 {

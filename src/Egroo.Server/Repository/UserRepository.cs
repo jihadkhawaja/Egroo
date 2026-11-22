@@ -1,8 +1,8 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
 using ImageMagick;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Repository

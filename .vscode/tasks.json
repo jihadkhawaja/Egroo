@@ -2,12 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build: Egroo (Blazor)",
+            "label": "build: Egroo (Avalonia)",
             "command": "dotnet",
             "type": "shell",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj",
+                "${workspaceFolder}/src/Egroo.Avalonia/Desktop/Egroo.Avalonia.Desktop.csproj",
                 "--configuration",
                 "Debug"
             ],
@@ -53,12 +53,12 @@
             }
         },
         {
-            "label": "publish: Egroo (Blazor)",
+            "label": "publish: Egroo (Avalonia)",
             "command": "dotnet",
             "type": "shell",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj",
+                "${workspaceFolder}/src/Egroo.Avalonia/Desktop/Egroo.Avalonia.Desktop.csproj",
                 "--configuration",
                 "Release",
                 "--output",
@@ -148,13 +148,13 @@
             }
         },
         {
-            "label": "watch: Egroo (Blazor)",
+            "label": "watch: Egroo (Avalonia)",
             "command": "dotnet",
             "type": "shell",
             "args": [
                 "watch",
                 "--project",
-                "${workspaceFolder}/src/Egroo/Egroo/Egroo.csproj"
+                "${workspaceFolder}/src/Egroo.Avalonia/Desktop/Egroo.Avalonia.Desktop.csproj"
             ],
             "group": "none",
             "isBackground": true,

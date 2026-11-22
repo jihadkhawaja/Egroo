@@ -1,4 +1,4 @@
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

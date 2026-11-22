@@ -1,5 +1,5 @@
 using Egroo.Server.Models;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Database

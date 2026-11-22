@@ -1,10 +1,10 @@
 namespace Egroo.Server.Test
 {
     /// <summary>
-    /// Tests the channel CRUD flow using the <c>jihadkhawaja.chat.server</c> hub
+    /// Tests the channel CRUD flow using the <c>Egroo.Server.SignalR</c> hub
     /// backed by an in-memory EF Core database.
     /// These tests exercise <c>ChannelRepository</c> which implements
-    /// <see cref="IChannel"/> defined in <c>jihadkhawaja.chat.shared</c>.
+    /// <see cref="IChannel"/> defined in <c>Egroo.Contracts</c>.
     /// </summary>
     [TestClass]
     public class ChannelTest

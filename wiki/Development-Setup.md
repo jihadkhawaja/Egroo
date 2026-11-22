@@ -20,13 +20,13 @@ Recommended:
 
 | Project | Role |
 |---|---|
-| `src/Egroo/Egroo` | Blazor host application |
-| `src/Egroo/Egroo.Client` | Blazor WebAssembly project |
+| `src/Egroo.Avalonia/Desktop` | Avalonia desktop client |
+| `src/Egroo.Avalonia/Browser` | Avalonia WebAssembly client |
 | `src/Egroo.UI` | Shared component library |
 | `src/Egroo.Server` | API, SignalR, EF Core, repositories |
-| `src/jihadkhawaja.chat.client` | Client chat services |
-| `src/jihadkhawaja.chat.server` | SignalR hub implementation |
-| `src/jihadkhawaja.chat.shared` | Shared contracts and models |
+| `src/Egroo.Client` | Client chat services |
+| `src/Egroo.Server.SignalR` | SignalR hub implementation |
+| `src/Egroo.Contracts` | Shared contracts and models |
 | `src/Egroo.Server.Test` | MSTest project |
 
 The main solution file is `src/Egroo.slnx`.
@@ -76,13 +76,13 @@ dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
 Terminal 2:
 
 ```bash
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
 Runtime defaults:
 
 - API: `http://localhost:5175`
-- Web app: `http://localhost:5068`
+- Desktop app: the Avalonia window opens when the client starts
 - Swagger: `http://localhost:5175/swagger`
 
 The UI already targets `http://localhost:5175/` in debug builds through `src/Egroo.UI/Constants/Source.cs`.
@@ -128,7 +128,7 @@ The workspace already includes build and test tasks for:
 
 - building the full solution
 - building the API
-- building the Blazor host
+- building the Avalonia client
 - running the server tests
 
 If you mainly work in VS Code, those tasks are the easiest way to keep the standard commands consistent.
@@ -154,7 +154,7 @@ If you mainly work in VS Code, those tasks are the easiest way to keep the stand
 
 1. Pull latest changes.
 2. Build the solution.
-3. Start API and web host with `dotnet watch`.
+3. Start the API and Avalonia desktop client.
 4. Run tests for the area you changed.
 5. Update docs when behavior or setup changes.
 

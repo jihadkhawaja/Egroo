@@ -1,6 +1,5 @@
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
-using Microsoft.JSInterop;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using System.Text;
 using System.Text.Json;
 
@@ -11,12 +10,13 @@ namespace Egroo.UI.Services
         private const string IdentityStorageKey = "egroo.e2ee.identity.v1";
         private const string DecryptionErrorMessage = "[Unable to decrypt this message on this device.]";
 
-        private readonly IJSRuntime _jsRuntime;
+        private readonly ClientRuntime _jsRuntime;
         private readonly StorageService _storageService;
         private readonly IUser _chatUserService;
+        private string _identityKey = IdentityStorageKey;
 
         public EndToEndEncryptionService(
-            IJSRuntime jsRuntime,
+            ClientRuntime jsRuntime,
             StorageService storageService,
             IUser chatUserService)
         {
@@ -25,9 +25,13 @@ namespace Egroo.UI.Services
             _chatUserService = chatUserService;
         }
 
-        public async Task<EncryptionIdentity?> GetLocalIdentityAsync()
+        internal void UseIdentityScope(Uri api, Guid userId) => _identityKey = $"{IdentityStorageKey}:{api.AbsoluteUri}:{userId:N}";
+
+        public Task<EncryptionIdentity?> GetLocalIdentityAsync() => ReadIdentityAsync(_identityKey);
+
+        private async Task<EncryptionIdentity?> ReadIdentityAsync(string key)
         {
-            string? raw = await _storageService.GetFromLocalStorage(IdentityStorageKey);
+            string? raw = await _storageService.GetFromLocalStorage(key);
             if (string.IsNullOrWhiteSpace(raw))
             {
                 return null;
@@ -46,6 +50,13 @@ namespace Egroo.UI.Services
         public async Task<EncryptionReadiness> EnsureIdentityAsync(UserDto? currentUser)
         {
             var localIdentity = await GetLocalIdentityAsync();
+            if (localIdentity is null && _identityKey != IdentityStorageKey
+                && await ReadIdentityAsync(IdentityStorageKey) is { } legacy
+                && IsKeyRegisteredOnServer(legacy, currentUser))
+            {
+                localIdentity = legacy;
+                await SaveLocalIdentityAsync(legacy);
+            }
 
             // No local key and no server keys → generate new key and register it
             if (localIdentity is null && string.IsNullOrWhiteSpace(currentUser?.EncryptionPublicKey))
@@ -269,7 +280,7 @@ namespace Egroo.UI.Services
 
         private async Task SaveLocalIdentityAsync(EncryptionIdentity identity)
         {
-            await _storageService.SetLocalStorage(IdentityStorageKey, JsonSerializer.Serialize(identity));
+            await _storageService.SetLocalStorage(_identityKey, JsonSerializer.Serialize(identity));
         }
 
         private async Task<EncryptedRecipientPayload[]> EncryptRecipientPayloadsAsync(string plaintext, EncryptionRecipientRequest[] recipients)

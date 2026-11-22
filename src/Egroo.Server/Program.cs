@@ -3,12 +3,13 @@ using Egroo.Server.Database;
 using Egroo.Server.Repository;
 using Egroo.Server.Security;
 using Egroo.Server.Services;
-using jihadkhawaja.chat.server;
-using jihadkhawaja.chat.shared.Interfaces;
+using Egroo.Server.SignalR;
+using Egroo.Contracts.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Diagnostics.CodeAnalysis;
@@ -238,6 +239,11 @@ public partial class Program
             app.UseHttpsRedirection();
         }
 
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            RequestPath = "/runtime",
+            FileProvider = new EmbeddedFileProvider(typeof(Program).Assembly, "Egroo.Server.Runtime")
+        });
         app.UseRouting();
         app.UseRateLimiter();
         app.UseCors("CorsPolicy");

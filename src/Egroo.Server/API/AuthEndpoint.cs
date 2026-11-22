@@ -1,4 +1,4 @@
-using jihadkhawaja.chat.shared.Interfaces;
+using Egroo.Contracts.Interfaces;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Egroo.Server.API

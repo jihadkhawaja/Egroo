@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="$(AvaloniaWebViewVersion)" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>EgrooApiUrl</_Parameter1>
+      <_Parameter2>$(EgrooApiUrl)</_Parameter2>
+    </AssemblyAttribute>
+    <AvaloniaResource Include="../../Egroo.UI/wwwroot/favicon.ico" Link="Assets/egroo.ico" />
+    <ProjectReference Include="../../Egroo.UI/Egroo.UI.csproj" />
+  </ItemGroup>
+</Project>

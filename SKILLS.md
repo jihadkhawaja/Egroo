@@ -4,11 +4,11 @@ This file captures the practical skills and conventions needed to work effective
 
 ## UI And Design Skill
 
-- Use MudBlazor components first.
+- Use Avalonia controls first.
 - Favor deliberate contrast and readable hierarchy over subtle low-contrast effects.
 - Keep the existing orange-accented dark visual language unless a feature explicitly introduces a scoped variant.
 - Chat surfaces must remain readable on desktop and mobile widths.
-- New CSS should support both regular message bubbles and current-user message bubbles.
+- New styles should support both regular message bubbles and current-user message bubbles.
 
 ## Chat Composition Skill
 

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -42,7 +42,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\jihadkhawaja.chat.server\jihadkhawaja.chat.server.csproj" />
+    <ProjectReference Include="..\Egroo.Contracts\Egroo.Contracts.csproj" />
+    <ProjectReference Include="..\Egroo.Server.SignalR\Egroo.Server.SignalR.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -53,5 +54,8 @@
 
   <ItemGroup>
     <Folder Include="wwwroot\" />
+    <EmbeddedResource Include="../Egroo.UI/wwwroot/runtime.html" LogicalName="Egroo.Server.Runtime.index.html" />
+    <EmbeddedResource Include="../Egroo.UI/wwwroot/js/clientRuntime.js;../Egroo.UI/wwwroot/js/egrooCrypto.js;../Egroo.UI/wwwroot/js/webrtcInterop*.js"
+                      LogicalName="Egroo.Server.Runtime.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

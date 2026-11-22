@@ -26,10 +26,10 @@ argument-hint: 'Describe what you want to build or fix (e.g. "add a weather tool
 | `src/Egroo.Server/Services/BuiltinTools.cs` | Predefined `AIFunction` tools (datetime, timezone) — add new builtins here |
 | `src/Egroo.Server/Services/McpClientService.cs` | JSON-RPC HTTP client for MCP tool discovery and invocation |
 | `src/Egroo.Server/API/AgentEndpoint.cs` | All `/api/v1/Agent` Minimal API routes |
-| `src/jihadkhawaja.chat.shared/Models/Agent.cs` | `AgentDefinition`, `AgentTool`, `AgentKnowledge`, `AgentConversation`, `AgentConversationMessage`, `LlmProvider` enum |
-| `src/jihadkhawaja.chat.shared/Interfaces/IAgentRepository.cs` | Repository interface for all agent CRUD operations |
+| `src/Egroo.Contracts/Models/Agent.cs` | `AgentDefinition`, `AgentTool`, `AgentKnowledge`, `AgentConversation`, `AgentConversationMessage`, `LlmProvider` enum |
+| `src/Egroo.Contracts/Interfaces/IAgentRepository.cs` | Repository interface for all agent CRUD operations |
 | `src/Egroo.Server/Repository/AgentRepository.cs` | EF Core implementation of `IAgentRepository` |
-| `src/jihadkhawaja.chat.client/Services/AgentService.cs` | Client-side HTTP service (mirrors server endpoints) |
+| `src/Egroo.Client/Services/AgentService.cs` | Client-side HTTP service (mirrors server endpoints) |
 
 For framework details, see [./references/ms-agent-framework.md](./references/ms-agent-framework.md).
 
@@ -38,7 +38,7 @@ For framework details, see [./references/ms-agent-framework.md](./references/ms-
 ## Architecture
 
 ```
-Client (Blazor)
+Client (Avalonia)
   └─ AgentService (HTTP)
        └─ POST /api/v1/Agent/conversations/{id}/send-message
             └─ AgentRuntimeService.ChatAsync / ChatStreamAsync
@@ -56,7 +56,7 @@ Client (Blazor)
 
 ### 1. Creating a New Agent (Backend)
 
-1. **Model**: `AgentDefinition` (in `jihadkhawaja.chat.shared/Models/Agent.cs`) holds all config. Required fields: `UserId`, `Name`, `Provider` (`LlmProvider` enum), `Model`, `ApiKey` (stored AES-encrypted), `Instructions`.
+1. **Model**: `AgentDefinition` (in `Egroo.Contracts/Models/Agent.cs`) holds all config. Required fields: `UserId`, `Name`, `Provider` (`LlmProvider` enum), `Model`, `ApiKey` (stored AES-encrypted), `Instructions`.
 
 2. **Encrypt the API key** before saving — `EncryptionService.Encrypt(apiKey)`. Keys are stripped from all API responses.
 
@@ -169,5 +169,5 @@ All agent routes require JWT auth (`RequireAuthorization()`) and inherit the `"A
 - **`LlmProvider.Ollama` requires an `Endpoint`** field on `AgentDefinition` — validate it non-null before calling.
 - **Conversation `SessionState`** is stored as serialized JSON in the DB — full history is loaded on every turn. For long conversations, consider truncation.
 - **MCP tool discover is manual** — tools are not auto-refreshed; call the discover endpoint after updating an MCP server.
-- **`jihadkhawaja.chat.shared` changes** require rebuilding shared → server/client in order before tests pass.
+- **`Egroo.Contracts` changes** require rebuilding shared → server/client in order before tests pass.
 - **Streaming endpoint** must be called with `HttpCompletionOption.ResponseHeadersRead` from the client.

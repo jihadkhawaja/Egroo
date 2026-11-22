@@ -1,6 +1,6 @@
 [
   {
-    "Name": "Web + Server",
+    "Name": "Desktop + Server",
     "Projects": [
       {
         "Path": "Egroo.Server\\Egroo.Server.csproj",
@@ -8,9 +8,9 @@
         "DebugTarget": "Server"
       },
       {
-        "Path": "Egroo\\Egroo\\Egroo.csproj",
+        "Path": "Egroo.Avalonia\\Desktop\\Egroo.Avalonia.Desktop.csproj",
         "Action": "Start",
-        "DebugTarget": "https"
+        "DebugTarget": "Egroo local"
       }
     ]
   },

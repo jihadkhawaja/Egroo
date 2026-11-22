@@ -1,6 +1,6 @@
 using Egroo.Server.Database;
 using Egroo.Server.Services;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.Extensions.AI;
 using System.ComponentModel;
 using System.Text;

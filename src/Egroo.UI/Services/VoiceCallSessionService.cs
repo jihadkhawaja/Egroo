@@ -1,8 +1,6 @@
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
-using Microsoft.JSInterop;
-using MudBlazor;
+using Egroo.Client.Services;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using System.Net.Http.Json;
 
 namespace Egroo.UI.Services
@@ -13,13 +11,12 @@ namespace Egroo.UI.Services
         private readonly ChatCallService _chatCallService;
         private readonly IUser _chatUserService;
         private readonly HttpClient _httpClient;
-        private readonly IJSRuntime _jsRuntime;
-        private readonly ISnackbar _snackbar;
+        private readonly ClientRuntime _jsRuntime;
+        private readonly Action<string> _notify;
 
         private readonly HashSet<Guid> _participantIds = new();
         private readonly Dictionary<Guid, UserDto> _participantUsers = new();
 
-        private DotNetObjectReference<VoiceCallSessionService>? _dotNetRef;
         private System.Timers.Timer? _callTimer;
         private DateTime? _callStartTime;
         private bool _initialized;
@@ -39,15 +36,15 @@ namespace Egroo.UI.Services
             ChatCallService chatCallService,
             IUser chatUserService,
             HttpClient httpClient,
-            IJSRuntime jsRuntime,
-            ISnackbar snackbar)
+            ClientRuntime jsRuntime,
+            Action<string> notify)
         {
             _sessionStorage = sessionStorage;
             _chatCallService = chatCallService;
             _chatUserService = chatUserService;
             _httpClient = httpClient;
             _jsRuntime = jsRuntime;
-            _snackbar = snackbar;
+            _notify = notify;
         }
 
         public event Action? StateChanged;
@@ -77,8 +74,7 @@ namespace Egroo.UI.Services
             }
 
             await ConfigureIceServersAsync();
-            _dotNetRef = DotNetObjectReference.Create(this);
-            await _jsRuntime.InvokeVoidAsync("webrtcInterop.registerDotNetObject", _dotNetRef);
+            _jsRuntime.MediaEvent += OnMediaEvent;
             RegisterCallEvents();
             _initialized = true;
             await SyncAudioProcessingStateAsync();
@@ -125,7 +121,7 @@ namespace Egroo.UI.Services
 
             if (IsInCall)
             {
-                _snackbar.Add("Leave your current voice call before joining another channel.", Severity.Warning);
+                _notify("Leave your current voice call before joining another channel.");
                 return false;
             }
 
@@ -135,7 +131,7 @@ namespace Egroo.UI.Services
                 bool acquired = await _jsRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString(), selfUserId);
                 if (!acquired)
                 {
-                    _snackbar.Add("Could not access microphone. Please check permissions.", Severity.Error);
+                    _notify("Could not access microphone. Please check permissions.");
                     return false;
                 }
 
@@ -159,12 +155,12 @@ namespace Egroo.UI.Services
 
                 await _chatCallService.JoinChannelCall(channelId);
 
-                _snackbar.Add("Joined voice call", Severity.Success);
+                _notify("Joined voice call");
                 return true;
             }
             catch (Exception ex)
             {
-                _snackbar.Add($"Failed to join call: {ex.Message}", Severity.Error);
+                _notify($"Failed to join call: {ex.Message}");
 
                 try
                 {
@@ -208,7 +204,7 @@ namespace Egroo.UI.Services
 
             if (notifyUser)
             {
-                _snackbar.Add("Left voice call", Severity.Info);
+                _notify("Left voice call");
             }
         }
 
@@ -235,13 +231,20 @@ namespace Egroo.UI.Services
 
             if (state?.WasApplied == false)
             {
-                _snackbar.Add($"{displayName} could not be changed on this browser/device.", Severity.Warning);
+                _notify($"{displayName} could not be changed on this browser/device.");
             }
 
             NotifyStateChanged();
         }
 
-        [JSInvokable]
+        private Task OnMediaEvent(string name, string peerId, string value) => name switch
+        {
+            nameof(OnIceCandidateGenerated) => OnIceCandidateGenerated(peerId, value),
+            nameof(OnPeerDisconnected) => OnPeerDisconnected(peerId),
+            nameof(OnOfferGenerated) => OnOfferGenerated(peerId, value),
+            _ => Task.CompletedTask
+        };
+
         public async Task OnIceCandidateGenerated(string peerId, string candidateJson)
         {
             if (_disposed || !IsInCall || !Guid.TryParse(peerId, out Guid targetUserId))
@@ -256,7 +259,6 @@ namespace Egroo.UI.Services
             catch { }
         }
 
-        [JSInvokable]
         public async Task OnPeerDisconnected(string peerId)
         {
             if (_disposed || !Guid.TryParse(peerId, out Guid userId))
@@ -302,7 +304,7 @@ namespace Egroo.UI.Services
             if (_onChannelCallParticipantsChanged is not null)
                 _chatCallService.OnChannelCallParticipantsChanged -= _onChannelCallParticipantsChanged;
 
-            _dotNetRef?.Dispose();
+            _jsRuntime.MediaEvent -= OnMediaEvent;
         }
 
         private void RegisterCallEvents()
@@ -504,7 +506,6 @@ namespace Egroo.UI.Services
             }
         }
 
-        [JSInvokable]
         public async Task OnOfferGenerated(string peerId, string offerSdp)
         {
             if (_disposed || !IsInCall || !Guid.TryParse(peerId, out Guid targetUserId) || string.IsNullOrWhiteSpace(offerSdp))

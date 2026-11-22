@@ -34,7 +34,7 @@ window.webrtcInterop = {
     },
 
     /**
-     * Register the DotNet object reference for callbacks into Blazor.
+     * Register the callback sink for the Egroo client runtime.
      */
     registerDotNetObject: function (dotNetObject) {
         this.dotNetObject = dotNetObject;

@@ -1,5 +1,5 @@
-using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.server.Services;
+using Egroo.Server.SignalR.Hubs;
+using Egroo.Server.SignalR.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;

@@ -1,5 +1,5 @@
 using Egroo.Server.Services;
-using jihadkhawaja.chat.shared.Interfaces;
+using Egroo.Contracts.Interfaces;
 using System.Security.Claims;
 
 namespace Egroo.Server.API

@@ -17,7 +17,6 @@ services:
 
   egroo-web:
     image: jihadkhawaja/egroo-client-prod:${WEB_IMAGE_TAG:-latest}
-    entrypoint: ["dotnet", "Egroo.dll"]
     container_name: egroo-web
     hostname: egroo-web
     restart: unless-stopped

@@ -1,7 +1,7 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
 using Egroo.Server.Tools;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -395,12 +395,12 @@ namespace Egroo.Server.Services
 
             // Separate built-in and MCP tools
             var builtinToolNames = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin)
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Builtin)
                 .Select(t => t.Name)
                 .ToList();
 
             var mcpToolDefs = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Mcp && t.McpServerId.HasValue)
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Mcp && t.McpServerId.HasValue)
                 .ToList();
 
             // Add enabled built-in tools
@@ -414,7 +414,7 @@ namespace Egroo.Server.Services
             if (mcpToolDefs.Count > 0)
             {
                 var serverIds = mcpToolDefs.Select(t => t.McpServerId!.Value).Distinct().ToList();
-                var servers = await dbContext.Set<jihadkhawaja.chat.shared.Models.AgentMcpServer>()
+                var servers = await dbContext.Set<Egroo.Contracts.Models.AgentMcpServer>()
                     .Where(s => serverIds.Contains(s.Id) && s.IsActive && s.DateDeleted == null)
                     .ToListAsync();
 
@@ -453,7 +453,7 @@ namespace Egroo.Server.Services
             var scopedToolNames = BuiltinTools.GetScopedToolNames();
 
             var enabledScopedTools = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
                 .Select(t => t.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

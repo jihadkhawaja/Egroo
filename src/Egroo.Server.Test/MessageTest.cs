@@ -2,9 +2,9 @@ namespace Egroo.Server.Test
 {
     /// <summary>
     /// Tests the message send / update / pending flow using the
-    /// <c>jihadkhawaja.chat.server</c> hub backed by an in-memory EF Core database.
+    /// <c>Egroo.Server.SignalR</c> hub backed by an in-memory EF Core database.
     /// These tests exercise <c>MessageRepository</c> which implements
-    /// <see cref="IMessageRepository"/> defined in <c>jihadkhawaja.chat.shared</c>.
+    /// <see cref="IMessageRepository"/> defined in <c>Egroo.Contracts</c>.
     /// </summary>
     [TestClass]
     public class MessageTest

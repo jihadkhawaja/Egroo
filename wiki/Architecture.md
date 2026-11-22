@@ -6,30 +6,29 @@ This document summarizes the current Egroo runtime, project boundaries, encrypti
 
 ```mermaid
 flowchart TD
-    Browser["Browser / PWA"]
+    Browser["Browser / WebAssembly"]
     Db[("PostgreSQL")]
 
     subgraph PresentationLayer["Presentation Layer"]
         direction TB
-        Host["Egroo Host"]
+        Host["Avalonia platform hosts"]
         UI["Egroo.UI"]
-        Client["Egroo.Client"]
     end
 
     subgraph ClientServicesLayer["Client Services Layer"]
         direction TB
-        ChatClient["jihadkhawaja.chat.client"]
+        ChatClient["Egroo.Client"]
     end
 
     subgraph ServerLayer["Server Layer"]
         direction TB
         Api["Egroo.Server"]
-        ChatServer["jihadkhawaja.chat.server"]
+        ChatServer["Egroo.Server.SignalR"]
     end
 
     subgraph SharedLayer["Shared Contracts Layer"]
         direction TB
-        Shared["jihadkhawaja.chat.shared"]
+        Shared["Egroo.Contracts"]
     end
 
     Browser --> PresentationLayer
@@ -44,28 +43,27 @@ flowchart TD
 
 | Project | Role |
 |---|---|
-| `src/Egroo/Egroo` | Blazor host application that serves SSR output and the WASM app |
-| `src/Egroo/Egroo.Client` | Client-side WebAssembly project |
-| `src/Egroo.UI` | Shared Razor component library and client-side UI services |
+| `src/Egroo.Avalonia` | Desktop, mobile, and browser entry points |
+| `src/Egroo.UI` | Shared Avalonia controls and client-side presentation services |
 | `src/Egroo.Server` | ASP.NET Core backend with Minimal APIs, SignalR, EF Core, repositories, and agent services |
-| `src/jihadkhawaja.chat.client` | Client chat services that wrap auth, user, channel, message, and call operations |
-| `src/jihadkhawaja.chat.server` | SignalR `ChatHub` implementation and connection tracking |
-| `src/jihadkhawaja.chat.shared` | Shared models, DTOs, and interfaces |
+| `src/Egroo.Client` | Client chat services that wrap auth, user, channel, message, and call operations |
+| `src/Egroo.Server.SignalR` | SignalR `ChatHub` implementation and connection tracking |
+| `src/Egroo.Contracts` | Shared models, DTOs, and interfaces |
 | `src/Egroo.Server.Test` | MSTest coverage for server behavior |
 
 ## Runtime Principles
 
-### Blazor Auto
+### Avalonia client
 
-- the host serves the initial experience quickly with SSR
-- the app then hydrates into the WebAssembly client
+- desktop and mobile builds use their platform's Avalonia host
+- the browser build runs as a static WebAssembly application
 - shared UI components live in `Egroo.UI`
 
 ### SignalR-First Chat
 
 - most interactive user, channel, message, and call behavior flows through `/chathub`
 - the hub is configured for WebSockets-only transport
-- `jihadkhawaja.chat.client` keeps component code away from raw `HubConnection` details
+- `Egroo.Client` keeps component code away from raw `HubConnection` details
 
 ### Self-Hosted Data Ownership
 
@@ -128,7 +126,7 @@ sequenceDiagram
 sequenceDiagram
     actor User
     participant UI as Egroo.UI
-    participant Client as chat.client
+    participant Client as Egroo.Client
     participant Hub as ChatHub
     participant Repo as Server Repository
     participant Recipient as Recipient Client

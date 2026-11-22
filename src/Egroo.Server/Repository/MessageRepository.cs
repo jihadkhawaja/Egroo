@@ -1,7 +1,7 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Repository

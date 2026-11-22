@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Egroo</title>
+    <link rel="icon" href="./favicon.ico">
+    <link rel="preload" id="webassembly">
+    <link rel="stylesheet" href="./app.css">
+    <script type="importmap"></script>
+    <script src="runtime/egrooCrypto#[.{fingerprint}].js"></script>
+    <script src="runtime/webrtcInterop#[.{fingerprint}].js"></script>
+    <script src="runtime/webrtcInterop.iceConfig#[.{fingerprint}].js"></script>
+    <script src="runtime/webrtcInterop.peerConnection#[.{fingerprint}].js"></script>
+    <script src="runtime/webrtcInterop.signaling#[.{fingerprint}].js"></script>
+    <script src="runtime/webrtcInterop.audioProcessing#[.{fingerprint}].js"></script>
+    <script src="runtime/clientRuntime#[.{fingerprint}].js"></script>
+    <script type="module" src="main#[.{fingerprint}].js"></script>
+</head>
+<body>
+    <div id="egroo">
+        <div class="avalonia-splash" role="status">Opening Egroo…</div>
+    </div>
+    <noscript>Enable JavaScript to open Egroo.</noscript>
+</body>
+</html>

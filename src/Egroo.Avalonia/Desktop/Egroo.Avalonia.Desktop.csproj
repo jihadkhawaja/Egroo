@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Egroo</AssemblyName>
+    <ApplicationIcon>../../Egroo.UI/wwwroot/favicon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <ProjectReference Include="../App/Egroo.Avalonia.csproj" />
+  </ItemGroup>
+  <Target Name="BundleMacApp" AfterTargets="Publish" Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">
+    <PropertyGroup>
+      <MacAppContents>$(PublishDir)../Egroo.app/Contents</MacAppContents>
+    </PropertyGroup>
+    <ItemGroup>
+      <MacAppFile Include="$(PublishDir)**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="Info.plist" DestinationFolder="$(MacAppContents)" />
+    <Copy SourceFiles="@(MacAppFile)" DestinationFiles="@(MacAppFile->'$(MacAppContents)/MacOS/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

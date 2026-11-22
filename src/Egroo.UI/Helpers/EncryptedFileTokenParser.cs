@@ -6,6 +6,17 @@ namespace Egroo.UI.Helpers
 {
     public static class EncryptedFileTokenParser
     {
+        public static EncryptedDownload Read(string token)
+        {
+            using var metadata = JsonDocument.Parse(Base64UrlDecode(token));
+            var root = metadata.RootElement;
+            return new EncryptedDownload(
+                root.GetProperty("Url").GetString() ?? string.Empty,
+                root.GetProperty("FileName").GetString() ?? "download",
+                root.GetProperty("Key").GetString() ?? string.Empty,
+                root.GetProperty("Iv").GetString() ?? string.Empty);
+        }
+
         public static EncryptedFileDescriptor Parse(string token)
         {
             try
@@ -47,5 +58,6 @@ namespace Egroo.UI.Helpers
             [property: JsonPropertyName("ContentType")] string? MediaType);
 
         public sealed record EncryptedFileDescriptor(string Label, bool IsImage);
+        public sealed record EncryptedDownload(string Url, string Name, string Key, string Iv);
     }
 }

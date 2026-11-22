@@ -2,15 +2,15 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Egroo (Blazor)",
+            "name": "Launch Egroo (Avalonia)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build: Egroo (Blazor)",
-            "program": "${workspaceFolder}/src/Egroo/Egroo/bin/Debug/net10.0/Egroo.dll",
+            "preLaunchTask": "build: Egroo (Avalonia)",
+            "program": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/bin/Debug/net10.0/Egroo.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/src/Egroo/Egroo",
-            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo/Egroo/Properties/launchSettings.json",
-            "launchSettingsProfile": "https",
+            "cwd": "${workspaceFolder}/src/Egroo.Avalonia/Desktop",
+            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/Properties/launchSettings.json",
+            "launchSettingsProfile": "Egroo local",
             "env": {
                 "ASPNETCORE_ENVIRONMENT": "Development"
             }
@@ -30,7 +30,7 @@
             }
         },
         {
-            "name": "Attach to Egroo (Blazor)",
+            "name": "Attach to Egroo (Avalonia)",
             "type": "coreclr",
             "request": "attach",
             "processId": "${command:pickProcess}"
@@ -44,10 +44,10 @@
     ],
     "compounds": [
         {
-            "name": "Launch All (Blazor + API)",
+            "name": "Launch All (Avalonia + API)",
             "configurations": [
                 "Launch Egroo.Server (API)",
-                "Launch Egroo (Blazor)"
+                "Launch Egroo (Avalonia)"
             ],
             "stopAll": true
         }

@@ -8,13 +8,13 @@ For local development, Egroo runs as:
 
 - a PostgreSQL database
 - the API and SignalR backend from `src/Egroo.Server`
-- the Blazor web host from `src/Egroo/Egroo`
+- the Avalonia desktop client from `src/Egroo.Avalonia/Desktop`
 
 Default development URLs:
 
 - API: `http://localhost:5175`
 - Swagger: `http://localhost:5175/swagger`
-- Web app: `http://localhost:5068`
+- Desktop app: the Avalonia window opens when the client starts
 
 ## Prerequisites
 
@@ -103,10 +103,10 @@ What to expect:
 Open a second terminal:
 
 ```bash
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
-Open `http://localhost:5068` in your browser.
+Open the Avalonia desktop window.
 
 The UI connects to the API base URL configured in `src/Egroo.UI/Constants/Source.cs`. In debug builds, that value is already `http://localhost:5175/`.
 
@@ -133,7 +133,7 @@ If you later clear browser storage or move to another device, you may need to re
 Use this quick checklist:
 
 1. `http://localhost:5175/swagger` opens.
-2. `http://localhost:5068` loads the web app.
+2. The Avalonia window opens.
 3. You can create an account and sign in.
 4. You can create a channel and send a test message.
 5. The API console shows no database connection errors.

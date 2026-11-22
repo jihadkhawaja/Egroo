@@ -1,9 +1,9 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
 using Egroo.Server.Tools;
-using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Server.SignalR.Hubs;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;

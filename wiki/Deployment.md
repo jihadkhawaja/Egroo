@@ -8,7 +8,7 @@ At minimum, a production deployment needs:
 
 - a PostgreSQL database
 - the Egroo API from `src/Egroo.Server`
-- the Egroo web host from `src/Egroo/Egroo`
+- the static Avalonia browser app from `src/Egroo.Avalonia/Browser`
 - a reverse proxy or ingress that handles TLS and WebSocket forwarding correctly
 
 ## Important Operational Caveats
@@ -26,7 +26,7 @@ Read these before scaling out:
 | File | What it is |
 |---|---|
 | `src/Egroo.Server/Dockerfile` | Builds the API container |
-| `src/Egroo/Egroo/Dockerfile` | Builds the Blazor host container |
+| `src/Egroo.Avalonia/Browser/Dockerfile` | Publishes and serves the Avalonia WebAssembly client |
 | `docker-compose-egroo.yml` | Minimal compose for prebuilt web and API images on an external network |
 | `src/Egroo.Server/docker-compose.yaml` | Development-oriented API plus PostgreSQL compose file |
 
@@ -58,7 +58,7 @@ From the repository root:
 
 ```bash
 docker build -f src/Egroo.Server/Dockerfile -t egroo-server .
-docker build -f src/Egroo/Egroo/Dockerfile -t egroo-web .
+docker build -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-web .
 ```
 
 Both Dockerfiles publish .NET 10 applications and expose port `8080` inside the container.

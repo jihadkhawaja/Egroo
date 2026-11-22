@@ -2,7 +2,7 @@ using Egroo.Server.Database;
 using Egroo.Server.Repository;
 using Egroo.Server.Security;
 using Egroo.Server.Services;
-using jihadkhawaja.chat.server.Services;
+using Egroo.Server.SignalR.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -65,7 +65,7 @@ namespace Egroo.Server.Test
                 services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             }
 
-            // ── jihadkhawaja.chat.server — InMemoryConnectionTracker ───────────────────
+            // ── Egroo.Server.SignalR — InMemoryConnectionTracker ───────────────────
             services.AddSingleton<IConnectionTracker, InMemoryConnectionTracker>();
 
             // ── Egroo.Server repositories (implement the shared interfaces) ────────────
