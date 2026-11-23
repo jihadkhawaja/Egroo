@@ -8,11 +8,12 @@ The Egroo server exposes:
 - REST endpoints for authentication under `/api/v1/Auth`
 - REST endpoints for agents under `/api/v1/Agent`
 - 1 SignalR hub at `/chathub` for real-time user, friend, channel, message, and call management
-- Swagger UI in development at `http://localhost:5175/swagger`
+- Swagger UI in development at `http://localhost:5176/swagger`
 
 All real-time features — user management, friends, channels, messages, and WebRTC calls — are handled exclusively over SignalR using WebSockets.
 
-**Base URL (development)**: `http://localhost:5175`  
+**Base URL (local debug)**: `http://localhost:5176`
+
 **Base URL (production)**: `https://api.egroo.org` (or your own hosted URL)
 
 ## 🔐 Authentication (REST)
@@ -132,7 +133,7 @@ Connect with the JWT token:
 
 ```csharp
 var connection = new HubConnectionBuilder()
-    .WithUrl("http://localhost:5175/chathub", options =>
+    .WithUrl("http://localhost:5176/chathub", options =>
     {
         options.AccessTokenProvider = () => Task.FromResult<string?>(jwtToken);
     })
@@ -538,7 +539,7 @@ Exceeding the limit returns `429 Too Many Requests`.
 Interactive API documentation is available **in development only** at:
 
 ```
-http://localhost:5175/swagger
+http://localhost:5176/swagger
 ```
 
 Bearer authentication is supported in the Swagger UI — paste your JWT token to test protected endpoints.

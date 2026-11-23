@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Egroo.Contracts.Models;
 
 namespace Egroo.UI;
@@ -9,32 +11,48 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowFriendsAsync(string? query)
     {
-        _channel = null;
+        await CloseChannelViewAsync();
+        SelectSection(WorkspaceSection.Friends);
         var user = _session.User!;
-        var panel = Page("Friends");
-        var search = Field("Find people", query);
-        panel.Children.Add(Actions(search, Button("Search", () => ShowFriendsAsync(search.Text)), Button("My friends", ShowFriendsAsync)));
+        var panel = Page("Friends", "Find people, manage requests, and start direct conversations.");
+        var search = Field("Search by username", query);
+        Task SearchAsync() => ShowFriendsAsync(search.Text?.Trim());
+        SubmitOnEnter(search, SearchAsync);
+        var searchButton = IconButton("Search", SearchIcon, SearchAsync);
+        var searchBar = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 8 };
+        searchBar.Children.Add(search);
+        Grid.SetColumn(searchButton, 1);
+        searchBar.Children.Add(searchButton);
+        panel.Children.Add(Card(searchBar, 14));
         if (!string.IsNullOrWhiteSpace(query))
         {
-            foreach (var person in await _session.Users.SearchUser(query) ?? [])
+            panel.Children.Add(Actions(Text("Search results", 17, Ink, FontWeight.SemiBold), QuietButton("My friends", ShowFriendsAsync)));
+            var results = (await _session.Users.SearchUser(query) ?? [])
+                .Where(person => person.Id != user.Id && !string.IsNullOrWhiteSpace(person.Username)).ToArray();
+            foreach (var person in results)
             {
-                if (person.Id == user.Id || string.IsNullOrWhiteSpace(person.Username))
-                    continue;
-                panel.Children.Add(Actions(Label(UserName(person)), Button("Add friend", async () =>
+                var name = UserName(person);
+                panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, $"@{person.Username}"), Button("Add friend", async () =>
                 {
-                    await RequireAsync(_session.Users.AddFriend(person.Username));
+                    await RequireAsync(_session.Users.AddFriend(person.Username!));
                     Notify("Friend request sent.");
                 })));
             }
+            if (results.Length == 0)
+                panel.Children.Add(Card(EmptyState(FriendsIcon, "No matching people", "Try a different username."), 0));
             return;
         }
 
-        foreach (var relation in await _session.Users.GetUserFriendRequests(user.Id) ?? [])
+        var requests = await _session.Users.GetUserFriendRequests(user.Id) ?? [];
+        if (requests.Length != 0)
+            panel.Children.Add(Text("Friend requests", 17, Ink, FontWeight.SemiBold));
+        foreach (var relation in requests)
         {
             var id = OtherUser(relation, user.Id);
             var person = await _session.Users.GetUserPublicDetails(id);
-            panel.Children.Add(Actions(Label($"{person?.Username ?? "User"} sent a request"),
-                Button("Accept", async () =>
+            var name = person is null ? "User" : UserName(person);
+            panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, "Sent you a friend request"),
+                PrimaryButton("Accept", async () =>
                 {
                     await RequireAsync(_session.Users.AcceptFriend(id));
                     await ShowFriendsAsync();
@@ -45,13 +63,17 @@ public sealed partial class ChatWorkspace
                     await ShowFriendsAsync();
                 })));
         }
-        foreach (var relation in await _session.Users.GetUserFriends(user.Id) ?? [])
+        var relations = await _session.Users.GetUserFriends(user.Id) ?? [];
+        if (relations.Length != 0)
+            panel.Children.Add(Text("Your friends", 17, Ink, FontWeight.SemiBold));
+        foreach (var relation in relations)
         {
             var person = await _session.Users.GetUserPublicDetails(OtherUser(relation, user.Id));
             if (person?.Username is not { } username)
                 continue;
-            panel.Children.Add(Actions(Label($"{UserName(person)} · {(person.IsOnline ? "Online" : "Offline")}"),
-                Button("Message", async () =>
+            var name = UserName(person);
+            panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, $"@{username} · {(person.IsOnline ? "Online" : "Offline")}"),
+                PrimaryButton("Message", async () =>
                 {
                     var channel = await _session.Channels.CreateChannel(username);
                     if (channel is null)
@@ -64,64 +86,79 @@ public sealed partial class ChatWorkspace
                     await ShowFriendsAsync();
                 })));
         }
+        if (requests.Length == 0 && relations.Length == 0)
+            panel.Children.Add(Card(EmptyState(FriendsIcon, "No friends yet", "Search for a username to send your first friend request."), 0));
     }
 
     private async Task ShowSettingsAsync()
     {
-        _channel = null;
-        var panel = Page("Settings");
+        await CloseChannelViewAsync();
+        SelectSection(WorkspaceSection.Settings);
+        var panel = Page("Settings", "Manage your profile, password, and encryption devices.");
         var user = await _session.Users.GetUserPrivateDetails() ?? _session.User!;
         var display = Field("Display name", user.UserDetail?.DisplayName);
         var email = Field("Email", user.UserDetail?.Email);
         var first = Field("First name", user.UserDetail?.FirstName);
         var last = Field("Last name", user.UserDetail?.LastName);
-        panel.Children.Add(Actions(display, email, first, last));
-        panel.Children.Add(Button("Save profile", async () =>
+        var profile = SettingsGroup(panel, "Profile");
+        profile.Children.Add(Actions(LabeledField("Display name", display), LabeledField("Email", email),
+            LabeledField("First name", first), LabeledField("Last name", last)));
+        profile.Children.Add(PrimaryButton("Save profile", async () =>
         {
             await RequireAsync(_session.Users.UpdateDetails(display.Text, email.Text, first.Text, last.Text));
             Notify("Profile saved.");
         }));
-        panel.Children.Add(Actions(Button("Change avatar", () => UploadProfileImageAsync(true)),
+        profile.Children.Add(Actions(Button("Change avatar", () => UploadProfileImageAsync(true)),
             Button("Change cover", () => UploadProfileImageAsync(false)),
             Button("Remove avatar", () => RequireAsync(_session.Users.UpdateAvatar(null))),
             Button("Remove cover", () => RequireAsync(_session.Users.UpdateCover(null)))));
 
         var password = Field("Current password", secret: true);
         var newPassword = Field("New password", secret: true);
-        panel.Children.Add(Actions(password, newPassword, Button("Change password", async () =>
+        var security = SettingsGroup(panel, "Password");
+        security.Children.Add(Actions(LabeledField("Current password", password), LabeledField("New password", newPassword)));
+        security.Children.Add(Button("Change password", async () =>
         {
             var result = await _session.ChangePasswordAsync(password.Text ?? "", newPassword.Text ?? "");
             if (!result.Success)
                 throw new InvalidOperationException(result.Message ?? "Could not change the password.");
             password.Text = newPassword.Text = null;
             Notify("Password changed.");
-        })));
+        }));
 
         var identity = await _session.Encryption.GetLocalIdentityAsync();
-        panel.Children.Add(Label("Encryption devices"));
-        foreach (var key in await _session.Users.GetEncryptionKeys() ?? [])
+        var devices = SettingsGroup(panel, "Encryption devices", "Manage the devices that can decrypt messages sent to you.");
+        var keys = await _session.Users.GetEncryptionKeys() ?? [];
+        foreach (var key in keys)
         {
-            panel.Children.Add(Actions(Label($"{key.DeviceLabel ?? key.KeyId}{(key.KeyId == identity?.KeyId ? " · This device" : "")}"),
+            devices.Children.Add(Actions(Label($"{key.DeviceLabel ?? key.KeyId}{(key.KeyId == identity?.KeyId ? " · This device" : "")}"),
                 Button("Remove device", async () =>
                 {
                     await RequireAsync(_session.Users.RemoveEncryptionKey(key.KeyId));
                     await ShowSettingsAsync();
                 })));
         }
-        AddConfirmation(panel, "Regenerate this device’s key", async () =>
+        AddConfirmation(devices, "Regenerate this device’s key", async () =>
         {
             await _session.Encryption.RegenerateIdentityAsync();
             await ShowSettingsAsync();
         });
 
-        var feedback = Field("Feedback");
-        panel.Children.Add(Actions(feedback, Button("Send feedback", async () =>
+        var feedback = Field("Tell us what you think");
+        feedback.AcceptsReturn = true;
+        feedback.TextWrapping = TextWrapping.Wrap;
+        feedback.MinHeight = 76;
+        var help = SettingsGroup(panel, "Feedback");
+        help.Children.Add(feedback);
+        help.Children.Add(Button("Send feedback", async () =>
         {
             await RequireAsync(_session.Users.SendFeedback(feedback.Text ?? string.Empty));
             feedback.Text = null;
             Notify("Feedback sent.");
-        })));
-        AddConfirmation(panel, "Delete account", async () =>
+        }));
+        var account = SettingsGroup(panel, "Account");
+        account.Children.Add(IconButton("Sign out", SignOutIcon, SignOutAsync));
+        AddConfirmation(account, "Delete account", async () =>
         {
             await RequireAsync(_session.Users.DeleteUser());
             await SignOutAsync();
@@ -157,13 +194,13 @@ public sealed partial class ChatWorkspace
     private void AddConfirmation(StackPanel panel, string label, Func<Task> action)
     {
         var row = Actions();
-        var confirm = Button($"Confirm {label.ToLowerInvariant()}", action);
+        var confirm = StyledButton($"Confirm {label.ToLowerInvariant()}", action, "danger");
         confirm.IsVisible = false;
-        row.Children.Add(Button(label, () =>
+        row.Children.Add(StyledButton(label, () =>
         {
             confirm.IsVisible = !confirm.IsVisible;
             return Task.CompletedTask;
-        }));
+        }, "danger"));
         row.Children.Add(confirm);
         panel.Children.Add(row);
     }

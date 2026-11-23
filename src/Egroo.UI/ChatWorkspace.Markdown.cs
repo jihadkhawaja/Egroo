@@ -33,7 +33,7 @@ public sealed partial class ChatWorkspace
                     panel.Children.Add(new Border
                     {
                         Padding = new Thickness(8),
-                        Background = new SolidColorBrush(Color.Parse("#182337")),
+                        Background = Canvas, CornerRadius = new CornerRadius(6),
                         Child = new TextBlock
                         {
                             Text = code.Lines.ToString(), Foreground = foreground, FontFamily = Monospace,
@@ -54,12 +54,13 @@ public sealed partial class ChatWorkspace
                     var index = 1;
                     foreach (var item in list.OfType<ListItemBlock>())
                     {
-                        var row = new StackPanel { Spacing = 4, Margin = new Thickness(14, 0, 0, 0) };
-                        row.Children.Add(new TextBlock
-                        {
-                            Text = list.IsOrdered ? $"{index++}." : "•", Foreground = foreground
-                        });
-                        RenderBlocks(row, item, foreground);
+                        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 7,
+                            Margin = new Thickness(10, 0, 0, 0) };
+                        row.Children.Add(Text(list.IsOrdered ? $"{index++}." : "•", 14, foreground));
+                        var content = new StackPanel { Spacing = 4 };
+                        RenderBlocks(content, item, foreground);
+                        Grid.SetColumn(content, 1);
+                        row.Children.Add(content);
                         panel.Children.Add(row);
                     }
                     break;

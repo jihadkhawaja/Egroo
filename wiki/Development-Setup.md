@@ -7,14 +7,13 @@ This guide is for contributors who want a repeatable local development environme
 Required:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
 Recommended:
 
 - Visual Studio 2022 or Visual Studio Code
 - Docker Desktop for database or deployment experiments
-- pgAdmin, Azure Data Studio, or another PostgreSQL client
+- PostgreSQL and a database client when working with that provider
 
 ## Solution Layout
 
@@ -38,24 +37,7 @@ git clone https://github.com/jihadkhawaja/Egroo.git
 cd Egroo
 ```
 
-Create a local PostgreSQL database and then update `src/Egroo.Server/appsettings.Development.json`.
-
-Example:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
-  },
-  "Secrets": {
-    "Jwt": "development-jwt-secret-at-least-32-characters"
-  },
-  "Encryption": {
-    "Key": "12345678901234567890123456789012",
-    "IV": "1234567890123456"
-  }
-}
-```
+The default launch uses SQLite and creates the database and development secrets under `src/Egroo.Server/App_Data/local-debug`. See [Configuration](Configuration) for the optional PostgreSQL setup.
 
 ## 2. Build The Solution
 
@@ -81,11 +63,9 @@ dotnet run --project src/Egroo.Avalonia/Desktop
 
 Runtime defaults:
 
-- API: `http://localhost:5175`
+- API: `http://localhost:5176`
 - Desktop app: the Avalonia window opens when the client starts
-- Swagger: `http://localhost:5175/swagger`
-
-The UI already targets `http://localhost:5175/` in debug builds through `src/Egroo.UI/Constants/Source.cs`.
+- Swagger: `http://localhost:5176/swagger`
 
 ## 4. Run Tests
 
@@ -95,11 +75,11 @@ Run the server tests:
 dotnet test src/Egroo.Server.Test/Egroo.Server.Test.csproj --verbosity normal
 ```
 
-The test project uses an in-memory EF Core setup, so it does not require a live PostgreSQL instance for normal test runs.
+The test project uses in-memory EF Core storage and temporary SQLite files. It runs without a PostgreSQL instance.
 
 ## 5. Working With Migrations
 
-Migrations target `src/Egroo.Server`.
+EF Core keeps separate migration histories for PostgreSQL (`DataContext`) and SQLite (`SqliteDataContext`). Both target `src/Egroo.Server`.
 
 Common scripts:
 
@@ -108,10 +88,7 @@ Common scripts:
 .\scripts\update-database.ps1
 ```
 
-Important detail:
-
-- normal local startup already runs `db.Database.MigrateAsync()` automatically
-- use migration scripts when you intentionally change the data model
+The first command creates a migration for each provider. The second updates the configured SQLite database. Add `-Provider PostgreSQL` to update a configured PostgreSQL database. The API applies pending migrations automatically on startup.
 
 ## 6. IDE Notes
 
@@ -131,7 +108,7 @@ The workspace already includes build and test tasks for:
 - building the Avalonia client
 - running the server tests
 
-If you mainly work in VS Code, those tasks are the easiest way to keep the standard commands consistent.
+Open `Egroo.code-workspace` and press **F5** with **Egroo (Desktop + API)** selected to build and debug both processes with SQLite.
 
 ## Development Conventions That Affect Setup
 
@@ -146,7 +123,7 @@ If you mainly work in VS Code, those tasks are the easiest way to keep the stand
 ## End-To-End Encryption Notes For Contributors
 
 - user profiles can publish `EncryptionPublicKey` and `EncryptionKeyId`
-- device private keys stay in client storage and are not stored in PostgreSQL
+- device private keys stay in client storage
 - clearing browser storage or using a different device can put the client out of sync until the encryption key is regenerated
 - if you change persisted encryption fields or mappings, add a migration and update the docs in the same change
 

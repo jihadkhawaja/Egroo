@@ -1,0 +1,125 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="Button.workspace-action">
+    <Setter Property="Background" Value="#FFFFFF" />
+    <Setter Property="Foreground" Value="#252525" />
+    <Setter Property="BorderBrush" Value="#DEDEDE" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.workspace-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#F1F1F1" />
+    <Setter Property="Foreground" Value="#191919" />
+    <Setter Property="BorderBrush" Value="#CDCDCD" />
+  </Style>
+  <Style Selector="Button.workspace-action:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#E4E4E4" />
+    <Setter Property="Foreground" Value="#191919" />
+  </Style>
+  <Style Selector="Button.workspace-action.primary">
+    <Setter Property="Background" Value="#303030" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#303030" />
+  </Style>
+  <Style Selector="Button.workspace-action.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#252525" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="BorderBrush" Value="#252525" />
+  </Style>
+  <Style Selector="Button.workspace-action.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#191919" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.workspace-action.quiet">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.workspace-action.selected">
+    <Setter Property="Background" Value="#E4E4E4" />
+    <Setter Property="Foreground" Value="#191919" />
+    <Setter Property="BorderBrush" Value="#E4E4E4" />
+  </Style>
+  <Style Selector="Button.workspace-action.danger">
+    <Setter Property="Foreground" Value="#191919" />
+    <Setter Property="BorderBrush" Value="#A3A3A3" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="Button.workspace-action.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#EAEAEA" />
+    <Setter Property="Foreground" Value="#191919" />
+    <Setter Property="BorderBrush" Value="#777777" />
+  </Style>
+  <Style Selector="Button.workspace-action.sidebar-action">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="#E3E3E3" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="MinHeight" Value="46" />
+  </Style>
+  <Style Selector="Button.workspace-action.sidebar-action.selected">
+    <Setter Property="Background" Value="#3C3C3C" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.workspace-action.sidebar-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#444444" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.workspace-action.sidebar-action:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="#515151" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.workspace-action.mobile-action">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="Padding" Value="3" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <Style Selector="Button.workspace-action.message-action">
+    <Setter Property="Background" Value="#D6D6D6" />
+    <Setter Property="Foreground" Value="#252525" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="MinHeight" Value="24" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector="TextBox.workspace-field, ComboBox.workspace-field">
+    <Setter Property="Background" Value="White" />
+    <Setter Property="Foreground" Value="#191919" />
+    <Setter Property="BorderBrush" Value="#CDCDCD" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="12,8" />
+  </Style>
+  <Style Selector="TextBox.workspace-field">
+    <Setter Property="PlaceholderForeground" Value="#626262" />
+  </Style>
+  <Style Selector="TextBox.workspace-field /template/ TextBlock#PART_Placeholder">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="StackPanel.workspace-page">
+    <Setter Property="Margin" Value="32,28,32,30" />
+  </Style>
+  <Style Selector=":is(UserControl).compact StackPanel.workspace-page">
+    <Setter Property="Margin" Value="14,20,14,22" />
+  </Style>
+  <Style Selector="TextBlock.page-title">
+    <Setter Property="FontSize" Value="36" />
+  </Style>
+  <Style Selector=":is(UserControl).compact TextBlock.page-title">
+    <Setter Property="FontSize" Value="28" />
+  </Style>
+  <Style Selector="Grid.conversation">
+    <Setter Property="Margin" Value="26,16,26,18" />
+  </Style>
+  <Style Selector=":is(UserControl).compact Grid.conversation">
+    <Setter Property="Margin" Value="10,8,10,10" />
+  </Style>
+</Styles>

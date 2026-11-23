@@ -1,5 +1,11 @@
 {
   "profiles": {
+    "Local Debug": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "EGROO_API_URL": "http://localhost:5176/"
+      }
+    },
     "Egroo local": {
       "commandName": "Project",
       "environmentVariables": {

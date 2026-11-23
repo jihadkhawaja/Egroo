@@ -2,7 +2,7 @@
 
 <img src="docs/icon.png" alt="Egroo icon" width="96" />
 
-Egroo is a self-hosted chat platform built with .NET 10, Avalonia, ASP.NET Core, SignalR, and PostgreSQL. The Avalonia client runs on Windows, macOS, Linux, Android, iOS, and WebAssembly.
+Egroo is a self-hosted chat platform built with .NET 10, Avalonia, ASP.NET Core, and SignalR. The API uses SQLite by default and also supports PostgreSQL. The Avalonia client runs on Windows, macOS, Linux, Android, iOS, and WebAssembly.
 
 - Chat in channels with real-time messaging, typing indicators, and presence.
 - Send end-to-end encrypted messages and attachments using device keys.
@@ -11,25 +11,38 @@ Egroo is a self-hosted chat platform built with .NET 10, Avalonia, ASP.NET Core,
 
 ## Run locally
 
-Install the .NET 10 SDK and have a running PostgreSQL instance with a database and a user that can apply migrations. Create `src/Egroo.Server/appsettings.Development.json` from the [configuration template](src/Egroo.Server/appsettings.template.json) and set these values.
+### VS Code
+
+With the .NET 10 SDK and the [C# extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csharp) installed, open `Egroo.code-workspace`, select **Egroo (Desktop + API)** in **Run and Debug**, and press **F5**. VS Code starts the API at `http://localhost:5176`, then opens the Avalonia desktop app. Create an account from the sign-in screen. Stop the API debug session to end both sessions.
+
+The local debug profile creates and migrates `src/Egroo.Server/App_Data/local-debug/egroo.db` at startup. The database and generated `local-debug-secrets.json` stay in that directory between runs. An optional `ConnectionStrings:Sqlite` setting can point to a different SQLite file, with relative paths resolved from the API content root.
+
+### Terminal
+
+Start the API and then the desktop client in separate terminals from the repository root. The `Local Debug` profiles are the defaults for both projects.
+
+```sh
+dotnet run --project src/Egroo.Server
+dotnet run --project src/Egroo.Avalonia/Desktop
+```
+
+### PostgreSQL setup
+
+Create a PostgreSQL database and a user that can apply migrations. Copy the [configuration template](src/Egroo.Server/appsettings.template.json) to `src/Egroo.Server/appsettings.Development.json` and set these values.
 
 | Setting | Value |
 |---|---|
+| `Database:Provider` | `PostgreSQL` |
 | `ConnectionStrings:DefaultConnection` | PostgreSQL connection string for Egroo |
 | `Secrets:Jwt` | Random JWT signing secret |
 | `Encryption:Key` | Random 32-character ASCII key for server-side encryption |
 | `Encryption:IV` | Random 16-character ASCII initialization vector |
 
-Start the API from the repository root. It applies database migrations at startup and listens on `http://localhost:5175` with the `Server` launch profile.
+Choose **Egroo (Desktop + PostgreSQL API)** in VS Code or start the API and desktop client in separate terminals. The PostgreSQL API listens on `http://localhost:5175`.
 
 ```sh
-dotnet run --project src/Egroo.Server --launch-profile Server
-```
-
-Start the desktop client in a second terminal. Its local launch profile uses the API address above.
-
-```sh
-dotnet run --project src/Egroo.Avalonia/Desktop
+dotnet run --project src/Egroo.Server --launch-profile PostgreSQL
+dotnet run --project src/Egroo.Avalonia/Desktop --launch-profile 'Egroo local'
 ```
 
 See the [Avalonia build and hosting guide](docs/Avalonia-Client.md) for desktop prerequisites, mobile workloads, platform signing, and API address overrides.
@@ -44,6 +57,8 @@ dotnet test src/Egroo.Server.Test
 The [main solution](src/Egroo.slnx) includes the desktop client, server, libraries, and tests. The [Avalonia solution](src/Egroo.Avalonia/Egroo.Avalonia.slnx) includes the browser and mobile projects for hosts with the corresponding workloads.
 
 ## Publish and self-host
+
+Self-hosted APIs default to `App_Data/egroo.db` under their content root. Configure your own JWT and encryption secrets for a hosted deployment. Set `Database:Provider` to `PostgreSQL` and supply `ConnectionStrings:DefaultConnection` to use a PostgreSQL server. [Server configuration](wiki/Configuration.md)
 
 Set `EgrooApiUrl` when publishing a client for your own server. To publish the WebAssembly client, install the workload and build against your public API address.
 

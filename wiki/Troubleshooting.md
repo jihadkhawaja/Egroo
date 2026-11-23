@@ -10,10 +10,11 @@ The `Egroo.Server` process exits on startup or throws a configuration exception.
 
 ### Checks
 
-1. Make sure `ConnectionStrings:DefaultConnection` exists.
-2. Make sure `Secrets:Jwt` exists.
-3. Make sure `Encryption:Key` and `Encryption:IV` exist.
-4. Confirm the encryption lengths are exact:
+The `Local Debug` profile supplies development secrets. For other server launches, check the configured secrets and, if using PostgreSQL, the connection string.
+
+1. Make sure `Secrets:Jwt` exists.
+2. Make sure `Encryption:Key` and `Encryption:IV` exist.
+3. Confirm the encryption lengths are exact:
     - key: 32 characters
     - IV: 16 characters
 
@@ -21,11 +22,15 @@ The `Egroo.Server` process exits on startup or throws a configuration exception.
 
 ### Symptom
 
-Startup fails with PostgreSQL connection or migration errors.
+Startup fails when opening or migrating the database.
 
 ### Checks
 
-1. Confirm PostgreSQL is running.
+For SQLite, confirm that the API can write to the database directory. The default debug path is `src/Egroo.Server/App_Data/local-debug/egroo.db`.
+
+For PostgreSQL, check the following.
+
+1. Confirm PostgreSQL is running and `ConnectionStrings:DefaultConnection` is set.
 2. Confirm the database, user, password, and port in `appsettings.Development.json` are correct.
 3. Test the connection with a PostgreSQL client using the same credentials.
 4. Confirm the target database already exists.
@@ -48,11 +53,9 @@ The page opens, but sign-in, channel actions, or real-time chat fail.
 
 ### Checks
 
-1. Confirm the API is running on `http://localhost:5175`.
-2. Confirm the UI is using the expected API base URL from `src/Egroo.UI/Constants/Source.cs`.
+1. Confirm the API is running on `http://localhost:5176` with the `Local Debug` profile, or `http://localhost:5175` with the `PostgreSQL` profile.
+2. Confirm the client is using the API base URL from its launch profile or published configuration.
 3. Open browser developer tools and check failed requests and WebSocket errors.
-
-In debug builds, the client should already target `http://localhost:5175/`.
 
 ## Messages Cannot Be Decrypted On This Device
 
@@ -71,12 +74,12 @@ Messages arrive, but the UI shows an error such as being unable to decrypt them 
 
 ### Symptom
 
-`http://localhost:5175/swagger` returns nothing.
+The Swagger page at `http://localhost:5176/swagger` does not load under the default local profile.
 
 ### Checks
 
 1. Confirm the API is running in development.
-2. Confirm the server actually started and is listening on `http://localhost:5175`.
+2. Confirm the API is listening on the port for its launch profile.
 3. Check the server console for configuration or migration failures.
 
 Swagger is enabled only in development.

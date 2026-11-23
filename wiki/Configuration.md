@@ -16,10 +16,20 @@ The web client also has one build-time constant in `src/Egroo.UI/Constants/Sourc
 
 ### Database Connection
 
-Required key:
+SQLite is the default when neither `Database:Provider` nor the legacy PostgreSQL connection string is configured. The server creates and migrates `App_Data/egroo.db` under its content root. The `Local Debug` profile uses `App_Data/local-debug/egroo.db` and generates its own persistent JWT and encryption settings. To use a custom SQLite file, set `ConnectionStrings:Sqlite` to a file-backed connection string. Relative paths are resolved from the API content root.
 
 ```json
 {
+  "Database": { "Provider": "SQLite" },
+  "ConnectionStrings": { "Sqlite": "Data Source=/var/lib/egroo/egroo.db" }
+}
+```
+
+For PostgreSQL, set `Database:Provider` and provide the connection string.
+
+```json
+{
+  "Database": { "Provider": "PostgreSQL" },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;"
   }
@@ -29,10 +39,11 @@ Required key:
 Environment variable form:
 
 ```bash
-ConnectionStrings__DefaultConnection=Server=localhost;Port=5432;User Id=postgres;Password=yourpassword;Database=egroodb;
+Database__Provider=PostgreSQL
+ConnectionStrings__DefaultConnection='Host=localhost;Port=5432;Username=postgres;Password=yourpassword;Database=egroodb'
 ```
 
-The API will fail on startup if `DefaultConnection` is missing.
+Existing deployments that set `ConnectionStrings:DefaultConnection` without a provider continue to use PostgreSQL.
 
 ### JWT Secret
 
@@ -189,10 +200,11 @@ Minimal example:
 
 ## Recommended Development Config
 
-`src/Egroo.Server/appsettings.Development.json`:
+The default `Local Debug` launch profile configures SQLite and generates development secrets. For a local PostgreSQL profile, use `src/Egroo.Server/appsettings.Development.json`.
 
 ```json
 {
+  "Database": { "Provider": "PostgreSQL" },
   "ConnectionStrings": {
     "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_dev_user;Password=dev_password;Database=egroo_dev;"
   },
@@ -210,20 +222,7 @@ Minimal example:
 
 ### API Base URL
 
-The web client uses `src/Egroo.UI/Constants/Source.cs`:
-
-```csharp
-#if DEBUG
-public const string ConnectionURL = "http://localhost:5175/";
-#else
-public const string ConnectionURL = "https://api.egroo.org/";
-#endif
-```
-
-What this means:
-
-- local development already points to the local API
-- a custom production deployment usually needs the release value changed before build and publish
+The desktop `Local Debug` profile sets `EGROO_API_URL` to `http://localhost:5176/`. The `Egroo local` profile points to the PostgreSQL API on `http://localhost:5175/`. To publish a client for a custom deployment, pass `-p:EgrooApiUrl=https://api.example.com/`.
 
 ### Hub URL
 
@@ -247,6 +246,7 @@ public const string HubConnectionURL = ConnectionURL + HubName;
 
 ```json
 {
+  "Database": { "Provider": "PostgreSQL" },
   "ConnectionStrings": {
     "DefaultConnection": "Server=db;Port=5432;User Id=egroo;Password=strong-password;Database=egroo;"
   },
@@ -275,7 +275,7 @@ public const string HubConnectionURL = ConnectionURL + HubName;
 
 Before blaming the code, confirm these first:
 
-1. `DefaultConnection` points to a reachable PostgreSQL instance.
+1. The API can write to the SQLite database directory, or `DefaultConnection` points to a reachable PostgreSQL instance.
 2. `Secrets:Jwt` exists and is long enough.
 3. `Encryption:Key` is 32 characters and `Encryption:IV` is 16 characters.
 4. The client is pointing at the correct API base URL for the environment you are running.
@@ -331,12 +331,12 @@ Validate your configuration:
 
 2. **Verify the API is running** (Swagger UI available in development):
    ```
-   http://localhost:5175/swagger
+   http://localhost:5176/swagger
    ```
 
 3. **Test authentication**:
    ```bash
-   curl -X POST http://localhost:5175/api/v1/Auth/signup \
+   curl -X POST http://localhost:5176/api/v1/Auth/signup \
      -H "Content-Type: application/json" \
      -d '{"username":"testuser","password":"TestPass123!"}'
    ```

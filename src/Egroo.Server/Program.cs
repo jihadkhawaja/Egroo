@@ -39,13 +39,46 @@ public partial class Program
 
     private static void ConfigureInfrastructure(WebApplicationBuilder builder)
     {
+        ConfigureLocalDebug(builder);
         ConfigureCors(builder.Services, builder.Configuration);
         ConfigureSwagger(builder.Services);
         ConfigureAuthentication(builder.Services, builder.Configuration);
         builder.Services.AddAuthorization();
         builder.Services.AddHttpContextAccessor();
         ConfigureRateLimiting(builder.Services);
-        ConfigureDatabase(builder.Services, builder.Configuration);
+        ServerDatabase.Register(builder);
+    }
+
+    private static void ConfigureLocalDebug(WebApplicationBuilder builder)
+    {
+        if (!builder.Configuration.GetValue<bool>("Egroo:LocalDebug"))
+        {
+            return;
+        }
+
+#if DEBUG
+        if (!builder.Environment.IsDevelopment())
+        {
+            throw new InvalidOperationException("Egroo local debug mode requires the Development environment.");
+        }
+
+        const string localDataDirectory = "App_Data/local-debug";
+        LocalDebugSecrets.Apply(builder.Configuration, Path.Combine(builder.Environment.ContentRootPath, localDataDirectory));
+        builder.Configuration["Database:Provider"] = "SQLite";
+        if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Sqlite")))
+        {
+            builder.Configuration["ConnectionStrings:Sqlite"] = $"Data Source={localDataDirectory}/egroo.db";
+        }
+
+        builder.WebHost.PreferHostingUrls(false).ConfigureKestrel(options =>
+        {
+            // Ignore configured endpoints so this profile only listens on loopback.
+            options.Configure(new ConfigurationBuilder().Build());
+            options.ListenLocalhost(5176);
+        });
+#else
+        throw new InvalidOperationException("Egroo local debug mode requires a Debug build.");
+#endif
     }
 
     private static void ConfigureCors(IServiceCollection services, IConfiguration configuration)
@@ -176,14 +209,6 @@ public partial class Program
                 opt.QueueLimit = 10;
             });
         });
-    }
-
-    private static void ConfigureDatabase(IServiceCollection services, IConfiguration configuration)
-    {
-        string connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new NullReferenceException("DefaultConnection not found");
-
-        services.AddDbContext<DataContext>(options => options.UseNpgsql(connectionString));
     }
 
     private static void ConfigureServerServices(IServiceCollection services)

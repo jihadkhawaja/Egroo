@@ -9,11 +9,11 @@ The main solution is `src/Egroo.slnx`. The Avalonia solution at `src/Egroo.Avalo
 Run the API and desktop client from separate terminals with the .NET 10 SDK:
 
 ```sh
-dotnet run --project src/Egroo.Server --launch-profile Server
+dotnet run --project src/Egroo.Server
 dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
-The desktop launch profile targets `http://localhost:5175/`. Packaged apps use `https://api.egroo.org/` by default. Set `EGROO_API_URL` before starting the executable, or pass `-p:EgrooApiUrl=https://api.example.com/` when publishing.
+The default desktop launch profile targets `http://localhost:5176/` for the local SQLite API. Packaged apps use `https://api.egroo.org/` by default. Set `EGROO_API_URL` before starting the executable, or pass `-p:EgrooApiUrl=https://api.example.com/` when publishing.
 
 ```sh
 dotnet publish src/Egroo.Avalonia/Desktop -c Release -r win-x64 --self-contained

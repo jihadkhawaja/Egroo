@@ -9,6 +9,11 @@ namespace Egroo.Server.Database
     public class DataContext : DbContext, IDataEntities
     {
         public DataContext(DbContextOptions<DataContext> options)
+            : this((DbContextOptions)options)
+        {
+        }
+
+        protected DataContext(DbContextOptions options)
             : base(options)
         {
         }

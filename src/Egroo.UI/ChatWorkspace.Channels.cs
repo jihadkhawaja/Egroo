@@ -1,8 +1,8 @@
 using System.Text.RegularExpressions;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
-using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -19,6 +19,11 @@ public sealed partial class ChatWorkspace
     private static readonly Regex MessageTokens = new(
         @"\[\[egroo-file:(?<file>[A-Za-z0-9_-]+)\]\]|\[(?<label>[^\]\r\n]+)\]\((?<link>https?://[^)\s]+)\)|(?<url>https?://[^\s<>]+)|(?<![\w@])@(?<mention><[^>]+>|[\w.-]+)",
         RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500));
+    private static readonly IBrush SenderSurface = Brush("#E4E4E4");
+    private static readonly IBrush SenderLine = Brush("#CDCDCD");
+    private static readonly IBrush AgentSurface = Brush("#F1F1F1");
+    private static readonly IBrush AgentLine = Brush("#BDBDBD");
+    private static readonly IBrush TokenSurface = Brush("#DADADA");
     private readonly Dictionary<string, ChannelTypingState> _typing = new();
     private readonly Dictionary<Guid, (string Cipher, string Text)> _displayCache = new();
     private readonly DispatcherTimer _typingTimer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -26,87 +31,99 @@ public sealed partial class ChatWorkspace
     private ScrollViewer? _timeline;
     private TextBlock? _typingStatus;
     private TextBlock? _voiceStatus;
+    private Button? _voiceAction;
+    private Button? _muteAction;
     private TextBox? _composer;
     private TextBox? _messageFilter;
     private IStorageFile? _attachment;
     private TextBlock? _attachmentStatus;
+    private Button? _removeAttachment;
     private bool _isTyping;
     private int _messageLimit;
 
     private async Task OpenChannelAsync(Channel channel)
     {
-        await StopTypingAsync();
-        _attachment?.Dispose();
-        _attachment = null;
+        await CloseChannelViewAsync();
+        SelectSection(WorkspaceSection.Channels);
         _channel = channel;
-        _typing.Clear();
-        _displayCache.Clear();
         _messageLimit = 150;
 
-        var channelGrid = new Grid
-        {
-            Margin = new Thickness(16, 0, 16, 6), RowDefinitions = new RowDefinitions("Auto,*,Auto")
-        };
-        var header = new StackPanel { Spacing = 8, Margin = new Thickness(0, 0, 0, 8) };
-        header.Children.Add(new TextBlock { Text = ChannelTitle(channel), FontSize = 22, FontWeight = FontWeight.SemiBold });
-        _voiceStatus = Label(null);
-        _messageFilter = Field("Search messages");
+        var header = ConversationHeading(ChannelTitle(channel), "Channels", ShowChannelsAsync,
+            BadgeIcon(ChatIcon), channel.IsPublic ? "Public channel" : "Private channel");
+        _voiceStatus = Text(null, 12, Muted);
+        _messageFilter = Field("Search this conversation");
+        _messageFilter.IsVisible = false;
+        AutomationProperties.SetName(_messageFilter, "Search messages");
         _messageFilter.TextChanged += (_, _) => _ = RenderMessagesSafelyAsync();
-        header.Children.Add(Actions(Button("Members", () => ShowMembersAsync(channel)), _messageFilter,
-            Button("Older messages", async () => { _messageLimit += 150; await RenderMessagesAsync(); }),
-            Button("Join / leave voice", async () =>
-            {
-                if (_session.Voice.IsCurrentChannel(channel.Id))
-                    await _session.Voice.LeaveCallAsync();
-                else
-                    await _session.Voice.JoinCallAsync(channel.Id, ChannelTitle(channel));
-            }),
-            Button("Mute / unmute", () => _session.Voice.ToggleMuteAsync()),
-            Button("Audio settings", () => ShowAudioSettingsAsync(channel))));
-        header.Children.Add(_voiceStatus);
-        channelGrid.Children.Add(header);
-
-        _messages = new StackPanel { Spacing = 8 };
-        _timeline = new ScrollViewer { Content = _messages };
-        Grid.SetRow(_timeline, 1);
-        channelGrid.Children.Add(_timeline);
-
-        _composer = Field("Write a message");
-        _composer.AcceptsReturn = true;
-        _composer.TextWrapping = TextWrapping.Wrap;
-        _composer.MaxHeight = 120;
-        _composer.TextChanged += (_, _) => _ = UpdateComposerTypingAsync();
-        _composer.KeyDown += (_, args) =>
+        var search = GlyphButton("Search messages", SearchIcon, () =>
         {
-            if (args.Key == Key.Enter && !args.KeyModifiers.HasFlag(KeyModifiers.Shift))
-            {
-                args.Handled = true;
-                _ = RunAsync(SendMessageAsync);
-            }
-        };
+            _messageFilter.IsVisible = !_messageFilter.IsVisible;
+            if (_messageFilter.IsVisible)
+                Dispatcher.UIThread.Post(() => _messageFilter?.Focus(), DispatcherPriority.Loaded);
+            else
+                _messageFilter.Text = null;
+            return Task.CompletedTask;
+        });
+        _voiceAction = Button("Join voice", async () =>
+        {
+            if (_session.Voice.IsCurrentChannel(channel.Id))
+                await _session.Voice.LeaveCallAsync();
+            else
+                await _session.Voice.JoinCallAsync(channel.Id, ChannelTitle(channel));
+        });
+        _muteAction = Button("Mute", () => _session.Voice.ToggleMuteAsync());
+        var more = MenuButton("More", ("Older messages", async () => { _messageLimit += 150; await RenderMessagesAsync(); }),
+            ("Audio settings", () => ShowAudioSettingsAsync(channel)));
+        header.Children.Add(Actions(search, QuietButton("Members", () => ShowMembersAsync(channel)), _voiceAction, _muteAction, more));
+        header.Children.Add(_messageFilter);
+        header.Children.Add(_voiceStatus);
+
+        _messages = new StackPanel { Spacing = 12 };
+        _composer = ComposerField();
+        SubmitMessageOnEnter(_composer, SendMessageAsync);
+        _composer.TextChanged += (_, _) => _ = UpdateComposerTypingAsync();
         _typingTimer.Stop();
         _typingTimer.Tick -= TypingTimerElapsed;
         _typingTimer.Tick += TypingTimerElapsed;
-        _typingStatus = Label(null);
-        _attachmentStatus = Label(null);
-        var footer = new StackPanel { Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
-        footer.Children.Add(_typingStatus);
-        footer.Children.Add(_attachmentStatus);
-        footer.Children.Add(_composer);
-        footer.Children.Add(Actions(Button("Send", SendMessageAsync), Button("Attach", SelectAttachmentAsync),
-            Button("Remove attachment", () =>
-            {
-                _attachment?.Dispose();
-                _attachment = null;
-                _attachmentStatus.Text = null;
-                return Task.CompletedTask;
-            }), Button("@ Mention", () => ShowMentionsAsync(channel))));
-        Grid.SetRow(footer, 2);
-        channelGrid.Children.Add(footer);
-        _body.Content = channelGrid;
+        _typingStatus = Text(null, 12, Muted);
+        _typingStatus.IsVisible = false;
+        _attachmentStatus = Text(null, 12, AccentInk);
+        _attachmentStatus.IsVisible = false;
+        _removeAttachment = QuietButton("Remove attachment", () =>
+        {
+            _attachment?.Dispose();
+            _attachment = null;
+            UpdateAttachmentStatus();
+            return Task.CompletedTask;
+        });
+        _removeAttachment.IsVisible = false;
+        var footer = ComposerPanel(_composer, SendMessageAsync, _attachmentStatus,
+            GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync),
+            QuietButton("@ Mention", () => ShowMentionsAsync(channel)), _removeAttachment);
+        _timeline = ShowConversation(header, _messages, footer, _typingStatus);
         await RenderMessagesAsync();
-        _timeline.ScrollToEnd();
+        ScrollToLatest(_timeline);
         UpdateVoice();
+    }
+
+    private async Task CloseChannelViewAsync()
+    {
+        await StopTypingAsync();
+        _channel = null;
+        _attachment?.Dispose();
+        _attachment = null;
+        _typing.Clear();
+        _displayCache.Clear();
+        _messages = null;
+        _timeline = null;
+        _composer = null;
+        _voiceStatus = null;
+        _voiceAction = null;
+        _muteAction = null;
+        _messageFilter = null;
+        _typingStatus = null;
+        _attachmentStatus = null;
+        _removeAttachment = null;
     }
 
     private async Task RenderMessagesSafelyAsync()
@@ -122,6 +139,7 @@ public sealed partial class ChatWorkspace
         var query = _messageFilter?.Text?.Trim();
         var history = await _session.ReadHistoryAsync(channel.Id, string.IsNullOrWhiteSpace(query) ? _messageLimit : null);
         var controls = new List<Control>();
+        DateOnly? previousDay = null;
         foreach (var message in history)
         {
             var cipher = message.Content ?? string.Empty;
@@ -134,6 +152,13 @@ public sealed partial class ChatWorkspace
             var plain = display.Text;
             if (!string.IsNullOrWhiteSpace(query) && !plain.Contains(query, StringComparison.OrdinalIgnoreCase))
                 continue;
+            if ((message.DateSent ?? message.DateCreated) is { } timestamp)
+            {
+                var day = DateOnly.FromDateTime(timestamp.LocalDateTime);
+                if (day != previousDay)
+                    controls.Add(TimelineDate(day));
+                previousDay = day;
+            }
             controls.Add(CreateMessageBubble(message, plain, user.Id));
         }
         if (channel != _channel || panel != _messages || query != _messageFilter?.Text?.Trim())
@@ -142,23 +167,36 @@ public sealed partial class ChatWorkspace
         foreach (var control in controls)
             panel.Children.Add(control);
         if (controls.Count == 0)
-            panel.Children.Add(Label("No messages."));
+            panel.Children.Add(string.IsNullOrWhiteSpace(query)
+                ? EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")
+                : EmptyState(SearchIcon, "No matching messages", "Try a different search term."));
     }
 
     private Border CreateMessageBubble(Message message, string text, Guid currentUser)
     {
         var agent = message.AgentDefinitionId.HasValue;
         var sender = message.SenderId == currentUser && !agent;
-        var foreground = new SolidColorBrush(Color.Parse("#F8FAFF"));
-        var timestamp = (message.DateSent ?? message.DateCreated)?.ToLocalTime().ToString("g");
-        var state = sender ? message.DateSeen.HasValue ? " · Seen" : " · Sent" : "";
-        var body = new StackPanel { Spacing = 4 };
-        body.Children.Add(new TextBlock
+        var name = sender ? "You" : message.DisplayName ?? (agent ? "Agent" : "User");
+        var time = (message.DateSent ?? message.DateCreated)?.ToLocalTime();
+        var body = new StackPanel { Spacing = 6 };
+        var metadata = Actions(Text(name, 13, Ink, FontWeight.SemiBold));
+        metadata.ItemSpacing = 6;
+        metadata.LineSpacing = 4;
+        if (agent)
         {
-            Text = $"{(sender ? "You" : message.DisplayName ?? (agent ? "Agent" : "User"))}{(agent ? " · Agent" : "")}  {timestamp}{state}",
-            Foreground = foreground, FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap
-        });
-        body.Children.Add(RenderMessageBody(text, foreground));
+            metadata.Children.Add(new Border { Background = TokenSurface, CornerRadius = new CornerRadius(5),
+                Padding = new Thickness(5, 1), Child = Text("Agent", 11, AccentInk, FontWeight.SemiBold) });
+        }
+        if (time is { } sent)
+        {
+            var timestamp = Text(sent.ToString("t"), 11, Muted);
+            ToolTip.SetTip(timestamp, sent.ToString("g"));
+            metadata.Children.Add(timestamp);
+        }
+        if (sender && time is not null)
+            metadata.Children.Add(Text(message.DateSeen.HasValue ? "Seen" : "Sent", 11, AccentInk));
+        body.Children.Add(metadata);
+        body.Children.Add(RenderMessageBody(text, Ink));
         foreach (Match match in MessageTokens.Matches(text))
         {
             if (!match.Groups["file"].Success)
@@ -181,12 +219,26 @@ public sealed partial class ChatWorkspace
             }));
             body.Children.Add(preview);
         }
-        return new Border
+        var bubble = new Border
         {
-            Background = new SolidColorBrush(Color.Parse(agent ? "#392B59" : sender ? "#174564" : "#273348")),
+            Background = agent ? AgentSurface : sender ? SenderSurface : Surface,
+            BorderBrush = agent ? AgentLine : sender ? SenderLine : Line,
+            BorderThickness = new Thickness(1), MaxWidth = 650,
             HorizontalAlignment = sender ? HorizontalAlignment.Right : HorizontalAlignment.Left,
-            CornerRadius = new CornerRadius(10), MaxWidth = 720, Padding = new Thickness(12, 9), Child = body
+            CornerRadius = sender ? new CornerRadius(13, 13, 4, 13) : new CornerRadius(4, 13, 13, 13),
+            Padding = new Thickness(12, 9), Child = body
         };
+        bubble.Classes.Add(sender ? "sender-message" : agent ? "agent-message" : "receiver-message");
+        if (sender)
+            return bubble;
+
+        var avatar = agent ? BadgeIcon(AgentIcon, TokenSurface, AccentInk, 30) : Avatar(name, 30);
+        avatar.VerticalAlignment = VerticalAlignment.Top;
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), ColumnSpacing = 8 };
+        row.Children.Add(avatar);
+        Grid.SetColumn(bubble, 1);
+        row.Children.Add(bubble);
+        return new Border { Child = row };
     }
 
     private TextBlock RenderMessage(string text, IBrush foreground)
@@ -201,18 +253,19 @@ public sealed partial class ChatWorkspace
             {
                 block.Inlines.Add(new InlineUIContainer(new Border
                 {
-                    Background = new SolidColorBrush(Color.Parse("#526891")), CornerRadius = new CornerRadius(6),
+                    Background = TokenSurface, CornerRadius = new CornerRadius(6),
                     Padding = new Thickness(5, 1), Child = new TextBlock
                     {
-                        Text = "@" + token.Groups["mention"].Value.Trim('<', '>'), Foreground = foreground
+                        Text = "@" + token.Groups["mention"].Value.Trim('<', '>'), Foreground = AccentInk,
+                        FontWeight = FontWeight.SemiBold, MaxWidth = 180, TextTrimming = TextTrimming.CharacterEllipsis
                     }
-                }));
+                }) { BaselineAlignment = BaselineAlignment.Center });
             }
             else if (token.Groups["file"].Success)
             {
                 var fileToken = token.Groups["file"].Value;
                 block.Inlines.Add(new InlineUIContainer(MessageAction(EncryptedFileTokenParser.Parse(fileToken).Label,
-                    () => DownloadAsync(fileToken))));
+                    () => DownloadAsync(fileToken))) { BaselineAlignment = BaselineAlignment.Center });
             }
             else
             {
@@ -226,7 +279,7 @@ public sealed partial class ChatWorkspace
                 {
                     if (TopLevel.GetTopLevel(this) is { } top)
                         await top.Launcher.LaunchUriAsync(uri);
-                })));
+                })) { BaselineAlignment = BaselineAlignment.Center });
             }
         }
         block.Inlines!.Add(new Run(text[position..]));
@@ -235,10 +288,15 @@ public sealed partial class ChatWorkspace
 
     private Button MessageAction(string label, Func<Task> action)
     {
-        var button = Button(label, action);
-        button.Padding = new Thickness(5, 1);
-        button.Foreground = new SolidColorBrush(Color.Parse("#C6E5FF"));
-        button.Background = new SolidColorBrush(Color.Parse("#243953"));
+        var button = StyledButton(label, action, "message-action");
+        var text = Text(label, 13, AccentInk, FontWeight.SemiBold);
+        text.TextDecorations = TextDecorations.Underline;
+        text.TextTrimming = TextTrimming.CharacterEllipsis;
+        text.TextWrapping = TextWrapping.NoWrap;
+        text.MaxWidth = 188;
+        button.Content = text;
+        AutomationProperties.SetName(button, label);
+        ToolTip.SetTip(button, label);
         return button;
     }
 
@@ -262,7 +320,7 @@ public sealed partial class ChatWorkspace
             UpdateTypingStatus();
             await RenderMessagesAsync();
             if (atEnd)
-                _timeline?.ScrollToEnd();
+                ScrollToLatest(_timeline);
         }
         catch (Exception ex) { Notify(ex.Message); }
     }
@@ -306,10 +364,9 @@ public sealed partial class ChatWorkspace
         composer.Text = string.Empty;
         _attachment?.Dispose();
         _attachment = null;
-        if (_attachmentStatus is not null)
-            _attachmentStatus.Text = null;
+        UpdateAttachmentStatus();
         await RenderMessagesAsync();
-        _timeline?.ScrollToEnd();
+        ScrollToLatest(_timeline);
     }
 
     private async Task<(string Summary, string Token)> UploadAsync(Channel channel, IStorageFile file)
@@ -330,8 +387,18 @@ public sealed partial class ChatWorkspace
             return;
         _attachment?.Dispose();
         _attachment = file;
+        UpdateAttachmentStatus();
+    }
+
+    private void UpdateAttachmentStatus()
+    {
         if (_attachmentStatus is not null)
-            _attachmentStatus.Text = file.Name;
+        {
+            _attachmentStatus.Text = _attachment?.Name;
+            _attachmentStatus.IsVisible = _attachment is not null;
+        }
+        if (_removeAttachment is not null)
+            _removeAttachment.IsVisible = _attachment is not null;
     }
 
     private async Task<IStorageFile?> PickFileAsync(string title)
@@ -384,11 +451,11 @@ public sealed partial class ChatWorkspace
         var members = await _session.Channels.GetChannelUsers(channel.Id) ?? [];
         var agentList = await _session.Agents.GetChannelAgents(channel.Id) ?? [];
         var admin = await _session.Channels.IsChannelAdmin(channel.Id, _session.User!.Id);
-        var panel = Page("Channel members");
-        panel.Children.Add(Button("Back to chat", () => OpenChannelAsync(channel)));
+        var panel = Page("Channel members", ChannelTitle(channel), IconButton("Back to chat", BackIcon, () => OpenChannelAsync(channel)));
+        var participants = SettingsGroup(panel, "People and agents");
         foreach (var member in members)
         {
-            panel.Children.Add(admin && member.Id != _session.User.Id
+            participants.Children.Add(admin && member.Id != _session.User.Id
                 ? Actions(Label(UserName(member)), Button("Remove", async () =>
                 {
                     await RequireAsync(_session.Channels.RemoveChannelUser(channel.Id, member.Id));
@@ -397,7 +464,7 @@ public sealed partial class ChatWorkspace
         }
         foreach (var agent in agentList)
         {
-            panel.Children.Add(admin
+            participants.Children.Add(admin
                 ? Actions(Label($"{agent.Name} · Agent"), Button("Remove", async () =>
                 {
                     await RequireAsync(_session.Agents.RemoveAgentFromChannel(channel.Id, agent.Id));
@@ -405,7 +472,8 @@ public sealed partial class ChatWorkspace
                 })) : Label($"{agent.Name} · Agent"));
         }
         var invite = Field("Usernames separated by commas");
-        panel.Children.Add(Actions(invite, Button("Add members", async () =>
+        var management = SettingsGroup(panel, "Add members");
+        management.Children.Add(Actions(invite, PrimaryButton("Invite", async () =>
         {
             await RequireAsync(_session.Channels.AddChannelUsers(channel.Id,
                 (invite.Text ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)));
@@ -416,19 +484,20 @@ public sealed partial class ChatWorkspace
             var agents = (await _session.Agents.GetAgents() ?? []).Concat(await _session.Agents.SearchPublishedAgents() ?? [])
                 .DistinctBy(agent => agent.Id);
             foreach (var agent in agents.Where(agent => agentList.All(item => item.Id != agent.Id)))
-                panel.Children.Add(Button($"Add {agent.Name}", async () =>
+                management.Children.Add(Button($"Add {agent.Name}", async () =>
                 {
                     await RequireAsync(_session.Agents.AddAgentToChannel(channel.Id, agent.Id));
                     await ShowMembersAsync(channel);
                 }));
         }
-        panel.Children.Add(Button("Leave channel", async () =>
+        var options = SettingsGroup(panel, "Channel access");
+        options.Children.Add(StyledButton("Leave channel", async () =>
         {
             await RequireAsync(_session.Channels.LeaveChannel(channel.Id));
             await ShowChannelsAsync();
-        }));
+        }, "danger"));
         if (admin)
-            AddConfirmation(panel, "Delete channel", async () =>
+            AddConfirmation(options, "Delete channel", async () =>
             {
                 await RequireAsync(_session.Channels.DeleteChannel(channel.Id));
                 await ShowChannelsAsync();
@@ -458,8 +527,8 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowAudioSettingsAsync(Channel channel)
     {
-        var panel = Page("Audio settings");
-        panel.Children.Add(Button("Back to chat", () => OpenChannelAsync(channel)));
+        var panel = Page("Audio settings", ChannelTitle(channel), IconButton("Back to chat", BackIcon, () => OpenChannelAsync(channel)));
+        var processing = SettingsGroup(panel, "Microphone processing");
         var voice = _session.Voice;
         foreach (var (name, label, enabled) in new[]
         {
@@ -470,7 +539,7 @@ public sealed partial class ChatWorkspace
         {
             var option = new CheckBox { Content = label, IsChecked = enabled };
             option.IsCheckedChanged += (_, _) => _ = RunAsync(() => voice.UpdateAudioProcessingSettingAsync(name, option.IsChecked == true, label));
-            panel.Children.Add(option);
+            processing.Children.Add(option);
         }
         await Task.CompletedTask;
     }
@@ -479,7 +548,17 @@ public sealed partial class ChatWorkspace
     {
         var voice = _session.Voice;
         if (_voiceStatus is not null)
+        {
             _voiceStatus.Text = voice.IsInCall ? $"{voice.CurrentChannelTitle} · {voice.CallDuration}{(voice.IsMuted ? " · Muted" : "")}" : null;
+            _voiceStatus.IsVisible = voice.IsInCall;
+        }
+        if (_voiceAction is not null && _channel is { } channel)
+            _voiceAction.Content = voice.IsCurrentChannel(channel.Id) ? "Leave voice" : "Join voice";
+        if (_muteAction is not null)
+        {
+            _muteAction.IsVisible = voice.IsInCall;
+            _muteAction.Content = voice.IsMuted ? "Unmute" : "Mute";
+        }
     }
 
     private static string ParticipantKey(Guid user, Guid? agent) => agent?.ToString() ?? user.ToString();
@@ -499,8 +578,11 @@ public sealed partial class ChatWorkspace
     private void UpdateTypingStatus()
     {
         if (_typingStatus is not null)
+        {
             _typingStatus.Text = _typing.Count == 0 ? null
                 : $"{string.Join(", ", _typing.Values.Select(state => state.DisplayName ?? (state.IsAgent ? "Agent" : "User")))} typing…";
+            _typingStatus.IsVisible = _typing.Count != 0;
+        }
     }
 
     private async Task UpdateComposerTypingAsync()

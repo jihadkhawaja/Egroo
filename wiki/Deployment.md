@@ -6,7 +6,7 @@ This page describes what the repository supports today and what to verify before
 
 At minimum, a production deployment needs:
 
-- a PostgreSQL database
+- a writable, persistent SQLite data directory or a PostgreSQL database
 - the Egroo API from `src/Egroo.Server`
 - the static Avalonia browser app from `src/Egroo.Avalonia/Browser`
 - a reverse proxy or ingress that handles TLS and WebSocket forwarding correctly
@@ -32,13 +32,12 @@ Read these before scaling out:
 
 ## Recommended Production Checklist
 
-1. Provision PostgreSQL separately or as part of your platform.
-2. Set `ConnectionStrings__DefaultConnection` for the API.
-3. Set `Secrets__Jwt`, `Encryption__Key`, and `Encryption__IV`.
-4. Set `Api__AllowedOrigins__*` for the actual web origin.
-5. Update the release API URL in `src/Egroo.UI/Constants/Source.cs` before building the web app.
-6. Put both services behind HTTPS.
-7. Ensure the reverse proxy forwards WebSocket upgrades to `/chathub`.
+1. Mount a writable persistent volume at `/app/App_Data` for SQLite in the API container. For PostgreSQL, provision a database and set `Database__Provider=PostgreSQL` and `ConnectionStrings__DefaultConnection`.
+2. Set `Secrets__Jwt`, `Encryption__Key`, and `Encryption__IV`.
+3. Set `Api__AllowedOrigins__*` for the actual web origin.
+4. Set `EgrooApiUrl` when publishing the web app.
+5. Put both services behind HTTPS.
+6. Ensure the reverse proxy forwards WebSocket upgrades to `/chathub`.
 
 ## End-To-End Encryption Deployment Notes
 

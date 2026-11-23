@@ -5,12 +5,12 @@
       {
         "Path": "Egroo.Server\\Egroo.Server.csproj",
         "Action": "Start",
-        "DebugTarget": "Server"
+        "DebugTarget": "Local Debug"
       },
       {
         "Path": "Egroo.Avalonia\\Desktop\\Egroo.Avalonia.Desktop.csproj",
         "Action": "Start",
-        "DebugTarget": "Egroo local"
+        "DebugTarget": "Local Debug"
       }
     ]
   },
@@ -20,7 +20,7 @@
       {
         "Path": "Egroo.Server\\Egroo.Server.csproj",
         "Action": "Start",
-        "DebugTarget": "Server"
+        "DebugTarget": "Local Debug"
       }
     ]
   }

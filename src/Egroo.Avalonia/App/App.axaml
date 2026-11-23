@@ -1,8 +1,12 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Egroo.Avalonia.App"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Light">
   <Application.Styles>
-    <FluentTheme />
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#303030" RegionColor="#F7F7F7" ErrorText="#303030" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
   </Application.Styles>
 </Application>

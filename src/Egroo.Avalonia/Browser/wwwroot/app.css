@@ -6,8 +6,8 @@ html, body, #egroo {
 }
 
 body {
-    background: #141920;
-    color: #f5f6f8;
+    background: #f7f7f7;
+    color: #191919;
     font: 1rem system-ui, sans-serif;
 }
 
@@ -15,8 +15,10 @@ body {
     display: grid;
     height: 100%;
     place-items: center;
+    color: #252525;
+    font-weight: 600;
 }
 
 a {
-    color: #bad7ff;
+    color: #252525;
 }

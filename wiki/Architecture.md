@@ -7,7 +7,7 @@ This document summarizes the current Egroo runtime, project boundaries, encrypti
 ```mermaid
 flowchart TD
     Browser["Browser / WebAssembly"]
-    Db[("PostgreSQL")]
+    Db[("SQLite or PostgreSQL")]
 
     subgraph PresentationLayer["Presentation Layer"]
         direction TB
@@ -67,7 +67,7 @@ flowchart TD
 
 ### Self-Hosted Data Ownership
 
-- PostgreSQL is the authoritative store
+- SQLite is the default authoritative store, with PostgreSQL available as an alternative
 - the platform does not depend on a third-party message relay
 - production deployment is controlled by your own infrastructure choices
 
@@ -106,7 +106,7 @@ sequenceDiagram
 - each device can register its own public key and `keyId`
 - user profiles still expose legacy single-key fields for backward compatibility, but the active model supports multiple device keys per user
 - multi-device recipients use a v2 envelope that carries multiple wrapped AES keys for a single ciphertext payload
-- device private keys stay in client storage and are not persisted in PostgreSQL
+- device private keys stay in client storage
 - `Message.Content` is not stored in the `Messages` table for encrypted delivery
 - recipient-specific ciphertext is stored temporarily in `UserPendingMessage` records until acknowledged
 - agent recipients use the same transport model, but their private keys are stored server-side in encrypted form
@@ -209,7 +209,7 @@ sequenceDiagram
 
 ### Agent Architecture Notes
 
-- agent definitions live in shared models and are persisted in PostgreSQL
+- agent definitions live in shared models and are persisted by the configured database provider
 - `AgentChannelService` loads context, executes the agent runtime, and broadcasts replies
 - agent API keys and agent private keys are protected with server-side encryption
 - agent replies can also be encrypted for recipients before delivery

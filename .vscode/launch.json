@@ -2,18 +2,66 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Egroo (Desktop + API)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: All Projects",
+            "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
+            "cwd": "${workspaceFolder}/src/Egroo.Server",
+            "launchSettingsProfile": "Local Debug",
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\bNow listening on:\\s+(http://localhost:5176)\\b",
+                "action": "startDebugging",
+                "name": "Egroo Desktop (Local Debug)",
+                "killOnServerStop": true
+            },
+            "presentation": { "order": 1 }
+        },
+        {
+            "name": "Egroo (Desktop + PostgreSQL API)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: All Projects",
+            "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
+            "cwd": "${workspaceFolder}/src/Egroo.Server",
+            "launchSettingsProfile": "PostgreSQL",
+            "console": "internalConsole",
+            "serverReadyAction": {
+                "pattern": "\\bNow listening on:\\s+(http://localhost:5175)\\b",
+                "action": "startDebugging",
+                "name": "Egroo Desktop (PostgreSQL API)",
+                "killOnServerStop": true
+            },
+            "presentation": { "order": 2 }
+        },
+        {
+            "name": "Egroo Desktop (Local Debug)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/bin/Debug/net10.0/Egroo.dll",
+            "cwd": "${workspaceFolder}/src/Egroo.Avalonia/Desktop",
+            "launchSettingsProfile": "Local Debug",
+            "presentation": { "hidden": true }
+        },
+        {
+            "name": "Egroo Desktop (PostgreSQL API)",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/bin/Debug/net10.0/Egroo.dll",
+            "cwd": "${workspaceFolder}/src/Egroo.Avalonia/Desktop",
+            "launchSettingsProfile": "Egroo local",
+            "presentation": { "hidden": true }
+        },
+        {
             "name": "Launch Egroo (Avalonia)",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build: Egroo (Avalonia)",
             "program": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/bin/Debug/net10.0/Egroo.dll",
-            "args": [],
             "cwd": "${workspaceFolder}/src/Egroo.Avalonia/Desktop",
-            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo.Avalonia/Desktop/Properties/launchSettings.json",
-            "launchSettingsProfile": "Egroo local",
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            }
+            "launchSettingsProfile": "Local Debug",
+            "presentation": { "order": 3 }
         },
         {
             "name": "Launch Egroo.Server (API)",
@@ -21,13 +69,9 @@
             "request": "launch",
             "preLaunchTask": "build: Egroo.Server (API)",
             "program": "${workspaceFolder}/src/Egroo.Server/bin/Debug/net10.0/Egroo.Server.dll",
-            "args": [],
             "cwd": "${workspaceFolder}/src/Egroo.Server",
-            "launchSettingsFilePath": "${workspaceFolder}/src/Egroo.Server/Properties/launchSettings.json",
-            "launchSettingsProfile": "Server",
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            }
+            "launchSettingsProfile": "Local Debug",
+            "presentation": { "order": 4 }
         },
         {
             "name": "Attach to Egroo (Avalonia)",
@@ -40,16 +84,6 @@
             "type": "coreclr",
             "request": "attach",
             "processId": "${command:pickProcess}"
-        }
-    ],
-    "compounds": [
-        {
-            "name": "Launch All (Avalonia + API)",
-            "configurations": [
-                "Launch Egroo.Server (API)",
-                "Launch Egroo (Avalonia)"
-            ],
-            "stopAll": true
         }
     ]
 }

@@ -1,5 +1,9 @@
 using System.Globalization;
+using System.Text;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Egroo.Contracts.Models;
@@ -12,32 +16,51 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowAgentsAsync(string? query, bool discover)
     {
-        _channel = null;
-        var panel = Page("Agents");
-        var search = Field("Search published agents", query);
-        panel.Children.Add(Actions(Button("My agents", ShowAgentsAsync), Button("Create agent", () => EditAgentAsync(null)),
-            search, Button("Discover", () => ShowAgentsAsync(search.Text, true))));
+        await CloseChannelViewAsync();
+        SelectSection(WorkspaceSection.Agents);
+        var panel = Page("Agents", "Create an agent, start a conversation, or discover agents shared by others.",
+            IconButton("New agent", PlusIcon, () => EditAgentAsync(null), "primary"));
+        var filters = new StackPanel { Spacing = 12 };
+        filters.Children.Add(Actions(StyledButton("My agents", ShowAgentsAsync, discover ? "quiet" : "selected"),
+            StyledButton("Discover", () => ShowAgentsAsync(null, true), discover ? "selected" : "quiet")));
+        if (discover)
+        {
+            var search = Field("Search published agents", query);
+            Task SearchAsync() => ShowAgentsAsync(search.Text?.Trim(), true);
+            var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 8 };
+            var searchButton = IconButton("Search", SearchIcon, SearchAsync);
+            row.Children.Add(search);
+            Grid.SetColumn(searchButton, 1);
+            row.Children.Add(searchButton);
+            filters.Children.Add(row);
+            SubmitOnEnter(search, SearchAsync);
+        }
+        panel.Children.Add(Card(filters, 14));
         var service = _session.Agents;
         var agents = discover ? await service.SearchPublishedAgents(query) ?? [] : await GetSavedAgentsAsync();
         foreach (var agent in agents)
         {
             var owned = agent.UserId == _session.User?.Id;
-            var row = Actions(Label(agent.Name), Button("Open conversations", () => ShowConversationsAsync(agent)));
+            var chat = PrimaryButton("Open conversations", () => ShowConversationsAsync(agent));
+            Button option;
             if (owned)
-                row.Children.Add(Button("Edit", () => EditAgentAsync(agent.Id)));
+                option = Button("Edit", () => EditAgentAsync(agent.Id));
             else
             {
                 var saved = await service.IsAgentFriend(agent.Id);
-                row.Children.Add(Button(saved ? "Remove saved agent" : "Save agent", async () =>
+                option = Button(saved ? "Remove saved agent" : "Save agent", async () =>
                 {
                     await RequireAsync(saved ? service.RemoveAgentFriend(agent.Id) : service.AddAgentFriend(agent.Id));
                     await ShowAgentsAsync(query, discover);
-                }));
+                });
             }
-            panel.Children.Add(row);
-            if (!string.IsNullOrWhiteSpace(agent.Description))
-                panel.Children.Add(Label(agent.Description));
+            panel.Children.Add(RecordCard(RecordTitle(BadgeIcon(AgentIcon), agent.Name, agent.Description), chat, option));
         }
+        if (agents.Length == 0)
+            panel.Children.Add(Card(discover
+                ? EmptyState(AgentIcon, "No agents found", "Try a different search or create an agent for your workspace.")
+                : EmptyState(AgentIcon, "No agents yet", "Create an agent or discover agents published by other people.",
+                    PrimaryButton("Create an agent", () => EditAgentAsync(null)), QuietButton("Browse agents", () => ShowAgentsAsync(null, true))), 0));
     }
 
     private async Task<AgentDefinition[]> GetSavedAgentsAsync()
@@ -57,8 +80,7 @@ public sealed partial class ChatWorkspace
         var service = _session.Agents;
         var agent = id.HasValue ? await service.GetAgent(id.Value)
             ?? throw new InvalidOperationException("Could not load the agent.") : new AgentDefinition();
-        var panel = Page(id.HasValue ? agent.Name : "Create agent");
-        panel.Children.Add(Button("Back to agents", ShowAgentsAsync));
+        var panel = Page(id.HasValue ? agent.Name : "Create agent", null, IconButton("Back to agents", BackIcon, ShowAgentsAsync));
         var name = Field("Name", agent.Name);
         var description = Field("Description", agent.Description);
         var instructions = Field("Instructions", agent.Instructions);
@@ -73,12 +95,18 @@ public sealed partial class ChatWorkspace
         var maxTokens = Field("Max tokens", agent.MaxTokens?.ToString(CultureInfo.InvariantCulture));
         var active = new CheckBox { Content = "Active", IsChecked = agent.IsActive };
         var permission = EnumField(agent.AddPermission);
-        panel.Children.Add(Actions(name, description, active));
-        panel.Children.Add(instructions);
-        panel.Children.Add(prompt);
-        panel.Children.Add(Actions(Label("Provider"), provider, model, endpoint, apiKey));
-        panel.Children.Add(Actions(temperature, maxTokens, Label("Who can add this agent"), permission));
-        panel.Children.Add(Button("Save agent", async () =>
+        instructions.TextWrapping = TextWrapping.Wrap;
+        var identity = SettingsGroup(panel, "Identity and instructions");
+        identity.Children.Add(Actions(LabeledField("Name", name), LabeledField("Description", description), active));
+        identity.Children.Add(LabeledField("Instructions", instructions));
+        identity.Children.Add(LabeledField("Skills instruction prompt", prompt));
+        var modelSettings = SettingsGroup(panel, "Model settings");
+        modelSettings.Children.Add(Actions(LabeledField("Provider", provider), LabeledField("Model", model),
+            LabeledField("Endpoint", endpoint), LabeledField("API key", apiKey)));
+        modelSettings.Children.Add(Actions(LabeledField("Temperature", temperature), LabeledField("Max tokens", maxTokens)));
+        var access = SettingsGroup(panel, "Access");
+        access.Children.Add(LabeledField("Who can add this agent", permission));
+        panel.Children.Add(PrimaryButton("Save agent", async () =>
         {
             agent.Name = name.Text?.Trim() ?? "";
             agent.Description = description.Text;
@@ -100,13 +128,15 @@ public sealed partial class ChatWorkspace
         }));
         if (!id.HasValue)
             return;
-        panel.Children.Add(Actions(Button(agent.IsPublished ? "Unpublish" : "Publish", async () =>
+        access.Children.Add(Button(agent.IsPublished ? "Unpublish" : "Publish", async () =>
         {
             await RequireAsync(agent.IsPublished ? service.UnpublishAgent(agent.Id) : service.PublishAgent(agent.Id));
             await EditAgentAsync(agent.Id);
-        }), Button("Skills and knowledge", () => ShowAgentResourcesAsync(agent)),
+        }));
+        var resources = SettingsGroup(panel, "Resources");
+        resources.Children.Add(Actions(Button("Skills and knowledge", () => ShowAgentResourcesAsync(agent)),
             Button("Tools and MCP", () => ShowAgentToolsAsync(agent))));
-        AddConfirmation(panel, "Delete agent", async () =>
+        AddConfirmation(access, "Delete agent", async () =>
         {
             await RequireAsync(service.DeleteAgent(agent.Id));
             await ShowAgentsAsync();
@@ -115,15 +145,15 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowAgentResourcesAsync(AgentDefinition agent)
     {
-        var panel = Page("Skills and knowledge");
-        panel.Children.Add(Button("Back to agent", () => EditAgentAsync(agent.Id)));
+        var panel = Page("Skills and knowledge", agent.Name, IconButton("Back to agent", BackIcon, () => EditAgentAsync(agent.Id)));
+        var skills = SettingsGroup(panel, "Skills");
         var service = _session.Agents;
         foreach (var skill in await service.GetSkillDirectories(agent.Id) ?? [])
         {
             var name = Field("Skill name", skill.Name);
             var path = Field("Skill path", skill.Path);
             var enabled = new CheckBox { Content = "Enabled", IsChecked = skill.IsEnabled };
-            panel.Children.Add(Actions(name, path, enabled, Button("Save skill", async () =>
+            skills.Children.Add(Actions(LabeledField("Name", name), LabeledField("Path", path), enabled, Button("Save skill", async () =>
             {
                 skill.Name = name.Text ?? "";
                 skill.Path = path.Text ?? "";
@@ -139,20 +169,21 @@ public sealed partial class ChatWorkspace
         var skillPath = Field("Server skill directory");
         var skillContent = Field("Managed SKILL.md content");
         skillContent.AcceptsReturn = true;
-        panel.Children.Add(Actions(skillName, skillPath, Button("Add directory", async () =>
+        skills.Children.Add(Actions(LabeledField("Skill name", skillName), LabeledField("Server directory", skillPath), Button("Add directory", async () =>
         {
             if (await service.AddSkillDirectory(agent.Id, new AgentSkillDirectory { Name = skillName.Text ?? "", Path = skillPath.Text ?? "" }) is null)
                 throw new InvalidOperationException("Could not add the directory.");
             await ShowAgentResourcesAsync(agent);
         })));
-        panel.Children.Add(skillContent);
-        panel.Children.Add(Button("Add managed skill", async () =>
+        skills.Children.Add(LabeledField("Managed skill content", skillContent));
+        skills.Children.Add(Button("Add managed skill", async () =>
         {
             if (await service.AddManagedSkill(agent.Id, skillName.Text ?? "", skillContent.Text ?? "") is null)
                 throw new InvalidOperationException("Could not create the skill.");
             await ShowAgentResourcesAsync(agent);
         }));
 
+        var knowledge = SettingsGroup(panel, "Knowledge");
         foreach (var entry in (await service.GetKnowledge(agent.Id) ?? []).Append(new AgentKnowledge()))
         {
             var existing = entry.AgentDefinitionId != Guid.Empty;
@@ -160,8 +191,8 @@ public sealed partial class ChatWorkspace
             var content = Field("Knowledge content", entry.Content);
             content.AcceptsReturn = true;
             var enabled = new CheckBox { Content = "Enabled", IsChecked = entry.IsEnabled };
-            panel.Children.Add(Actions(title, enabled));
-            panel.Children.Add(content);
+            knowledge.Children.Add(Actions(LabeledField("Title", title), enabled));
+            knowledge.Children.Add(LabeledField("Content", content));
             var controls = Actions(Button(existing ? "Save knowledge" : "Add knowledge", async () =>
             {
                 entry.Title = title.Text ?? "";
@@ -179,16 +210,16 @@ public sealed partial class ChatWorkspace
                     await RequireAsync(service.DeleteKnowledge(entry.Id));
                     await ShowAgentResourcesAsync(agent);
                 }));
-            panel.Children.Add(controls);
+            knowledge.Children.Add(controls);
         }
     }
 
     private async Task ShowAgentToolsAsync(AgentDefinition agent)
     {
         var service = _session.Agents;
-        var panel = Page("Tools and MCP");
-        panel.Children.Add(Button("Back to agent", () => EditAgentAsync(agent.Id)));
-        panel.Children.Add(Button("Add built-in tools", async () =>
+        var panel = Page("Tools and MCP", agent.Name, IconButton("Back to agent", BackIcon, () => EditAgentAsync(agent.Id)));
+        var tools = SettingsGroup(panel, "Tools");
+        tools.Children.Add(Button("Add built-in tools", async () =>
         {
             await service.SeedBuiltinTools(agent.Id);
             await ShowAgentToolsAsync(agent);
@@ -201,12 +232,13 @@ public sealed partial class ChatWorkspace
                 tool.IsEnabled = enabled.IsChecked == true;
                 await RequireAsync(service.UpdateTool(tool));
             });
-            panel.Children.Add(Actions(enabled, Button("Remove", async () =>
+            tools.Children.Add(Actions(enabled, Button("Remove", async () =>
             {
                 await RequireAsync(service.DeleteTool(tool.Id));
                 await ShowAgentToolsAsync(agent);
             })));
         }
+        var servers = SettingsGroup(panel, "MCP servers");
         foreach (var server in (await service.GetMcpServers(agent.Id) ?? []).Append(new AgentMcpServer()))
         {
             var existing = server.AgentDefinitionId != Guid.Empty;
@@ -214,7 +246,8 @@ public sealed partial class ChatWorkspace
             var endpoint = Field("HTTPS endpoint", server.Endpoint);
             var key = Field("API key", secret: true);
             var enabled = new CheckBox { Content = "Active", IsChecked = server.IsActive };
-            var row = Actions(name, endpoint, key, enabled, Button(existing ? "Save server" : "Add server", async () =>
+            var row = Actions(LabeledField("Name", name), LabeledField("HTTPS endpoint", endpoint),
+                LabeledField("API key", key), enabled, Button(existing ? "Save server" : "Add server", async () =>
             {
                 server.Name = name.Text ?? "";
                 server.Endpoint = endpoint.Text ?? "";
@@ -239,25 +272,39 @@ public sealed partial class ChatWorkspace
                     await ShowAgentToolsAsync(agent);
                 }));
             }
-            panel.Children.Add(row);
+            servers.Children.Add(row);
         }
     }
 
     private async Task ShowConversationsAsync(AgentDefinition agent)
     {
-        var panel = Page($"{agent.Name} · Conversations");
-        panel.Children.Add(Button("Back to agents", ShowAgentsAsync));
+        SelectSection(WorkspaceSection.Agents);
+        var panel = Page("Conversations", agent.Name, IconButton("Back to agents", BackIcon, ShowAgentsAsync));
         var service = _session.Agents;
-        var title = Field("Conversation name");
-        panel.Children.Add(Actions(title, Button("New conversation", async () =>
+        var title = Field("Give it a name");
+        var create = SettingsGroup(panel, "New conversation");
+        create.Children.Add(LabeledField("Conversation name (optional)", title));
+        async Task StartAsync()
         {
             var conversation = await service.CreateConversation(agent.Id, title.Text);
             if (conversation is null)
                 throw new InvalidOperationException("Could not start a conversation.");
             await OpenAgentConversationAsync(agent, conversation);
-        })));
-        foreach (var conversation in await service.GetConversations(agent.Id) ?? [])
-            panel.Children.Add(Button(conversation.Title ?? "Conversation", () => OpenAgentConversationAsync(agent, conversation)));
+        }
+        create.Children.Add(IconButton("Start conversation", PlusIcon, StartAsync, "primary"));
+        SubmitOnEnter(title, StartAsync);
+        var conversations = await service.GetConversations(agent.Id) ?? [];
+        foreach (var conversation in conversations)
+        {
+            var name = conversation.Title ?? "Conversation";
+            panel.Children.Add(RecordCard(RecordTitle(BadgeIcon(ChatIcon), name),
+                QuietButton("Open conversation", () => OpenAgentConversationAsync(agent, conversation))));
+        }
+        if (conversations.Length == 0)
+        {
+            panel.Children.Add(Card(EmptyState(ChatIcon, "No conversations yet", $"Start a conversation with {agent.Name} above."), 0));
+            return;
+        }
         AddConfirmation(panel, "Delete all conversations", async () =>
         {
             await service.DeleteAllConversations(agent.Id);
@@ -267,65 +314,96 @@ public sealed partial class ChatWorkspace
 
     private async Task OpenAgentConversationAsync(AgentDefinition agent, AgentConversation conversation, int take = 50)
     {
+        SelectSection(WorkspaceSection.Agents);
         var service = _session.Agents;
-        var panel = Page(conversation.Title ?? agent.Name);
-        panel.Children.Add(Actions(Button("Conversations", () => ShowConversationsAsync(agent)),
-            Button("Older messages", () => OpenAgentConversationAsync(agent, conversation, take + 50)),
-            Button("Clear memory", () => RequireAsync(service.ClearConversationMemory(conversation.Id)))));
-        AddConfirmation(panel, "Delete conversation", async () =>
+        var header = ConversationHeading(conversation.Title ?? agent.Name, "conversations", () => ShowConversationsAsync(agent),
+            BadgeIcon(AgentIcon, TokenSurface, AccentInk), $"{agent.Name} · Agent");
+        var more = MenuButton("More", ("Older messages", () => OpenAgentConversationAsync(agent, conversation, take + 50)),
+            ("Clear memory", () => RequireAsync(service.ClearConversationMemory(conversation.Id))));
+        var flyout = (Flyout)more.Flyout!;
+        AddConfirmation((StackPanel)flyout.Content!, "Delete conversation", async () =>
         {
+            flyout.Hide();
             await RequireAsync(service.DeleteConversation(conversation.Id));
             await ShowConversationsAsync(agent);
         });
-        var items = new StackPanel { Spacing = 8 };
-        panel.Children.Add(items);
+        header.Children.Add(more);
+        var items = new StackPanel { Spacing = 12 };
         var userId = _session.User!.Id;
-        Border AgentBubble(string role, string content)
+        Border AgentBubble(string role, string content, DateTimeOffset? sent = null)
         {
             var isUser = role == "user";
             return CreateMessageBubble(new Message
             {
                 SenderId = isUser ? userId : Guid.Empty,
                 AgentDefinitionId = isUser ? null : agent.Id,
-                DisplayName = isUser ? "You" : agent.Name
+                DisplayName = isUser ? "You" : agent.Name, DateSent = sent ?? DateTimeOffset.UtcNow
             }, content, userId);
         }
-        foreach (var message in (await service.GetMessages(conversation.Id, take: take) ?? []).OrderBy(item => item.DateCreated))
-            items.Children.Add(AgentBubble(message.Role, message.Content));
 
-        var input = Field("Message");
-        input.AcceptsReturn = true;
-        panel.Children.Add(input);
         AgentChatAttachment? attachment = null;
-        var attachmentStatus = Label(null);
-        panel.Children.Add(attachmentStatus);
-        panel.Children.Add(Actions(Button("Send", async () =>
+        var attachmentStatus = Text(null, 12, AccentInk);
+        var input = ComposerField();
+        var empty = EmptyState(AgentIcon, "Start a conversation", $"Write a message to {agent.Name} below.");
+        ScrollViewer? timeline = null;
+        var remove = new Button { Content = "Remove attachment", Classes = { "workspace-action", "quiet" } };
+        remove.Click += (_, _) =>
+        {
+            attachment = null;
+            UpdateAttachment();
+        };
+        SubmitMessageOnEnter(input, SendAsync);
+        var footer = ComposerPanel(input, SendAsync, attachmentStatus,
+            GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync), remove);
+        UpdateAttachment();
+        timeline = ShowConversation(header, items, footer);
+        var history = (await service.GetMessages(conversation.Id, take: take) ?? []).OrderBy(item => item.DateCreated).ToArray();
+        foreach (var message in history)
+            items.Children.Add(AgentBubble(message.Role, message.Content, message.DateCreated));
+        if (history.Length == 0)
+            items.Children.Add(empty);
+        ScrollToLatest(timeline);
+
+        async Task SendAsync()
         {
             var text = input.Text?.Trim() ?? "";
             if (text.Length == 0 && attachment is null)
                 return;
+            items.Children.Remove(empty);
             items.Children.Add(AgentBubble("user", attachment is null ? text : $"{text}\n{attachment.FileName}"));
             input.Text = null;
             var request = new AgentChatRequest { Message = text, Attachments = attachment is null ? null : [attachment] };
             attachment = null;
-            attachmentStatus.Text = null;
-            var progress = Label($"{agent.Name} is responding…");
+            UpdateAttachment();
+            var preview = Text($"{agent.Name} is responding…", 14, Muted);
+            var progress = Card(new StackPanel
+            {
+                Spacing = 6, Children = { Text(agent.Name, 13, Ink, FontWeight.SemiBold), preview }
+            }, 12);
+            progress.Background = AgentSurface;
+            progress.HorizontalAlignment = HorizontalAlignment.Left;
+            progress.MaxWidth = 650;
             items.Children.Add(progress);
-            var response = new System.Text.StringBuilder();
+            ScrollToLatest(timeline);
+            var response = new StringBuilder();
             try
             {
                 await foreach (var chunk in service.ChatStream(conversation.Id, request))
                 {
                     response.Append(chunk);
-                    progress.Text = response.ToString();
+                    preview.Text = response.ToString();
+                    ScrollToLatest(timeline);
                 }
                 items.Children.Add(AgentBubble("assistant", response.ToString()));
             }
             finally
             {
                 items.Children.Remove(progress);
+                ScrollToLatest(timeline);
             }
-        }), Button("Attach", async () =>
+        }
+
+        async Task SelectAttachmentAsync()
         {
             using var file = await PickFileAsync("Attach an image or document");
             if (file is null)
@@ -337,17 +415,19 @@ public sealed partial class ChatWorkspace
                 FileName = file.Name, ContentType = mime,
                 DataUri = $"data:{mime};base64,{Convert.ToBase64String(bytes)}"
             };
-            attachmentStatus.Text = file.Name;
-        }), Button("Remove attachment", () =>
+            UpdateAttachment();
+        }
+
+        void UpdateAttachment()
         {
-            attachment = null;
-            attachmentStatus.Text = null;
-            return Task.CompletedTask;
-        })));
+            attachmentStatus.Text = attachment?.FileName;
+            attachmentStatus.IsVisible = attachment is not null;
+            remove.IsVisible = attachment is not null;
+        }
     }
 
     private static ComboBox EnumField<T>(T selected) where T : struct, Enum => new()
     {
-        ItemsSource = Enum.GetValues<T>(), SelectedItem = selected
+        ItemsSource = Enum.GetValues<T>(), SelectedItem = selected, Classes = { "workspace-field" }
     };
 }
