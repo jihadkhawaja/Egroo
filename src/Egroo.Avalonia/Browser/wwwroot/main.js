@@ -17,6 +17,7 @@ try {
     const [runtime, apiUrl] = await Promise.all([dotnet.create(), loadApiUrl()]);
     const args = apiUrl ? [apiUrl] : [];
     await runtime.runMain(runtime.getConfig().mainAssemblyName, args);
+    document.getElementById('egroo')?.setAttribute('data-egroo-ready', 'true');
 } catch (error) {
     console.error(error);
     const status = document.createElement('div');

@@ -8,6 +8,7 @@ browser_url=http://127.0.0.1:18080
 api_container=egroo-api-smoke
 browser_container=egroo-browser-smoke
 browser_config=$(mktemp)
+browser_dom=$(mktemp)
 
 cleanup() {
     local status=$?
@@ -16,7 +17,7 @@ cleanup() {
         docker logs "$browser_container" || true
     fi
     docker rm --force "$api_container" "$browser_container" >/dev/null 2>&1 || true
-    rm -f "$browser_config"
+    rm -f "$browser_config" "$browser_dom"
 }
 trap cleanup EXIT
 
@@ -38,6 +39,14 @@ curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 "
 curl --fail --silent --show-error "$browser_url/_framework/dotnet.js" >/dev/null
 curl --fail --silent --show-error "$browser_url/egroo-config.json" \
     | jq --exit-status --arg apiUrl "$api_url/" '.apiUrl == $apiUrl' >/dev/null
+
+timeout 90s google-chrome --headless --no-sandbox --disable-dev-shm-usage \
+    --disable-background-networking --use-angle=swiftshader --enable-unsafe-swiftshader \
+    --virtual-time-budget=30000 --dump-dom "$browser_url/" > "$browser_dom"
+if ! grep --fixed-strings 'data-egroo-ready="true"' "$browser_dom" >/dev/null; then
+    cat "$browser_dom"
+    exit 1
+fi
 
 signup="$api_url/api/v1/Auth/signup"
 headers=$(curl --fail --silent --show-error --dump-header - --output /dev/null \
