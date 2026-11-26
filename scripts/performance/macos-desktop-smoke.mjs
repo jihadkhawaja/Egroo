@@ -128,7 +128,7 @@ async function main() {
     const executable = join(app, 'Contents', 'MacOS', 'Egroo');
     await access(executable, constants.X_OK);
     await run('plutil', ['-lint', join(app, 'Contents', 'Info.plist')]);
-    await run('codesign', ['--verify', '--strict', executable]);
+    await run('codesign', ['--verify', '--deep', '--strict', app]);
 
     const scratch = await mkdtemp(join(tmpdir(), 'egroo-macos-smoke-'));
     let recorder;
