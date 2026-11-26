@@ -1,5 +1,6 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
+using Egroo.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -273,6 +274,66 @@ public class EndpointIntegrationTest
         }
     }
 
+    [TestMethod]
+    public async Task AgentTasks_HostedWorkerCompletesSubmittedTaskWithFakeExecutor()
+    {
+        const string route = "/api/v1/AgentTasks";
+        string path = Path.Combine(Path.GetTempPath(), $"egroo-task-worker-endpoint-{Guid.NewGuid():N}.db");
+        var connectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connectionString).Options;
+        var agent = new AgentDefinition { UserId = Guid.NewGuid(), Name = "Worker agent" };
+        var executor = new EndpointTaskExecutor();
+        var overrides = new Dictionary<string, string?> { ["AgentTasks:WorkerEnabled"] = "true" };
+
+        try
+        {
+            await using var factory = CreateFactory(nameof(AgentTasks_HostedWorkerCompletesSubmittedTaskWithFakeExecutor),
+                overrides, () => new SqliteDataContext(options), executor);
+            using (var scope = factory.Services.CreateScope())
+            {
+                var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+                database.AgentDefinitions.Add(agent);
+                await database.SaveChangesAsync();
+            }
+
+            using var owner = CreateAuthenticatedClient(factory, agent.UserId);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var request = new CreateAgentTaskRequest(agent.Id, Guid.NewGuid(), "Run privately");
+            using var created = await owner.PostAsJsonAsync(route, request, timeout.Token);
+            var task = await created.Content.ReadFromJsonAsync<AgentTaskInfo>(timeout.Token);
+            Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+            Assert.IsNotNull(task);
+            Assert.AreEqual(task.Id, (await executor.Claim.Task.WaitAsync(timeout.Token)).Id);
+
+            using var polling = new PeriodicTimer(TimeSpan.FromMilliseconds(125));
+            while (await polling.WaitForNextTickAsync(timeout.Token))
+            {
+                var stored = await owner.GetFromJsonAsync<AgentTaskInfo>($"{route}/{task.Id:D}", timeout.Token);
+                if (stored?.Status is AgentTaskStatus.Queued or AgentTaskStatus.Running)
+                    continue;
+
+                Assert.AreEqual(AgentTaskStatus.Completed, stored?.Status);
+                Assert.AreEqual("synthetic hosted result", stored?.Result);
+                break;
+            }
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private sealed class EndpointTaskExecutor : IAgentTaskExecutor
+    {
+        public TaskCompletionSource<AgentTaskRecord> Claim { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task<string?> ExecuteAsync(AgentTaskRecord task, CancellationToken cancellationToken)
+        {
+            Claim.SetResult(task);
+            return Task.FromResult<string?>("synthetic hosted result");
+        }
+    }
+
     static EndpointIntegrationTest()
     {
         ApplyTestConfigurationToProcessEnvironment();
@@ -282,7 +343,8 @@ public class EndpointIntegrationTest
     /// Creates a WebApplicationFactory with a disposable database.
     /// </summary>
     private static WebApplicationFactory<Program> CreateFactory(string dbName,
-        IDictionary<string, string?>? configurationOverrides = null, Func<DataContext>? createContext = null)
+        IDictionary<string, string?>? configurationOverrides = null, Func<DataContext>? createContext = null,
+        IAgentTaskExecutor? taskExecutor = null)
     {
         ApplyTestConfigurationToProcessEnvironment();
 
@@ -299,6 +361,17 @@ public class EndpointIntegrationTest
 
                 builder.ConfigureServices(services =>
                 {
+                    if (taskExecutor is null)
+                    {
+                        var taskWorker = services.FirstOrDefault(service => service.ImplementationType == typeof(AgentTaskWorker));
+                        if (taskWorker is not null)
+                            services.Remove(taskWorker);
+                    }
+                    else
+                    {
+                        services.AddSingleton(taskExecutor);
+                    }
+
                     // Remove all EF Core DataContext-related registrations (Npgsql)
                     var toRemove = services.Where(d =>
                         d.ServiceType == typeof(DbContextOptions<DataContext>) ||

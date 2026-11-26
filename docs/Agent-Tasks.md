@@ -2,7 +2,7 @@
 
 A one-time task is a private work item for an active agent that you own. The owner can create, view, list, or cancel their tasks. An agent in a channel or a friends list is governed by the separate conversation rules. Task state and results are stored by the server outside channel timelines and agent conversations.
 
-The current implementation accepts and persists tasks in the queue. A hosted worker and Avalonia task controls are the next increments.
+The hosted worker runs tasks submitted by an owner. Each task uses the agent's configured model and system instructions in a fresh request. The worker sends the prompt and instructions to that model provider. The request is limited to those inputs. Set `AgentTasks:WorkerEnabled` to `false` to pause execution and keep accepting queued work.
 
 ## API
 
@@ -19,6 +19,6 @@ Send `agentId`, a client-generated UUID called `requestId`, and a `prompt` to cr
 
 ## Lifecycle and restart
 
-The task status is `Queued`, `Running`, `Completed`, `Failed`, or `Cancelled`. The worker-facing queue can claim a task once and records an execution deadline. An inactive or removed agent leaves its queued task in the `Failed` state when the queue reaches it. A cancelled task keeps that state when a worker reports a late result.
+The task status is `Queued`, `Running`, `Completed`, `Failed`, or `Cancelled`. One worker claims a task and records a five-minute execution deadline. The worker marks queued work for an inactive or removed agent as `Failed` with the code `AgentUnavailable`. Model failures use `ExecutionFailed`. Cancelling a running task requests provider cancellation and preserves the cancelled state if a result arrives later.
 
-Queued tasks remain available after server restart. The worker-facing recovery step marks expired running tasks `Failed` with the failure code `Interrupted`. The original request ID continues to refer to that task. An intentional rerun uses a new request ID.
+Queued tasks remain available after server restart. In-flight tasks keep their execution deadline. Active workers mark expired tasks `Failed` with the code `Interrupted`. The original request ID continues to refer to that task. An intentional rerun uses a new request ID.

@@ -131,14 +131,23 @@ internal sealed class AgentTaskRepository(DataContext database, TimeProvider clo
         return FinishAsync(taskId, AgentTaskStatus.Completed, result, null, cancellationToken);
     }
 
-    internal Task<bool> FailAsync(Guid taskId, CancellationToken cancellationToken) =>
-        FinishAsync(taskId, AgentTaskStatus.Failed, null, AgentTaskFailure.ExecutionFailed, cancellationToken);
+    internal Task<bool> FailAsync(Guid taskId, AgentTaskFailure failure, CancellationToken cancellationToken) =>
+        FinishAsync(taskId, AgentTaskStatus.Failed, null, failure, cancellationToken);
+
+    internal Task<bool> IsClaimActiveAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        var now = clock.GetUtcNow();
+        return database.AgentTasks.AnyAsync(task =>
+            task.Id == taskId && task.Status == AgentTaskStatus.Running && task.ExecutionDeadline > now,
+            cancellationToken);
+    }
 
     internal Task<int> ExpireRunningAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
         return database.AgentTasks
-            .Where(task => task.Status == AgentTaskStatus.Running && task.ExecutionDeadline <= now)
+            .Where(task => task.Status == AgentTaskStatus.Running
+                && (task.ExecutionDeadline == null || task.ExecutionDeadline <= now))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(task => task.Status, AgentTaskStatus.Failed)
                 .SetProperty(task => task.Failure, AgentTaskFailure.Interrupted)
