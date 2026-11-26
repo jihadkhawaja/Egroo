@@ -412,7 +412,7 @@ jobs:
           plist="$app/Info.plist"
           executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$plist")"
           test -n "$executable"
-          xcrun lipo -verify_arch arm64 "$app/$executable"
+          xcrun lipo "$app/$executable" -verify_arch arm64
           build="$(xcrun vtool -show-build "$app/$executable")"
           printf '%s\n' "$build"
           grep -E '^[[:space:]]*platform[[:space:]]+IOS[[:space:]]*$' <<<"$build" >/dev/null
