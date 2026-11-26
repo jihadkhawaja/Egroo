@@ -360,26 +360,9 @@ public sealed partial class ChatWorkspace
             var descriptor = EncryptedFileTokenParser.Parse(token);
             if (!descriptor.IsImage)
                 continue;
-            var preview = new Image { MaxHeight = 280, Stretch = Stretch.Uniform, IsVisible = false };
-            preview.DetachedFromVisualTree += (_, _) =>
-            {
-                var bitmap = preview.Source as Bitmap;
-                preview.Source = null;
-                bitmap?.Dispose();
-            };
-            body.Children.Add(MessageAction($"Preview {descriptor.Label}", async () =>
-            {
-                if (preview.Source is null)
-                {
-                    var file = await _session.DownloadAsync(token);
-                    if (TopLevel.GetTopLevel(preview) is null)
-                        return;
-                    using var stream = new MemoryStream(file.Bytes);
-                    preview.Source = Bitmap.DecodeToWidth(stream, 640);
-                }
-                preview.IsVisible = !preview.IsVisible;
-            }));
-            body.Children.Add(preview);
+            var action = MessageAction($"Preview {descriptor.Label}");
+            action.Click += async (_, _) => await RunAsync(() => PreviewAttachmentAsync(action, token));
+            body.Children.Add(action);
         }
         var bubble = new Border
         {
@@ -448,9 +431,57 @@ public sealed partial class ChatWorkspace
         return block;
     }
 
-    private Button MessageAction(string label, Func<Task> action)
+    private async Task PreviewAttachmentAsync(Button action, string token)
     {
-        var button = StyledButton(label, action, "message-action");
+        var file = await _session.DownloadAsync(token);
+        if (TopLevel.GetTopLevel(action) is not { } root)
+            return;
+
+        using var stream = new MemoryStream(file.Bytes);
+        var bitmap = Bitmap.DecodeToWidth(stream, 640);
+        var preview = new Image
+        {
+            Source = bitmap, Stretch = Stretch.Uniform,
+            MaxWidth = Math.Clamp(root.ClientSize.Width - 48, 1, 420),
+            MaxHeight = Math.Clamp(root.ClientSize.Height - 88, 1, 280)
+        };
+        AutomationProperties.SetName(preview, file.Name);
+        // Expanding an inline image changes the virtualized row height enough to move its viewport anchor.
+        var flyout = new Flyout { Placement = PlacementMode.TopEdgeAlignedLeft };
+        var close = new Button { Content = "Close preview", HorizontalAlignment = HorizontalAlignment.Right,
+            Classes = { "workspace-action", "quiet" } };
+        close.Click += (_, _) => ClosePreview();
+        close.KeyDown += (_, args) =>
+        {
+            if (args.Key != Key.Escape)
+                return;
+            args.Handled = true;
+            ClosePreview();
+        };
+        flyout.Content = new StackPanel { Spacing = 8, Children = { preview, close } };
+        flyout.Opened += (_, _) => close.Focus();
+
+        void ClosePreview()
+        {
+            flyout.Hide();
+            action.Focus();
+        }
+        void CloseOnDetach(object? sender, VisualTreeAttachmentEventArgs args) => flyout.Hide();
+
+        flyout.Closed += (_, _) =>
+        {
+            action.DetachedFromVisualTree -= CloseOnDetach;
+            preview.Source = null;
+            bitmap.Dispose();
+        };
+        action.DetachedFromVisualTree += CloseOnDetach;
+        flyout.ShowAt(action);
+    }
+
+    private Button MessageAction(string label, Func<Task>? action = null)
+    {
+        var button = action is null ? new Button { Classes = { "workspace-action", "message-action" } }
+            : StyledButton(label, action, "message-action");
         var text = Text(label, 13, AccentInk, FontWeight.SemiBold);
         text.TextDecorations = TextDecorations.Underline;
         text.TextTrimming = TextTrimming.CharacterEllipsis;
