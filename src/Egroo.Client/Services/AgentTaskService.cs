@@ -20,6 +20,8 @@ public sealed class AgentTaskService(HttpClient http)
         using var response = await http.PostAsJsonAsync(BasePath, request, cancellationToken);
         if (response.StatusCode == HttpStatusCode.NotFound)
             throw new InvalidOperationException("The selected agent is unavailable.");
+        if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            throw new InvalidOperationException("Task submissions are temporarily limited. Wait for a task to finish or cancel one and try again.");
 
         response.EnsureSuccessStatusCode();
         return await ReadTaskAsync(response, cancellationToken);
