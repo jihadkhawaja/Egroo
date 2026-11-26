@@ -253,12 +253,24 @@ jobs:
           echo "Booting the hosted iPhone 17 simulator with iOS 26.5."
           xcrun simctl bootstatus "$simulator" -b
           echo "Installing Egroo."
+          codesign --force --deep --sign - "$app"
           xcrun simctl install "$simulator" "$app"
-          launch="$(xcrun simctl launch "$simulator" "$bundle")"
+          stdout="$RUNNER_TEMP/egroo-ios.stdout"
+          stderr="$RUNNER_TEMP/egroo-ios.stderr"
+          launch="$(xcrun simctl launch --stdout="$stdout" --stderr="$stderr" "$simulator" "$bundle")"
           echo "$launch"
           pid="${launch##* }"
           sleep 5
-          if ! kill -0 "$pid" 2>/dev/null; then
-            xcrun simctl spawn "$simulator" log show --last 1m --predicate "processIdentifier == $pid" --style compact | tail -n 100 || true
+          if ! kill -0 "$pid" 2>/dev/null && ! xcrun simctl spawn "$simulator" launchctl list \
+            | awk -v pid="$pid" '$1 == pid { alive = 1 } END { exit !alive }'; then
+            cat "$stdout" "$stderr" 2>/dev/null || true
+            xcrun simctl spawn "$simulator" log show --last 3m --style compact \
+              --predicate "processIdentifier == $pid OR eventMessage CONTAINS[c] '$bundle'" | tail -n 100 || true
+            for reports in "$HOME/Library/Logs/DiagnosticReports" \
+              "$HOME/Library/Developer/CoreSimulator/Devices/$simulator/data/Library/Logs/CrashReporter"; do
+              if [[ -d "$reports" ]]; then
+                find "$reports" -iname '*egroo*.ips' -print -exec head -c 12000 {} \;
+              fi
+            done
             exit 1
           fi
