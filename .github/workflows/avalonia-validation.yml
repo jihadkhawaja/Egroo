@@ -149,7 +149,7 @@ jobs:
       - run: dotnet workload install android
       - name: Build and verify APK
         run: |
-          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk '-p:RuntimeIdentifiers=android-arm64%3Bandroid-x64' -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: android-test-apk
