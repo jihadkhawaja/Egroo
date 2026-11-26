@@ -126,7 +126,7 @@ namespace Egroo.UI.Services
         public async Task<bool> JoinCallAsync(Guid channelId, string? channelTitle)
         {
             if (_disposed || channelId == Guid.Empty || _sessionStorage.User is not { } user
-                || _joinCancellation is not null || _leaveTask is not null)
+                || _joinCancellation is not null)
             {
                 return false;
             }
@@ -147,6 +147,14 @@ namespace Egroo.UI.Services
             var cancellationToken = joining.Token;
             try
             {
+                if (_leaveTask is { } releasing)
+                {
+                    await releasing.WaitAsync(cancellationToken);
+                    if (_leaveTask == releasing)
+                        _leaveTask = null;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
                 await EnsureInitializedAsync().WaitAsync(cancellationToken);
                 bool acquired = await _jsRuntime.InvokeAsync<bool>(
                     "webrtcInterop.joinCall", cancellationToken, channelId.ToString(), user.Id.ToString());
@@ -199,30 +207,32 @@ namespace Egroo.UI.Services
 
         private async Task<bool> StopCallAsync()
         {
+            var joining = _joinCancellation;
+            _joinCancellation = null;
+            joining?.Cancel();
+
             if (_leaveTask is { } pending)
             {
                 await pending;
                 return false;
             }
 
-            if (!IsInCall && _joinCancellation is null)
+            if (!IsInCall && joining is null)
                 return false;
 
             var channelId = CurrentChannelId;
-            var joining = _joinCancellation;
-            _joinCancellation = null;
-            joining?.Cancel();
             ResetCallState();
 
             // Release capture independently of the network round trip.
-            _leaveTask = ReleaseCallAsync(channelId);
+            var releasing = _leaveTask = ReleaseCallAsync(channelId);
             try
             {
-                await _leaveTask;
+                await releasing;
             }
             finally
             {
-                _leaveTask = null;
+                if (_leaveTask == releasing)
+                    _leaveTask = null;
             }
 
             return true;

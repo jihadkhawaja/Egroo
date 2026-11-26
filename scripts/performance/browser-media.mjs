@@ -11,6 +11,7 @@ if (!browserPublish || !serverPublish)
     throw new Error('Pass the published browser wwwroot directory and the published API directory.');
 
 const viewport = { width: 1280, height: 900 };
+const channelLists = new WeakMap();
 const fixture = await startLoopbackFixture(browserPublish, serverPublish);
 let browser;
 let observer;
@@ -40,11 +41,11 @@ try {
     await verifyCaptureTransitions(alicePage);
 
     const joinStarted = Date.now();
-    await openRoom(alicePage, 0, room.id);
+    await openRoom(alicePage, room.id);
     await alicePage.mouse.click(445, 152);
     await waitForVoice(alicePage, room.id);
 
-    await openRoom(bobPage, 0, room.id);
+    await openRoom(bobPage, room.id);
     await bobPage.mouse.click(445, 152);
     await waitForVoice(bobPage, room.id);
     await Promise.all([waitForInboundAudio(alicePage), waitForInboundAudio(bobPage)]);
@@ -53,13 +54,10 @@ try {
     const secondRoom = await observer.invoke('CreateChannel', ['media_bob']);
     assert.ok(secondRoom?.id && secondRoom.id !== room.id, 'Second fixture channel was not created.');
 
-    const roomIndex = (await observer.invoke('GetUserChannels')).findIndex(channel => channel.id === room.id);
-    assert.ok(roomIndex === 0 || roomIndex === 1, 'Call channel was missing from the fixture channel list.');
     for (let index = 0; index < 6; index++) {
+        const currentRevision = channelLists.get(alicePage).revision;
         await alicePage.mouse.click(275, 99);
-        await delay(250);
-        const showCallRoom = index % 2 !== 0;
-        await openRoom(alicePage, showCallRoom ? roomIndex : 1 - roomIndex, showCallRoom ? room.id : secondRoom.id);
+        await openRoom(alicePage, index % 2 === 0 ? secondRoom.id : room.id, currentRevision);
     }
 
     const afterSwitches = await mediaSnapshot(alicePage);
@@ -82,6 +80,7 @@ try {
     // A fresh call in the same browser context must open its own capture and release it again.
     await bobPage.mouse.click(445, 152);
     await waitForVoice(bobPage, room.id);
+    await waitForParticipants(room.id, [bob.userId]);
     await bobPage.mouse.click(453, 152);
     await waitForReleasedMedia(bobPage);
 
@@ -166,11 +165,28 @@ try {
             };
         }, { api, token, origin });
 
-        const ready = page.waitForEvent('websocket', { timeout: 45_000 }).then(socket =>
-            socket.waitForEvent('framesent', {
-                predicate: frame => typeof frame.payload === 'string' && frame.payload.includes('SendPendingMessages'),
+        const listing = { revision: 0, channels: [], requests: new Set() };
+        channelLists.set(page, listing);
+        const ready = page.waitForEvent('websocket', { timeout: 45_000 }).then(socket => {
+            socket.on('framesent', frame => {
+                for (const message of signalRMessages(frame)) {
+                    if (message.target === 'GetUserChannels')
+                        listing.requests.add(message.invocationId);
+                }
+            });
+            socket.on('framereceived', frame => {
+                for (const message of signalRMessages(frame)) {
+                    if (message.type === 3 && listing.requests.delete(message.invocationId)) {
+                        listing.channels = message.result ?? [];
+                        listing.revision++;
+                    }
+                }
+            });
+            return socket.waitForEvent('framesent', {
+                predicate: frame => signalRMessages(frame).some(message => message.target === 'SendPendingMessages'),
                 timeout: 45_000
-            }));
+            });
+        });
         await Promise.all([
             page.goto(origin),
             page.locator('#egroo[data-egroo-ready=true]').waitFor({ timeout: 45_000 }),
@@ -197,8 +213,21 @@ async function register(api, username) {
     return account;
 }
 
-// Avalonia Browser paints onto a canvas. These points target the channel list at the fixed viewport.
-async function openRoom(page, index, channelId) {
+function signalRMessages({ payload }) {
+    return typeof payload === 'string' ? payload.split('\x1e').filter(Boolean).map(message => JSON.parse(message)) : [];
+}
+
+// Avalonia Browser paints onto a canvas. Use the actual channel-list ordering from the connection.
+async function openRoom(page, channelId, afterRevision = 0) {
+    const listing = channelLists.get(page);
+    const deadline = Date.now() + 10_000;
+    while (listing.revision <= afterRevision && Date.now() < deadline)
+        await delay(50);
+
+    assert.ok(listing.revision > afterRevision, 'The app did not refresh the list of channels.');
+    const index = listing.channels.findIndex(channel => channel.id === channelId);
+    assert.ok(index === 0 || index === 1, 'Expected a fixture channel in one of the first two rows.');
+
     await page.mouse.click(400, 333 + 63 * index);
     await page.waitForFunction(id => globalThis.egrooMediaProbe.historyScope?.endsWith(id), channelId.replaceAll('-', ''),
         { timeout: 10_000 });
