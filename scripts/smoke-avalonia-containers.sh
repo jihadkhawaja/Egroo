@@ -39,6 +39,12 @@ curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 "
 curl --fail --silent --show-error "$browser_url/egroo-config.json" \
     | jq --exit-status --arg apiUrl "$api_url/" '.apiUrl == $apiUrl' >/dev/null
 
+asset=$(docker exec "$browser_container" find /usr/share/nginx/html/_framework -name '*.wasm.gz' -print -quit)
+test -n "$asset"
+asset=${asset#/usr/share/nginx/html}
+curl --fail --silent --show-error --head --header 'Accept-Encoding: gzip' "$browser_url${asset%.gz}" \
+    | tr -d '\r' | grep --ignore-case --line-regexp 'content-encoding: gzip' >/dev/null
+
 timeout 90s google-chrome --headless --no-sandbox --disable-dev-shm-usage \
     --disable-background-networking --use-angle=swiftshader --enable-unsafe-swiftshader \
     --virtual-time-budget=30000 --dump-dom "$browser_url/" > "$browser_dom"

@@ -89,6 +89,6 @@ docker run -d --name egroo-browser --restart unless-stopped \
   "ghcr.io/jihadkhawaja/egroo-browser:$tag"
 ```
 
-Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time.
+Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time. The browser container serves the precompressed WebAssembly assets when the client accepts gzip.
 
 Record the installed pair and back up the API database before upgrading. To roll back, recreate both containers with the previous pair and preserve the API settings and persistent volume. If the newer API applied incompatible migrations, restore the corresponding database backup before restarting it.
