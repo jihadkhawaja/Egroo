@@ -167,7 +167,7 @@ internal sealed class WorkspaceSession
         return await _runtime.InvokeAsync<Message[]>("history.get", key, limit);
     }
 
-    public async Task StoreMessageAsync(Message message, bool updateOnly = false)
+    public async Task StoreMessageAsync(Message message, bool updateOnly = false, bool addOnly = false)
     {
         if (User is not { } user)
             return;
@@ -178,7 +178,7 @@ internal sealed class WorkspaceSession
             DateSent = message.DateSent, DateSeen = message.DateSeen, AgentDefinitionId = message.AgentDefinitionId,
             DateCreated = message.DateCreated
         };
-        await _runtime.InvokeVoidAsync("history.put", HistoryKey(user.Id, message.ChannelId), record, updateOnly);
+        await _runtime.InvokeVoidAsync("history.put", HistoryKey(user.Id, message.ChannelId), record, updateOnly, addOnly);
     }
 
     public async Task<(string Name, byte[] Bytes)> DownloadAsync(string token)

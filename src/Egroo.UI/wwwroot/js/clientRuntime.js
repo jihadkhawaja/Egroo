@@ -76,7 +76,7 @@
         });
     }
 
-    async function storeMessage(scope, message, updateOnly) {
+    async function storeMessage(scope, message, updateOnly, addOnly) {
         const db = await openCache();
         return new Promise((resolve, reject) => {
             const tx = db.transaction("cache", "readwrite");
@@ -86,6 +86,7 @@
             request.onsuccess = () => {
                 const current = request.result;
                 if (current?.content != null) {
+                    if (addOnly) return;
                     current.id = message.id;
                     current.content = message.content ?? current.content;
                     current.dateSeen ??= message.dateSeen;

@@ -503,8 +503,9 @@ public sealed partial class ChatWorkspace
             throw new InvalidOperationException("The message could not be sent.");
 
         message.Content = payload.UserRecipientContents.Single(item => item.UserId == user.Id).Content;
+        message.Id = Guid.Empty;
         message.DateSent = DateTimeOffset.UtcNow;
-        await _session.StoreMessageAsync(message);
+        await _session.StoreMessageAsync(message, addOnly: true);
         composer.Text = string.Empty;
         _attachment?.Dispose();
         _attachment = null;
