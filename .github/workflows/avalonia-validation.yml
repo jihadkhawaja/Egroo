@@ -84,8 +84,16 @@ jobs:
       - run: dotnet workload install wasm-tools
       - run: dotnet publish src/Egroo.Avalonia/Browser -c Release -o artifacts/browser
       - name: Verify static app assets
+        shell: pwsh
         run: |
-          test -s artifacts/browser/wwwroot/index.html
-          test -s artifacts/browser/wwwroot/runtime/clientRuntime.js
-          test -s artifacts/browser/wwwroot/runtime/egrooCrypto.js
-          test -n "$(find artifacts/browser/wwwroot/_framework -name '*.wasm' -print -quit)"
+          $root = 'artifacts/browser/wwwroot'
+          $page = Get-Content (Join-Path $root 'index.html') -Raw
+          $scripts = [regex]::Matches($page, '<script\b[^>]*\bsrc="([^"]+)"')
+          if ($scripts.Count -eq 0) { throw 'The published page declares no scripts.' }
+          foreach ($script in $scripts) {
+            $asset = Get-Item -LiteralPath (Join-Path $root $script.Groups[1].Value)
+            if ($asset.Length -eq 0) { throw "Published script is empty: $($asset.Name)" }
+          }
+          $wasm = Get-ChildItem (Join-Path $root '_framework') -Recurse -File -Filter '*.wasm' |
+            Where-Object Length -gt 0 | Select-Object -First 1
+          if (!$wasm) { throw 'The published bundle contains no WebAssembly runtime.' }
