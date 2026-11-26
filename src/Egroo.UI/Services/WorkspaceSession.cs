@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Egroo.Client.Core;
 using Egroo.Client.Services;
 using Egroo.Contracts.Interfaces;
@@ -16,6 +18,7 @@ internal sealed class WorkspaceSession
     private readonly SessionStorage _state = new();
     private readonly AuthService _auth;
     private HubConnection? _hub;
+    private DateTimeOffset? _expiresAt;
     private long _connectionGeneration;
     private bool _importLegacyHistory;
 
@@ -45,6 +48,7 @@ internal sealed class WorkspaceSession
     public ChatMessageService Messages { get; private set; } = new();
     public UserDto? User => _state.User;
     public bool Connected => _hub?.State == HubConnectionState.Connected;
+    public bool HasExpired => _expiresAt is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow;
     public long ConnectionGeneration => Interlocked.Read(ref _connectionGeneration);
     public event Action<Message>? Received;
     public event Action<Message>? Updated;
@@ -59,6 +63,11 @@ internal sealed class WorkspaceSession
             token = await _storage.GetFromLocalStorage("token");
         if (token is null)
             return;
+        if (ReadTokenExpiry(token) is { } expiresAt && expiresAt <= DateTimeOffset.UtcNow)
+        {
+            await SignOutAsync();
+            return;
+        }
 
         Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var result = await _auth.RefreshSession();
@@ -116,6 +125,7 @@ internal sealed class WorkspaceSession
             await _storage.SetLocalStorage(_tokenKey, token);
             _importLegacyHistory = IsLegacyProductionApi
                 && await _storage.GetFromLocalStorage("egroo.legacyHistoryOwner") == _state.User.Id.ToString("D");
+            _expiresAt = ReadTokenExpiry(token);
         }
         catch
         {
@@ -141,17 +151,24 @@ internal sealed class WorkspaceSession
 
     public async Task SignOutAsync()
     {
-        await DisconnectAsync();
         _state.User = null;
         _importLegacyHistory = false;
         Http.DefaultRequestHeaders.Authorization = null;
-        await _storage.RemoveFromLocalStorage(_tokenKey);
-        if (IsLegacyProductionApi)
-            await _storage.RemoveFromLocalStorage("token");
+        try
+        {
+            await DisconnectAsync();
+        }
+        finally
+        {
+            await _storage.RemoveFromLocalStorage(_tokenKey);
+            if (IsLegacyProductionApi)
+                await _storage.RemoveFromLocalStorage("token");
+        }
     }
 
     private async Task DisconnectAsync()
     {
+        _expiresAt = null;
         if (_hub is not { } hub)
             return;
         _hub = null;
@@ -161,16 +178,48 @@ internal sealed class WorkspaceSession
         await hub.DisposeAsync();
     }
 
+    private static DateTimeOffset? ReadTokenExpiry(string token)
+    {
+        var parts = token.Split('.');
+        if (parts.Length != 3)
+            return null;
+
+        try
+        {
+            // Use the expiry claim as a local UI hint. The server validates the token.
+            var payload = parts[1].Replace('-', '+').Replace('_', '/');
+            var bytes = Convert.FromBase64String(payload.PadRight((payload.Length + 3) / 4 * 4, '='));
+            using var claims = JsonDocument.Parse(bytes);
+            if (claims.RootElement.ValueKind != JsonValueKind.Object
+                || !claims.RootElement.TryGetProperty("exp", out var expiry))
+                return null;
+
+            var timestamp = expiry.ValueKind switch
+            {
+                JsonValueKind.Number => expiry.GetRawText(),
+                JsonValueKind.String => expiry.GetString(),
+                _ => null
+            };
+            return long.TryParse(timestamp, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+                ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+                : null;
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException or ArgumentOutOfRangeException)
+        {
+            return null;
+        }
+    }
+
     private string HistoryKey(Guid user, Guid channel) => $"{Api.AbsoluteUri}{user:N}/{channel:N}";
 
-    public async Task<Message[]> ReadHistoryAsync(Guid channel, int? limit)
+    public async Task<Message[]> ReadHistoryAsync(Guid channel, int? limit, CancellationToken cancellationToken)
     {
         if (User is not { } user)
             return [];
         var key = HistoryKey(user.Id, channel);
         if (_importLegacyHistory)
-            await _runtime.InvokeVoidAsync("history.importLegacy", key, channel);
-        return await _runtime.InvokeAsync<Message[]>("history.get", key, limit);
+            await _runtime.InvokeVoidAsync("history.importLegacy", cancellationToken, key, channel);
+        return await _runtime.InvokeAsync<Message[]>("history.get", cancellationToken, key, limit);
     }
 
     public async Task StoreMessageAsync(Message message, bool updateOnly = false, bool addOnly = false)

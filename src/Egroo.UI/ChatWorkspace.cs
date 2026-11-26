@@ -164,6 +164,12 @@ public sealed partial class ChatWorkspace : UserControl
         if (_session.User is null)
             return;
 
+        if (_session.HasExpired)
+        {
+            _ = ExpireSessionAsync();
+            return;
+        }
+
         UpdateConnectionIndicator();
         if (!_session.Connected)
         {
@@ -182,7 +188,32 @@ public sealed partial class ChatWorkspace : UserControl
         _ = ReplayPendingMessagesAsync();
     }
 
-    private Task ReconnectAsync() => _session.Connected ? ReplayPendingMessagesAsync() : RestoreAsync();
+    private Task ReconnectAsync()
+    {
+        if (_session.HasExpired)
+            return ExpireSessionAsync();
+        return _session.Connected ? ReplayPendingMessagesAsync() : RestoreAsync();
+    }
+
+    private Task ExpireSessionAsync() => RunAsync(async () =>
+    {
+        if (!_session.HasExpired)
+            return;
+
+        var username = _session.User?.Username;
+        _pendingReplayCancellation?.Cancel();
+        try
+        {
+            await _session.SignOutAsync();
+        }
+        finally
+        {
+            await CloseChannelViewAsync();
+            _wasConnected = false;
+            ShowAuthentication(usernameValue: username);
+            Notify("Your session expired. Sign in again.");
+        }
+    });
 
     private async Task ReplayPendingMessagesAsync()
     {
@@ -241,6 +272,12 @@ public sealed partial class ChatWorkspace : UserControl
 
     private async Task PollMediaAsync()
     {
+        if (_session.HasExpired)
+        {
+            await ExpireSessionAsync();
+            return;
+        }
+
         if (_receivingMedia || !_session.Voice.IsInCall)
             return;
         _receivingMedia = true;

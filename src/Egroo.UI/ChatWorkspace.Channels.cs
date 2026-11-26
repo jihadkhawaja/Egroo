@@ -42,14 +42,30 @@ public sealed partial class ChatWorkspace
 
     private readonly record struct BubbleDisplay(Guid Sender, Guid? Agent, string? Name, DateTimeOffset? Time, bool Seen, string Text);
 
-    private sealed class TimelineRender(StackPanel panel)
+    private sealed class TimelineRender
     {
-        public StackPanel Panel { get; } = panel;
+        private readonly CancellationTokenSource _lifetime = new();
+
+        public TimelineRender(StackPanel panel)
+        {
+            Panel = panel;
+            CancellationToken = _lifetime.Token;
+        }
+
+        public StackPanel Panel { get; }
+        public CancellationToken CancellationToken { get; }
         public bool Running { get; set; }
+        public bool DecryptionUnavailable { get; set; }
         public TaskCompletionSource? Pending { get; set; }
         public Dictionary<Guid, (string Cipher, string Text)> Decrypted { get; } = new();
         public Dictionary<Guid, (BubbleDisplay Display, Control View)> Bubbles { get; set; } = new();
         public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control> Dates { get; set; } = new();
+
+        public void Cancel()
+        {
+            _lifetime.Cancel();
+            _lifetime.Dispose();
+        }
     }
 
     private async Task OpenChannelAsync(Channel channel)
@@ -112,15 +128,20 @@ public sealed partial class ChatWorkspace
         var footer = ComposerPanel(_composer, SendMessageAsync, _attachmentStatus,
             GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync),
             QuietButton("@ Mention", () => ShowMentionsAsync(channel)), _removeAttachment);
-        _timeline = ShowConversation(header, messages, footer, _typingStatus);
+        var timeline = _timeline = ShowConversation(header, messages, footer, _typingStatus);
         await RenderMessagesAsync();
-        ScrollToLatest(_timeline);
-        UpdateVoice();
+        if (timeline == _timeline)
+        {
+            ScrollToLatest(timeline);
+            UpdateVoice();
+        }
     }
 
     private async Task CloseChannelViewAsync()
     {
+        var render = _timelineRender;
         _timelineRender = null;
+        render?.Cancel();
         await StopTypingAsync();
         _channel = null;
         _attachment?.Dispose();
@@ -171,6 +192,10 @@ public sealed partial class ChatWorkspace
                 await RenderTimelineSnapshotAsync(render);
                 request.SetResult();
             }
+            catch (OperationCanceledException) when (render.CancellationToken.IsCancellationRequested)
+            {
+                request.SetResult();
+            }
             catch (Exception ex)
             {
                 request.SetException(ex);
@@ -189,7 +214,7 @@ public sealed partial class ChatWorkspace
         bool IsCurrentView() => render == _timelineRender && query == _messageFilter?.Text?.Trim()
             && (searching || limit == _messageLimit);
 
-        var history = await _session.ReadHistoryAsync(channel.Id, searching ? null : limit);
+        var history = await _session.ReadHistoryAsync(channel.Id, searching ? null : limit, render.CancellationToken);
         if (!IsCurrentView())
             return;
 
@@ -203,7 +228,9 @@ public sealed partial class ChatWorkspace
             var cipher = message.Content ?? string.Empty;
             if (!render.Decrypted.TryGetValue(message.ReferenceId, out var display) || display.Cipher != cipher)
             {
-                display = (cipher, await _session.Encryption.GetDisplayContentAsync(message) ?? string.Empty);
+                var result = await _session.Encryption.GetDisplayContentAsync(message, !render.DecryptionUnavailable, render.CancellationToken);
+                render.DecryptionUnavailable |= result.RuntimeUnavailable;
+                display = (cipher, result.Text ?? string.Empty);
                 if (!IsCurrentView())
                     return;
                 render.Decrypted[message.ReferenceId] = display;
