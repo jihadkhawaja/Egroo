@@ -70,6 +70,13 @@ namespace Egroo.Server.Database
             modelBuilder.Entity<AgentConversationMessage>()
                 .HasIndex(x => x.AgentConversationId)
                 .IsUnique(false);
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.OwnerId, x.RequestId })
+                .IsUnique();
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.OwnerId, x.CreatedAt, x.Id });
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.Status, x.CreatedAt, x.Id });
 
             modelBuilder.Entity<AgentPendingMessage>()
                 .HasIndex(x => new { x.AgentDefinitionId, x.MessageId })
@@ -108,6 +115,7 @@ namespace Egroo.Server.Database
         public DbSet<AgentMcpServer> AgentMcpServers { get; set; }
         public DbSet<AgentConversation> AgentConversations { get; set; }
         public DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
+        internal DbSet<AgentTaskRecord> AgentTasks => Set<AgentTaskRecord>();
         public DbSet<ChannelAgent> ChannelAgents { get; set; }
         public DbSet<UserAgentFriend> UserAgentFriends { get; set; }
         public DbSet<UserEncryptionKey> UserEncryptionKeys { get; set; }

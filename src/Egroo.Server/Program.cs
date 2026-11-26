@@ -33,7 +33,7 @@ public partial class Program
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         ConfigureInfrastructure(builder);
-        ConfigureServerServices(builder.Services);
+        ConfigureServerServices(builder.Services, builder.Configuration);
 
         WebApplication app = builder.Build();
 
@@ -218,7 +218,7 @@ public partial class Program
         });
     }
 
-    private static void ConfigureServerServices(IServiceCollection services)
+    private static void ConfigureServerServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton(CreateEncryptionService);
         services.AddSingleton<EndToEndEncryptionService>();
@@ -229,12 +229,20 @@ public partial class Program
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<AgentTaskRepository>();
+        services.AddSingleton(TimeProvider.System);
         services.AddHttpClient("McpClient");
         services.AddSingleton<ChannelFileStorageService>();
         services.AddSingleton<AgentSkillsService>();
         services.AddSingleton<AgentManagedSkillsService>();
         services.AddSingleton<McpClientService>();
         services.AddSingleton<AgentRuntimeService>();
+        if (configuration.GetValue("AgentTasks:WorkerEnabled", true))
+        {
+            services.AddSingleton<IAgentTaskExecutor>(provider => provider.GetRequiredService<AgentRuntimeService>());
+            services.AddHostedService<AgentTaskWorker>();
+        }
+
         services.AddSingleton<AgentChannelService>();
         services.AddSingleton<IAgentChannelResponder>(sp => sp.GetRequiredService<AgentChannelService>());
         services.AddChatHub();
@@ -298,6 +306,7 @@ public partial class Program
         app.MapChatHub();
         app.MapAuthentication();
         app.MapAgents();
+        app.MapAgentTasks();
         app.MapChannelFiles();
         app.MapVoiceCall();
     }

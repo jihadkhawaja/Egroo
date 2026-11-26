@@ -22,7 +22,8 @@ public sealed partial class ChatWorkspace
             IconButton("New agent", PlusIcon, () => EditAgentAsync(null), "primary"));
         var filters = new StackPanel { Spacing = 12 };
         filters.Children.Add(Actions(StyledButton("My agents", ShowAgentsAsync, discover ? "quiet" : "selected"),
-            StyledButton("Discover", () => ShowAgentsAsync(null, true), discover ? "selected" : "quiet")));
+            StyledButton("Discover", () => ShowAgentsAsync(null, true), discover ? "selected" : "quiet"),
+            QuietButton("Tasks", ShowAgentTasksAsync)));
         if (discover)
         {
             var search = Field("Search published agents", query);

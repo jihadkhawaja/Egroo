@@ -49,10 +49,10 @@ namespace Egroo.Client.Services
             return await response.Content.ReadFromJsonAsync<AgentDefinition>(JsonOptions);
         }
 
-        public async Task<AgentDefinition[]?> GetAgents()
-        {
-            return await HttpClient.GetFromJsonAsync<AgentDefinition[]>(BasePath, JsonOptions);
-        }
+        public Task<AgentDefinition[]?> GetAgents() => GetAgents(CancellationToken.None);
+
+        public Task<AgentDefinition[]?> GetAgents(CancellationToken cancellationToken) =>
+            HttpClient.GetFromJsonAsync<AgentDefinition[]>(BasePath, JsonOptions, cancellationToken);
 
         public async Task<AgentDefinition?> GetAgent(Guid agentId)
         {

@@ -7,7 +7,7 @@ param(
 
 $projectDirectory = Join-Path $PSScriptRoot '../src/Egroo.Server'
 $context = if ($Provider -eq 'SQLite') { 'SqliteDataContext' } else { 'DataContext' }
-$migrationArgs = if ($Migration) { @($Migration) } else { @() }
+[string[]]$migrationArgs = if ($Migration) { @($Migration) } else { @() }
 
 Push-Location -LiteralPath $projectDirectory
 try {
