@@ -20,6 +20,7 @@ namespace Egroo.UI;
 public sealed partial class ChatWorkspace
 {
     private const int MaxAttachmentBytes = 1024 * 1024 - 16;
+    private const int LiveHistoryBufferSize = 64;
     private static readonly Regex MessageTokens = new(
         @"\[\[egroo-file:(?<file>[A-Za-z0-9_-]+)\]\]|\[(?<label>[^\]\r\n]+)\]\((?<link>https?://[^)\s]+)\)|(?<url>https?://[^\s<>]+)|(?<![\w@])@(?<mention><[^>]+>|[\w.-]+)",
         RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(500));
@@ -54,6 +55,7 @@ public sealed partial class ChatWorkspace
     private sealed class TimelineRender
     {
         private readonly CancellationTokenSource _lifetime = new();
+        private readonly HashSet<Guid> _liveMessages = new();
 
         public TimelineRender()
         {
@@ -64,10 +66,26 @@ public sealed partial class ChatWorkspace
         public CancellationToken CancellationToken { get; }
         public bool Running { get; set; }
         public bool DecryptionUnavailable { get; set; }
+        public int LiveMessages => _liveMessages.Count;
         public TaskCompletionSource? Pending { get; set; }
         public Dictionary<Guid, (string Cipher, string Text)> Decrypted { get; } = new();
         public Dictionary<Guid, (BubbleDisplay Display, TimelineRow Row)> Bubbles { get; set; } = new();
         public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), TimelineRow> Dates { get; set; } = new();
+
+        public void ExtendHistory(Guid referenceId, bool followingLatest)
+        {
+            if (Decrypted.ContainsKey(referenceId) || _liveMessages.Contains(referenceId))
+                return;
+            if (_liveMessages.Count == LiveHistoryBufferSize)
+            {
+                if (!followingLatest)
+                    return;
+                _liveMessages.Clear();
+            }
+            // Keep the first loaded row stable while appending. A leading removal invalidates the
+            // virtual panel's estimated extent and can force a new viewport layout after each message.
+            _liveMessages.Add(referenceId);
+        }
 
         public void Cancel()
         {
@@ -241,9 +259,9 @@ public sealed partial class ChatWorkspace
             return;
         var query = _messageFilter?.Text?.Trim();
         var searching = !string.IsNullOrWhiteSpace(query);
-        var limit = _messageLimit;
+        var limit = _messageLimit + render.LiveMessages;
         bool IsCurrentView() => render == _timelineRender && query == _messageFilter?.Text?.Trim()
-            && (searching || limit == _messageLimit);
+            && (searching || limit == _messageLimit + render.LiveMessages);
 
         var history = await _session.ReadHistoryAsync(channel.Id, searching ? null : limit, render.CancellationToken);
         if (!IsCurrentView())
@@ -301,8 +319,53 @@ public sealed partial class ChatWorkspace
                 : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")));
         render.Bubbles = bubbles;
         render.Dates = dates;
+        if (!searching && render.LiveMessages == LiveHistoryBufferSize && _timeline is { } timeline
+            && !IsNearLatest(timeline) && render.Rows.Count == rows.Count && render.Rows[0] != rows[0])
+            PreserveReaderPosition(timeline, render.Rows, rows);
         ApplyRows(render.Rows, rows, render.Rows.Move);
+        if (!searching && render.Decrypted.Count > bubbles.Count)
+        {
+            var staleIds = render.Decrypted.Keys.Where(id => !bubbles.ContainsKey(id)).ToArray();
+            foreach (var id in staleIds)
+                render.Decrypted.Remove(id);
+        }
     }
+
+    private void PreserveReaderPosition(ScrollViewer timeline, ObservableCollection<TimelineRow> current, List<TimelineRow> next)
+    {
+        if (timeline.Content is not ItemsControl items)
+            return;
+
+        // Removing a leading item can make the virtual panel replace the entire visible range.
+        // Keep a surviving visible row at its previous viewport position after that layout.
+        foreach (var container in items.GetRealizedContainers())
+        {
+            if (container.TranslatePoint(default, timeline) is not { } position
+                || position.Y >= timeline.Viewport.Height || position.Y + container.Bounds.Height <= 0)
+                continue;
+            var oldIndex = items.IndexFromContainer(container);
+            if (oldIndex < 0 || oldIndex >= current.Count)
+                continue;
+            var row = current[oldIndex];
+            var newIndex = next.IndexOf(row);
+            if (newIndex < 0)
+                continue;
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (timeline != _timeline || newIndex >= current.Count || current[newIndex] != row)
+                    return;
+                if (items.ContainerFromIndex(newIndex) is null)
+                    items.ScrollIntoView(newIndex);
+                if (items.ContainerFromIndex(newIndex)?.TranslatePoint(default, timeline) is { } updated)
+                    timeline.Offset = timeline.Offset.WithY(timeline.Offset.Y + updated.Y - position.Y);
+            }, DispatcherPriority.Loaded);
+            break;
+        }
+    }
+
+    private static bool IsNearLatest(ScrollViewer timeline) =>
+        timeline.Offset.Y >= timeline.Extent.Height - timeline.Viewport.Height - 48;
 
     private static void ApplyRows<T>(IList<T> children, List<T> rows, Action<int, int> move) where T : class
     {
@@ -499,8 +562,7 @@ public sealed partial class ChatWorkspace
             return;
 
         var initialTimeline = _channel?.Id == message.ChannelId ? _timeline : null;
-        var atEnd = initialTimeline is not null
-            && initialTimeline.Offset.Y >= initialTimeline.Extent.Height - initialTimeline.Viewport.Height - 48;
+        var atEnd = initialTimeline is not null && IsNearLatest(initialTimeline);
         var messages = _session.Messages;
         var connectionGeneration = _session.ConnectionGeneration;
 
@@ -526,8 +588,11 @@ public sealed partial class ChatWorkspace
 
             _typing.Remove(ParticipantKey(message.SenderId, message.AgentDefinitionId));
             UpdateTypingStatus();
+            var followingLatest = atEnd && timeline == initialTimeline;
+            if (!updateOnly && message.Content is not null && _timelineRender is { } render)
+                render.ExtendHistory(message.ReferenceId, followingLatest && string.IsNullOrWhiteSpace(_messageFilter?.Text));
             await RenderMessagesAsync();
-            if (atEnd && timeline == initialTimeline && timeline == _timeline)
+            if (followingLatest && timeline == _timeline)
                 ScrollToLatest(timeline);
         }
 
@@ -603,6 +668,8 @@ public sealed partial class ChatWorkspace
         _attachment?.Dispose();
         _attachment = null;
         UpdateAttachmentStatus();
+        if (_channel?.Id == channel.Id)
+            _timelineRender?.ExtendHistory(message.ReferenceId, followingLatest: string.IsNullOrWhiteSpace(_messageFilter?.Text));
         await RenderMessagesAsync();
         ScrollToLatest(_timeline);
     }
