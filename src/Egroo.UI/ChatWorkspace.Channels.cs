@@ -402,21 +402,32 @@ public sealed partial class ChatWorkspace
 
     private async Task ReceiveAsync(Message message, bool updateOnly = false)
     {
+        if (_session.User is not { } user)
+            return;
+
+        var initialTimeline = _channel?.Id == message.ChannelId ? _timeline : null;
+        var atEnd = initialTimeline is not null
+            && initialTimeline.Offset.Y >= initialTimeline.Extent.Height - initialTimeline.Viewport.Height - 48;
+        var messages = _session.Messages;
+        var connectionGeneration = _session.ConnectionGeneration;
+
         try
         {
-            var initialTimeline = _channel?.Id == message.ChannelId ? _timeline : null;
-            var atEnd = initialTimeline is not null
-                && initialTimeline.Offset.Y >= initialTimeline.Extent.Height - initialTimeline.Viewport.Height - 48;
-            var user = _session.User;
             await _session.StoreMessageAsync(message, updateOnly);
-            if (user is null || _session.User?.Id != user.Id)
+            if (_session.User?.Id != user.Id)
                 return;
-            if (!updateOnly && message.Id != Guid.Empty && message.Content is not null)
-            {
-                if (_channel?.Id == message.ChannelId && _timelineRender is not null && message.SenderId != user.Id && message.DateSeen is null)
-                    await _session.Messages.UpdateMessage(message);
-                await _session.Messages.UpdatePendingMessage(message.Id);
-            }
+
+            // A network receipt must not delay the display of a locally stored message.
+            await Task.WhenAll(RefreshTimelineAsync(), AcknowledgeDeliveryAsync());
+        }
+        catch (Exception ex)
+        {
+            if (_session.User?.Id == user.Id)
+                Notify(ex.Message);
+        }
+
+        async Task RefreshTimelineAsync()
+        {
             if (_channel?.Id != message.ChannelId || _timeline is not { } timeline)
                 return;
 
@@ -426,7 +437,36 @@ public sealed partial class ChatWorkspace
             if (atEnd && timeline == initialTimeline && timeline == _timeline)
                 ScrollToLatest(timeline);
         }
-        catch (Exception ex) { Notify(ex.Message); }
+
+        Task AcknowledgeDeliveryAsync()
+        {
+            if (updateOnly || message.Id == Guid.Empty || message.Content is null)
+                return Task.CompletedTask;
+
+            var readReceipt = _channel?.Id == message.ChannelId && _timelineRender is not null
+                && message.SenderId != user.Id && message.DateSeen is null
+                ? TryAcknowledgeAsync(() => messages.UpdateMessage(message))
+                : Task.CompletedTask;
+            return Task.WhenAll(readReceipt, TryAcknowledgeAsync(() => messages.UpdatePendingMessage(message.Id)));
+        }
+
+        async Task TryAcknowledgeAsync(Func<Task> acknowledge)
+        {
+            if (!CanAcknowledge())
+                return;
+            try
+            {
+                await acknowledge();
+            }
+            catch (Exception ex)
+            {
+                if (CanAcknowledge())
+                    Notify(ex.Message);
+            }
+        }
+
+        bool CanAcknowledge() => _session.Connected && _session.ConnectionGeneration == connectionGeneration
+            && _session.User?.Id == user.Id && ReferenceEquals(messages, _session.Messages);
     }
 
     private async Task SendMessageAsync()
