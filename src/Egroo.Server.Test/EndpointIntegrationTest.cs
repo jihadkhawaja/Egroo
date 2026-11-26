@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
@@ -189,15 +190,99 @@ public class EndpointIntegrationTest
             .Build();
     }
 
+    [TestMethod]
+    public async Task AgentTasks_ArePrivateIdempotentAndCancellable()
+    {
+        const string route = "/api/v1/AgentTasks";
+        string path = Path.Combine(Path.GetTempPath(), $"egroo-task-endpoint-{Guid.NewGuid():N}.db");
+        var connectionString = new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connectionString).Options;
+        var agent = new AgentDefinition { UserId = Guid.NewGuid(), Name = "Owner's agent" };
+        var otherAgent = new AgentDefinition { UserId = Guid.NewGuid(), Name = "Other agent" };
+        var request = new CreateAgentTaskRequest(agent.Id, Guid.NewGuid(), "Review this draft");
+
+        try
+        {
+            await using var factory = CreateFactory(nameof(AgentTasks_ArePrivateIdempotentAndCancellable),
+                createContext: () => new SqliteDataContext(options));
+            using (var scope = factory.Services.CreateScope())
+            {
+                var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+                database.AgentDefinitions.AddRange(agent, otherAgent);
+                await database.SaveChangesAsync();
+            }
+
+            using var anonymous = factory.CreateClient();
+            using var owner = CreateAuthenticatedClient(factory, agent.UserId);
+            using var other = CreateAuthenticatedClient(factory, otherAgent.UserId);
+            using var unauthorized = await anonymous.PostAsJsonAsync(route, request);
+            using var foreignAgent = await other.PostAsJsonAsync(route, request);
+            using var invalid = await owner.PostAsJsonAsync(route, request with { Prompt = " " });
+            Assert.AreEqual(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+            Assert.AreEqual(HttpStatusCode.NotFound, foreignAgent.StatusCode);
+            Assert.AreEqual(HttpStatusCode.BadRequest, invalid.StatusCode);
+
+            using var created = await owner.PostAsJsonAsync(route, request);
+            Assert.AreEqual(HttpStatusCode.Created, created.StatusCode);
+            var task = await created.Content.ReadFromJsonAsync<AgentTaskInfo>();
+            Assert.IsNotNull(task);
+            string taskUrl = $"{route}/{task.Id:D}";
+            Assert.AreEqual(taskUrl, created.Headers.Location?.OriginalString);
+            Assert.AreEqual(AgentTaskStatus.Queued, task.Status);
+            Assert.AreEqual(request.RequestId, task.RequestId);
+
+            using var duplicate = await owner.PostAsJsonAsync(route, request with { Prompt = "  Review this draft  " });
+            using var conflict = await owner.PostAsJsonAsync(route, request with { Prompt = "Other work" });
+            Assert.AreEqual(HttpStatusCode.OK, duplicate.StatusCode);
+            Assert.AreEqual(task.Id, (await duplicate.Content.ReadFromJsonAsync<AgentTaskInfo>())?.Id);
+            Assert.AreEqual(HttpStatusCode.Conflict, conflict.StatusCode);
+
+            using var otherCreated = await other.PostAsJsonAsync(route, request with { AgentId = otherAgent.Id });
+            using var otherRead = await other.GetAsync(taskUrl);
+            using var otherCancel = await other.PostAsync($"{taskUrl}/cancel", null);
+            Assert.AreEqual(HttpStatusCode.Created, otherCreated.StatusCode);
+            Assert.AreNotEqual(task.Id, (await otherCreated.Content.ReadFromJsonAsync<AgentTaskInfo>())?.Id);
+            Assert.AreEqual(HttpStatusCode.NotFound, otherRead.StatusCode);
+            Assert.AreEqual(HttpStatusCode.NotFound, otherCancel.StatusCode);
+            var tasks = await owner.GetFromJsonAsync<AgentTaskInfo[]>(route);
+            Assert.IsNotNull(tasks);
+            Assert.AreEqual(task.Id, tasks.Single().Id);
+
+            using var cancelled = await owner.PostAsync($"{taskUrl}/cancel", null);
+            using var repeatedCancel = await owner.PostAsync($"{taskUrl}/cancel", null);
+            Assert.AreEqual(HttpStatusCode.OK, cancelled.StatusCode);
+            Assert.AreEqual(HttpStatusCode.OK, repeatedCancel.StatusCode);
+            var stored = await owner.GetFromJsonAsync<AgentTaskInfo>(taskUrl);
+            Assert.IsNotNull(stored);
+            Assert.AreEqual(AgentTaskStatus.Cancelled, stored.Status);
+            Assert.IsNotNull(stored.FinishedAt);
+
+            using var retriedSubmission = await owner.PostAsJsonAsync(route, request);
+            Assert.AreEqual(HttpStatusCode.OK, retriedSubmission.StatusCode);
+            Assert.AreEqual(AgentTaskStatus.Cancelled,
+                (await retriedSubmission.Content.ReadFromJsonAsync<AgentTaskInfo>())?.Status);
+
+            using var snapshotScope = factory.Services.CreateScope();
+            var snapshot = snapshotScope.ServiceProvider.GetRequiredService<DataContext>();
+            Assert.IsFalse(await snapshot.AgentConversations.AnyAsync());
+            Assert.IsFalse(await snapshot.Messages.AnyAsync());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     static EndpointIntegrationTest()
     {
         ApplyTestConfigurationToProcessEnvironment();
     }
 
     /// <summary>
-    /// Creates a WebApplicationFactory that swaps PostgreSQL for InMemory.
+    /// Creates a WebApplicationFactory with a disposable database.
     /// </summary>
-    private static WebApplicationFactory<Program> CreateFactory(string dbName, IDictionary<string, string?>? configurationOverrides = null)
+    private static WebApplicationFactory<Program> CreateFactory(string dbName,
+        IDictionary<string, string?>? configurationOverrides = null, Func<DataContext>? createContext = null)
     {
         ApplyTestConfigurationToProcessEnvironment();
 
@@ -222,14 +307,19 @@ public class EndpointIntegrationTest
                     foreach (var d in toRemove)
                         services.Remove(d);
 
-                    // Register InMemory options directly (avoids dual-provider issue)
-                    var options = new DbContextOptionsBuilder<DataContext>()
-                        .UseInMemoryDatabase(dbName, DatabaseRoot)
-                        .Options;
-
-                    services.AddSingleton<DbContextOptions<DataContext>>(options);
-                    services.AddSingleton<DbContextOptions>(options);
-                    services.AddScoped<DataContext>();
+                    if (createContext is null)
+                    {
+                        var options = new DbContextOptionsBuilder<DataContext>()
+                            .UseInMemoryDatabase(dbName, DatabaseRoot)
+                            .Options;
+                        services.AddSingleton<DbContextOptions<DataContext>>(options);
+                        services.AddSingleton<DbContextOptions>(options);
+                        services.AddScoped<DataContext>();
+                    }
+                    else
+                    {
+                        services.AddScoped<DataContext>(_ => createContext());
+                    }
 
                     // Override the JWT signing key (the app captures
                     // appsettings.json at registration time, so PostConfigure

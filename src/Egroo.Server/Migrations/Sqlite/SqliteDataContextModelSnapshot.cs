@@ -1052,6 +1052,72 @@ namespace Egroo.Server.Migrations.Sqlite
                     b.ToTable("userstorage");
                 });
 
+            modelBuilder.Entity("Egroo.Server.Models.AgentTaskRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("agentid");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("createdat");
+
+                    b.Property<long?>("ExecutionDeadline")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("executiondeadline");
+
+                    b.Property<int?>("Failure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("failure");
+
+                    b.Property<long?>("FinishedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("finishedat");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ownerid");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prompt");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("requestid");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(65536)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("startedat");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt", "Id");
+
+                    b.HasIndex("Status", "CreatedAt", "Id");
+
+                    b.ToTable("agenttasks");
+                });
+
             modelBuilder.Entity("Egroo.Server.Models.User", b =>
                 {
                     b.Property<Guid>("Id")

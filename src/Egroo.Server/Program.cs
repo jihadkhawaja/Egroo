@@ -229,6 +229,8 @@ public partial class Program
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<AgentTaskRepository>();
+        services.AddSingleton(TimeProvider.System);
         services.AddHttpClient("McpClient");
         services.AddSingleton<ChannelFileStorageService>();
         services.AddSingleton<AgentSkillsService>();
@@ -298,6 +300,7 @@ public partial class Program
         app.MapChatHub();
         app.MapAuthentication();
         app.MapAgents();
+        app.MapAgentTasks();
         app.MapChannelFiles();
         app.MapVoiceCall();
     }
