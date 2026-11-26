@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   server:
-    name: Solution and server tests
+    name: Test, Coverage & Report
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -39,14 +39,39 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - run: dotnet build src/Egroo.slnx -c Release
-      - run: dotnet test src/Egroo.Server.Test -c Release --no-build --logger trx --results-directory TestResults
+      - name: Test with coverage
+        run: >
+          dotnet test src/Egroo.Server.Test -c Release --no-build
+          --logger trx --results-directory TestResults
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=cobertura
+          /p:CoverletOutput=TestResults/Coverage/coverage
+      - name: Summarize server coverage
+        shell: pwsh
+        run: |
+          ./scripts/generate-coverage-report.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $summary = Get-Content src/Egroo.Server.Test/TestResults/CoverageReport/Summary.txt |
+            Select-Object -First 20
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value @('## Server coverage', '```text')
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: server-test-results
           path: TestResults/*.trx
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: server-coverage
+          path: |
+            src/Egroo.Server.Test/TestResults/Coverage/coverage.cobertura.xml
+            src/Egroo.Server.Test/TestResults/CoverageReport/
       - name: Smoke test PostgreSQL setup and diagnostics
         env:
           ASPNETCORE_URLS: http://127.0.0.1:5175
