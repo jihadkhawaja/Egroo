@@ -201,6 +201,7 @@
         ["egrooCrypto.generateIdentity", egrooCrypto.generateIdentity],
         ["egrooCrypto.encryptMessageForRecipients", egrooCrypto.encryptMessageForRecipients],
         ["egrooCrypto.decryptMessage", egrooCrypto.decryptMessage],
+        ["egrooCrypto.decryptMessages", egrooCrypto.decryptMessages],
         ["egrooCrypto.encryptFile", egrooCrypto.encryptFile],
         ["egrooCrypto.decryptFile", egrooCrypto.decryptFile],
         ["file.save", (base64, name) => {
@@ -235,7 +236,7 @@
             const { method, args } = JSON.parse(request);
             const handler = methods.get(method);
             if (!handler) throw new Error("Unsupported runtime operation.");
-            if (id && method === "egrooCrypto.decryptMessage") {
+            if (id && (method === "egrooCrypto.decryptMessage" || method === "egrooCrypto.decryptMessages")) {
                 controller = new AbortController();
                 operations.set(id, controller);
                 args.push(controller.signal);

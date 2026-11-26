@@ -72,6 +72,77 @@
         return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
     }
 
+    function createPrivateKeyLoader(encodedKey) {
+        if (!encodedKey) return null;
+        let key;
+        return () => key ??= importPrivateKey(encodedKey);
+    }
+
+    async function readMessage(payloadText, loadPrivateKey, signal) {
+        checkCancellation(signal);
+        if (!payloadText) {
+            return { status: "empty", plaintext: "" };
+        }
+
+        let payload;
+        try {
+            payload = JSON.parse(payloadText);
+        }
+        catch {
+            return { status: "plain", plaintext: payloadText };
+        }
+
+        if (!payload || !payload.iv || !payload.ct) {
+            return { status: "plain", plaintext: payloadText };
+        }
+        if (!loadPrivateKey) {
+            return { status: "missing-key", plaintext: null };
+        }
+
+        // v2 contains one wrapped key per enrolled device.
+        if (payload.v === 2) {
+            if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+                return { status: "failed", plaintext: null };
+            }
+
+            let privateKey;
+            try {
+                privateKey = await loadPrivateKey();
+            }
+            catch {
+                checkCancellation(signal);
+                return { status: "failed", plaintext: null };
+            }
+
+            for (const keyEntry of payload.keys) {
+                try {
+                    return await decryptUsingWrappedKey(payload, keyEntry.wk, privateKey, signal);
+                }
+                catch {
+                    checkCancellation(signal);
+                    // This wrapped key doesn't match our private key, try next.
+                }
+            }
+            return { status: "failed", plaintext: null };
+        }
+
+        // v1 contains one wrapped key.
+        if (payload.v !== 1) {
+            return { status: "plain", plaintext: payloadText };
+        }
+        if (!payload.wk) {
+            return { status: "failed", plaintext: null };
+        }
+
+        try {
+            return await decryptUsingWrappedKey(payload, payload.wk, await loadPrivateKey(), signal);
+        }
+        catch {
+            checkCancellation(signal);
+            return { status: "failed", plaintext: null };
+        }
+    }
+
     window.egrooCrypto = {
         async generateIdentity() {
             const keyPair = await crypto.subtle.generateKey(
@@ -153,71 +224,13 @@
             return results;
         },
 
-        async decryptMessage(request, signal) {
-            checkCancellation(signal);
-            if (!request || !request.payload) {
-                return { status: "empty", plaintext: "" };
-            }
+        decryptMessage(request, signal) {
+            return readMessage(request?.payload, createPrivateKeyLoader(request?.privateKey), signal);
+        },
 
-            let payload;
-            try {
-                payload = JSON.parse(request.payload);
-            }
-            catch {
-                return { status: "plain", plaintext: request.payload };
-            }
-
-            if (!payload || !payload.iv || !payload.ct) {
-                return { status: "plain", plaintext: request.payload };
-            }
-
-            if (!request.privateKey) {
-                return { status: "missing-key", plaintext: null };
-            }
-
-            // v2 envelope: multiple wrapped keys
-            if (payload.v === 2) {
-                if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
-                    return { status: "failed", plaintext: null };
-                }
-
-                let privateKey;
-                try {
-                    privateKey = await importPrivateKey(request.privateKey);
-                }
-                catch {
-                    return { status: "failed", plaintext: null };
-                }
-
-                for (const keyEntry of payload.keys) {
-                    try {
-                        return await decryptUsingWrappedKey(payload, keyEntry.wk, privateKey, signal);
-                    }
-                    catch {
-                        checkCancellation(signal);
-                        // This wrapped key doesn't match our private key, try next
-                    }
-                }
-
-                return { status: "failed", plaintext: null };
-            }
-
-            // v1 envelope: single wrapped key
-            if (payload.v !== 1) {
-                return { status: "plain", plaintext: request.payload };
-            }
-            if (!payload.wk) {
-                return { status: "failed", plaintext: null };
-            }
-
-            try {
-                const privateKey = await importPrivateKey(request.privateKey);
-                return await decryptUsingWrappedKey(payload, payload.wk, privateKey, signal);
-            }
-            catch {
-                checkCancellation(signal);
-                return { status: "failed", plaintext: null };
-            }
+        decryptMessages(request, signal) {
+            const loadPrivateKey = createPrivateKeyLoader(request.privateKey);
+            return Promise.all(request.payloads.map(payload => readMessage(payload, loadPrivateKey, signal)));
         },
 
         async encryptFile(request) {
