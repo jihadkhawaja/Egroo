@@ -22,6 +22,9 @@ namespace Egroo.UI.Services
         private bool _initialized;
         private bool _iceConfigurationLoaded;
         private bool _disposed;
+        private Task? _initializationTask;
+        private CancellationTokenSource? _joinCancellation;
+        private Task? _leaveTask;
 
         private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
         private Func<Guid, Guid, Task>? _onUserJoinedCall;
@@ -69,11 +72,26 @@ namespace Egroo.UI.Services
         public async Task EnsureInitializedAsync()
         {
             if (_initialized || _disposed)
-            {
                 return;
-            }
 
+            var initializing = _initializationTask ??= InitializeAsync();
+            try
+            {
+                await initializing;
+            }
+            finally
+            {
+                if (_initializationTask == initializing)
+                    _initializationTask = null;
+            }
+        }
+
+        private async Task InitializeAsync()
+        {
             await ConfigureIceServersAsync();
+            if (_disposed)
+                return;
+
             _jsRuntime.MediaEvent += OnMediaEvent;
             RegisterCallEvents();
             _initialized = true;
@@ -107,12 +125,11 @@ namespace Egroo.UI.Services
 
         public async Task<bool> JoinCallAsync(Guid channelId, string? channelTitle)
         {
-            if (_disposed || channelId == Guid.Empty)
+            if (_disposed || channelId == Guid.Empty || _sessionStorage.User is not { } user
+                || _joinCancellation is not null || _leaveTask is not null)
             {
                 return false;
             }
-
-            await EnsureInitializedAsync();
 
             if (IsCurrentChannel(channelId))
             {
@@ -125,12 +142,17 @@ namespace Egroo.UI.Services
                 return false;
             }
 
+            using var joining = new CancellationTokenSource();
+            _joinCancellation = joining;
+            var cancellationToken = joining.Token;
             try
             {
-                string selfUserId = _sessionStorage.User?.Id.ToString() ?? string.Empty;
-                bool acquired = await _jsRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString(), selfUserId);
+                await EnsureInitializedAsync().WaitAsync(cancellationToken);
+                bool acquired = await _jsRuntime.InvokeAsync<bool>(
+                    "webrtcInterop.joinCall", cancellationToken, channelId.ToString(), user.Id.ToString());
                 if (!acquired)
                 {
+                    await StopCallAsync();
                     _notify("Could not access microphone. Please check permissions.");
                     return false;
                 }
@@ -138,74 +160,90 @@ namespace Egroo.UI.Services
                 CurrentChannelId = channelId;
                 CurrentChannelTitle = channelTitle;
                 IsInCall = true;
-                IsMuted = false;
+                _participantIds.Add(user.Id);
 
-                _participantIds.Clear();
-                _participantUsers.Clear();
-
-                if (_sessionStorage.User is not null)
-                {
-                    _participantIds.Add(_sessionStorage.User.Id);
-                    await FetchAndCacheParticipantAsync(_sessionStorage.User.Id);
-                }
-
-                await SyncAudioProcessingStateAsync();
+                await FetchAndCacheParticipantAsync(user.Id).WaitAsync(cancellationToken);
+                await SyncAudioProcessingStateAsync().WaitAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 StartCallTimer();
                 NotifyStateChanged();
 
                 await _chatCallService.JoinChannelCall(channelId);
+                cancellationToken.ThrowIfCancellationRequested();
 
                 _notify("Joined voice call");
                 return true;
             }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
             catch (Exception ex)
             {
+                await StopCallAsync();
                 _notify($"Failed to join call: {ex.Message}");
-
-                try
-                {
-                    await _jsRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
-                }
-                catch { }
-
-                ResetCallState();
-                NotifyStateChanged();
-
                 return false;
+            }
+            finally
+            {
+                if (_joinCancellation == joining)
+                    _joinCancellation = null;
             }
         }
 
         public async Task LeaveCallAsync(bool notifyUser = true)
         {
-            if (_disposed)
+            if (!_disposed && await StopCallAsync() && notifyUser)
+                _notify("Left voice call");
+        }
+
+        private async Task<bool> StopCallAsync()
+        {
+            if (_leaveTask is { } pending)
             {
-                return;
+                await pending;
+                return false;
             }
 
-            Guid channelId = CurrentChannelId;
+            if (!IsInCall && _joinCancellation is null)
+                return false;
 
+            var channelId = CurrentChannelId;
+            var joining = _joinCancellation;
+            _joinCancellation = null;
+            joining?.Cancel();
+            ResetCallState();
+
+            // Release capture independently of the network round trip.
+            _leaveTask = ReleaseCallAsync(channelId);
             try
             {
-                if (channelId != Guid.Empty)
-                {
-                    await _chatCallService.LeaveChannelCall(channelId);
-                }
+                await _leaveTask;
             }
-            catch { }
+            finally
+            {
+                _leaveTask = null;
+            }
 
+            return true;
+        }
+
+        private async Task ReleaseCallAsync(Guid channelId)
+        {
             try
             {
                 await _jsRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
             }
             catch { }
 
-            ResetCallState();
             NotifyStateChanged();
 
-            if (notifyUser)
+            try
             {
-                _notify("Left voice call");
+                if (channelId != Guid.Empty)
+                    await _chatCallService.LeaveChannelCall(channelId);
             }
+            catch { }
         }
 
         public async Task ToggleMuteAsync()
@@ -280,14 +318,11 @@ namespace Egroo.UI.Services
 
         public async ValueTask DisposeAsync()
         {
+            if (_disposed)
+                return;
+
             _disposed = true;
-
-            if (IsInCall)
-            {
-                await LeaveCallAsync(false);
-            }
-
-            StopCallTimer();
+            await StopCallAsync();
 
             if (_onExistingCallParticipants is not null)
                 _chatCallService.OnExistingCallParticipants -= _onExistingCallParticipants;
@@ -474,7 +509,8 @@ namespace Egroo.UI.Services
                     user.AvatarPreview = user.CombineAvatarForPreview(avatar);
                 }
 
-                _participantUsers[userId] = user;
+                if (_participantIds.Contains(userId))
+                    _participantUsers[userId] = user;
             }
             catch { }
         }
