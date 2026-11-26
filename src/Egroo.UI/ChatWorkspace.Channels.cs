@@ -25,9 +25,8 @@ public sealed partial class ChatWorkspace
     private static readonly IBrush AgentLine = Brush("#BDBDBD");
     private static readonly IBrush TokenSurface = Brush("#DADADA");
     private readonly Dictionary<string, ChannelTypingState> _typing = new();
-    private readonly Dictionary<Guid, (string Cipher, string Text)> _displayCache = new();
     private readonly DispatcherTimer _typingTimer = new() { Interval = TimeSpan.FromSeconds(2) };
-    private StackPanel? _messages;
+    private TimelineRender? _timelineRender;
     private ScrollViewer? _timeline;
     private TextBlock? _typingStatus;
     private TextBlock? _voiceStatus;
@@ -40,6 +39,18 @@ public sealed partial class ChatWorkspace
     private Button? _removeAttachment;
     private bool _isTyping;
     private int _messageLimit;
+
+    private readonly record struct BubbleDisplay(Guid Sender, Guid? Agent, string? Name, DateTimeOffset? Time, bool Seen, string Text);
+
+    private sealed class TimelineRender(StackPanel panel)
+    {
+        public StackPanel Panel { get; } = panel;
+        public bool Running { get; set; }
+        public TaskCompletionSource? Pending { get; set; }
+        public Dictionary<Guid, (string Cipher, string Text)> Decrypted { get; } = new();
+        public Dictionary<Guid, (BubbleDisplay Display, Control View)> Bubbles { get; set; } = new();
+        public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control> Dates { get; set; } = new();
+    }
 
     private async Task OpenChannelAsync(Channel channel)
     {
@@ -78,7 +89,8 @@ public sealed partial class ChatWorkspace
         header.Children.Add(_messageFilter);
         header.Children.Add(_voiceStatus);
 
-        _messages = new StackPanel { Spacing = 12 };
+        var messages = new StackPanel { Spacing = 12 };
+        _timelineRender = new TimelineRender(messages);
         _composer = ComposerField();
         SubmitMessageOnEnter(_composer, SendMessageAsync);
         _composer.TextChanged += (_, _) => _ = UpdateComposerTypingAsync();
@@ -100,7 +112,7 @@ public sealed partial class ChatWorkspace
         var footer = ComposerPanel(_composer, SendMessageAsync, _attachmentStatus,
             GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync),
             QuietButton("@ Mention", () => ShowMentionsAsync(channel)), _removeAttachment);
-        _timeline = ShowConversation(header, _messages, footer, _typingStatus);
+        _timeline = ShowConversation(header, messages, footer, _typingStatus);
         await RenderMessagesAsync();
         ScrollToLatest(_timeline);
         UpdateVoice();
@@ -108,13 +120,12 @@ public sealed partial class ChatWorkspace
 
     private async Task CloseChannelViewAsync()
     {
+        _timelineRender = null;
         await StopTypingAsync();
         _channel = null;
         _attachment?.Dispose();
         _attachment = null;
         _typing.Clear();
-        _displayCache.Clear();
-        _messages = null;
         _timeline = null;
         _composer = null;
         _voiceStatus = null;
@@ -132,44 +143,124 @@ public sealed partial class ChatWorkspace
         catch (Exception ex) { Notify(ex.Message); }
     }
 
-    private async Task RenderMessagesAsync()
+    private Task RenderMessagesAsync()
     {
-        if (_channel is not { } channel || _messages is not { } panel || _session.User is not { } user)
+        if (_timelineRender is not { } render)
+            return Task.CompletedTask;
+        if (render.Pending is { } pending)
+            return pending.Task;
+
+        // Requests queued during a read share the next snapshot.
+        var request = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        render.Pending = request;
+        if (!render.Running)
+        {
+            render.Running = true;
+            Dispatcher.UIThread.Post(() => _ = RunTimelineRefreshesAsync(render));
+        }
+        return request.Task;
+    }
+
+    private async Task RunTimelineRefreshesAsync(TimelineRender render)
+    {
+        while (render.Pending is { } request)
+        {
+            render.Pending = null;
+            try
+            {
+                await RenderTimelineSnapshotAsync(render);
+                request.SetResult();
+            }
+            catch (Exception ex)
+            {
+                request.SetException(ex);
+            }
+        }
+        render.Running = false;
+    }
+
+    private async Task RenderTimelineSnapshotAsync(TimelineRender render)
+    {
+        if (render != _timelineRender || _channel is not { } channel || _session.User is not { } user)
             return;
         var query = _messageFilter?.Text?.Trim();
-        var history = await _session.ReadHistoryAsync(channel.Id, string.IsNullOrWhiteSpace(query) ? _messageLimit : null);
-        var controls = new List<Control>();
+        var searching = !string.IsNullOrWhiteSpace(query);
+        var limit = _messageLimit;
+        bool IsCurrentView() => render == _timelineRender && query == _messageFilter?.Text?.Trim()
+            && (searching || limit == _messageLimit);
+
+        var history = await _session.ReadHistoryAsync(channel.Id, searching ? null : limit);
+        if (!IsCurrentView())
+            return;
+
+        var controls = new List<Control>(history.Length);
+        var bubbles = new Dictionary<Guid, (BubbleDisplay Display, Control View)>();
+        var dates = new Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control>();
+        var today = DateOnly.FromDateTime(DateTime.Today);
         DateOnly? previousDay = null;
-        foreach (var message in history)
+        foreach (var message in history.DistinctBy(message => message.ReferenceId))
         {
             var cipher = message.Content ?? string.Empty;
-            if (!_displayCache.TryGetValue(message.ReferenceId, out var display) || display.Cipher != cipher)
+            if (!render.Decrypted.TryGetValue(message.ReferenceId, out var display) || display.Cipher != cipher)
             {
                 display = (cipher, await _session.Encryption.GetDisplayContentAsync(message) ?? string.Empty);
-                if (channel == _channel)
-                    _displayCache[message.ReferenceId] = display;
+                if (!IsCurrentView())
+                    return;
+                render.Decrypted[message.ReferenceId] = display;
             }
-            var plain = display.Text;
-            if (!string.IsNullOrWhiteSpace(query) && !plain.Contains(query, StringComparison.OrdinalIgnoreCase))
+            if (searching && !display.Text.Contains(query!, StringComparison.OrdinalIgnoreCase))
                 continue;
-            if ((message.DateSent ?? message.DateCreated) is { } timestamp)
+
+            var sentAt = message.DateSent ?? message.DateCreated;
+            if (sentAt is { } timestamp)
             {
                 var day = DateOnly.FromDateTime(timestamp.LocalDateTime);
                 if (day != previousDay)
-                    controls.Add(TimelineDate(day));
+                {
+                    var key = (today, day, message.ReferenceId);
+                    var separator = render.Dates.GetValueOrDefault(key) ?? TimelineDate(day);
+                    dates.Add(key, separator);
+                    controls.Add(separator);
+                }
                 previousDay = day;
             }
-            controls.Add(CreateMessageBubble(message, plain, user.Id));
+
+            var bubbleDisplay = new BubbleDisplay(message.SenderId, message.AgentDefinitionId, message.DisplayName,
+                sentAt, message.DateSeen.HasValue, display.Text);
+            var bubble = render.Bubbles.TryGetValue(message.ReferenceId, out var previous) && previous.Display == bubbleDisplay
+                ? previous.View : CreateMessageBubble(message, display.Text, user.Id);
+            bubbles.Add(message.ReferenceId, (bubbleDisplay, bubble));
+            controls.Add(bubble);
         }
-        if (channel != _channel || panel != _messages || query != _messageFilter?.Text?.Trim())
-            return;
-        panel.Children.Clear();
-        foreach (var control in controls)
-            panel.Children.Add(control);
+
         if (controls.Count == 0)
-            panel.Children.Add(string.IsNullOrWhiteSpace(query)
-                ? EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")
-                : EmptyState(SearchIcon, "No matching messages", "Try a different search term."));
+            controls.Add(searching
+                ? EmptyState(SearchIcon, "No matching messages", "Try a different search term.")
+                : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going."));
+        render.Bubbles = bubbles;
+        render.Dates = dates;
+        ApplyTimelineRows(render.Panel.Children, controls);
+    }
+
+    private static void ApplyTimelineRows(Controls children, List<Control> rows)
+    {
+        var desired = rows.ToHashSet();
+        var retained = new HashSet<Control>();
+        for (var index = children.Count - 1; index >= 0; index--)
+        {
+            if (desired.Contains(children[index]))
+                retained.Add(children[index]);
+            else
+                children.RemoveAt(index);
+        }
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var row = rows[index];
+            if (!retained.Contains(row))
+                children.Insert(index, row);
+            else if (children[index] != row)
+                children.Move(children.IndexOf(row), index);
+        }
     }
 
     private Border CreateMessageBubble(Message message, string text, Guid currentUser)
@@ -206,12 +297,19 @@ public sealed partial class ChatWorkspace
             if (!descriptor.IsImage)
                 continue;
             var preview = new Image { MaxHeight = 280, Stretch = Stretch.Uniform, IsVisible = false };
-            preview.DetachedFromVisualTree += (_, _) => (preview.Source as Bitmap)?.Dispose();
+            preview.DetachedFromVisualTree += (_, _) =>
+            {
+                var bitmap = preview.Source as Bitmap;
+                preview.Source = null;
+                bitmap?.Dispose();
+            };
             body.Children.Add(MessageAction($"Preview {descriptor.Label}", async () =>
             {
                 if (preview.Source is null)
                 {
                     var file = await _session.DownloadAsync(token);
+                    if (TopLevel.GetTopLevel(preview) is null)
+                        return;
                     using var stream = new MemoryStream(file.Bytes);
                     preview.Source = Bitmap.DecodeToWidth(stream, 640);
                 }
@@ -304,23 +402,27 @@ public sealed partial class ChatWorkspace
     {
         try
         {
-            var activeChannel = _channel?.Id == message.ChannelId;
-            var atEnd = _timeline is null || _timeline.Offset.Y >= _timeline.Extent.Height - _timeline.Viewport.Height - 48;
+            var initialTimeline = _channel?.Id == message.ChannelId ? _timeline : null;
+            var atEnd = initialTimeline is not null
+                && initialTimeline.Offset.Y >= initialTimeline.Extent.Height - initialTimeline.Viewport.Height - 48;
+            var user = _session.User;
             await _session.StoreMessageAsync(message, updateOnly);
-            if (!updateOnly && _session.User is { } user && message.Id != Guid.Empty && message.Content is not null)
+            if (user is null || _session.User?.Id != user.Id)
+                return;
+            if (!updateOnly && message.Id != Guid.Empty && message.Content is not null)
             {
-                if (activeChannel && message.SenderId != user.Id && message.DateSeen is null)
+                if (_channel?.Id == message.ChannelId && _timelineRender is not null && message.SenderId != user.Id && message.DateSeen is null)
                     await _session.Messages.UpdateMessage(message);
                 await _session.Messages.UpdatePendingMessage(message.Id);
             }
-            if (_channel?.Id != message.ChannelId)
+            if (_channel?.Id != message.ChannelId || _timeline is not { } timeline)
                 return;
 
             _typing.Remove(ParticipantKey(message.SenderId, message.AgentDefinitionId));
             UpdateTypingStatus();
             await RenderMessagesAsync();
-            if (atEnd)
-                ScrollToLatest(_timeline);
+            if (atEnd && timeline == initialTimeline && timeline == _timeline)
+                ScrollToLatest(timeline);
         }
         catch (Exception ex) { Notify(ex.Message); }
     }
