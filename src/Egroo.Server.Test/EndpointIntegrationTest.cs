@@ -129,11 +129,39 @@ public class EndpointIntegrationTest
         }
     }
 
-    private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid userId)
+    [TestMethod]
+    public async Task AuthenticatedWebSocketClosesWhenItsTokenExpires()
+    {
+        await using var factory = CreateFactory(nameof(AuthenticatedWebSocketClosesWhenItsTokenExpires));
+        var user = new User { Username = "expiry-test-user", Role = "Member" };
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            database.Users.Add(user);
+            await database.SaveChangesAsync();
+        }
+
+        await using var connection = CreateHubConnection(factory, user.Id, expires: DateTime.UtcNow.AddSeconds(5));
+        var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        connection.Closed += _ =>
+        {
+            closed.TrySetResult();
+            return Task.CompletedTask;
+        };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+        await connection.StartAsync(timeout.Token);
+        var profile = await connection.InvokeAsync<UserDto>(nameof(IUser.GetUserPrivateDetails), timeout.Token);
+        Assert.AreEqual(user.Id, profile.Id);
+
+        await closed.Task.WaitAsync(timeout.Token);
+        Assert.AreEqual(HubConnectionState.Disconnected, connection.State);
+    }
+
+    private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid userId, DateTime? expires = null)
     {
         var server = factory.Server;
         var socket = server.CreateWebSocketClient();
-        socket.ConfigureRequest = request => request.Headers.Authorization = "Bearer " + GenerateTestJwt(userId);
+        socket.ConfigureRequest = request => request.Headers.Authorization = "Bearer " + GenerateTestJwt(userId, expires);
 
         return new HubConnectionBuilder()
             .WithUrl(new Uri(server.BaseAddress, "/chathub"), options =>
@@ -213,7 +241,7 @@ public class EndpointIntegrationTest
     /// <summary>
     /// Generates a valid JWT for the given userId, matching the test JWT secret.
     /// </summary>
-    private static string GenerateTestJwt(Guid userId)
+    private static string GenerateTestJwt(Guid userId, DateTime? expires = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -225,7 +253,7 @@ public class EndpointIntegrationTest
 
         var token = new JwtSecurityToken(
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: expires ?? DateTime.UtcNow.AddHours(1),
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
