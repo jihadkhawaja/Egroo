@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { arch, cpus, platform, release } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import { chromium } from 'playwright-core';
+import { chromium, errors } from 'playwright-core';
 import { HubConnectionBuilder, HttpTransportType, LogLevel } from '@microsoft/signalr';
 import { startLoopbackFixture } from './loopback-fixture.mjs';
 
@@ -228,9 +228,26 @@ async function openRoom(page, channelId, afterRevision = 0) {
     const index = listing.channels.findIndex(channel => channel.id === channelId);
     assert.ok(index === 0 || index === 1, 'Expected a fixture channel in one of the first two rows.');
 
-    await page.mouse.click(400, 333 + 63 * index);
-    await page.waitForFunction(id => globalThis.egrooMediaProbe.historyScope?.endsWith(id), channelId.replaceAll('-', ''),
-        { timeout: 10_000 });
+    const scopeSuffix = channelId.replaceAll('-', '');
+    for (let attempt = 0; attempt < 3; attempt++) {
+        // The SignalR reply can precede layout and the end of the list action.
+        await waitForPaint(page);
+        await page.mouse.click(400, 333 + 63 * index);
+        try {
+            await page.waitForFunction(id => globalThis.egrooMediaProbe.historyScope?.endsWith(id), scopeSuffix,
+                { timeout: 2_000 });
+            await waitForPaint(page);
+            return;
+        } catch (error) {
+            if (!(error instanceof errors.TimeoutError)) throw error;
+        }
+    }
+    assert.fail('The fixture channel did not open from the rendered list.');
+}
+
+function waitForPaint(page) {
+    return page.evaluate(() => new Promise(resolve =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
 }
 
 async function waitForVoice(page, channelId) {
