@@ -9,6 +9,7 @@ on:
       - 'global.json'
       - 'Directory.Build.props'
       - 'scripts/smoke-avalonia-containers.sh'
+      - 'scripts/verify-published-image.sh'
       - 'scripts/performance/browser-ready.mjs'
       - 'scripts/performance/package*.json'
       - 'src/Egroo.Avalonia/**'
@@ -52,6 +53,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      api: ${{ steps.push.outputs.api }}
+      browser: ${{ steps.push.outputs.browser }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -72,6 +76,7 @@ jobs:
           npm ci --prefix scripts/performance --ignore-scripts
           bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
       - name: Push both images with the same release tag
+        id: push
         env:
           GHCR_TOKEN: ${{ github.token }}
         run: |
@@ -86,7 +91,39 @@ jobs:
           docker tag egroo-browser:verified "$browser"
           docker push "$api"
           docker push "$browser"
+          printf 'api=%s\nbrowser=%s\n' "$api" "$browser" >> "$GITHUB_OUTPUT"
+
+  verify-published:
+    name: Pull and smoke-test the published images
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - run: npm ci --prefix scripts/performance --ignore-scripts
+      - name: Verify and report the published digest pair
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          API_TAG: ${{ needs.publish.outputs.api }}
+          BROWSER_TAG: ${{ needs.publish.outputs.browser }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          unset GHCR_TOKEN
+          api=$(bash scripts/verify-published-image.sh "$API_TAG" "$GITHUB_SHA")
+          browser=$(bash scripts/verify-published-image.sh "$BROWSER_TAG" "$GITHUB_SHA")
+          bash scripts/smoke-avalonia-containers.sh "$api" "$browser"
           {
-            printf '### Avalonia container images\n\n'
-            printf -- '- `%s`\n' "$api" "$browser"
+            printf '### Verified Avalonia container images\n\n'
+            printf -- '- API `%s` from `%s`\n' "$api" "$API_TAG"
+            printf -- '- Browser `%s` from `%s`\n' "$browser" "$BROWSER_TAG"
           } >> "$GITHUB_STEP_SUMMARY"
