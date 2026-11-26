@@ -43,7 +43,7 @@ public sealed partial class ChatWorkspace
         return new Button { Content = label, Flyout = flyout, Classes = { "workspace-action", "quiet" } };
     }
 
-    private ScrollViewer ShowConversation(Control header, Panel messages, Control composer, Control? typing = null)
+    private ScrollViewer ShowConversation(Control header, Control messages, Control composer, Control? typing = null)
     {
         var grid = new Grid { RowDefinitions = new RowDefinitions("Auto,*,Auto"), RowSpacing = 8, MaxWidth = 1150,
             Classes = { "conversation" } };
@@ -110,6 +110,11 @@ public sealed partial class ChatWorkspace
     private static void ScrollToLatest(ScrollViewer? timeline)
     {
         if (timeline is not null)
-            Dispatcher.UIThread.Post(timeline.ScrollToEnd, DispatcherPriority.Loaded);
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (timeline.Content is ItemsControl messages && messages.ItemCount > 0)
+                    messages.ScrollIntoView(messages.ItemCount - 1);
+                timeline.ScrollToEnd();
+            }, DispatcherPriority.Loaded);
     }
 }

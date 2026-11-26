@@ -1,8 +1,11 @@
+using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Controls.Templates;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -43,24 +46,28 @@ public sealed partial class ChatWorkspace
 
     private readonly record struct BubbleDisplay(Guid Sender, Guid? Agent, string? Name, DateTimeOffset? Time, bool Seen, string Text);
 
+    private sealed class TimelineRow(Func<Control> create)
+    {
+        public Control Create() => create();
+    }
+
     private sealed class TimelineRender
     {
         private readonly CancellationTokenSource _lifetime = new();
 
-        public TimelineRender(StackPanel panel)
+        public TimelineRender()
         {
-            Panel = panel;
             CancellationToken = _lifetime.Token;
         }
 
-        public StackPanel Panel { get; }
+        public ObservableCollection<TimelineRow> Rows { get; } = [];
         public CancellationToken CancellationToken { get; }
         public bool Running { get; set; }
         public bool DecryptionUnavailable { get; set; }
         public TaskCompletionSource? Pending { get; set; }
         public Dictionary<Guid, (string Cipher, string Text)> Decrypted { get; } = new();
-        public Dictionary<Guid, (BubbleDisplay Display, Control View)> Bubbles { get; set; } = new();
-        public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control> Dates { get; set; } = new();
+        public Dictionary<Guid, (BubbleDisplay Display, TimelineRow Row)> Bubbles { get; set; } = new();
+        public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), TimelineRow> Dates { get; set; } = new();
 
         public void Cancel()
         {
@@ -106,8 +113,17 @@ public sealed partial class ChatWorkspace
         header.Children.Add(_messageFilter);
         header.Children.Add(_voiceStatus);
 
-        var messages = new StackPanel { Spacing = 12 };
-        _timelineRender = new TimelineRender(messages);
+        var render = _timelineRender = new TimelineRender();
+        var messages = new ItemsControl
+        {
+            ItemsSource = render.Rows,
+            ItemsPanel = new FuncTemplate<Panel?>(() => new VirtualizingStackPanel()),
+            ItemTemplate = new FuncDataTemplate<TimelineRow>((row, _) => row is null ? null : new Border
+            {
+                Padding = new Thickness(0, 0, 0, 12),
+                Child = row.Create()
+            })
+        };
         _composer = ComposerField();
         SubmitMessageOnEnter(_composer, SendMessageAsync);
         _composer.TextChanged += (_, _) => _ = UpdateComposerTypingAsync();
@@ -130,6 +146,20 @@ public sealed partial class ChatWorkspace
             GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync),
             QuietButton("@ Mention", () => ShowMentionsAsync(channel)), _removeAttachment);
         var timeline = _timeline = ShowConversation(header, messages, footer, _typingStatus);
+        timeline.Focusable = true;
+        AutomationProperties.SetName(timeline, "Message timeline");
+        timeline.KeyDown += (_, args) =>
+        {
+            if (args.Source != timeline)
+                return;
+            if (args.Key == Key.Home)
+                timeline.ScrollToHome();
+            else if (args.Key == Key.End)
+                ScrollToLatest(timeline);
+            else
+                return;
+            args.Handled = true;
+        };
         await RenderMessagesAsync();
         if (timeline == _timeline)
         {
@@ -232,9 +262,9 @@ public sealed partial class ChatWorkspace
                 render.Decrypted[message.ReferenceId] = (message.Content ?? string.Empty, message.DecryptedContent ?? string.Empty);
         }
 
-        var controls = new List<Control>(history.Length);
-        var bubbles = new Dictionary<Guid, (BubbleDisplay Display, Control View)>();
-        var dates = new Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control>();
+        var rows = new List<TimelineRow>(history.Length);
+        var bubbles = new Dictionary<Guid, (BubbleDisplay Display, TimelineRow Row)>();
+        var dates = new Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), TimelineRow>();
         var today = DateOnly.FromDateTime(DateTime.Today);
         DateOnly? previousDay = null;
         foreach (var message in messages)
@@ -250,9 +280,9 @@ public sealed partial class ChatWorkspace
                 if (day != previousDay)
                 {
                     var key = (today, day, message.ReferenceId);
-                    var separator = render.Dates.GetValueOrDefault(key) ?? TimelineDate(day);
+                    var separator = render.Dates.GetValueOrDefault(key) ?? new TimelineRow(() => TimelineDate(day));
                     dates.Add(key, separator);
-                    controls.Add(separator);
+                    rows.Add(separator);
                 }
                 previousDay = day;
             }
@@ -260,24 +290,24 @@ public sealed partial class ChatWorkspace
             var bubbleDisplay = new BubbleDisplay(message.SenderId, message.AgentDefinitionId, message.DisplayName,
                 sentAt, message.DateSeen.HasValue, display.Text);
             var bubble = render.Bubbles.TryGetValue(message.ReferenceId, out var previous) && previous.Display == bubbleDisplay
-                ? previous.View : CreateMessageBubble(message, display.Text, user.Id);
+                ? previous.Row : new TimelineRow(() => CreateMessageBubble(message, display.Text, user.Id));
             bubbles.Add(message.ReferenceId, (bubbleDisplay, bubble));
-            controls.Add(bubble);
+            rows.Add(bubble);
         }
 
-        if (controls.Count == 0)
-            controls.Add(searching
+        if (rows.Count == 0)
+            rows.Add(new TimelineRow(() => searching
                 ? EmptyState(SearchIcon, "No matching messages", "Try a different search term.")
-                : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going."));
+                : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")));
         render.Bubbles = bubbles;
         render.Dates = dates;
-        ApplyTimelineRows(render.Panel.Children, controls);
+        ApplyTimelineRows(render.Rows, rows);
     }
 
-    private static void ApplyTimelineRows(Controls children, List<Control> rows)
+    private static void ApplyTimelineRows(ObservableCollection<TimelineRow> children, List<TimelineRow> rows)
     {
         var desired = rows.ToHashSet();
-        var retained = new HashSet<Control>();
+        var retained = new HashSet<TimelineRow>();
         for (var index = children.Count - 1; index >= 0; index--)
         {
             if (desired.Contains(children[index]))
