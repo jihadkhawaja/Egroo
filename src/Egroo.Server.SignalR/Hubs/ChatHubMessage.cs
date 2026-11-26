@@ -89,13 +89,13 @@ namespace Egroo.Server.SignalR.Hubs
             if (string.IsNullOrWhiteSpace(deliveryContent))
                 return;
 
-            string? connectionId = _connectionTracker.GetUserConnectionIds(userId).LastOrDefault();
-            if (string.IsNullOrEmpty(connectionId))
+            var connectionIds = _connectionTracker.GetUserConnectionIds(userId);
+            if (connectionIds.Count == 0)
                 return;
 
             try
             {
-                await Clients.Client(connectionId).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
+                await Clients.Clients(connectionIds).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
             }
             catch (Exception ex)
             {

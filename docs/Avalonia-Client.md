@@ -45,3 +45,9 @@ dotnet publish src/Egroo.Avalonia/Browser -c Release -p:EgrooApiUrl=https://api.
 Serve the published `wwwroot` directory over HTTPS. The API must allow the browser origin in `Api:AllowedOrigins`. The browser Dockerfile builds and serves these static assets on port 8080. Set its `EGROO_API_URL` build argument for a self-hosted API.
 
 On an existing production browser session, the new client can import the previous browser's device key and local channel history when served from the same origin. Native app history and private keys in another WebView origin remain in that origin's storage.
+
+## Encrypted channel delivery
+
+A message sent by a person is delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
+
+On reconnect, the requesting session receives that user's pending messages in sent order. A message remains pending for the user until one device saves and acknowledges it. Each device keeps its own local message history, and newly enrolled devices start with their own history.

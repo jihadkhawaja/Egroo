@@ -1,4 +1,5 @@
 using Egroo.Server.Database;
+using Egroo.Server.Models;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -84,6 +85,48 @@ public class EndpointIntegrationTest
         using var verificationScope = factory.Services.CreateScope();
         var verification = verificationScope.ServiceProvider.GetRequiredService<DataContext>();
         Assert.IsFalse(await verification.UsersPendingMessages.AnyAsync(pending => pending.MessageId == message.Id));
+    }
+
+    [TestMethod]
+    public async Task SendMessage_DeliversTheUsersEnvelopeToBothActiveWebSockets()
+    {
+        await using var factory = CreateFactory(nameof(SendMessage_DeliversTheUsersEnvelopeToBothActiveWebSockets));
+        var user = new User { Username = "two-device-user", Role = "Member" };
+        var channel = new Channel();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            database.Users.Add(user);
+            database.Channels.Add(channel);
+            database.ChannelUsers.Add(new ChannelUser { UserId = user.Id, ChannelId = channel.Id });
+            await database.SaveChangesAsync();
+        }
+
+        await using var firstDevice = CreateHubConnection(factory, user.Id);
+        await using var secondDevice = CreateHubConnection(factory, user.Id);
+        var firstReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var secondReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var onFirstReceipt = firstDevice.On<Message>("ReceiveMessage", incoming => { firstReceipt.TrySetResult(incoming); });
+        using var onSecondReceipt = secondDevice.On<Message>("ReceiveMessage", incoming => { secondReceipt.TrySetResult(incoming); });
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await firstDevice.StartAsync(timeout.Token);
+        await secondDevice.StartAsync(timeout.Token);
+
+        var message = new Message
+        {
+            SenderId = user.Id,
+            ChannelId = channel.Id,
+            RecipientContents = [new() { UserId = user.Id, Content = "ciphertext for both devices" }]
+        };
+        Assert.IsTrue(await firstDevice.InvokeAsync<bool>(nameof(IMessageHub.SendMessage), message, timeout.Token));
+        var receipts = await Task.WhenAll(firstReceipt.Task, secondReceipt.Task).WaitAsync(timeout.Token);
+
+        Assert.AreEqual(receipts[0].Id, receipts[1].Id);
+        foreach (var received in receipts)
+        {
+            Assert.AreEqual(message.ReferenceId, received.ReferenceId);
+            Assert.AreEqual("ciphertext for both devices", received.Content);
+        }
     }
 
     private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid userId)

@@ -701,7 +701,7 @@ public class ChatHubTest
     }
 
     [TestMethod]
-    public async Task SendMessage_WithRecipientContents_DeliversPerUser()
+    public async Task SendMessage_WithRecipientContents_DeliversEachEnvelopeToAllOfItsUsersConnections()
     {
         var userId = Guid.NewGuid();
         var otherUserId = Guid.NewGuid();
@@ -718,6 +718,7 @@ public class ChatHubTest
         var tracker = new InMemoryConnectionTracker();
         tracker.TrackConnection(userId, "conn-sender");
         tracker.TrackConnection(otherUserId, "conn-receiver");
+        tracker.TrackConnection(otherUserId, "conn-receiver-second-device");
 
         var hub = CreateHub(userId, tracker: tracker, channelRepo: channelRepo);
 
@@ -734,7 +735,17 @@ public class ChatHubTest
         };
 
         var result = await hub.SendMessage(msg);
+
         Assert.IsTrue(result);
+        var calls = GetClients(hub).ClientCalls;
+        Assert.HasCount(2, calls);
+        var sender = calls.Single(call => call.ConnectionIds.Contains("conn-sender"));
+        var recipient = calls.Single(call => call.ConnectionIds.Contains("conn-receiver"));
+        Assert.HasCount(1, sender.ConnectionIds);
+        CollectionAssert.AreEquivalent(
+            new[] { "conn-receiver", "conn-receiver-second-device" }, recipient.ConnectionIds.ToArray());
+        Assert.AreEqual("encrypted-for-sender", ((Message)sender.Proxy.Calls.Single().Args.Single()!).Content);
+        Assert.AreEqual("encrypted-for-receiver", ((Message)recipient.Proxy.Calls.Single().Args.Single()!).Content);
     }
 
     [TestMethod]
