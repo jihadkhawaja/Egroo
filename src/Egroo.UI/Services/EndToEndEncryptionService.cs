@@ -32,9 +32,9 @@ namespace Egroo.UI.Services
 
         public Task<EncryptionIdentity?> GetLocalIdentityAsync() => ReadIdentityAsync(_identityKey);
 
-        private async Task<EncryptionIdentity?> ReadIdentityAsync(string key)
+        private async Task<EncryptionIdentity?> ReadIdentityAsync(string key, CancellationToken cancellationToken = default)
         {
-            string? raw = await _storageService.GetFromLocalStorage(key);
+            string? raw = await _storageService.GetFromLocalStorage(key, cancellationToken);
             if (string.IsNullOrWhiteSpace(raw))
             {
                 return null;
@@ -191,19 +191,28 @@ namespace Egroo.UI.Services
                     .ToList());
         }
 
-        public async Task<string?> GetDisplayContentAsync(Message message)
+        public async Task<string?> GetDisplayContentAsync(Message message) =>
+            (await GetDisplayContentAsync(message, runtimeAvailable: true, CancellationToken.None)).Text;
+
+        internal async Task<(string? Text, bool RuntimeUnavailable)> GetDisplayContentAsync(
+            Message message, bool runtimeAvailable, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!string.IsNullOrWhiteSpace(message.DecryptedContent))
-            {
-                return message.DecryptedContent;
-            }
+                return (message.DecryptedContent, false);
+            if (string.IsNullOrWhiteSpace(message.Content))
+                return (string.Empty, false);
+            if (!runtimeAvailable)
+                return (DecryptionUnavailableMessage, true);
 
             for (var attempt = 0; attempt < 2; attempt++)
             {
+                using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                attemptTimeout.CancelAfter(DecryptionAttemptTimeout);
                 try
                 {
-                    var result = await DecryptTransportContentAsync(message.Content).WaitAsync(DecryptionAttemptTimeout);
-                    return message.DecryptedContent = result.Status switch
+                    var result = await DecryptTransportContentAsync(message.Content, attemptTimeout.Token);
+                    message.DecryptedContent = result.Status switch
                     {
                         MessageDecryptionStatus.Decrypted => result.Plaintext,
                         MessageDecryptionStatus.Plaintext => result.Plaintext,
@@ -211,6 +220,11 @@ namespace Egroo.UI.Services
                         MessageDecryptionStatus.MissingKey => MissingKeyMessage,
                         _ => DecryptionErrorMessage,
                     };
+                    return (message.DecryptedContent, false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex) when (ex is not OutOfMemoryException)
                 {
@@ -219,19 +233,22 @@ namespace Egroo.UI.Services
                 }
             }
 
-            return message.DecryptedContent = DecryptionUnavailableMessage;
+            return (DecryptionUnavailableMessage, true);
         }
 
-        public async Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent)
+        public Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent) =>
+            DecryptTransportContentAsync(transportContent, CancellationToken.None);
+
+        private async Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(transportContent))
             {
                 return new MessageDecryptionResult(MessageDecryptionStatus.Empty, string.Empty);
             }
 
-            var identity = await GetLocalIdentityAsync();
+            var identity = await ReadIdentityAsync(_identityKey, cancellationToken);
             var result = await _jsRuntime.InvokeAsync<BrowserDecryptionResult>(
-                "egrooCrypto.decryptMessage",
+                "egrooCrypto.decryptMessage", cancellationToken,
                 new
                 {
                     payload = transportContent,

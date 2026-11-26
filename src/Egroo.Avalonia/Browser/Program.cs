@@ -23,12 +23,34 @@ internal sealed partial class BrowserRuntime : ClientRuntime
 {
     [JSImport("globalThis.egrooRuntime.invoke")]
     [return: JSMarshalAs<JSType.Promise<JSType.String>>]
-    private static partial Task<string> InvokeJavaScript(string request);
+    private static partial Task<string> InvokeJavaScript(string request, string? operationId);
 
-    protected override async Task<string> CallAsync(string request)
+    [JSImport("globalThis.egrooRuntime.cancel")]
+    private static partial void CancelJavaScript(string operationId);
+
+    protected override Task<string> CallAsync(string request) => CallAsync(request, CancellationToken.None);
+
+    protected override async Task<string> CallAsync(string request, CancellationToken cancellationToken)
     {
-        if (Dispatcher.UIThread.CheckAccess())
-            return await InvokeJavaScript(request);
-        return await Dispatcher.UIThread.InvokeAsync(() => InvokeJavaScript(request));
+        if (!Dispatcher.UIThread.CheckAccess())
+            return await Dispatcher.UIThread.InvokeAsync(() => CallAsync(request, cancellationToken));
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!cancellationToken.CanBeCanceled)
+            return await InvokeJavaScript(request, null);
+
+        var operationId = Guid.NewGuid().ToString("N");
+        try
+        {
+            return await InvokeJavaScript(request, operationId).WaitAsync(cancellationToken);
+        }
+        finally
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                try { CancelJavaScript(operationId); }
+                catch (JSException) { }
+            }
+        }
     }
 }

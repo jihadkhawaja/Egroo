@@ -2,6 +2,7 @@
     const events = [];
     const requests = new Map();
     const results = new Map();
+    const operations = new Map();
     let database;
 
     const historyIndex = "historyByChannelAndDate";
@@ -223,27 +224,43 @@
             methods.set("webrtcInterop." + name, webrtcInterop[name].bind(webrtcInterop));
     }
 
-    async function invoke(request) {
+    function cancel(id) {
+        operations.get(id)?.abort();
+        operations.delete(id);
+    }
+
+    async function invoke(request, id) {
+        let controller;
         try {
             const { method, args } = JSON.parse(request);
             const handler = methods.get(method);
             if (!handler) throw new Error("Unsupported runtime operation.");
+            if (id && method === "egrooCrypto.decryptMessage") {
+                controller = new AbortController();
+                operations.set(id, controller);
+                args.push(controller.signal);
+            }
             return JSON.stringify({ value: (await handler(...args)) ?? null });
         } catch (error) {
             return JSON.stringify({ error: error.message || String(error) });
+        } finally {
+            if (controller) operations.delete(id);
         }
     }
 
     globalThis.egrooRuntime = {
         invoke,
+        cancel,
         append(id, chunk) {
             requests.set(id, (requests.get(id) ?? "") + chunk);
         },
         async start(id) {
+            const request = requests.get(id);
+            if (request === undefined) return;
             results.set(id, null);
             try {
-                const bytes = Uint8Array.from(atob(requests.get(id)), char => char.charCodeAt(0));
-                const result = await invoke(new TextDecoder().decode(bytes));
+                const bytes = Uint8Array.from(atob(request), char => char.charCodeAt(0));
+                const result = await invoke(new TextDecoder().decode(bytes), id);
                 if (results.has(id)) results.set(id, result);
             } finally {
                 requests.delete(id);
@@ -253,6 +270,7 @@
             return results.get(id)?.slice(offset, offset + 16384) ?? null;
         },
         clear(id) {
+            cancel(id);
             requests.delete(id);
             results.delete(id);
         }

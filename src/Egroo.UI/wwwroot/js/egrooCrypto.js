@@ -49,6 +49,29 @@
             .join("");
     }
 
+    function checkCancellation(signal) {
+        if (signal?.aborted) {
+            throw new DOMException("Decryption was canceled.", "AbortError");
+        }
+    }
+
+    async function decryptUsingWrappedKey(payload, wrappedKey, privateKey, signal) {
+        checkCancellation(signal);
+        const rawAesKey = await crypto.subtle.decrypt(
+            { name: "RSA-OAEP" },
+            privateKey,
+            base64ToBytes(wrappedKey));
+        checkCancellation(signal);
+        const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
+        checkCancellation(signal);
+        const plainBuffer = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
+            aesKey,
+            base64ToBytes(payload.ct));
+        checkCancellation(signal);
+        return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
+    }
+
     window.egrooCrypto = {
         async generateIdentity() {
             const keyPair = await crypto.subtle.generateKey(
@@ -130,7 +153,8 @@
             return results;
         },
 
-        async decryptMessage(request) {
+        async decryptMessage(request, signal) {
+            checkCancellation(signal);
             if (!request || !request.payload) {
                 return { status: "empty", plaintext: "" };
             }
@@ -167,19 +191,10 @@
 
                 for (const keyEntry of payload.keys) {
                     try {
-                        const rawAesKey = await crypto.subtle.decrypt(
-                            { name: "RSA-OAEP" },
-                            privateKey,
-                            base64ToBytes(keyEntry.wk));
-                        const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
-                        const plainBuffer = await crypto.subtle.decrypt(
-                            { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
-                            aesKey,
-                            base64ToBytes(payload.ct));
-
-                        return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
+                        return await decryptUsingWrappedKey(payload, keyEntry.wk, privateKey, signal);
                     }
                     catch {
+                        checkCancellation(signal);
                         // This wrapped key doesn't match our private key, try next
                     }
                 }
@@ -197,19 +212,10 @@
 
             try {
                 const privateKey = await importPrivateKey(request.privateKey);
-                const rawAesKey = await crypto.subtle.decrypt(
-                    { name: "RSA-OAEP" },
-                    privateKey,
-                    base64ToBytes(payload.wk));
-                const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
-                const plainBuffer = await crypto.subtle.decrypt(
-                    { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
-                    aesKey,
-                    base64ToBytes(payload.ct));
-
-                return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
+                return await decryptUsingWrappedKey(payload, payload.wk, privateKey, signal);
             }
             catch {
+                checkCancellation(signal);
                 return { status: "failed", plaintext: null };
             }
         },

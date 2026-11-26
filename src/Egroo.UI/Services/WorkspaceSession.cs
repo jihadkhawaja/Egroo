@@ -206,14 +206,14 @@ internal sealed class WorkspaceSession
 
     private string HistoryKey(Guid user, Guid channel) => $"{Api.AbsoluteUri}{user:N}/{channel:N}";
 
-    public async Task<Message[]> ReadHistoryAsync(Guid channel, int? limit)
+    public async Task<Message[]> ReadHistoryAsync(Guid channel, int? limit, CancellationToken cancellationToken)
     {
         if (User is not { } user)
             return [];
         var key = HistoryKey(user.Id, channel);
         if (_importLegacyHistory)
-            await _runtime.InvokeVoidAsync("history.importLegacy", key, channel);
-        return await _runtime.InvokeAsync<Message[]>("history.get", key, limit);
+            await _runtime.InvokeVoidAsync("history.importLegacy", cancellationToken, key, channel);
+        return await _runtime.InvokeAsync<Message[]>("history.get", cancellationToken, key, limit);
     }
 
     public async Task StoreMessageAsync(Message message, bool updateOnly = false, bool addOnly = false)
