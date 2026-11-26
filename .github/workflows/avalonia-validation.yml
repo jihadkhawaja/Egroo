@@ -19,6 +19,20 @@ jobs:
     name: Solution and server tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: egroo
+          POSTGRES_DB: egroo
+          POSTGRES_PASSWORD: egroo-ci
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U egroo -d egroo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -33,6 +47,29 @@ jobs:
         with:
           name: server-test-results
           path: TestResults/*.trx
+      - name: Smoke test PostgreSQL setup and diagnostics
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5175
+          Database__Provider: PostgreSQL
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=${{ job.services.postgres.ports['5432'] }};Database=egroo;Username=egroo;Password=egroo-ci
+          Secrets__Jwt: egroo-disposable-ci-jwt-signing-secret
+          Encryption__Key: 0123456789abcdef0123456789abcdef
+          Encryption__IV: 0123456789abcdef
+          Api__AllowedOrigins__0: https://chat.example.test
+          Logging__LogLevel__Default: Warning
+        run: |
+          server=src/Egroo.Server/bin/Release/net10.0/Egroo.Server.dll
+          dotnet "$server" setup
+          dotnet "$server" setup
+          dotnet "$server" > "$RUNNER_TEMP/egroo-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          if ! curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 --max-time 3 \
+            "$ASPNETCORE_URLS/runtime/index.html" > /dev/null; then
+            cat "$RUNNER_TEMP/egroo-api.log"
+            exit 1
+          fi
+          dotnet "$server" doctor --api-url "$ASPNETCORE_URLS" --browser-origin https://chat.example.test
 
   desktop:
     name: Desktop publish (${{ matrix.rid }})
