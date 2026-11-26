@@ -150,6 +150,48 @@ jobs:
       - name: Build and verify APK
         run: |
           dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+      - name: Launch Egroo on an offline Android emulator
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          sudo chown "$(id -u):$(id -g)" /dev/kvm
+          image='system-images;android-35;default;x86_64'
+          sdkmanager --install emulator "$image"
+          printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image"
+          "$ANDROID_HOME/emulator/emulator" -avd egroo-ci -port 5554 -no-window -no-snapshot \
+            -no-audio -no-boot-anim -gpu swiftshader > "$RUNNER_TEMP/egroo-emulator.log" 2>&1 &
+          adb_device=emulator-5554
+          cleanup() {
+            adb -s "$adb_device" emu kill >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          if ! timeout 5m bash -c '
+            adb -s emulator-5554 wait-for-device
+            until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do
+              sleep 2
+            done
+          '; then
+            tail -n 150 "$RUNNER_TEMP/egroo-emulator.log"
+            exit 1
+          fi
+
+          adb -s "$adb_device" shell cmd connectivity airplane-mode enable
+          adb -s "$adb_device" shell svc wifi disable
+          adb -s "$adb_device" shell svc data disable
+          apk="$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*-Signed.apk' -print -quit)"
+          test -n "$apk"
+          adb -s "$adb_device" install "$apk"
+          package=com.jihadkhawaja.egroo
+          activity="$(adb -s "$adb_device" shell cmd package resolve-activity --brief \
+            -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$package" | tail -n 1 | tr -d '\r')"
+          [[ "$activity" == "$package/"* ]]
+          adb -s "$adb_device" shell am start -W -n "$activity"
+          sleep 5
+          if ! adb -s "$adb_device" shell pidof "$package"; then
+            adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
+            exit 1
+          fi
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: android-test-apk
@@ -192,7 +234,7 @@ jobs:
         run: |
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
-          runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-6"))) | .identifier')"
+          runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-5"))) | .identifier')"
           device="$(xcrun simctl list devicetypes --json | jq -er '.devicetypes[] | select(.name == "iPhone 17") | .identifier')"
           simulator="$(xcrun simctl create Egroo-CI "$device" "$runtime")"
           cleanup() {
@@ -201,10 +243,13 @@ jobs:
           }
           trap cleanup EXIT
 
+          echo "Booting the iPhone 17 simulator with iOS 26.5."
           xcrun simctl boot "$simulator"
           xcrun simctl bootstatus "$simulator" -b
+          echo "Installing Egroo."
           xcrun simctl install "$simulator" "$app"
           launch="$(xcrun simctl launch "$simulator" "$bundle")"
+          echo "$launch"
           pid="${launch##* }"
           sleep 5
           if ! kill -0 "$pid" 2>/dev/null; then
