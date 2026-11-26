@@ -82,6 +82,9 @@ public class EndpointIntegrationTest
             Assert.IsNotNull(state.ProtectedAddress);
             Assert.IsFalse(state.ProtectedAddress.Contains(address, StringComparison.Ordinal));
             Assert.IsNull(state.ConfirmationHash);
+            var account = await database.Users.SingleAsync(user => user.Id == userId);
+            account.UserSecuriy!.AllowedSignInRegions = "HM";
+            await database.SaveChangesAsync();
         }
         using var legacy = CreateAuthenticatedClient(factory, userId);
         using var beforeReset = await legacy.GetAsync("/api/v1/Auth/recovery/email");
@@ -126,6 +129,13 @@ public class EndpointIntegrationTest
         Assert.IsNull(resetJson["token"]);
         Assert.IsTrue(changed.Headers.CacheControl?.NoStore);
         await disconnected.Task.WaitAsync(timeout.Token);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var account = await database.Users.SingleAsync(user => user.Id == userId, timeout.Token);
+            Assert.IsTrue(account.UserSecuriy?.IsTwoFactorEnabled);
+            Assert.IsNull(account.UserSecuriy?.AllowedSignInRegions);
+        }
         using var oldHttp = await signedIn.GetAsync("/api/v1/Auth/refreshsession", timeout.Token);
         Assert.AreEqual(HttpStatusCode.Unauthorized, oldHttp.StatusCode);
         using var oldLegacy = await legacy.GetAsync("/api/v1/Auth/recovery/email", timeout.Token);

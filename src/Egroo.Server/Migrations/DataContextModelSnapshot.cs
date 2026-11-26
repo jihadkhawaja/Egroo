@@ -1344,6 +1344,10 @@ namespace Egroo.Server.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("userid");
 
+                            b1.Property<string>("AllowedSignInRegions")
+                                .HasColumnType("text")
+                                .HasColumnName("allowedsigninregions");
+
                             b1.Property<long?>("FactorLockedUntil")
                                 .HasColumnType("bigint")
                                 .HasColumnName("factorlockeduntil");

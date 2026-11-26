@@ -40,6 +40,8 @@ namespace Egroo.Server.API
                 return await auth.ChangePassword(req.OldPassword, req.NewPassword);
             }).RequireAuthorization();
 
+            group.MapIpRegionProtection();
+
             var twoFactor = group.MapGroup("/twofactor").RequireAuthorization();
             twoFactor.MapGet("/", (ITwoFactorAuth auth) => auth.GetTwoFactorStatus());
             twoFactor.MapPost("/enrollment", (ITwoFactorAuth auth, TwoFactorEnrollmentRequest req) =>

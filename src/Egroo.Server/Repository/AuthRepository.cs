@@ -3,6 +3,7 @@ using Egroo.Server.Authorization;
 using Egroo.Server.Database;
 using Egroo.Server.Helpers;
 using Egroo.Server.Models;
+using Egroo.Server.Security;
 using Egroo.Contracts.Helpers;
 using Egroo.Contracts.Interfaces;
 using Egroo.Contracts.Models;
@@ -12,11 +13,12 @@ using System.Security.Claims;
 
 namespace Egroo.Server.Repository
 {
-    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth, IAccountRecovery
+    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth, IAccountRecovery, IIpRegionAuth
     {
         private readonly TimeProvider _timeProvider;
         private readonly IRecoveryEmailDelivery? _recoveryEmail;
         private readonly AccountSessions? _accountSessions;
+        private readonly IpRegionPolicy _ipRegionPolicy;
 
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
@@ -25,12 +27,14 @@ namespace Egroo.Server.Repository
             ILogger<AuthRepository> logger,
             TimeProvider? timeProvider = null,
             IRecoveryEmailDelivery? recoveryEmail = null,
-            AccountSessions? accountSessions = null)
+            AccountSessions? accountSessions = null,
+            IpRegionPolicy? ipRegionPolicy = null)
             : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
             _timeProvider = timeProvider ?? TimeProvider.System;
             _recoveryEmail = recoveryEmail;
             _accountSessions = accountSessions;
+            _ipRegionPolicy = ipRegionPolicy ?? IpRegionPolicy.Disabled;
         }
 
         private void UpdateUserStatus(ref User user)
@@ -192,9 +196,15 @@ namespace Egroo.Server.Repository
                     Token = token
                 };
             }
-            catch (DbUpdateConcurrencyException) when (user.UserSecuriy?.IsTwoFactorEnabled == true)
+            catch (DbUpdateConcurrencyException) when (user.UserSecuriy is { IsTwoFactorEnabled: true } state)
             {
-                return new Operation.Response { RequiresTwoFactor = true, Message = RejectedFactor };
+                bool requiresRecovery = RequiresRegionalRecovery(state);
+                return new Operation.Response
+                {
+                    RequiresTwoFactor = true,
+                    RequiresRecoveryCode = requiresRecovery,
+                    Message = requiresRecovery ? RegionRecoveryPrompt : RejectedFactor
+                };
             }
             catch (Exception ex)
             {

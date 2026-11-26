@@ -184,6 +184,8 @@ public partial class AuthRepository
         user.Password = CryptographyHelper.SecurePassword(newPassword);
         user.DateUpdated = _timeProvider.GetUtcNow();
         user.SessionRevision++;
+        if (user.UserSecuriy is { AllowedSignInRegions: not null } security)
+            security.AllowedSignInRegions = null;
         ClearConfirmation(state);
         ClearReset(state);
         state.Revision++;

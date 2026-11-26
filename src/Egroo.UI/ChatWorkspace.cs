@@ -95,8 +95,8 @@ public sealed partial class ChatWorkspace : UserControl
         if (create)
             form.Children.Add(Text("Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.", 12, Muted));
         var verificationCode = VerificationCodeField();
-        var verification = LabeledField("Authenticator or recovery code", verificationCode);
-        verification.IsVisible = false;
+        var verificationCaption = Text("Authenticator or recovery code", 13, Ink, FontWeight.SemiBold);
+        var verification = new StackPanel { Spacing = 5, Children = { verificationCaption, verificationCode }, IsVisible = false };
         form.Children.Add(verification);
         async Task AuthenticateAsync()
         {
@@ -106,9 +106,14 @@ public sealed partial class ChatWorkspace : UserControl
             verificationCode.Text = null;
             if (result.RequiresTwoFactor)
             {
+                var label = result.RequiresRecoveryCode ? "Recovery code" : "Authenticator or recovery code";
+                verificationCaption.Text = label;
+                AutomationProperties.SetName(verificationCode, label);
                 verification.IsVisible = true;
                 verificationCode.Focus();
-                Notify(result.Message ?? "Enter an authenticator code or a recovery code.");
+                Notify(result.Message ?? (result.RequiresRecoveryCode
+                    ? "Enter an unused recovery code."
+                    : "Enter an authenticator code or a recovery code."));
                 return;
             }
 

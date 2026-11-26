@@ -55,6 +55,7 @@ public partial class Program
         ConfigureAuthentication(builder.Services, builder.Configuration);
         builder.Services.AddAuthorization();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton(IpRegionPolicy.FromConfiguration(builder.Configuration));
         ConfigureRateLimiting(builder.Services);
         ServerDatabase.Register(builder);
     }
@@ -229,6 +230,7 @@ public partial class Program
         services.AddSingleton<IRecoveryEmailDelivery, SmtpRecoveryEmailDelivery>();
         services.AddSingleton<RecoveryEmailQueue>();
         services.AddHostedService(provider => provider.GetRequiredService<RecoveryEmailQueue>());
+        services.AddScoped<IIpRegionAuth>(provider => provider.GetRequiredService<AuthRepository>());
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
@@ -282,6 +284,16 @@ public partial class Program
 
     private static void ConfigurePipeline(WebApplication app)
     {
+        var regionPolicy = app.Services.GetRequiredService<IpRegionPolicy>();
+        if (regionPolicy.ConfigurationError is { } error)
+            app.Logger.LogWarning("IP-region protection needs a configuration correction. {Reason}", error);
+
+        if (regionPolicy.CreateForwardedHeadersOptions() is { } forwarding)
+        {
+            app.UseWhen(context => regionPolicy.IsTrustedProxy(context.Connection.RemoteIpAddress),
+                proxy => proxy.UseForwardedHeaders(forwarding));
+        }
+
         if (app.Environment.IsDevelopment())
         {
             ConfigureDevelopmentPipeline(app);

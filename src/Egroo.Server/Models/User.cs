@@ -24,6 +24,7 @@ namespace Egroo.Server.Models
         public long? TotpEnrollmentExpiresAt { get; set; }
         public long? LastTotpStep { get; set; }
         public string? RecoveryCodeHashes { get; set; }
+        public string? AllowedSignInRegions { get; set; }
         public int FailedFactorAttempts { get; set; }
         public long? FactorLockedUntil { get; set; }
         [ConcurrencyCheck]

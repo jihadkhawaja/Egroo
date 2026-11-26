@@ -12,6 +12,8 @@ namespace Egroo.Contracts.Models
             public string? Token { get; set; }
             [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
             public bool RequiresTwoFactor { get; set; }
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool RequiresRecoveryCode { get; set; }
         }
 
         public class Result

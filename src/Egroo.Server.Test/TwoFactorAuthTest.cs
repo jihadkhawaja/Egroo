@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Egroo.Server.Database;
@@ -88,6 +89,7 @@ public class TwoFactorAuthTest
             var auth = test.Repository(challenge);
             var result = await auth.SignIn(Username, Password);
             Assert.IsTrue(result.RequiresTwoFactor);
+            Assert.IsFalse(result.RequiresRecoveryCode);
             Assert.IsFalse(result.Success);
             Assert.IsNull(result.Token);
         }
@@ -185,6 +187,85 @@ public class TwoFactorAuthTest
         Assert.IsTrue((await test.Repository(unlocked).SignIn(Username, Password, test.CurrentCode(key))).Success);
     }
 
+    [TestMethod]
+    public async Task OptedInAccountCanRecoverWhenTravelingAndTurnOffRestriction()
+    {
+        using var test = new AuthFixture();
+        await test.InitializeAsync();
+        var policy = IpRegionPolicy.FromConfiguration(new ConfigurationBuilder().AddInMemoryCollection(
+            new Dictionary<string, string?>
+            {
+                ["IpRegionProtection:Enabled"] = "true",
+                ["IpRegionProtection:Regions:HM:0"] = "198.51.100.0/24",
+                ["IpRegionProtection:Regions:WK:0"] = "203.0.113.0/24",
+            }).Build());
+        var home = IPAddress.Parse("198.51.100.42");
+        var travel = IPAddress.Parse("203.0.113.42");
+        string key;
+        string recoveryCode;
+
+        await using (var enrollment = test.Open())
+        {
+            var auth = test.Repository(enrollment, authenticated: true, policy: policy, peer: home);
+            var ordinary = await auth.SignIn(Username, Password);
+            Assert.IsTrue(ordinary.Success);
+            Assert.IsFalse((await auth.GetIpRegionStatus()).CanEnable);
+            Assert.IsFalse((await auth.UpdateIpRegionSettings(new(Password, "unused", ["HM"]))).Success);
+
+            key = (await auth.BeginTwoFactorEnrollment(Password)).SharedKey!;
+            var enabled = await auth.EnableTwoFactor(Password, test.CurrentCode(key));
+            Assert.IsTrue(enabled.Success);
+            recoveryCode = enabled.RecoveryCodes![0];
+        }
+
+        test.Advance(TimeSpan.FromSeconds(30));
+        await using (var protection = test.Open())
+        {
+            var auth = test.Repository(protection, authenticated: true, policy: policy, peer: home);
+            var code = test.CurrentCode(key);
+            Assert.IsFalse((await auth.UpdateIpRegionSettings(new(Password, code, ["WK"]))).Success);
+            Assert.IsFalse((await auth.UpdateIpRegionSettings(new(Password, recoveryCode, ["HM"]))).Success);
+            Assert.IsTrue((await auth.UpdateIpRegionSettings(new(Password, code, ["hm"]))).Success);
+            var status = await auth.GetIpRegionStatus();
+            Assert.IsTrue(status.Enabled);
+            CollectionAssert.AreEqual(new[] { "HM" }, status.AllowedRegions);
+        }
+
+        test.Advance(TimeSpan.FromSeconds(30));
+        await using (var allowed = test.Open())
+        {
+            var auth = test.Repository(allowed, policy: policy, peer: home);
+            Assert.IsTrue((await auth.SignIn(Username, Password, test.CurrentCode(key))).Success);
+        }
+
+        test.Advance(TimeSpan.FromSeconds(30));
+        await using (var away = test.Open())
+        {
+            var auth = test.Repository(away, policy: policy, peer: travel);
+            var prompt = await auth.SignIn(Username, Password);
+            Assert.IsTrue(prompt.RequiresTwoFactor);
+            Assert.IsTrue(prompt.RequiresRecoveryCode);
+            StringAssert.Contains(prompt.Message, "unused recovery code");
+            Assert.IsNull((await auth.SignIn(Username, Password, test.CurrentCode(key))).Token);
+            Assert.IsNull((await auth.SignIn(Username, "wrong-password", recoveryCode)).Token);
+            Assert.IsTrue((await auth.SignIn(Username, Password, recoveryCode)).Success);
+        }
+
+        await using (var abroad = test.Open())
+        {
+            var auth = test.Repository(abroad, authenticated: true, policy: policy);
+            Assert.IsNull((await auth.SignIn(Username, Password, recoveryCode)).Token);
+            Assert.IsTrue((await auth.UpdateIpRegionSettings(new(Password, test.CurrentCode(key), []))).Success);
+        }
+
+        test.Advance(TimeSpan.FromSeconds(30));
+        await using var cleared = test.Open();
+        var after = test.Repository(cleared, authenticated: true, policy: policy, peer: travel);
+        Assert.IsFalse((await after.GetIpRegionStatus()).Enabled);
+        Assert.IsTrue((await after.GetTwoFactorStatus()).Enabled);
+        Assert.IsTrue((await after.SignIn(Username, Password, test.CurrentCode(key))).Success);
+    }
+
     internal static string CodeForSecret(string base32Secret, DateTimeOffset now)
     {
         const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -226,7 +307,8 @@ public class TwoFactorAuthTest
             .UseSqlite(new SqliteConnectionStringBuilder { DataSource = _databasePath, Pooling = false }.ToString())
             .Options);
 
-        public AuthRepository Repository(DataContext context, bool authenticated = false)
+        public AuthRepository Repository(DataContext context, bool authenticated = false, IpRegionPolicy? policy = null,
+            IPAddress? peer = null)
         {
             var accessor = authenticated
                 ? new HttpContextAccessor { HttpContext = new DefaultHttpContext
@@ -234,8 +316,9 @@ public class TwoFactorAuthTest
                     User = new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, _userId.ToString())], "Test"))
                 } }
                 : new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+            accessor.HttpContext!.Connection.RemoteIpAddress = peer;
             return new(context, accessor, _services.GetRequiredService<IConfiguration>(),
-                _services.GetRequiredService<IConnectionTracker>(), NullLogger<AuthRepository>.Instance, _clock);
+                _services.GetRequiredService<IConnectionTracker>(), NullLogger<AuthRepository>.Instance, _clock, ipRegionPolicy: policy);
         }
 
         public void Advance(TimeSpan delay) => _clock.Now += delay;

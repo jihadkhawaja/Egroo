@@ -42,6 +42,7 @@ internal sealed class WorkspaceSession
     public HttpClient Http { get; }
     public ITwoFactorAuth AccountSecurity => _auth;
     public AccountRecoveryService AccountRecovery { get; }
+    public IIpRegionAuth IpRegionSecurity => _auth;
     public ChatUserService Users { get; } = new();
     public ChatChannelService Channels { get; } = new();
     public AgentService Agents { get; }

@@ -1334,6 +1334,10 @@ namespace Egroo.Server.Migrations.Sqlite
                                 .HasColumnType("TEXT")
                                 .HasColumnName("userid");
 
+                            b1.Property<string>("AllowedSignInRegions")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("allowedsigninregions");
+
                             b1.Property<long?>("FactorLockedUntil")
                                 .HasColumnType("INTEGER")
                                 .HasColumnName("factorlockeduntil");
