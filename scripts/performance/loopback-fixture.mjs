@@ -14,9 +14,9 @@ const contentTypes = {
 };
 
 export async function startLoopbackFixture(browserPublish, serverPublish) {
-    const site = resolve(browserPublish);
+    const site = browserPublish === null ? null : resolve(browserPublish);
     const server = resolve(serverPublish);
-    await access(join(site, 'index.html'));
+    if (site) await access(join(site, 'index.html'));
     await access(join(server, 'Egroo.Server.dll'));
 
     const tempRoot = resolve(tmpdir());
@@ -26,7 +26,7 @@ export async function startLoopbackFixture(browserPublish, serverPublish) {
     let api;
     let backend;
     let backendClosed;
-    const frontend = createServer(async (request, response) => {
+    const frontend = site && createServer(async (request, response) => {
         const { pathname } = new URL(request.url, 'http://' + fixtureHost);
         if (pathname === '/egroo-config.json') {
             response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -55,7 +55,7 @@ export async function startLoopbackFixture(browserPublish, serverPublish) {
             backend.kill();
             await backendClosed;
         }
-        if (frontend.listening) {
+        if (frontend?.listening) {
             const closed = once(frontend, 'close');
             frontend.close();
             frontend.closeAllConnections();
@@ -70,9 +70,12 @@ export async function startLoopbackFixture(browserPublish, serverPublish) {
             recursive: true,
             filter: path => !/^(App_Data|appsettings(?:\..+)?\.json|\.env(?:\..+)?)$/i.test(basename(path))
         });
-        frontend.listen(0, fixtureHost);
-        await once(frontend, 'listening');
-        const origin = 'http://' + fixtureHost + ':' + frontend.address().port;
+        let origin;
+        if (frontend) {
+            frontend.listen(0, fixtureHost);
+            await once(frontend, 'listening');
+            origin = 'http://' + fixtureHost + ':' + frontend.address().port;
+        }
 
         backend = spawn('dotnet', [join(hosted, 'Egroo.Server.dll')], {
             cwd: fixture,
@@ -89,7 +92,7 @@ export async function startLoopbackFixture(browserPublish, serverPublish) {
                 Secrets__Jwt: randomBytes(48).toString('hex'),
                 Encryption__Key: randomBytes(16).toString('hex'),
                 Encryption__IV: randomBytes(8).toString('hex'),
-                Api__AllowedOrigins__0: origin,
+                Api__AllowedOrigins__0: origin ?? 'http://' + fixtureHost,
                 Logging__LogLevel__Default: 'Warning',
                 'Logging__LogLevel__Microsoft.Hosting.Lifetime': 'Information'
             }
