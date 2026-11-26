@@ -443,7 +443,7 @@ public sealed partial class ChatWorkspace
             if (updateOnly || message.Id == Guid.Empty || message.Content is null)
                 return Task.CompletedTask;
 
-            var readReceipt = _channel?.Id == message.ChannelId && _timelineRender is not null
+            var readReceipt = !_publicProfileView.IsVisible && _channel?.Id == message.ChannelId && _timelineRender is not null
                 && message.SenderId != user.Id && message.DateSeen is null
                 ? TryAcknowledgeAsync(() => messages.UpdateMessage(message))
                 : Task.CompletedTask;

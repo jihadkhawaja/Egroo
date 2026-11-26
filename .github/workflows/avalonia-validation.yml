@@ -179,7 +179,8 @@ jobs:
           dotnet workload install ios
       - name: Build and verify arm64 simulator app
         run: |
-          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false
+          # Exercise the simulator bundle without the Release device AOT pass.
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false -p:UseInterpreter=true
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           test -n "$app"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
