@@ -190,9 +190,35 @@ jobs:
           name: android-test-apk
           path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
           if-no-files-found: error
-      - name: Launch Egroo on an offline Android emulator
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - name: Build the isolated Android conversation fixture
         shell: bash
-        timeout-minutes: 15
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          dotnet publish src/Egroo.Server -c Release -o "$RUNNER_TEMP/egroo-android-api"
+          manifest="src/Egroo.Avalonia/Android/Smoke.AndroidManifest.xml"
+          python3 - "$manifest" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          android = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android)
+          manifest = ET.parse("src/Egroo.Avalonia/Android/AndroidManifest.xml")
+          manifest.getroot().set("package", "com.jihadkhawaja.egroo.smoke")
+          manifest.find("application").set(f"{{{android}}}usesCleartextTraffic", "true")
+          manifest.write(sys.argv[1], encoding="utf-8", xml_declaration=True)
+          PY
+          # Keep the loopback address and manifest out of the uploaded default Release package.
+          dotnet build src/Egroo.Avalonia/Android -c Release -r android-x64 \
+            --artifacts-path "$RUNNER_TEMP/egroo-android-smoke" \
+            -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64" \
+            -p:AndroidManifest=Smoke.AndroidManifest.xml -p:ApplicationId=com.jihadkhawaja.egroo.smoke \
+            -p:EgrooApiUrl=http://127.0.0.1:5187/
+      - name: Verify offline startup and authenticated native chat
+        shell: bash
+        timeout-minutes: 18
         run: |
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           image='system-images;android-35;default;x86_64'
@@ -232,44 +258,27 @@ jobs:
           adb -s "$adb_device" shell cmd connectivity airplane-mode enable
           adb -s "$adb_device" shell svc wifi disable
           adb -s "$adb_device" shell svc data disable
+          adb -s "$adb_device" shell wm size 1080x1920
+          adb -s "$adb_device" shell wm density 420
           apk="$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*-Signed.apk' -print -quit)"
-          test -n "$apk"
-          adb -s "$adb_device" install "$apk"
-          package=com.jihadkhawaja.egroo
-          activity="$(adb -s "$adb_device" shell cmd package resolve-activity --brief \
-            -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$package" | tail -n 1 | tr -d '\r')"
-          [[ "$activity" == "$package/"* ]]
-          adb -s "$adb_device" shell wm dismiss-keyguard
-          adb -s "$adb_device" shell am start -W -n "$activity"
-
-          # A running activity can still fail to render its workspace.
-          hierarchy="$RUNNER_TEMP/egroo-android-window.xml"
-          for attempt in {1..4}; do
-            if timeout 20s adb -s "$adb_device" shell uiautomator dump /sdcard/egroo-window.xml               && adb -s "$adb_device" exec-out cat /sdcard/egroo-window.xml > "$hierarchy"               && python3 - "$hierarchy" "$package" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          hierarchy, package = sys.argv[1:]
-          root = ET.parse(hierarchy).getroot()
-          labels = {
-              node.get(attribute, "").strip()
-              for node in root.iter("node")
-              if node.get("package") == package
-              for attribute in ("text", "content-desc")
-          }
-          expected = {"Sign in", "Username", "Password"}
-          if not expected.issubset(labels):
-              sys.exit("Missing sign-in controls: " + ", ".join(sorted(expected - labels)))
-          print("Egroo sign-in controls are visible to Android accessibility.")
-          PY
-            then
-              adb -s "$adb_device" shell pidof "$package"
-              exit 0
-            fi
-            sleep 2
-          done
-          adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
-          exit 1
+          smoke_apk="$(find "$RUNNER_TEMP/egroo-android-smoke/bin" -name 'com.jihadkhawaja.egroo.smoke-Signed.apk' -print -quit)"
+          test -n "$apk" && test -n "$smoke_apk"
+          if ! node scripts/performance/android-conversation.mjs "$adb_device" "$apk" "$smoke_apk" \
+            "$RUNNER_TEMP/egroo-android-api" "$RUNNER_TEMP/egroo-android-results"; then
+            adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
+            exit 1
+          fi
+          {
+            echo '## Android emulator conversation'
+            echo '~~~json'
+            cat "$RUNNER_TEMP/egroo-android-results/android-conversation.json"
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: android-conversation-smoke
+          path: ${{ runner.temp }}/egroo-android-results/
 
   ios:
     name: iOS simulator release build
