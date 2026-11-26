@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Egroo.Server.Migrations.Sqlite
 {
     [DbContext(typeof(SqliteDataContext))]
-    [Migration("20261126195106_AddAgentTasks")]
+    [Migration("20261126201627_AddAgentTasks")]
     partial class AddAgentTasks
     {
         /// <inheritdoc />
@@ -1284,9 +1284,38 @@ namespace Egroo.Server.Migrations.Sqlite
                                 .HasColumnType("TEXT")
                                 .HasColumnName("userid");
 
+                            b1.Property<long?>("FactorLockedUntil")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("factorlockeduntil");
+
+                            b1.Property<long>("FactorRevision")
+                                .IsConcurrencyToken()
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("factorrevision");
+
+                            b1.Property<int>("FailedFactorAttempts")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("failedfactorattempts");
+
                             b1.Property<bool>("IsTwoFactorEnabled")
                                 .HasColumnType("INTEGER")
                                 .HasColumnName("istwofactorenabled");
+
+                            b1.Property<long?>("LastTotpStep")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("lasttotpstep");
+
+                            b1.Property<string>("ProtectedTotpSecret")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("protectedtotpsecret");
+
+                            b1.Property<string>("RecoveryCodeHashes")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("recoverycodehashes");
+
+                            b1.Property<long?>("TotpEnrollmentExpiresAt")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("totpenrollmentexpiresat");
 
                             b1.HasKey("UserId");
 
