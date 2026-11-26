@@ -73,20 +73,26 @@ namespace Egroo.Server.Repository
             }
         }
 
-        public async Task UpdatePendingMessage(Guid messageid)
+        public async Task UpdatePendingMessage(Guid userId, Guid messageId)
         {
             try
             {
-                var pendingMessage = await _dbContext.UsersPendingMessages.FirstOrDefaultAsync(x =>
-                    x.MessageId == messageid &&
-                    x.DateUserReceivedOn == null &&
-                    x.DateDeleted == null);
+                var pendingMessages = await _dbContext.UsersPendingMessages
+                    .Where(x => x.UserId == userId
+                        && x.MessageId == messageId
+                        && x.DateUserReceivedOn == null
+                        && x.DateDeleted == null)
+                    .ToListAsync();
 
-                if (pendingMessage is not null)
-                {
-                    _dbContext.UsersPendingMessages.Remove(pendingMessage);
-                    await _dbContext.SaveChangesAsync();
-                }
+                if (pendingMessages.Count == 0)
+                    return;
+
+                _dbContext.UsersPendingMessages.RemoveRange(pendingMessages);
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another receipt already removed the pending delivery.
             }
             catch (Exception ex)
             {

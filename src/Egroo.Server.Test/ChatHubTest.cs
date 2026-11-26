@@ -171,6 +171,7 @@ public class ChatHubTest
     {
         public bool SendMessageResult { get; set; } = true;
         public bool AddPendingResult { get; set; } = true;
+        public (Guid UserId, Guid MessageId)? PendingReceipt { get; private set; }
 
         public Task<bool> SendMessage(Message message) => Task.FromResult(SendMessageResult);
         public Task<bool> AddPendingMessage(UserPendingMessage pm) => Task.FromResult(AddPendingResult);
@@ -178,7 +179,11 @@ public class ChatHubTest
         public Task<Message?> GetMessageById(Guid messageId) => Task.FromResult<Message?>(null);
         public Task<Message?> GetMessageByReferenceId(Guid referenceId) => Task.FromResult<Message?>(null);
         public Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId) => Task.FromResult<IEnumerable<UserPendingMessage>>(Array.Empty<UserPendingMessage>());
-        public Task UpdatePendingMessage(Guid messageId) => Task.CompletedTask;
+        public Task UpdatePendingMessage(Guid userId, Guid messageId)
+        {
+            PendingReceipt = (userId, messageId);
+            return Task.CompletedTask;
+        }
         public string DecryptContent(string content) => content;
     }
 
@@ -752,15 +757,25 @@ public class ChatHubTest
     [TestMethod]
     public async Task UpdatePendingMessage_UnauthenticatedUser_NoOp()
     {
-        var hub = CreateHub(null);
+        var repository = new StubMessageRepository();
+        var hub = CreateHub(null, messageRepo: repository);
+
         await hub.UpdatePendingMessage(Guid.NewGuid());
+
+        Assert.IsNull(repository.PendingReceipt);
     }
 
     [TestMethod]
-    public async Task UpdatePendingMessage_AuthenticatedUser_Completes()
+    public async Task UpdatePendingMessage_PassesAuthenticatedRecipientToRepository()
     {
-        var hub = CreateHub(Guid.NewGuid());
-        await hub.UpdatePendingMessage(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+        var messageId = Guid.NewGuid();
+        var repository = new StubMessageRepository();
+        var hub = CreateHub(userId, messageRepo: repository);
+
+        await hub.UpdatePendingMessage(messageId);
+
+        Assert.AreEqual<(Guid UserId, Guid MessageId)?>((userId, messageId), repository.PendingReceipt);
     }
 
     // ── ChatHubMessage (typing) ─────────────────────────────────────────────

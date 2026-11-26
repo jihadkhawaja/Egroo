@@ -199,7 +199,7 @@ namespace Egroo.Server.SignalR.Hubs
             if (!userId.HasValue)
                 return;
 
-            await _messageRepository.UpdatePendingMessage(messageid);
+            await _messageRepository.UpdatePendingMessage(userId.Value, messageid);
         }
 
         [Authorize]
