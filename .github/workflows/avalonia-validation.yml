@@ -97,3 +97,46 @@ jobs:
           $wasm = Get-ChildItem (Join-Path $root '_framework') -Recurse -File -Filter '*.wasm' |
             Where-Object Length -gt 0 | Select-Object -First 1
           if (!$wasm) { throw 'The published bundle contains no WebAssembly runtime.' }
+
+  android:
+    name: Android release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install android
+      - name: Build and verify APK
+        run: |
+          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:RuntimeIdentifier=android-x64 -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+          test -n "$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*.apk' -size +0c -print -quit)"
+
+  ios:
+    name: iOS simulator release build
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: src/Egroo.Avalonia/iOS
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.401
+      - name: Install iOS workload for Xcode 26.6
+        run: |
+          xcodebuild -version
+          printf '%s\n' '{"sdk":{"version":"10.0.401","rollForward":"disable","workloadVersion":"10.0.401"}}' > global.json
+          dotnet workload install ios
+      - name: Build and verify arm64 simulator app
+        run: |
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false
+          test -n "$(find bin/Release -type d -name '*.app' -print -quit)"
