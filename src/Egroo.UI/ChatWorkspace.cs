@@ -94,11 +94,25 @@ public sealed partial class ChatWorkspace : UserControl
         form.Children.Add(LabeledField("Password", password));
         if (create)
             form.Children.Add(Text("Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.", 12, Muted));
+        var verificationCode = VerificationCodeField();
+        var verification = LabeledField("Authenticator or recovery code", verificationCode);
+        verification.IsVisible = false;
+        form.Children.Add(verification);
         async Task AuthenticateAsync()
         {
             if (string.IsNullOrWhiteSpace(username.Text) || string.IsNullOrWhiteSpace(password.Text))
                 throw new InvalidOperationException("Enter a username and password.");
-            await _session.SignInAsync(username.Text.Trim(), password.Text, create);
+            var result = await _session.SignInAsync(username.Text.Trim(), password.Text, create, verificationCode.Text);
+            verificationCode.Text = null;
+            if (result.RequiresTwoFactor)
+            {
+                verification.IsVisible = true;
+                verificationCode.Focus();
+                Notify(result.Message ?? "Enter an authenticator code or a recovery code.");
+                return;
+            }
+
+            Notify(string.Empty);
             password.Text = null;
             await OpenWorkspaceAsync();
         }
@@ -113,6 +127,7 @@ public sealed partial class ChatWorkspace : UserControl
         switchMode.HorizontalAlignment = HorizontalAlignment.Center;
         form.Children.Add(switchMode);
         SubmitOnEnter(password, AuthenticateAsync);
+        SubmitOnEnter(verificationCode, AuthenticateAsync);
         var authCard = Card(form, 28);
         authCard.MaxWidth = 430;
         authCard.VerticalAlignment = VerticalAlignment.Center;

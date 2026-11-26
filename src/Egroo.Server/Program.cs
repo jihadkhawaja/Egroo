@@ -222,7 +222,9 @@ public partial class Program
     {
         services.AddSingleton(CreateEncryptionService);
         services.AddSingleton<EndToEndEncryptionService>();
-        services.AddScoped<IAuth, AuthRepository>();
+        services.AddScoped<AuthRepository>();
+        services.AddScoped<IAuth>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddScoped<ITwoFactorAuth>(provider => provider.GetRequiredService<AuthRepository>());
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();

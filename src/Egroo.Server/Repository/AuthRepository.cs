@@ -11,15 +11,19 @@ using System.Security.Claims;
 
 namespace Egroo.Server.Repository
 {
-    public class AuthRepository : BaseRepository, IAuth
+    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth
     {
+        private readonly TimeProvider _timeProvider;
+
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
             IConnectionTracker connectionTracker,
-            ILogger<AuthRepository> logger)
+            ILogger<AuthRepository> logger,
+            TimeProvider? timeProvider = null)
             : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
+            _timeProvider = timeProvider ?? TimeProvider.System;
         }
 
         private void UpdateUserStatus(ref User user)
@@ -108,7 +112,10 @@ namespace Egroo.Server.Repository
             }
         }
 
-        public async Task<Operation.Response> SignIn(string username, string password)
+        public Task<Operation.Response> SignIn(string username, string password) =>
+            SignIn(username, password, verificationCode: null);
+
+        public async Task<Operation.Response> SignIn(string username, string password, string? verificationCode)
         {
             username = username.ToLower();
 
@@ -149,8 +156,6 @@ namespace Egroo.Server.Repository
                 };
             }
 
-            UpdateUserStatus(ref user);
-
             var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
             if (string.IsNullOrEmpty(jwtSecret))
             {
@@ -161,12 +166,15 @@ namespace Egroo.Server.Repository
                 };
             }
 
+            if (await CheckSignInFactorAsync(user, verificationCode) is { } failure)
+                return failure;
+
+            UpdateUserStatus(ref user);
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
             try
             {
-                _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
 
                 return new Operation.Response
@@ -176,6 +184,10 @@ namespace Egroo.Server.Repository
                     UserId = user.Id,
                     Token = token
                 };
+            }
+            catch (DbUpdateConcurrencyException) when (user.UserSecuriy?.IsTwoFactorEnabled == true)
+            {
+                return new Operation.Response { RequiresTwoFactor = true, Message = RejectedFactor };
             }
             catch (Exception ex)
             {
@@ -220,7 +232,6 @@ namespace Egroo.Server.Repository
 
             try
             {
-                _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
 
                 return new Operation.Response
