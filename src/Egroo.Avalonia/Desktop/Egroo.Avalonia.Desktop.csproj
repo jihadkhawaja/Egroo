@@ -12,12 +12,23 @@
   </ItemGroup>
   <Target Name="BundleMacApp" AfterTargets="Publish" Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('osx-'))">
     <PropertyGroup>
-      <MacAppContents>$(PublishDir)../Egroo.app/Contents</MacAppContents>
+      <MacAppBundle>$(PublishDir)../Egroo.app</MacAppBundle>
+      <MacAppContents>$(MacAppBundle)/Contents</MacAppContents>
     </PropertyGroup>
     <ItemGroup>
       <MacAppFile Include="$(PublishDir)**/*" />
     </ItemGroup>
     <Copy SourceFiles="Info.plist" DestinationFolder="$(MacAppContents)" />
     <Copy SourceFiles="@(MacAppFile)" DestinationFiles="@(MacAppFile->'$(MacAppContents)/MacOS/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <!-- The copied .NET apphost needs a seal for the completed bundle. Sign nested code first. -->
+    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+      <MacAppNativeLibrary Include="$(MacAppContents)/MacOS/**/*.dylib" />
+    </ItemGroup>
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX')) And '@(MacAppNativeLibrary)' != ''"
+          Command="/usr/bin/codesign --force --sign - &quot;%(MacAppNativeLibrary.FullPath)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Command="/usr/bin/codesign --force --sign - &quot;$(MacAppBundle)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX'))"
+          Command="/usr/bin/codesign --verify --deep --strict &quot;$(MacAppBundle)&quot;" />
   </Target>
 </Project>
