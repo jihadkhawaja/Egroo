@@ -72,7 +72,7 @@ On reconnect, the requesting session receives that user's pending messages in se
 
 ## Container images
 
-The **Avalonia containers** workflow builds and smoke-tests both images on pull requests. After the workflow reaches the default branch, a maintainer can run it there to publish a paired release to GitHub Container Registry. The workflow summary lists the Linux x64 image references.
+The **Avalonia containers** workflow builds and smoke-tests both images on pull requests. After the workflow reaches the default branch, a maintainer can run it there to publish a paired release to GitHub Container Registry. A separate runner pulls both Linux x64 images by their registry digests and smoke-tests the pair. The workflow summary lists the paired tags and immutable references after verification succeeds.
 
 Both image names share a release tag derived from the source revision, workflow run, and attempt. Use the same tag for the API and browser. Use image digests if your deployment needs immutable references. Public images can be pulled anonymously. For a private package, sign in to `ghcr.io` with a GitHub personal access token (classic) that has `read:packages` and access to the package.
 
