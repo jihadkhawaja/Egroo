@@ -67,24 +67,46 @@ public sealed partial class ChatWorkspace
         public bool Running { get; set; }
         public bool DecryptionUnavailable { get; set; }
         public int LiveMessages => _liveMessages.Count;
+        public bool HasDeferredMessages { get; private set; }
+        public Button? JumpToLatest { get; set; }
         public TaskCompletionSource? Pending { get; set; }
         public Dictionary<Guid, (string Cipher, string Text)> Decrypted { get; } = new();
         public Dictionary<Guid, (BubbleDisplay Display, TimelineRow Row)> Bubbles { get; set; } = new();
         public Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), TimelineRow> Dates { get; set; } = new();
 
-        public void ExtendHistory(Guid referenceId, bool followingLatest)
+        public bool TryExtendHistory(Guid referenceId, bool followingLatest)
         {
-            if (Decrypted.ContainsKey(referenceId) || _liveMessages.Contains(referenceId))
-                return;
+            if (Bubbles.ContainsKey(referenceId) || _liveMessages.Contains(referenceId))
+                return true;
             if (_liveMessages.Count == LiveHistoryBufferSize)
             {
                 if (!followingLatest)
-                    return;
+                    return false;
                 _liveMessages.Clear();
             }
             // Keep the first loaded row stable while appending. A leading removal invalidates the
             // virtual panel's estimated extent and can force a new viewport layout after each message.
             _liveMessages.Add(referenceId);
+            return true;
+        }
+
+        public void DeferLiveMessages()
+        {
+            HasDeferredMessages = true;
+            if (JumpToLatest is { } jump)
+                jump.IsVisible = true;
+        }
+
+        public bool ResumeLiveMessages(bool compact = true)
+        {
+            if (!HasDeferredMessages)
+                return false;
+            HasDeferredMessages = false;
+            if (compact)
+                _liveMessages.Clear();
+            if (JumpToLatest is { } jump)
+                jump.IsVisible = false;
+            return true;
         }
 
         public void Cancel()
@@ -125,13 +147,23 @@ public sealed partial class ChatWorkspace
                 await _session.Voice.JoinCallAsync(channel.Id, ChannelTitle(channel));
         });
         _muteAction = Button("Mute", () => _session.Voice.ToggleMuteAsync());
-        var more = MenuButton("More", ("Older messages", async () => { _messageLimit += 150; await RenderMessagesAsync(); }),
+        var more = MenuButton("More", ("Older messages", async () =>
+            {
+                _timelineRender?.ResumeLiveMessages(compact: false);
+                _messageLimit += 150;
+                await RenderMessagesAsync();
+            }),
             ("Audio settings", () => ShowAudioSettingsAsync(channel)));
         header.Children.Add(Actions(search, QuietButton("Members", () => ShowMembersAsync(channel)), _voiceAction, _muteAction, more));
         header.Children.Add(_messageFilter);
         header.Children.Add(_voiceStatus);
 
         var render = _timelineRender = new TimelineRender();
+        var jumpToLatest = render.JumpToLatest = QuietButton("Jump to latest", () => JumpToLatestAsync(render));
+        jumpToLatest.IsVisible = false;
+        jumpToLatest.HorizontalAlignment = HorizontalAlignment.Right;
+        jumpToLatest.VerticalAlignment = VerticalAlignment.Bottom;
+        jumpToLatest.Margin = new Thickness(0, 0, 16, 10);
         var messages = new ItemsControl
         {
             ItemsSource = render.Rows,
@@ -163,7 +195,7 @@ public sealed partial class ChatWorkspace
         var footer = ComposerPanel(_composer, SendMessageAsync, _attachmentStatus,
             GlyphButton("Attach a file", AttachmentIcon, SelectAttachmentAsync),
             QuietButton("@ Mention", () => ShowMentionsAsync(channel)), _removeAttachment);
-        var timeline = _timeline = ShowConversation(header, messages, footer, _typingStatus);
+        var timeline = _timeline = ShowConversation(header, messages, footer, _typingStatus, jumpToLatest);
         timeline.Focusable = true;
         AutomationProperties.SetName(timeline, "Message timeline");
         timeline.KeyDown += (_, args) =>
@@ -173,10 +205,21 @@ public sealed partial class ChatWorkspace
             if (args.Key == Key.Home)
                 timeline.ScrollToHome();
             else if (args.Key == Key.End)
-                ScrollToLatest(timeline);
+            {
+                if (string.IsNullOrWhiteSpace(_messageFilter?.Text))
+                    _ = JumpToLatestAsync(render);
+                else
+                    ScrollToLatest(timeline);
+            }
             else
                 return;
             args.Handled = true;
+        };
+        timeline.ScrollChanged += (_, args) =>
+        {
+            if (render.HasDeferredMessages && args.OffsetDelta.Y > 0 && IsNearLatest(timeline)
+                && string.IsNullOrWhiteSpace(_messageFilter?.Text))
+                _ = JumpToLatestAsync(render);
         };
         await RenderMessagesAsync();
         if (timeline == _timeline)
@@ -209,8 +252,48 @@ public sealed partial class ChatWorkspace
 
     private async Task RenderMessagesSafelyAsync()
     {
-        try { await RenderMessagesAsync(); }
+        try
+        {
+            if (_timelineRender is { HasDeferredMessages: true } render && string.IsNullOrWhiteSpace(_messageFilter?.Text))
+                await JumpToLatestAsync(render);
+            else
+                await RenderMessagesAsync();
+        }
         catch (Exception ex) { Notify(ex.Message); }
+    }
+
+    private async Task JumpToLatestAsync(TimelineRender render)
+    {
+        if (render != _timelineRender || _timeline is not { } timeline)
+            return;
+        var moveFocus = render.JumpToLatest?.IsFocused == true;
+        var resumed = render.ResumeLiveMessages();
+        try
+        {
+            var refresh = resumed;
+            if (_messageFilter is { Text: { Length: > 0 } } filter)
+            {
+                filter.Text = null;
+                refresh = true;
+            }
+            if (refresh)
+                await RenderMessagesAsync();
+            if (timeline == _timeline)
+            {
+                if (moveFocus)
+                    timeline.Focus();
+                ScrollToLatest(timeline);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (render == _timelineRender)
+            {
+                if (resumed)
+                    render.DeferLiveMessages();
+                Notify(ex.Message);
+            }
+        }
     }
 
     private Task RenderMessagesAsync()
@@ -261,8 +344,11 @@ public sealed partial class ChatWorkspace
         var searching = !string.IsNullOrWhiteSpace(query);
         var limit = _messageLimit + render.LiveMessages;
         bool IsCurrentView() => render == _timelineRender && query == _messageFilter?.Text?.Trim()
+            && (searching || !render.HasDeferredMessages)
             && (searching || limit == _messageLimit + render.LiveMessages);
 
+        if (!IsCurrentView())
+            return;
         var history = await _session.ReadHistoryAsync(channel.Id, searching ? null : limit, render.CancellationToken);
         if (!IsCurrentView())
             return;
@@ -319,48 +405,12 @@ public sealed partial class ChatWorkspace
                 : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")));
         render.Bubbles = bubbles;
         render.Dates = dates;
-        if (!searching && render.LiveMessages == LiveHistoryBufferSize && _timeline is { } timeline
-            && !IsNearLatest(timeline) && render.Rows.Count == rows.Count && render.Rows[0] != rows[0])
-            PreserveReaderPosition(timeline, render.Rows, rows);
         ApplyRows(render.Rows, rows, render.Rows.Move);
         if (!searching && render.Decrypted.Count > bubbles.Count)
         {
             var staleIds = render.Decrypted.Keys.Where(id => !bubbles.ContainsKey(id)).ToArray();
             foreach (var id in staleIds)
                 render.Decrypted.Remove(id);
-        }
-    }
-
-    private void PreserveReaderPosition(ScrollViewer timeline, ObservableCollection<TimelineRow> current, List<TimelineRow> next)
-    {
-        if (timeline.Content is not ItemsControl items)
-            return;
-
-        // Removing a leading item can make the virtual panel replace the entire visible range.
-        // Keep a surviving visible row at its previous viewport position after that layout.
-        foreach (var container in items.GetRealizedContainers())
-        {
-            if (container.TranslatePoint(default, timeline) is not { } position
-                || position.Y >= timeline.Viewport.Height || position.Y + container.Bounds.Height <= 0)
-                continue;
-            var oldIndex = items.IndexFromContainer(container);
-            if (oldIndex < 0 || oldIndex >= current.Count)
-                continue;
-            var row = current[oldIndex];
-            var newIndex = next.IndexOf(row);
-            if (newIndex < 0)
-                continue;
-
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (timeline != _timeline || newIndex >= current.Count || current[newIndex] != row)
-                    return;
-                if (items.ContainerFromIndex(newIndex) is null)
-                    items.ScrollIntoView(newIndex);
-                if (items.ContainerFromIndex(newIndex)?.TranslatePoint(default, timeline) is { } updated)
-                    timeline.Offset = timeline.Offset.WithY(timeline.Offset.Y + updated.Y - position.Y);
-            }, DispatcherPriority.Loaded);
-            break;
         }
     }
 
@@ -589,10 +639,25 @@ public sealed partial class ChatWorkspace
             _typing.Remove(ParticipantKey(message.SenderId, message.AgentDefinitionId));
             UpdateTypingStatus();
             var followingLatest = atEnd && timeline == initialTimeline;
-            if (!updateOnly && message.Content is not null && _timelineRender is { } render)
-                render.ExtendHistory(message.ReferenceId, followingLatest && string.IsNullOrWhiteSpace(_messageFilter?.Text));
+            var searching = !string.IsNullOrWhiteSpace(_messageFilter?.Text);
+            if (_timelineRender is { } render)
+            {
+                if (!searching && render.HasDeferredMessages)
+                {
+                    if (followingLatest)
+                        await JumpToLatestAsync(render);
+                    return;
+                }
+                if (!updateOnly && message.Content is not null
+                    && !render.TryExtendHistory(message.ReferenceId, followingLatest && !searching) && !searching)
+                {
+                    // Storage and receipts continue while the reader's visible window stays fixed.
+                    render.DeferLiveMessages();
+                    return;
+                }
+            }
             await RenderMessagesAsync();
-            if (followingLatest && timeline == _timeline)
+            if (followingLatest && timeline == _timeline && _timelineRender?.HasDeferredMessages == false)
                 ScrollToLatest(timeline);
         }
 
@@ -668,8 +733,11 @@ public sealed partial class ChatWorkspace
         _attachment?.Dispose();
         _attachment = null;
         UpdateAttachmentStatus();
-        if (_channel?.Id == channel.Id)
-            _timelineRender?.ExtendHistory(message.ReferenceId, followingLatest: string.IsNullOrWhiteSpace(_messageFilter?.Text));
+        if (_channel?.Id == channel.Id && _timelineRender is { } render)
+        {
+            render.ResumeLiveMessages();
+            render.TryExtendHistory(message.ReferenceId, followingLatest: string.IsNullOrWhiteSpace(_messageFilter?.Text));
+        }
         await RenderMessagesAsync();
         ScrollToLatest(_timeline);
     }
