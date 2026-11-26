@@ -1,0 +1,11 @@
+{
+  "name": "egroo-performance",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "history": "node browser-history.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.65.1"
+  }
+}

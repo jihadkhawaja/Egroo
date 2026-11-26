@@ -111,6 +111,13 @@
         if (limit === null)
             return cache("readonly", store => store.index(historyIndex).getAll(range));
 
+        // Browsers that ship getAllRecords also support the directional getAll overload.
+        if (typeof IDBIndex.prototype.getAllRecords === "function") {
+            const messages = await cache("readonly", store =>
+                store.index(historyIndex).getAll({ query: range, count: limit, direction: "prev" }));
+            return messages.reverse();
+        }
+
         const db = await openCache();
         return new Promise((resolve, reject) => {
             const tx = db.transaction("cache", "readonly");

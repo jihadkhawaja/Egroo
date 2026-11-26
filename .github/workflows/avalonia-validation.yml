@@ -134,6 +134,16 @@ jobs:
           $wasm = Get-ChildItem (Join-Path $root '_framework') -Recurse -File -Filter '*.wasm' |
             Where-Object Length -gt 0 | Select-Object -First 1
           if (!$wasm) { throw 'The published bundle contains no WebAssembly runtime.' }
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - name: Verify browser history migration and paging
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          runtime=$(find artifacts/browser/wwwroot/runtime -maxdepth 1 -type f -name 'clientRuntime*.js' -print -quit)
+          test -n "$runtime"
+          EGROO_PERF_RUNTIME="$runtime" node scripts/performance/browser-history.mjs
+          EGROO_PERF_RUNTIME="$runtime" node scripts/performance/browser-history.mjs --cursor
 
   android:
     name: Android release build
