@@ -35,3 +35,12 @@ The fixture uses a 1,280 × 900 Chromium viewport, seeds 150 encrypted records a
 Compare baseline and candidate browser publishes on the same idle machine with the same server output. Save each JSON report with the Git commit and published configuration. The live frame metric starts at send time and looks for a change in the rendered region. Encryption and upload preparation happen before that timer. The report includes a separate server read receipt, persisted reconnect timing, long tasks, and Chromium heap snapshots before and after navigation. The heap snapshots do not measure the complete .NET or GPU footprint.
 
 Canvas checks use fixed coordinates for the channel row, back button, and sign-out. They locate the preview action in the latest receiver bubble and verify that the decrypted fixture colors paint. Add `--inline-preview` when benchmarking a publish from before the preview flyout. Adjust those coordinates if the application layout changes. Run the scenario manually for comparison because compositor timing and release builds on a shared machine can vary.
+## Voice call teardown
+
+Use the same Release server and browser outputs with the microphone lifecycle scenario.
+
+```sh
+node scripts/performance/browser-media.mjs artifacts/perf-browser/wwwroot artifacts/perf-server
+```
+
+Two disposable browser sessions join a private conversation through the Avalonia UI. Chromium's synthetic microphone sends audio over a real loopback peer connection. The script verifies audio packets in both directions, six channel switches, sign-out, explicit leave, and rejoining. Separate checks exercise idle settings, denied and delayed capture, and interrupted or failed track replacement. The report records remaining tracks, peers, playback elements, and stats timers. The fixed canvas positions target the fixture viewport. Use the release acceptance runbook for microphone permissions, devices, and networks outside the fixture.
