@@ -109,6 +109,8 @@ public sealed partial class ChatWorkspace
         main.Children.Add(_titleBar);
         Grid.SetRow(_body, 1);
         main.Children.Add(_body);
+        Grid.SetRow(_publicProfileView, 1);
+        main.Children.Add(_publicProfileView);
         Grid.SetRow(_notice, 2);
         main.Children.Add(_notice);
         Grid.SetColumn(main, 1);
@@ -148,6 +150,7 @@ public sealed partial class ChatWorkspace
 
     private void SetWorkspaceOpen(bool open)
     {
+        ClosePublicProfile();
         _workspaceOpen = open;
         _profile.Children.Clear();
         if (open && _session.User is { } user)
@@ -172,6 +175,7 @@ public sealed partial class ChatWorkspace
 
     private void SelectSection(WorkspaceSection section)
     {
+        ClosePublicProfile();
         _sectionName.Text = section.ToString();
         foreach (var (destination, buttons) in _destinations)
         {

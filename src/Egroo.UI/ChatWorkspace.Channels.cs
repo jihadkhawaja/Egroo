@@ -270,7 +270,9 @@ public sealed partial class ChatWorkspace
         var name = sender ? "You" : message.DisplayName ?? (agent ? "Agent" : "User");
         var time = (message.DateSent ?? message.DateCreated)?.ToLocalTime();
         var body = new StackPanel { Spacing = 6 };
-        var metadata = Actions(Text(name, 13, Ink, FontWeight.SemiBold));
+        var metadata = Actions(!agent && message.SenderId != Guid.Empty
+            ? PublicProfileButton(message.SenderId, name, inMessage: true)
+            : Text(name, 13, Ink, FontWeight.SemiBold));
         metadata.ItemSpacing = 6;
         metadata.LineSpacing = 4;
         if (agent)
