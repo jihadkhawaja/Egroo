@@ -13,15 +13,19 @@ namespace Egroo.Server.SignalR.Hubs
             if (!await CanSendMessageAsync(message))
                 return false;
 
-            bool dbResult = await _messageRepository.SendMessage(message);
-            if (!dbResult)
-                return false;
-
             UserDto[]? users = await GetChannelUsers(message.ChannelId);
-            if (users == null)
+            if (users is null)
                 return false;
 
-            await DeliverMessageToUsersAsync(users, message);
+            var deliveries = GetUserDeliveries(users, message);
+            if (deliveries.Count == 0 || !await _messageRepository.SendMessage(message, deliveries))
+                return false;
+
+            foreach (var delivery in deliveries)
+            {
+                await SendClientMessage(delivery.UserId, message, delivery.Content);
+            }
+
             await NotifyAgentsAsync(message);
 
             return true;
@@ -54,18 +58,19 @@ namespace Egroo.Server.SignalR.Hubs
                 || message.RecipientContents?.Count > 0;
         }
 
-        private async Task DeliverMessageToUsersAsync(IEnumerable<UserDto> users, Message message)
+        private static List<MessageRecipientContent> GetUserDeliveries(UserDto[] users, Message message)
         {
-            foreach (UserDto user in users)
+            var deliveries = new List<MessageRecipientContent>(users.Length);
+            foreach (var user in users)
             {
                 string? deliveryContent = GetDeliveryContentForUser(message, user.Id);
-                if (string.IsNullOrWhiteSpace(deliveryContent))
+                if (!string.IsNullOrWhiteSpace(deliveryContent))
                 {
-                    continue;
+                    deliveries.Add(new MessageRecipientContent { UserId = user.Id, Content = deliveryContent });
                 }
-
-                await SendClientMessage(user, message, ignorePendingMessages: false, deliveryContent);
             }
+
+            return deliveries;
         }
 
         private async Task NotifyAgentsAsync(Message message)
@@ -79,40 +84,23 @@ namespace Egroo.Server.SignalR.Hubs
             _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
         }
 
-        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages, string deliveryContent)
+        private async Task SendClientMessage(Guid userId, Message message, string? deliveryContent)
         {
             if (string.IsNullOrWhiteSpace(deliveryContent))
-                return false;
+                return;
 
-            UserPendingMessage pendingMsg = new()
-            {
-                UserId = user.Id,
-                MessageId = message.Id,
-                Content = deliveryContent,
-            };
-
-            if (!ignorePendingMessages)
-            {
-                bool pendingSaved = await _messageRepository.AddPendingMessage(pendingMsg);
-                if (!pendingSaved)
-                    return false;
-            }
-
-            string? connectionId = _connectionTracker.GetUserConnectionIds(user.Id).LastOrDefault();
+            string? connectionId = _connectionTracker.GetUserConnectionIds(userId).LastOrDefault();
             if (string.IsNullOrEmpty(connectionId))
-                return false;
+                return;
 
             try
             {
                 await Clients.Client(connectionId).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
-                return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to send message: {ex}");
             }
-
-            return false;
         }
 
         [Authorize]
@@ -157,9 +145,7 @@ namespace Egroo.Server.SignalR.Hubs
                 var message = await _messageRepository.GetMessageById(pending.MessageId);
                 if (message == null)
                     continue;
-                message.Content = pending.Content;
-                var userDto = new UserDto { Id = userId.Value };
-                await SendClientMessage(userDto, message, ignorePendingMessages: true, pending.Content ?? string.Empty);
+                await SendClientMessage(userId.Value, message, pending.Content);
             }
         }
 

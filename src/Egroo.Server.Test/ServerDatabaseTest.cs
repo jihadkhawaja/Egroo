@@ -1,9 +1,15 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
+using Egroo.Server.Repository;
+using Egroo.Server.Security;
+using Egroo.Server.SignalR.Services;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Egroo.Server.Test;
 
@@ -52,6 +58,84 @@ public class ServerDatabaseTest
             CollectionAssert.AreEqual(new[] { "earlier", "later" }, users.Select(user => user.Username).ToArray());
             Assert.AreEqual(later.UtcTicks, users[1].DateCreated?.UtcTicks);
             Assert.AreEqual(TimeSpan.Zero, users[1].DateCreated?.Offset);
+        }
+        finally
+        {
+            File.Delete(databasePath);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SendMessage_CommitsMetadataAndAllDeliveriesTogether(bool rejectSecondDelivery)
+    {
+        string databasePath = Path.Combine(Path.GetTempPath(), $"egroo-delivery-{Guid.NewGuid():N}.db");
+        string connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            Pooling = false
+        }.ToString();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>()
+            .UseSqlite(connectionString)
+            .Options;
+
+        var message = new Message { ChannelId = Guid.NewGuid(), SenderId = Guid.NewGuid() };
+        MessageRecipientContent[] deliveries =
+        [
+            new() { UserId = message.SenderId, Content = "encrypted-for-sender" },
+            new() { UserId = Guid.NewGuid(), Content = "encrypted-for-offline-recipient" }
+        ];
+        message.RecipientContents = [.. deliveries];
+
+        try
+        {
+            await using (var writer = new SqliteDataContext(options))
+            {
+                await writer.Database.MigrateAsync();
+                if (rejectSecondDelivery)
+                {
+                    await writer.Database.ExecuteSqlRawAsync("""
+                        CREATE TRIGGER reject_second_delivery
+                        BEFORE INSERT ON userspendingmessages
+                        WHEN EXISTS (SELECT 1 FROM userspendingmessages WHERE messageid = NEW.messageid)
+                        BEGIN
+                            SELECT RAISE(ABORT, 'Simulated failure storing a recipient delivery');
+                        END;
+                        """);
+                }
+
+                var repository = new MessageRepository(
+                    writer,
+                    new HttpContextAccessor(),
+                    new ConfigurationBuilder().Build(),
+                    new InMemoryConnectionTracker(),
+                    new EncryptionService(TestServiceProvider.EncryptionKey, TestServiceProvider.EncryptionIV),
+                    NullLogger<MessageRepository>.Instance);
+                bool sent = await repository.SendMessage(message, deliveries);
+                Assert.AreEqual(!rejectSecondDelivery, sent);
+            }
+
+            await using var reopened = new SqliteDataContext(options);
+            var storedMessage = await reopened.Messages.SingleOrDefaultAsync();
+            var storedDeliveries = await reopened.UsersPendingMessages.ToArrayAsync();
+            if (rejectSecondDelivery)
+            {
+                Assert.IsNull(storedMessage);
+                Assert.HasCount(0, storedDeliveries);
+                return;
+            }
+
+            Assert.IsNotNull(storedMessage);
+            Assert.AreEqual(message.Id, storedMessage.Id);
+            Assert.AreEqual(message.ReferenceId, storedMessage.ReferenceId);
+            Assert.HasCount(deliveries.Length, storedDeliveries);
+            foreach (var delivery in deliveries)
+            {
+                var stored = storedDeliveries.Single(row => row.UserId == delivery.UserId);
+                Assert.AreEqual(message.Id, stored.MessageId);
+                Assert.AreEqual(delivery.Content, stored.Content);
+            }
         }
         finally
         {

@@ -23,7 +23,9 @@ namespace Egroo.Server.Repository
 
         public string DecryptContent(string content) => _encryptionService.Decrypt(content);
 
-        public async Task<bool> SendMessage(Message message)
+        public Task<bool> SendMessage(Message message) => SendMessage(message, []);
+
+        public async Task<bool> SendMessage(Message message, IReadOnlyCollection<MessageRecipientContent> deliveries)
         {
             bool hasTransportContent = !string.IsNullOrWhiteSpace(message?.Content)
                 || (message?.RecipientContents?.Count > 0)
@@ -33,16 +35,28 @@ namespace Egroo.Server.Repository
                 return false;
 
             message.Id = Guid.NewGuid();
-            message.DateSent = DateTime.UtcNow;
+            message.DateSent = DateTimeOffset.UtcNow;
+            var pendingMessages = deliveries.Select(delivery => new UserPendingMessage
+            {
+                UserId = delivery.UserId,
+                MessageId = message.Id,
+                Content = delivery.Content,
+            }).ToArray();
 
             try
             {
-                await _dbContext.Messages.AddAsync(message);
+                _dbContext.Messages.Add(message);
+                _dbContext.UsersPendingMessages.AddRange(pendingMessages);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
             {
+                _dbContext.Entry(message).State = EntityState.Detached;
+                foreach (var pendingMessage in pendingMessages)
+                {
+                    _dbContext.Entry(pendingMessage).State = EntityState.Detached;
+                }
                 _logger.LogError(ex, "Error sending message");
                 return false;
             }

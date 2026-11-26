@@ -170,11 +170,17 @@ public class ChatHubTest
     private sealed class StubMessageRepository : IMessageRepository
     {
         public bool SendMessageResult { get; set; } = true;
-        public bool AddPendingResult { get; set; } = true;
+        public Task<bool>? DeliveryCommit { get; set; }
+        public IReadOnlyCollection<MessageRecipientContent>? Deliveries { get; private set; }
         public (Guid UserId, Guid MessageId)? PendingReceipt { get; private set; }
 
         public Task<bool> SendMessage(Message message) => Task.FromResult(SendMessageResult);
-        public Task<bool> AddPendingMessage(UserPendingMessage pm) => Task.FromResult(AddPendingResult);
+        public Task<bool> SendMessage(Message message, IReadOnlyCollection<MessageRecipientContent> deliveries)
+        {
+            Deliveries = deliveries;
+            return DeliveryCommit ?? SendMessage(message);
+        }
+        public Task<bool> AddPendingMessage(UserPendingMessage pm) => Task.FromResult(true);
         public Task<bool> UpdateMessage(Message message) => Task.FromResult(true);
         public Task<Message?> GetMessageById(Guid messageId) => Task.FromResult<Message?>(null);
         public Task<Message?> GetMessageByReferenceId(Guid referenceId) => Task.FromResult<Message?>(null);
@@ -643,19 +649,25 @@ public class ChatHubTest
         var channelRepo = new StubChannelRepository();
         channelRepo.MembershipResults[channelId] = true;
 
+        channelRepo.ChannelUsers[channelId] = [new UserDto { Id = userId }];
+        var tracker = new InMemoryConnectionTracker();
+        tracker.TrackConnection(userId, "conn-sender");
+
         var messageRepo = new StubMessageRepository { SendMessageResult = false };
-        var hub = CreateHub(userId, channelRepo: channelRepo, messageRepo: messageRepo);
+        var hub = CreateHub(userId, tracker: tracker, channelRepo: channelRepo, messageRepo: messageRepo);
 
         var msg = new Message
         {
             Id = Guid.NewGuid(),
             ChannelId = channelId,
             SenderId = userId,
-            Content = "hello"
+            RecipientContents = [new MessageRecipientContent { UserId = userId, Content = "encrypted" }]
         };
-
         var result = await hub.SendMessage(msg);
+
+        Assert.IsNotNull(messageRepo.Deliveries);
         Assert.IsFalse(result);
+        Assert.HasCount(0, GetClients(hub).ClientCalls);
     }
 
     [TestMethod]
@@ -720,6 +732,54 @@ public class ChatHubTest
 
         var result = await hub.SendMessage(msg);
         Assert.IsTrue(result);
+    }
+
+    [TestMethod]
+    public async Task SendMessage_WaitsForAllDeliveriesToCommitBeforeBroadcast()
+    {
+        var senderId = Guid.NewGuid();
+        var offlineRecipientId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        var channelRepo = new StubChannelRepository();
+        channelRepo.MembershipResults[channelId] = true;
+        channelRepo.ChannelUsers[channelId] =
+            [new UserDto { Id = senderId }, new UserDto { Id = offlineRecipientId }];
+
+        var tracker = new InMemoryConnectionTracker();
+        tracker.TrackConnection(senderId, "conn-sender");
+        var commit = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var repository = new StubMessageRepository { DeliveryCommit = commit.Task };
+        var hub = CreateHub(senderId, tracker: tracker, channelRepo: channelRepo, messageRepo: repository);
+        var clients = GetClients(hub);
+        var message = new Message
+        {
+            ChannelId = channelId,
+            SenderId = senderId,
+            RecipientContents =
+            [
+                new() { UserId = senderId, Content = "encrypted-for-sender" },
+                new() { UserId = offlineRecipientId, Content = "encrypted-for-offline-recipient" },
+                new() { UserId = Guid.NewGuid(), Content = "excluded-non-member" }
+            ]
+        };
+
+        Task<bool> send = hub.SendMessage(message);
+
+        Assert.IsNotNull(repository.Deliveries);
+        CollectionAssert.AreEquivalent(
+            new[] { senderId, offlineRecipientId },
+            repository.Deliveries.Select(delivery => delivery.UserId).ToArray());
+        Assert.HasCount(0, clients.ClientCalls);
+        Assert.IsFalse(send.IsCompleted);
+
+        commit.SetResult(true);
+        Assert.IsTrue(await send);
+
+        var broadcast = clients.ClientCalls.Single();
+        Assert.AreEqual("conn-sender", broadcast.ConnectionIds.Single());
+        var call = broadcast.Proxy.Calls.Single();
+        Assert.AreEqual("ReceiveMessage", call.Method);
+        Assert.AreEqual("encrypted-for-sender", ((Message)call.Args.Single()!).Content);
     }
 
     [TestMethod]

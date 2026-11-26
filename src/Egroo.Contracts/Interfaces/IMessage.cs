@@ -16,6 +16,7 @@ namespace Egroo.Contracts.Interfaces
     }
     public interface IMessageRepository : IMessage
     {
+        Task<bool> SendMessage(Message message, IReadOnlyCollection<MessageRecipientContent> deliveries);
         Task UpdatePendingMessage(Guid userId, Guid messageId);
         Task<Message?> GetMessageByReferenceId(Guid referenceId);
         Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId);
