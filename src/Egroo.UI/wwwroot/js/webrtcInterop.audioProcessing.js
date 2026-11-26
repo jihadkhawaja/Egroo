@@ -24,10 +24,9 @@ Object.assign(window.webrtcInterop, {
 
     toggleMute: function () {
         if (!this.localStream) return this.isMuted;
-        this.localStream.getAudioTracks().forEach(track => {
-            track.enabled = !track.enabled;
-        });
         this.isMuted = !this.isMuted;
+        for (const stream of [this.localStream, ...this.pendingAudioStreams])
+            stream.getAudioTracks().forEach(track => { track.enabled = !this.isMuted; });
         console.log("[WebRTC] Muted:", this.isMuted);
         return this.isMuted;
     },
@@ -175,27 +174,37 @@ Object.assign(window.webrtcInterop, {
             if (!newTrack)
                 throw new Error("No audio track was returned when recreating the microphone stream.");
 
-            const replacements = [];
-            for (const { pc } of this.peers.values()) {
-                for (const sender of pc.getSenders()) {
-                    if (sender.track?.kind === "audio")
-                        replacements.push({ sender, previousTrack: sender.track });
-                }
-            }
+            const replaced = new Map();
             newTrack.enabled = !this.isMuted;
-            const outcomes = await Promise.allSettled(
-                replacements.map(async ({ sender }) => sender.replaceTrack(newTrack)));
+            while (true) {
+                const replacements = [];
+                for (const peer of this.peers.values()) {
+                    for (const sender of peer.pc.getSenders()) {
+                        if (sender.track?.kind === "audio" && !replaced.has(sender)) {
+                            replaced.set(sender, sender.track);
+                            replacements.push({ peer, sender });
+                        }
+                    }
+                }
+                if (replacements.length === 0)
+                    break;
 
-            if (generation !== this.callGeneration)
-                return null;
+                const outcomes = await Promise.allSettled(
+                    replacements.map(async ({ sender }) => sender.replaceTrack(newTrack)));
+                if (generation !== this.callGeneration)
+                    return null;
 
-            const failed = outcomes.find(outcome => outcome.status === "rejected");
-            if (failed) {
-                await Promise.allSettled(replacements.map(async ({ sender, previousTrack }) => {
-                    if (sender.track === newTrack)
-                        await sender.replaceTrack(previousTrack);
-                }));
-                throw failed.reason;
+                const currentPeers = new Set(this.peers.values());
+                const failed = outcomes.find((outcome, index) =>
+                    outcome.status === "rejected" && currentPeers.has(replacements[index].peer));
+                if (failed) {
+                    await Promise.allSettled(Array.from(replaced, async ([sender, previousTrack]) => {
+                        if (sender.track === newTrack)
+                            await sender.replaceTrack(previousTrack);
+                    }));
+                    throw failed.reason;
+                }
+                // Check senders attached by negotiation while the previous updates were pending.
             }
 
             newTrack.enabled = !this.isMuted;

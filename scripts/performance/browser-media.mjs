@@ -93,7 +93,7 @@ try {
         afterSignOut: await mediaSnapshot(alicePage),
         afterLeaveAndRejoin: await mediaSnapshot(bobPage),
         regressions: ['idle preferences', 'denial and retry', 'late permission after leave',
-            'leave during track replacement', 'failed track replacement rollback']
+            'leave during track replacement', 'failed track replacement rollback', 'mute and new peers during replacement']
     }, null, 2));
 
     async function waitForParticipants(channelId, users) {
@@ -301,7 +301,7 @@ async function mediaSnapshot(page) {
 }
 
 async function verifyCaptureTransitions(page) {
-    const result = await page.evaluate(async () => {
+    const verification = page.evaluate(async () => {
         const voice = globalThis.webrtcInterop;
         const probe = globalThis.egrooMediaProbe;
         const require = (condition, label) => { if (!condition) throw new Error(label); };
@@ -374,7 +374,40 @@ async function verifyCaptureTransitions(page) {
             voice.localStream.getAudioTracks()[0] === current && accepting.track === current &&
             probe.tracks.at(-1).readyState === 'ended', 'A rejected sender replacement leaked or lost the old audio track.');
         voice.leaveCall();
+
+        require(await voice.joinCall('late-sender', 'fixture'), 'Expected a new call after a failed replacement.');
+        const originalTrack = voice.localStream.getAudioTracks()[0];
+        const attached = Promise.withResolvers();
+        const continueReplace = Promise.withResolvers();
+        const firstSender = {
+            track: originalTrack,
+            async replaceTrack(track) {
+                this.track = track;
+                attached.resolve();
+                await continueReplace.promise;
+            }
+        };
+        const secondSender = { track: originalTrack, async replaceTrack(track) { this.track = track; } };
+        voice.peers.set('first-sender', { pc: { getSenders: () => [firstSender], close() {} } });
+        const replacing = voice.setAudioProcessingSetting('echoCancellation', false);
+        await attached.promise;
+        voice.peers.set('late-sender', { pc: { getSenders: () => [secondSender], close() {} } });
+        require(voice.toggleMute() && !originalTrack.enabled && !firstSender.track.enabled,
+            'Muting during replacement left a live track enabled.');
+        continueReplace.resolve();
+        await replacing;
+        require(secondSender.track === voice.localStream.getAudioTracks()[0] &&
+            secondSender.track.readyState === 'live' && !secondSender.track.enabled &&
+            originalTrack.readyState === 'ended', 'A peer negotiated during replacement retained the stopped track.');
+        voice.leaveCall();
         return probe.tracks.every(track => track.readyState === 'ended');
     });
-    assert.equal(result, true);
+    const timer = new AbortController();
+    try {
+        const deadline = delay(15_000, undefined, { signal: timer.signal }).then(() =>
+            assert.fail('The direct microphone lifecycle checks did not finish.'));
+        assert.equal(await Promise.race([verification, deadline]), true);
+    } finally {
+        timer.abort();
+    }
 }
