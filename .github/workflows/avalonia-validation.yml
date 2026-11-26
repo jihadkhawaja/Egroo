@@ -150,12 +150,23 @@ jobs:
       - name: Build and verify APK
         run: |
           dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-test-apk
+          path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
+          if-no-files-found: error
       - name: Launch Egroo on an offline Android emulator
         shell: bash
         timeout-minutes: 15
         run: |
           sudo chown "$(id -u):$(id -g)" /dev/kvm
           image='system-images;android-35;default;x86_64'
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [[ -z "$sdkmanager_path" ]]; then
+            echo "The Android SDK command-line tools were unavailable at $ANDROID_HOME."
+            exit 1
+          fi
+          export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$PATH"
           sdkmanager --install emulator "$image"
           printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image"
           "$ANDROID_HOME/emulator/emulator" -avd egroo-ci -port 5554 -no-window -no-snapshot \
@@ -192,11 +203,6 @@ jobs:
             adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
             exit 1
           fi
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: android-test-apk
-          path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
-          if-no-files-found: error
 
   ios:
     name: iOS simulator release build
@@ -227,7 +233,13 @@ jobs:
           test -n "$app"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
           tar -czf "$GITHUB_WORKSPACE/artifacts/egroo-ios-simulator.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-arm64-simulator-app
+          path: artifacts/egroo-ios-simulator.tar.gz
+          if-no-files-found: error
       - name: Launch Egroo on the iOS simulator
+        timeout-minutes: 10
         shell: bash
         env:
           SIMCTL_CHILD_EGROO_API_URL: https://egroo-simulator.invalid/
@@ -235,16 +247,10 @@ jobs:
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
           runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-5"))) | .identifier')"
-          device="$(xcrun simctl list devicetypes --json | jq -er '.devicetypes[] | select(.name == "iPhone 17") | .identifier')"
-          simulator="$(xcrun simctl create Egroo-CI "$device" "$runtime")"
-          cleanup() {
-            xcrun simctl shutdown "$simulator" || true
-            xcrun simctl delete "$simulator" || true
-          }
-          trap cleanup EXIT
+          simulator="$(xcrun simctl list devices available --json | jq -er --arg runtime "$runtime" '.devices[$runtime][] | select(.name == "iPhone 17") | .udid')"
+          trap 'xcrun simctl shutdown "$simulator" || true' EXIT
 
-          echo "Booting the iPhone 17 simulator with iOS 26.5."
-          xcrun simctl boot "$simulator"
+          echo "Booting the hosted iPhone 17 simulator with iOS 26.5."
           xcrun simctl bootstatus "$simulator" -b
           echo "Installing Egroo."
           xcrun simctl install "$simulator" "$app"
@@ -256,8 +262,3 @@ jobs:
             xcrun simctl spawn "$simulator" log show --last 1m --predicate "processIdentifier == $pid" --style compact | tail -n 100 || true
             exit 1
           fi
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: ios-arm64-simulator-app
-          path: artifacts/egroo-ios-simulator.tar.gz
-          if-no-files-found: error
