@@ -15,6 +15,7 @@ internal sealed class WorkspaceSession
     private readonly SessionStorage _state = new();
     private readonly AuthService _auth;
     private HubConnection? _hub;
+    private long _connectionGeneration;
     private bool _importLegacyHistory;
 
     public WorkspaceSession(Uri api, ClientRuntime runtime, Action<string> notify)
@@ -42,6 +43,7 @@ internal sealed class WorkspaceSession
     public ChatMessageService Messages { get; private set; } = new();
     public UserDto? User => _state.User;
     public bool Connected => _hub?.State == HubConnectionState.Connected;
+    public long ConnectionGeneration => Interlocked.Read(ref _connectionGeneration);
     public event Action<Message>? Received;
     public event Action<Message>? Updated;
     public event Action<ChannelTypingState, bool>? Typing;
@@ -87,14 +89,15 @@ internal sealed class WorkspaceSession
         ChatSignalR.Initialize(new Uri(Api, "chathub").AbsoluteUri, token);
         var hub = ChatSignalR.HubConnection!;
         _hub = hub;
+        Interlocked.Increment(ref _connectionGeneration);
         Messages = new ChatMessageService();
         Messages.OnMessageReceived += message => { Received?.Invoke(message); return Task.CompletedTask; };
         Messages.OnMessageUpdated += message => { Updated?.Invoke(message); return Task.CompletedTask; };
         Messages.OnTypingStarted += state => { Typing?.Invoke(state, true); return Task.CompletedTask; };
         Messages.OnTypingStopped += state => { Typing?.Invoke(state, false); return Task.CompletedTask; };
-        hub.Reconnecting += _ => { ConnectionChanged?.Invoke(); return Task.CompletedTask; };
-        hub.Reconnected += _ => { ConnectionChanged?.Invoke(); return Task.CompletedTask; };
-        hub.Closed += _ => { ConnectionChanged?.Invoke(); return Task.CompletedTask; };
+        hub.Reconnecting += _ => OnConnectionChanged(hub);
+        hub.Reconnected += _ => OnConnectionChanged(hub);
+        hub.Closed += _ => OnConnectionChanged(hub);
         try
         {
             Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -114,6 +117,17 @@ internal sealed class WorkspaceSession
             _state.User = null;
             throw;
         }
+    }
+
+    private Task OnConnectionChanged(HubConnection hub)
+    {
+        if (ReferenceEquals(_hub, hub))
+        {
+            Interlocked.Increment(ref _connectionGeneration);
+            ConnectionChanged?.Invoke();
+        }
+
+        return Task.CompletedTask;
     }
 
     public Task<Operation.Result> ChangePasswordAsync(string oldPassword, string newPassword) =>
