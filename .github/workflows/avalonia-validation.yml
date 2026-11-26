@@ -379,3 +379,43 @@ jobs:
           path: ${{ runner.temp }}/egroo-ios-smoke/ios-sign-in.png
           if-no-files-found: ignore
           retention-days: 5
+
+  ios-device:
+    name: iOS device release build
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: src/Egroo.Avalonia/iOS
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.401
+      - name: Install iOS workload for Xcode 26.6
+        run: |
+          xcodebuild -version
+          printf '%s\n' '{"sdk":{"version":"10.0.401","rollForward":"disable","workloadVersion":"10.0.401"}}' > global.json
+          dotnet workload install ios
+      - name: Compile and link the unsigned device app
+        shell: bash
+        run: |
+          dotnet build -c Release -r ios-arm64 \
+            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=false
+
+          app="$(find bin/Release -path '*/ios-arm64/*.app' -type d -print -quit)"
+          test -n "$app"
+          plist="$app/Info.plist"
+          executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$plist")"
+          test -n "$executable"
+          xcrun lipo -verify_arch arm64 "$app/$executable"
+          build="$(xcrun vtool -show-build "$app/$executable")"
+          printf '%s\n' "$build"
+          grep -E '^[[:space:]]*platform[[:space:]]+IOS[[:space:]]*$' <<<"$build" >/dev/null
+
+          printf 'iOS device Release app built and linked for arm64. The unsigned build is for compile verification.\n' \
+            >> "$GITHUB_STEP_SUMMARY"

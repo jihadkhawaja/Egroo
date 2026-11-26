@@ -14,6 +14,8 @@ Use Android SDK Platform 36, a compatible JDK, and the .NET 10 Android workload.
 
 Use macOS, compatible Xcode and the .NET 10 iOS workload, and an Apple certificate and provisioning profile for an `ios-arm64` build. The profile needs the app ID and the registered test device. The `ios-arm64-simulator-app` Actions artifact uses ad hoc simulator signing and the interpreter. It can support simulator checks. Use the separately provisioned device build to exercise the device Release path. [Apple device setup](https://developer.apple.com/documentation/Xcode/running-your-app-on-simulated-or-physical-devices)
 
+The hosted **iOS device release build** compiles and links an unsigned `ios-arm64` app with the Release AOT compiler, then checks the executable architecture and Mach-O iOS platform. The physical checks use a separate signed and provisioned build.
+
 Example commands run from the candidate checkout. Set `EGROO_TEST_API_URL` to the disposable HTTPS API. On macOS, set `IOS_SIGNING_IDENTITY` and `IOS_PROVISIONING_PROFILE` to the installed test signing identity and profile. Find the intended test phone with ADB or Xcode. Set the device and package variables to the matching device and build output before each install.
 
 ```sh
