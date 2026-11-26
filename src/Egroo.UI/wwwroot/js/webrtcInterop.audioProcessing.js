@@ -4,12 +4,17 @@
  * auto gain control, track recreation, and preference persistence.
  */
 Object.assign(window.webrtcInterop, {
-    acquireLocalStream: async function () {
-        if (this.localStream) return true;
+    acquireLocalStream: async function (generation) {
         try {
             this._loadPersistedAudioProcessingPreferences();
-            this.localStream = await navigator.mediaDevices.getUserMedia(this._buildUserMediaConstraints());
-            console.log("[WebRTC] Local audio stream acquired:", this.localStream.getAudioTracks().length, "audio tracks");
+            const stream = await navigator.mediaDevices.getUserMedia(this._buildUserMediaConstraints());
+            if (generation !== this.callGeneration || !stream.getAudioTracks().some(track => track.readyState === "live")) {
+                stream.getTracks().forEach(track => track.stop());
+                return false;
+            }
+
+            this.localStream = stream;
+            console.log("[WebRTC] Local audio stream acquired:", stream.getAudioTracks().length, "audio tracks");
             return true;
         } catch (err) {
             console.error("[WebRTC] Error acquiring microphone:", err);
@@ -55,23 +60,36 @@ Object.assign(window.webrtcInterop, {
         this._loadPersistedAudioProcessingPreferences();
         this._refreshAudioProcessingSupport();
 
+        if (this.audioSettingsUpdate)
+            return this._createAudioProcessingState(false);
+
         const previousEnabled = this[enabledProperty];
         this[enabledProperty] = !!enabled;
         this._persistAudioProcessingPreferences();
 
-        if (!this[supportedProperty]) {
+        if (!this[supportedProperty])
             return this._createAudioProcessingState(false);
-        }
 
+        // Store preferences without opening the microphone. The next join uses these constraints.
+        if (!this.localStream)
+            return this._createAudioProcessingState(true);
+
+        const generation = this.callGeneration;
+        const update = this.audioSettingsUpdate = {};
         try {
-            const track = await this._recreateLocalAudioTrack();
+            const track = await this._recreateLocalAudioTrack(generation);
             const wasApplied = this._verifyAudioProcessingSetting(track, settingName, this[enabledProperty]);
             return this._createAudioProcessingState(wasApplied);
         } catch (err) {
-            this[enabledProperty] = previousEnabled;
-            this._persistAudioProcessingPreferences();
+            if (generation === this.callGeneration) {
+                this[enabledProperty] = previousEnabled;
+                this._persistAudioProcessingPreferences();
+            }
             console.error("[WebRTC] Error applying audio processing setting:", settingName, err);
             return this._createAudioProcessingState(false);
+        } finally {
+            if (this.audioSettingsUpdate === update)
+                this.audioSettingsUpdate = null;
         }
     },
 
@@ -144,50 +162,51 @@ Object.assign(window.webrtcInterop, {
         }
     },
 
-    _recreateLocalAudioTrack: async function () {
+    _recreateLocalAudioTrack: async function (generation) {
         const previousStream = this.localStream;
-        const previousTrack = this._getPrimaryAudioTrack();
         const newStream = await navigator.mediaDevices.getUserMedia(this._buildUserMediaConstraints());
-        const newTrack = newStream.getAudioTracks()[0];
+        this.pendingAudioStreams.add(newStream);
 
-        if (!newTrack) {
-            newStream.getTracks().forEach(track => track.stop());
-            throw new Error("No audio track was returned when recreating the microphone stream.");
-        }
+        try {
+            if (generation !== this.callGeneration)
+                return null;
 
-        newTrack.enabled = !this.isMuted;
+            const newTrack = newStream.getAudioTracks()[0];
+            if (!newTrack)
+                throw new Error("No audio track was returned when recreating the microphone stream.");
 
-        const replaceOperations = [];
-        for (const [, peerData] of this.peers) {
-            const audioSenders = peerData.pc.getSenders().filter(sender => sender.track && sender.track.kind === "audio");
-
-            if (audioSenders.length === 0) {
-                peerData.pc.addTrack(newTrack, newStream);
-                continue;
-            }
-
-            for (const sender of audioSenders) {
-                replaceOperations.push(sender.replaceTrack(newTrack));
-            }
-        }
-
-        await Promise.all(replaceOperations);
-
-        this.localStream = newStream;
-
-        if (previousStream) {
-            previousStream.getTracks().forEach(track => {
-                if (track !== newTrack) {
-                    track.stop();
+            const replacements = [];
+            for (const { pc } of this.peers.values()) {
+                for (const sender of pc.getSenders()) {
+                    if (sender.track?.kind === "audio")
+                        replacements.push({ sender, previousTrack: sender.track });
                 }
-            });
-        }
+            }
+            newTrack.enabled = !this.isMuted;
+            const outcomes = await Promise.allSettled(
+                replacements.map(async ({ sender }) => sender.replaceTrack(newTrack)));
 
-        if (previousTrack && previousTrack !== newTrack) {
-            previousTrack.stop();
-        }
+            if (generation !== this.callGeneration)
+                return null;
 
-        return newTrack;
+            const failed = outcomes.find(outcome => outcome.status === "rejected");
+            if (failed) {
+                await Promise.allSettled(replacements.map(async ({ sender, previousTrack }) => {
+                    if (sender.track === newTrack)
+                        await sender.replaceTrack(previousTrack);
+                }));
+                throw failed.reason;
+            }
+
+            newTrack.enabled = !this.isMuted;
+            this.localStream = newStream;
+            previousStream.getTracks().forEach(track => track.stop());
+            return newTrack;
+        } finally {
+            this.pendingAudioStreams.delete(newStream);
+            if (this.localStream !== newStream)
+                newStream.getTracks().forEach(track => track.stop());
+        }
     },
 
     _verifyAudioProcessingSetting: function (track, settingName, expectedValue) {

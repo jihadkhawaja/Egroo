@@ -16,7 +16,8 @@ Object.assign(window.webrtcInterop, {
             iceRestartAttempts: 0,
             disconnectTimer: null,
             selectedCandidatePairLogged: false,
-            signalQueue: Promise.resolve()
+            signalQueue: Promise.resolve(),
+            audioPlaybackRetry: null
         };
 
         pc.onicecandidate = (event) => {
@@ -45,6 +46,9 @@ Object.assign(window.webrtcInterop, {
         };
 
         pc.ontrack = (event) => {
+            if (this.peers.get(peerId) !== peerData)
+                return;
+            peerData.audioPlaybackRetry?.abort();
             console.log("[WebRTC] Remote track received from peer", peerId);
             const container = this._ensureRemoteAudioContainer();
 
@@ -66,15 +70,20 @@ Object.assign(window.webrtcInterop, {
             audioEl.play().then(() => {
                 console.log("[WebRTC] Audio playing for peer", peerId);
             }).catch(err => {
+                if (this.peers.get(peerId) !== peerData || audioEl.srcObject !== stream)
+                    return;
+
                 console.warn("[WebRTC] Autoplay blocked for peer", peerId, err);
-                // Retry audio playback on next user interaction
+                const retry = new AbortController();
+                peerData.audioPlaybackRetry?.abort();
+                peerData.audioPlaybackRetry = retry;
                 const resumeAudio = () => {
-                    audioEl.play().then(() => {
-                        console.log("[WebRTC] Audio resumed for peer", peerId, "after user interaction");
-                    }).catch(() => {});
+                    retry.abort();
+                    peerData.audioPlaybackRetry = null;
+                    audioEl.play().catch(() => {});
                 };
-                document.addEventListener("click", resumeAudio, { once: true });
-                document.addEventListener("keydown", resumeAudio, { once: true });
+                document.addEventListener("click", resumeAudio, { signal: retry.signal });
+                document.addEventListener("keydown", resumeAudio, { signal: retry.signal });
             });
         };
 
@@ -117,7 +126,7 @@ Object.assign(window.webrtcInterop, {
 
     _withPeerSignalingQueue: function (peerData, fn) {
         const next = peerData.signalQueue
-            .then(fn)
+            .then(() => peerData.pc.signalingState === "closed" ? null : fn())
             .catch(err => {
                 console.error("[WebRTC] Signaling queue error:", err);
                 return null;
@@ -130,16 +139,22 @@ Object.assign(window.webrtcInterop, {
         const peerData = this.peers.get(peerId);
         if (!peerData) return;
 
+        this.peers.delete(peerId);
+        this._clearDisconnectTimer(peerData);
+        peerData.audioPlaybackRetry?.abort();
+
         peerData.pc.onicecandidate = null;
+        peerData.pc.onicecandidateerror = null;
+        peerData.pc.onconnectionstatechange = null;
         peerData.pc.ontrack = null;
         peerData.pc.oniceconnectionstatechange = null;
         peerData.pc.onsignalingstatechange = null;
         peerData.pc.close();
-        this.peers.delete(peerId);
 
         // Remove the audio element for this peer
         const audioEl = document.getElementById("remoteAudio-" + peerId);
         if (audioEl) {
+            audioEl.pause();
             audioEl.srcObject = null;
             audioEl.remove();
         }
