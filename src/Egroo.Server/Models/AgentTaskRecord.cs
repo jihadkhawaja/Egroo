@@ -5,7 +5,7 @@ namespace Egroo.Server.Models;
 
 internal sealed class AgentTaskRecord
 {
-    internal const int MaxPromptLength = 8192;
+    internal const int MaxPromptLength = CreateAgentTaskRequest.MaxPromptLength;
     internal const int MaxResultLength = 65536;
 
     public Guid Id { get; set; }

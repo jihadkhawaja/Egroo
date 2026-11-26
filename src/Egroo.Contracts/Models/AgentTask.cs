@@ -20,7 +20,10 @@ public enum AgentTaskFailure
     Interrupted = 2
 }
 
-public sealed record CreateAgentTaskRequest(Guid AgentId, Guid RequestId, string? Prompt);
+public sealed record CreateAgentTaskRequest(Guid AgentId, Guid RequestId, string? Prompt)
+{
+    public const int MaxPromptLength = 8192;
+}
 
 public sealed record AgentTaskInfo(
     Guid Id,

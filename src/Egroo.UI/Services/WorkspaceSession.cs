@@ -29,6 +29,7 @@ internal sealed class WorkspaceSession
         _auth = new AuthService(Http);
         Encryption = new EndToEndEncryptionService(runtime, _storage, Users);
         Agents = new AgentService(Http);
+        AgentTasks = new AgentTaskService(Http);
         Files = new ChannelFileService(Http);
         Voice = new VoiceCallSessionService(_state, new ChatCallService(), Users, Http, runtime, notify);
     }
@@ -39,6 +40,7 @@ internal sealed class WorkspaceSession
     public ChatUserService Users { get; } = new();
     public ChatChannelService Channels { get; } = new();
     public AgentService Agents { get; }
+    public AgentTaskService AgentTasks { get; }
     public ChannelFileService Files { get; }
     public EndToEndEncryptionService Encryption { get; }
     public VoiceCallSessionService Voice { get; private set; }
