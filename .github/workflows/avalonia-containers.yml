@@ -9,6 +9,8 @@ on:
       - 'global.json'
       - 'Directory.Build.props'
       - 'scripts/smoke-avalonia-containers.sh'
+      - 'scripts/performance/browser-ready.mjs'
+      - 'scripts/performance/package*.json'
       - 'src/Egroo.Avalonia/**'
       - 'src/Egroo.Client/**'
       - 'src/Egroo.Contracts/**'
@@ -34,8 +36,13 @@ jobs:
         run: |
           docker build --pull -f src/Egroo.Server/Dockerfile -t egroo-api:verified .
           docker build --pull -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-browser:verified .
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
       - name: Smoke-test both containers
-        run: bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
 
   publish:
     name: Publish verified images to GHCR
@@ -57,8 +64,13 @@ jobs:
           )
           docker build --pull "${labels[@]}" -f src/Egroo.Server/Dockerfile -t egroo-api:verified .
           docker build --pull "${labels[@]}" -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-browser:verified .
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
       - name: Smoke-test release images
-        run: bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
       - name: Push both images with the same release tag
         env:
           GHCR_TOKEN: ${{ github.token }}
