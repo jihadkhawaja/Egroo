@@ -85,14 +85,18 @@
             const request = store.get(id);
             request.onsuccess = () => {
                 const current = request.result;
-                if (current) {
+                if (current?.content != null) {
                     current.id = message.id;
                     current.content = message.content ?? current.content;
-                    current.dateSeen = message.dateSeen ?? current.dateSeen;
+                    current.dateSeen ??= message.dateSeen;
                     current.dateSent = message.dateSent ?? current.dateSent;
                     putHistory(store, scope, current, id);
-                } else if (!updateOnly && message.content !== null) {
+                } else if (!updateOnly && message.content != null) {
+                    message.dateSeen = current?.dateSeen ?? message.dateSeen;
                     putHistory(store, scope, message, id);
+                } else if (updateOnly && message.dateSeen != null && current?.dateSeen == null) {
+                    // A receipt can arrive before the message. Keep it outside the history index.
+                    store.put({ dateSeen: message.dateSeen }, id);
                 }
             };
             tx.oncomplete = () => resolve();
@@ -151,8 +155,12 @@
                             const key = scope + "/" + reference;
                             const existing = store.get(key);
                             existing.onsuccess = () => {
-                                if (!existing.result && reference && record.content)
-                                    putHistory(store, scope, { ...record, referenceId: reference }, key);
+                                if (existing.result?.content == null && reference && record.content) {
+                                    putHistory(store, scope, {
+                                        ...record, referenceId: reference,
+                                        dateSeen: existing.result?.dateSeen ?? record.dateSeen
+                                    }, key);
+                                }
                             };
                         }
                         tx.oncomplete = resolve;
