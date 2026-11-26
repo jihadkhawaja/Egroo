@@ -5,11 +5,14 @@ namespace Egroo.Server.Security;
 
 internal static class LocalDebugSecrets
 {
-    internal static void Apply(IConfiguration configuration, string directory)
+    internal static void Apply(IConfiguration configuration, string directory, bool createIfMissing = true)
     {
         string path = Path.Combine(directory, "local-debug-secrets.json");
         if (!File.Exists(path))
         {
+            if (!createIfMissing)
+                return;
+
             Directory.CreateDirectory(directory);
             CreateFile(path);
         }

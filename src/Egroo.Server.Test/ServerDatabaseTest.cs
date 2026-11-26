@@ -144,6 +144,37 @@ public class ServerDatabaseTest
     }
 
     [TestMethod]
+    public async Task ReadOnlyDatabaseRegistrationDoesNotCreateMissingSqliteFile()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), $"egroo-{Guid.NewGuid():N}");
+        string databasePath = Path.Combine(directory, "egroo.db");
+        var builder = WebApplication.CreateBuilder([]);
+        builder.Configuration["Database:Provider"] = "SQLite";
+        builder.Configuration["ConnectionStrings:Sqlite"] = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath
+        }.ToString();
+
+        try
+        {
+            ServerDatabase.Register(builder, readOnly: true);
+            await using var app = builder.Build();
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+
+            Assert.IsFalse(await db.Database.CanConnectAsync());
+            Assert.IsFalse(Directory.Exists(directory));
+        }
+        finally
+        {
+            if (File.Exists(databasePath))
+                File.Delete(databasePath);
+            if (Directory.Exists(directory))
+                Directory.Delete(directory);
+        }
+    }
+
+    [TestMethod]
     public async Task ExistingPostgreSqlConnectionSelectsPostgreSql()
     {
         var builder = WebApplication.CreateBuilder([]);
