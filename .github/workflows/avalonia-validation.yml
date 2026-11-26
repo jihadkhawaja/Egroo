@@ -168,7 +168,14 @@ jobs:
           fi
           export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$PATH"
           sdkmanager --install emulator "$image"
-          printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/egroo-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image" --path "$ANDROID_AVD_HOME/egroo-ci.avd"
+          if ! "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx egroo-ci; then
+            find "$ANDROID_USER_HOME" -maxdepth 3 -type f -print
+            exit 1
+          fi
           "$ANDROID_HOME/emulator/emulator" -avd egroo-ci -port 5554 -no-window -no-snapshot \
             -no-audio -no-boot-anim -gpu swiftshader > "$RUNNER_TEMP/egroo-emulator.log" 2>&1 &
           adb_device=emulator-5554
