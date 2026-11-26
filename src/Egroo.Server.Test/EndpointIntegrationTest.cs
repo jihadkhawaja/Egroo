@@ -1,5 +1,6 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
+using Egroo.Server.Repository;
 using Egroo.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
@@ -262,6 +263,21 @@ public class EndpointIntegrationTest
             Assert.AreEqual(HttpStatusCode.OK, retriedSubmission.StatusCode);
             Assert.AreEqual(AgentTaskStatus.Cancelled,
                 (await retriedSubmission.Content.ReadFromJsonAsync<AgentTaskInfo>())?.Status);
+
+            for (int i = 0; i < AgentTaskRepository.MaxActiveTasks; i++)
+            {
+                using var active = await owner.PostAsJsonAsync(route, request with { RequestId = Guid.NewGuid() });
+                Assert.AreEqual(HttpStatusCode.Created, active.StatusCode);
+            }
+
+            using var overCapacity = await owner.PostAsJsonAsync(route, request with { RequestId = Guid.NewGuid() });
+            Assert.AreEqual(HttpStatusCode.TooManyRequests, overCapacity.StatusCode);
+            var body = await overCapacity.Content.ReadFromJsonAsync<JsonObject>();
+            StringAssert.Contains(body?["message"]?.GetValue<string>(), "queued or running agent tasks");
+
+            using var replayAtCapacity = await owner.PostAsJsonAsync(route, request);
+            Assert.AreEqual(HttpStatusCode.OK, replayAtCapacity.StatusCode);
+            Assert.AreEqual(task.Id, (await replayAtCapacity.Content.ReadFromJsonAsync<AgentTaskInfo>())?.Id);
 
             using var snapshotScope = factory.Services.CreateScope();
             var snapshot = snapshotScope.ServiceProvider.GetRequiredService<DataContext>();

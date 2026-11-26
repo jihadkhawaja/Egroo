@@ -38,6 +38,12 @@ internal static class AgentTaskEndpoint
                 AgentTaskSubmission.Created => Results.Created($"{Route}/{result.Task!.Id:D}", result.Task),
                 AgentTaskSubmission.Existing => Results.Ok(result.Task),
                 AgentTaskSubmission.Conflict => Results.Conflict(new { message = "This request ID already belongs to a different task." }),
+                AgentTaskSubmission.AtCapacity => Results.Json(new
+                {
+                    message = $"You can have up to {AgentTaskRepository.MaxActiveTasks} queued or running agent tasks. Cancel a task or wait for one to finish."
+                }, statusCode: StatusCodes.Status429TooManyRequests),
+                AgentTaskSubmission.AdmissionBusy => Results.Json(new { message = "The agent task queue is busy. Try again shortly." },
+                    statusCode: StatusCodes.Status429TooManyRequests),
                 _ => Results.NotFound()
             };
         });

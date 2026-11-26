@@ -17,6 +17,8 @@ All requests use the normal Egroo bearer token.
 
 Send `agentId`, a client-generated UUID called `requestId`, and a `prompt` to create a task. Prompts accept up to 8,192 characters after trimming surrounding whitespace. The first submission returns HTTP 201 and the task location. Reusing the same request ID with the same agent and trimmed prompt returns HTTP 200 and the original task. The server returns HTTP 409 if an owner reuses a request ID for different work. A task or agent outside the caller's permissions returns HTTP 404.
 
+Each owner can have up to five queued or running tasks across their agents. A new submission at that limit returns HTTP 429. Wait for a task to finish or cancel one to make room. Retries with the original request ID can still retrieve their existing task.
+
 ## Lifecycle and restart
 
 The task status is `Queued`, `Running`, `Completed`, `Failed`, or `Cancelled`. One worker claims a task and records a five-minute execution deadline. The worker marks queued work for an inactive or removed agent as `Failed` with the code `AgentUnavailable`. Model failures use `ExecutionFailed`. Cancelling a running task requests provider cancellation and preserves the cancelled state if a result arrives later.

@@ -1,7 +1,10 @@
+using System.Data;
 using Egroo.Contracts.Models;
 using Egroo.Server.Database;
 using Egroo.Server.Models;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Egroo.Server.Repository;
 
@@ -10,11 +13,16 @@ internal enum AgentTaskSubmission
     Created,
     Existing,
     Conflict,
-    AgentUnavailable
+    AgentUnavailable,
+    AtCapacity,
+    AdmissionBusy
 }
 
 internal sealed class AgentTaskRepository(DataContext database, TimeProvider clock)
 {
+    internal const int MaxActiveTasks = 5;
+    private const int MaxAdmissionAttempts = 6;
+
     private IQueryable<AgentDefinition> ActiveAgents => database.AgentDefinitions
         .Where(agent => agent.IsActive && agent.DateDeleted == null);
 
@@ -25,8 +33,43 @@ internal sealed class AgentTaskRepository(DataContext database, TimeProvider clo
         if (existing is not null)
             return ResolveDuplicate(existing, agentId, prompt);
 
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await AdmitAsync(ownerId, agentId, requestId, prompt, cancellationToken);
+            }
+            catch (Exception error) when (CanRetryAdmission(error))
+            {
+                if (attempt == MaxAdmissionAttempts)
+                {
+                    existing = await FindByRequestAsync(ownerId, requestId, cancellationToken);
+                    return existing is null
+                        ? (AgentTaskSubmission.AdmissionBusy, null)
+                        : ResolveDuplicate(existing, agentId, prompt);
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(10 * attempt + Random.Shared.Next(10)), cancellationToken);
+            }
+        }
+    }
+
+    private async Task<(AgentTaskSubmission Status, AgentTaskInfo? Task)> AdmitAsync(
+        Guid ownerId, Guid agentId, Guid requestId, string prompt, CancellationToken cancellationToken)
+    {
+        await using var transaction = await database.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var existing = await FindByRequestAsync(ownerId, requestId, cancellationToken);
+        if (existing is not null)
+            return ResolveDuplicate(existing, agentId, prompt);
+
         if (!await ActiveAgents.AnyAsync(agent => agent.Id == agentId && agent.UserId == ownerId, cancellationToken))
             return (AgentTaskSubmission.AgentUnavailable, null);
+
+        int activeCount = await database.AgentTasks.Where(task => task.OwnerId == ownerId
+                && (task.Status == AgentTaskStatus.Queued || task.Status == AgentTaskStatus.Running))
+            .Take(MaxActiveTasks).CountAsync(cancellationToken);
+        if (activeCount == MaxActiveTasks)
+            return (AgentTaskSubmission.AtCapacity, null);
 
         var task = new AgentTaskRecord
         {
@@ -43,18 +86,24 @@ internal sealed class AgentTaskRepository(DataContext database, TimeProvider clo
         try
         {
             await database.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return (AgentTaskSubmission.Created, task.ToInfo());
         }
-        catch (DbUpdateException)
+        catch
         {
             database.Entry(task).State = EntityState.Detached;
-            existing = await FindByRequestAsync(ownerId, requestId, cancellationToken);
-            if (existing is null)
-                throw;
-
-            return ResolveDuplicate(existing, agentId, prompt);
+            throw;
         }
     }
+
+    private static bool CanRetryAdmission(Exception error) => error.GetBaseException() switch
+    {
+        PostgresException { SqlState: PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected
+            or PostgresErrorCodes.UniqueViolation } => true,
+        SqliteException { SqliteErrorCode: 5 or 6 } => true, // Busy or locked.
+        SqliteException { SqliteExtendedErrorCode: 2067 } => true, // Unique constraint.
+        _ => false
+    };
 
     public async Task<AgentTaskInfo[]> ListAsync(Guid ownerId, int skip, int take, CancellationToken cancellationToken)
     {

@@ -4,7 +4,6 @@ using Egroo.Server.Repository;
 using Egroo.Server.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Egroo.Server.Test;
@@ -16,15 +15,12 @@ public class AgentTaskRepositoryTest
     public async Task TwoConcurrentSubmissionsWithSameKeyCreateOneTask()
     {
         using var fixture = await Fixture.CreateAsync();
-        var insertBarrier = new InsertBarrier();
-        await using var first = fixture.Open(insertBarrier);
-        await using var second = fixture.Open(insertBarrier);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var requestId = Guid.NewGuid();
-
-        var results = await Task.WhenAll(
-            fixture.Repository(first).CreateAsync(fixture.Agent.UserId, fixture.Agent.Id, requestId, "same task", timeout.Token),
-            fixture.Repository(second).CreateAsync(fixture.Agent.UserId, fixture.Agent.Id, requestId, "same task", timeout.Token));
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var submissions = new[] { Task.Run(SubmitAsync), Task.Run(SubmitAsync) };
+        start.SetResult();
+        var results = await Task.WhenAll(submissions).WaitAsync(timeout.Token);
 
         CollectionAssert.AreEquivalent(
             new[] { AgentTaskSubmission.Created, AgentTaskSubmission.Existing },
@@ -35,6 +31,56 @@ public class AgentTaskRepositoryTest
 
         await using var read = fixture.Open();
         Assert.AreEqual(1, await read.AgentTasks.CountAsync(timeout.Token));
+
+        async Task<(AgentTaskSubmission Status, AgentTaskInfo? Task)> SubmitAsync()
+        {
+            await start.Task.WaitAsync(timeout.Token);
+            await using var database = fixture.Open();
+            return await fixture.Repository(database).CreateAsync(fixture.Agent.UserId, fixture.Agent.Id,
+                requestId, "same task", timeout.Token);
+        }
+    }
+
+    [TestMethod]
+    public async Task ConcurrentAdmissionCapsQueuedAndRunningTasksAndAllowsIdempotentReplay()
+    {
+        using var fixture = await Fixture.CreateAsync();
+        await using var database = fixture.Open();
+        var repository = fixture.Repository(database);
+        var cap = AgentTaskRepository.MaxActiveTasks;
+        for (int i = 0; i < cap - 2; i++)
+            await fixture.QueueAsync(repository, $"existing task {i}");
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var running = await repository.TryClaimNextAsync(TimeSpan.FromMinutes(5), timeout.Token);
+        Assert.IsNotNull(running);
+        var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var submissions = Enumerable.Range(0, 8).Select(index => Task.Run(() => SubmitAsync(index))).ToArray();
+        start.SetResult();
+        var results = await Task.WhenAll(submissions).WaitAsync(timeout.Token);
+
+        Assert.AreEqual(2, results.Count(result => result == AgentTaskSubmission.Created));
+        Assert.AreEqual(6, results.Count(result => result == AgentTaskSubmission.AtCapacity));
+        Assert.AreEqual(cap, await database.AgentTasks.AsNoTracking().CountAsync(task =>
+            task.Status == AgentTaskStatus.Queued || task.Status == AgentTaskStatus.Running, timeout.Token));
+
+        var replay = await repository.CreateAsync(running.OwnerId, running.AgentId, running.RequestId,
+            running.Prompt, timeout.Token);
+        Assert.AreEqual(AgentTaskSubmission.Existing, replay.Status);
+        Assert.AreEqual(running.Id, replay.Task?.Id);
+
+        var cancelled = await repository.CancelAsync(running.OwnerId, running.Id, timeout.Token);
+        Assert.AreEqual(AgentTaskStatus.Cancelled, cancelled?.Status);
+        await fixture.QueueAsync(repository, "admitted after cancellation");
+
+        async Task<AgentTaskSubmission> SubmitAsync(int index)
+        {
+            await start.Task.WaitAsync(timeout.Token);
+            await using var candidate = fixture.Open();
+            var result = await fixture.Repository(candidate).CreateAsync(fixture.Agent.UserId, fixture.Agent.Id,
+                Guid.NewGuid(), $"candidate {index}", timeout.Token);
+            return result.Status;
+        }
     }
 
     [TestMethod]
@@ -235,22 +281,6 @@ public class AgentTaskRepositoryTest
             execute(task, cancellationToken);
     }
 
-    private sealed class InsertBarrier : SaveChangesInterceptor
-    {
-        private readonly TaskCompletionSource _ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        private int _arrived;
-
-        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
-            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
-        {
-            if (Interlocked.Increment(ref _arrived) == 2)
-                _ready.SetResult();
-
-            await _ready.Task.WaitAsync(cancellationToken);
-            return result;
-        }
-    }
-
     private sealed class TestClock : TimeProvider
     {
         private long _utcTicks = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero).UtcTicks;
@@ -283,12 +313,10 @@ public class AgentTaskRepositoryTest
             }
         }
 
-        internal SqliteDataContext Open(SaveChangesInterceptor? interceptor = null)
+        internal SqliteDataContext Open()
         {
             var connectionString = new SqliteConnectionStringBuilder { DataSource = _path, Pooling = false }.ToString();
             var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connectionString);
-            if (interceptor is not null)
-                options.AddInterceptors(interceptor);
             return new SqliteDataContext(options.Options);
         }
 
