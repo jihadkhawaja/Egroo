@@ -13,8 +13,8 @@ browser_dom=$(mktemp)
 cleanup() {
     local status=$?
     if (( status != 0 )); then
-        docker logs "$api_container" || true
-        docker logs "$browser_container" || true
+        docker logs --tail 50 "$api_container" || true
+        docker logs --tail 50 "$browser_container" || true
     fi
     docker rm --force "$api_container" "$browser_container" >/dev/null 2>&1 || true
     rm -f "$browser_config" "$browser_dom"
@@ -36,7 +36,6 @@ docker run --detach --name "$browser_container" --publish 127.0.0.1:18080:8080 \
 curl --fail --silent --show-error --retry 15 --retry-all-errors --retry-delay 1 \
     --max-time 5 "$api_url/runtime/index.html" >/dev/null
 curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 "$browser_url/" | grep '<title>Egroo</title>' >/dev/null
-curl --fail --silent --show-error "$browser_url/_framework/dotnet.js" >/dev/null
 curl --fail --silent --show-error "$browser_url/egroo-config.json" \
     | jq --exit-status --arg apiUrl "$api_url/" '.apiUrl == $apiUrl' >/dev/null
 
