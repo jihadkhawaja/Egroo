@@ -6,6 +6,8 @@
     "history": "node browser-history.mjs"
   },
   "devDependencies": {
-    "playwright-core": "1.65.1"
+    "@microsoft/signalr": "10.0.11",
+    "playwright-core": "1.65.1",
+    "pngjs": "7.0.0"
   }
 }

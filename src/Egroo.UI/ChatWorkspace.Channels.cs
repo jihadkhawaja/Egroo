@@ -10,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Egroo.Contracts.Models;
 using Egroo.UI.Helpers;
+using Egroo.UI.Services;
 
 namespace Egroo.UI;
 
@@ -218,23 +219,27 @@ public sealed partial class ChatWorkspace
         if (!IsCurrentView())
             return;
 
+        var messages = history.DistinctBy(message => message.ReferenceId).ToArray();
+        var uncached = messages.Where(message => !render.Decrypted.TryGetValue(message.ReferenceId, out var cached)
+            || cached.Cipher != (message.Content ?? string.Empty));
+        foreach (var batch in EndToEndEncryptionService.DecryptionBatches(uncached))
+        {
+            render.DecryptionUnavailable |= await _session.Encryption.PopulateDisplayContentsAsync(
+                batch, !render.DecryptionUnavailable, render.CancellationToken);
+            if (!IsCurrentView())
+                return;
+            foreach (var message in batch)
+                render.Decrypted[message.ReferenceId] = (message.Content ?? string.Empty, message.DecryptedContent ?? string.Empty);
+        }
+
         var controls = new List<Control>(history.Length);
         var bubbles = new Dictionary<Guid, (BubbleDisplay Display, Control View)>();
         var dates = new Dictionary<(DateOnly Today, DateOnly Day, Guid FirstMessage), Control>();
         var today = DateOnly.FromDateTime(DateTime.Today);
         DateOnly? previousDay = null;
-        foreach (var message in history.DistinctBy(message => message.ReferenceId))
+        foreach (var message in messages)
         {
-            var cipher = message.Content ?? string.Empty;
-            if (!render.Decrypted.TryGetValue(message.ReferenceId, out var display) || display.Cipher != cipher)
-            {
-                var result = await _session.Encryption.GetDisplayContentAsync(message, !render.DecryptionUnavailable, render.CancellationToken);
-                render.DecryptionUnavailable |= result.RuntimeUnavailable;
-                display = (cipher, result.Text ?? string.Empty);
-                if (!IsCurrentView())
-                    return;
-                render.Decrypted[message.ReferenceId] = display;
-            }
+            var display = render.Decrypted[message.ReferenceId];
             if (searching && !display.Text.Contains(query!, StringComparison.OrdinalIgnoreCase))
                 continue;
 
