@@ -14,18 +14,42 @@
     <PropertyGroup>
       <MacAppBundle>$(PublishDir)../Egroo.app</MacAppBundle>
       <MacAppContents>$(MacAppBundle)/Contents</MacAppContents>
+      <MacAppUseStandardLayout Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</MacAppUseStandardLayout>
     </PropertyGroup>
     <ItemGroup>
       <MacAppFile Include="$(PublishDir)**/*" />
     </ItemGroup>
-    <Copy SourceFiles="Info.plist" DestinationFolder="$(MacAppContents)" />
-    <Copy SourceFiles="@(MacAppFile)" DestinationFiles="@(MacAppFile->'$(MacAppContents)/MacOS/%(RecursiveDir)%(Filename)%(Extension)')" />
-    <!-- The copied .NET apphost needs a seal for the completed bundle. Sign nested code first. -->
-    <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
-      <MacAppNativeLibrary Include="$(MacAppContents)/MacOS/**/*.dylib" />
+    <ItemGroup Condition="'$(MacAppUseStandardLayout)' == 'true'">
+      <MacAppHost Include="$(PublishDir)$(AssemblyName)" />
+      <MacAppHelper Include="$(PublishDir)createdump" Condition="Exists('$(PublishDir)createdump')" />
+      <MacAppLibrary Include="$(PublishDir)*.dylib" />
+      <MacAppResource Include="@(MacAppFile)" Exclude="@(MacAppHost);@(MacAppHelper);@(MacAppLibrary)" />
     </ItemGroup>
-    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX')) And '@(MacAppNativeLibrary)' != ''"
-          Command="/usr/bin/codesign --force --sign - &quot;%(MacAppNativeLibrary.FullPath)&quot;" />
+    <RemoveDir Condition="'$(MacAppUseStandardLayout)' == 'true'"
+               Directories="$(MacAppContents)/MacOS;$(MacAppContents)/Frameworks;$(MacAppContents)/Resources;$(MacAppContents)/_CodeSignature" />
+    <Copy SourceFiles="Info.plist" DestinationFolder="$(MacAppContents)" />
+    <Copy Condition="'$(MacAppUseStandardLayout)' != 'true'"
+          SourceFiles="@(MacAppFile)" DestinationFiles="@(MacAppFile->'$(MacAppContents)/MacOS/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy Condition="'$(MacAppUseStandardLayout)' == 'true'"
+          SourceFiles="@(MacAppHost);@(MacAppHelper)" DestinationFolder="$(MacAppContents)/MacOS" />
+    <Copy Condition="'$(MacAppUseStandardLayout)' == 'true'"
+          SourceFiles="@(MacAppLibrary)" DestinationFolder="$(MacAppContents)/Frameworks" />
+    <Copy Condition="'$(MacAppUseStandardLayout)' == 'true'"
+          SourceFiles="@(MacAppResource)" DestinationFiles="@(MacAppResource->'$(MacAppContents)/Resources/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <!-- .NET resolves the entry DLL's real path, then looks for the runtime in that directory. -->
+    <Exec Condition="'$(MacAppUseStandardLayout)' == 'true'"
+          Command="/bin/ln -s &quot;../Resources/$(AssemblyName).dll&quot; &quot;$(MacAppContents)/MacOS/$(AssemblyName).dll&quot;" />
+    <Exec Condition="'$(MacAppUseStandardLayout)' == 'true' And '@(MacAppLibrary)' != ''"
+          Command="/bin/ln -s &quot;../Frameworks/%(MacAppLibrary.Filename)%(MacAppLibrary.Extension)&quot; &quot;$(MacAppContents)/Resources/%(MacAppLibrary.Filename)%(MacAppLibrary.Extension)&quot;" />
+    <Exec Condition="'$(MacAppUseStandardLayout)' == 'true' And '@(MacAppHelper)' != ''"
+          Command="/bin/ln -s &quot;../MacOS/createdump&quot; &quot;$(MacAppContents)/Resources/createdump&quot;" />
+    <Exec Condition="'$(MacAppUseStandardLayout)' == 'true' And '@(MacAppHelper)' != ''"
+          Command="/bin/ln -s &quot;../MacOS/createdump&quot; &quot;$(MacAppContents)/Frameworks/createdump&quot;" />
+    <!-- Sign the nested Mach-O files before sealing the completed bundle. -->
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX')) And '@(MacAppLibrary)' != ''"
+          Command="/usr/bin/codesign --force --sign - &quot;$(MacAppContents)/Frameworks/%(MacAppLibrary.Filename)%(MacAppLibrary.Extension)&quot;" />
+    <Exec Condition="$([MSBuild]::IsOSPlatform('OSX')) And '@(MacAppHelper)' != ''"
+          Command="/usr/bin/codesign --force --sign - &quot;$(MacAppContents)/MacOS/createdump&quot;" />
     <Exec Condition="$([MSBuild]::IsOSPlatform('OSX'))"
           Command="/usr/bin/codesign --force --sign - &quot;$(MacAppBundle)&quot;" />
     <Exec Condition="$([MSBuild]::IsOSPlatform('OSX'))"
