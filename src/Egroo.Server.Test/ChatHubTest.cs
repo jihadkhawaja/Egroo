@@ -181,7 +181,13 @@ public class ChatHubTest
             return DeliveryCommit ?? SendMessage(message);
         }
         public Task<bool> AddPendingMessage(UserPendingMessage pm) => Task.FromResult(true);
-        public Task<bool> UpdateMessage(Message message) => Task.FromResult(true);
+        public (Message? Message, bool Changed) ReadReceiptResult { get; set; }
+        public (Guid ReaderId, Guid MessageId, Guid ReferenceId)? ReadReceiptRequest { get; private set; }
+        public Task<(Message? Message, bool Changed)> MarkMessageSeen(Guid readerId, Guid messageId, Guid referenceId)
+        {
+            ReadReceiptRequest = (readerId, messageId, referenceId);
+            return Task.FromResult(ReadReceiptResult);
+        }
         public Task<Message?> GetMessageById(Guid messageId) => Task.FromResult<Message?>(null);
         public Task<Message?> GetMessageByReferenceId(Guid referenceId) => Task.FromResult<Message?>(null);
         public Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId) => Task.FromResult<IEnumerable<UserPendingMessage>>(Array.Empty<UserPendingMessage>());
@@ -805,11 +811,53 @@ public class ChatHubTest
     }
 
     [TestMethod]
-    public async Task UpdateMessage_EmptyContent_ReturnsFalse()
+    public async Task UpdateMessage_EmptyReference_ReturnsFalse()
     {
         var hub = CreateHub(Guid.NewGuid());
-        var result = await hub.UpdateMessage(new Message { Id = Guid.NewGuid(), Content = "" });
+        var result = await hub.UpdateMessage(new Message { ReferenceId = Guid.Empty });
         Assert.IsFalse(result);
+    }
+
+    [TestMethod]
+    [DataRow(true, true, 1)]
+    [DataRow(false, true, 0)]
+    [DataRow(true, false, 0)]
+    public async Task UpdateMessage_OnlyNotifiesActiveSenderSessionsOfChangedReceipt(
+        bool senderInChannel, bool changed, int expectedBroadcasts)
+    {
+        var readerId = Guid.NewGuid();
+        var senderId = Guid.NewGuid();
+        var stored = new Message
+        {
+            ChannelId = Guid.NewGuid(), SenderId = senderId,
+            DateSeen = DateTimeOffset.UtcNow, Content = "unneeded ciphertext"
+        };
+        var channelRepo = new StubChannelRepository();
+        channelRepo.MembershipResults[stored.ChannelId] = senderInChannel;
+        var tracker = new InMemoryConnectionTracker();
+        tracker.TrackConnection(senderId, "sender-desktop");
+        tracker.TrackConnection(senderId, "sender-browser");
+        tracker.TrackConnection(readerId, "reader");
+        var repository = new StubMessageRepository { ReadReceiptResult = (stored, changed) };
+        var hub = CreateHub(readerId, tracker: tracker, channelRepo: channelRepo, messageRepo: repository);
+
+        Assert.IsTrue(await hub.UpdateMessage(new Message { Id = stored.Id, ReferenceId = stored.ReferenceId }));
+        Assert.AreEqual<(Guid ReaderId, Guid MessageId, Guid ReferenceId)?>(
+            (readerId, stored.Id, stored.ReferenceId), repository.ReadReceiptRequest);
+        var broadcasts = GetClients(hub).ClientCalls;
+        Assert.HasCount(expectedBroadcasts, broadcasts);
+        if (expectedBroadcasts == 0)
+            return;
+
+        var broadcast = broadcasts.Single();
+        CollectionAssert.AreEquivalent(new[] { "sender-desktop", "sender-browser" }, broadcast.ConnectionIds.ToArray());
+        var call = broadcast.Proxy.Calls.Single();
+        Assert.AreEqual("UpdateMessage", call.Method);
+        var receipt = (Message)call.Args.Single()!;
+        Assert.AreEqual(stored.ChannelId, receipt.ChannelId);
+        Assert.AreEqual(stored.ReferenceId, receipt.ReferenceId);
+        Assert.AreEqual(stored.DateSeen, receipt.DateSeen);
+        Assert.IsNull(receipt.Content);
     }
 
     [TestMethod]

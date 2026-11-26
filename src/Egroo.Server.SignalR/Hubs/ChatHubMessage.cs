@@ -95,7 +95,7 @@ namespace Egroo.Server.SignalR.Hubs
 
             try
             {
-                await Clients.Clients(connectionIds).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
+                await Clients.Clients(connectionIds).SendAsync("ReceiveMessage", CreateClientMessage(message, deliveryContent));
             }
             catch (Exception ex)
             {
@@ -106,27 +106,21 @@ namespace Egroo.Server.SignalR.Hubs
         [Authorize]
         public async Task<bool> UpdateMessage(Message message)
         {
-            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
+            var readerId = GetUserIdFromContext();
+            if (!readerId.HasValue || message is null || message.Id == Guid.Empty || message.ReferenceId == Guid.Empty)
                 return false;
 
-            bool dbResult = await _messageRepository.UpdateMessage(message);
-            if (!dbResult)
+            var (receipt, changed) = await _messageRepository.MarkMessageSeen(readerId.Value, message.Id, message.ReferenceId);
+            if (receipt is null)
                 return false;
 
-            Message? updatedMessage = await _messageRepository.GetMessageByReferenceId(message.ReferenceId);
-            if (updatedMessage == null)
-                return false;
-
-            UserDto[]? users = await GetChannelUsers(updatedMessage.ChannelId);
-            if (users == null)
-                return false;
-
-            foreach (UserDto user in users)
+            if (changed && await ChannelContainUser(receipt.ChannelId, receipt.SenderId))
             {
-                string? connectionId = _connectionTracker.GetUserConnectionIds(user.Id).LastOrDefault();
-                if (string.IsNullOrEmpty(connectionId))
-                    continue;
-                await Clients.Client(connectionId).SendAsync("UpdateMessage", updatedMessage);
+                var connections = _connectionTracker.GetUserConnectionIds(receipt.SenderId);
+                if (connections.Count > 0)
+                {
+                    await Clients.Clients(connections).SendAsync("UpdateMessage", CreateClientMessage(receipt, content: null));
+                }
             }
 
             return true;
@@ -144,7 +138,7 @@ namespace Egroo.Server.SignalR.Hubs
             {
                 if (!string.IsNullOrWhiteSpace(content))
                 {
-                    await Clients.Caller.SendAsync("ReceiveMessage", CloneForDelivery(message, content), Context.ConnectionAborted);
+                    await Clients.Caller.SendAsync("ReceiveMessage", CreateClientMessage(message, content), Context.ConnectionAborted);
                 }
             }
         }
@@ -159,7 +153,7 @@ namespace Egroo.Server.SignalR.Hubs
             return message.Content;
         }
 
-        private static Message CloneForDelivery(Message source, string deliveryContent)
+        private static Message CreateClientMessage(Message source, string? content)
         {
             return new Message
             {
@@ -174,7 +168,7 @@ namespace Egroo.Server.SignalR.Hubs
                 DateDeleted = source.DateDeleted,
                 AgentDefinitionId = source.AgentDefinitionId,
                 DisplayName = source.DisplayName,
-                Content = deliveryContent,
+                Content = content,
             };
         }
 

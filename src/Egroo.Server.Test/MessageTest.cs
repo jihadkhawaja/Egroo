@@ -187,37 +187,6 @@ namespace Egroo.Server.Test
             Assert.IsNull(fetched, "Expected null for an unknown message Id.");
         }
 
-        // ── Update ──────────────────────────────────────────────────────────────────
-
-        [TestMethod]
-        public async Task UpdateMessage_ExistingMessage_Succeeds()
-        {
-            var original = new Message
-            {
-                ChannelId = _channelId,
-                SenderId = _userId,
-                Content = "Original content",
-                ReferenceId = Guid.NewGuid(),
-            };
-
-            using var sendScope = _authenticatedServices.CreateScope();
-            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                           .SendMessage(original);
-
-            var updated = new Message
-            {
-                Id = original.Id,
-                ReferenceId = original.ReferenceId,
-                Content = "Updated content",
-            };
-
-            using var updateScope = _authenticatedServices.CreateScope();
-            bool result = await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                                           .UpdateMessage(updated);
-
-            Assert.IsTrue(result, "UpdateMessage should return true for an existing message.");
-        }
-
         // ── Pending messages ─────────────────────────────────────────────────────────
 
         [TestMethod]
@@ -359,22 +328,6 @@ namespace Egroo.Server.Test
 
             var stillPending = await queries.GetPendingMessagesForUser(offlineRecipientId);
             Assert.AreEqual("encrypted-for-offline-recipient", stillPending.Single(p => p.MessageId == message.Id).Content);
-        }
-
-        [TestMethod]
-        public async Task UpdateMessage_NonExistentId_ReturnsFalse()
-        {
-            var updated = new Message
-            {
-                Id = Guid.NewGuid(),
-                Content = "Won't update",
-            };
-
-            using var scope = _authenticatedServices.CreateScope();
-            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                                     .UpdateMessage(updated);
-
-            Assert.IsFalse(result);
         }
     }
 }

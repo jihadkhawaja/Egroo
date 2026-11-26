@@ -62,28 +62,27 @@ namespace Egroo.Server.Repository
             }
         }
 
-        public async Task<bool> UpdateMessage(Message message)
+        public async Task<(Message? Message, bool Changed)> MarkMessageSeen(Guid readerId, Guid messageId, Guid referenceId)
         {
-            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
-                return false;
-
-            Message? dbMessage = await _dbContext.Messages.FirstOrDefaultAsync(x => x.ReferenceId == message.ReferenceId);
-            if (dbMessage is null)
-                return false;
-
-            dbMessage.DateSeen = DateTimeOffset.UtcNow;
-            dbMessage.DateUpdated = DateTimeOffset.UtcNow;
+            var authorizedMessage = _dbContext.Messages.Where(message =>
+                message.Id == messageId && message.ReferenceId == referenceId && message.DateDeleted == null
+                && message.SenderId != readerId && _dbContext.ChannelUsers.Any(member =>
+                    member.UserId == readerId && member.ChannelId == message.ChannelId && member.DateDeleted == null));
 
             try
             {
-                _dbContext.Messages.Update(dbMessage);
-                await _dbContext.SaveChangesAsync();
-                return true;
+                var seenAt = DateTimeOffset.UtcNow;
+                int changed = await authorizedMessage.Where(message => message.DateSeen == null)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(message => message.DateSeen, seenAt)
+                        .SetProperty(message => message.DateUpdated, seenAt));
+
+                return (await authorizedMessage.AsNoTracking().SingleOrDefaultAsync(), changed == 1);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating message");
-                return false;
+                _logger.LogError(ex, "Error recording a read receipt for message {MessageId}", messageId);
+                return default;
             }
         }
 

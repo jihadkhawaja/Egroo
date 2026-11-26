@@ -207,6 +207,59 @@ public class ServerDatabaseTest
     }
 
     [TestMethod]
+    public async Task MarkMessageSeen_CurrentChannelMemberRecordsFirstSeenOnce()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connection).Options;
+        await using var database = new SqliteDataContext(options);
+        await database.Database.MigrateAsync();
+        var stored = new Message { ChannelId = Guid.NewGuid(), SenderId = Guid.NewGuid() };
+        var readerId = Guid.NewGuid();
+        database.Messages.Add(stored);
+        database.ChannelUsers.Add(new ChannelUser { ChannelId = stored.ChannelId, UserId = readerId });
+        await database.SaveChangesAsync();
+
+        var repository = CreateMessageRepository(database);
+        var first = await repository.MarkMessageSeen(readerId, stored.Id, stored.ReferenceId);
+        var repeated = await repository.MarkMessageSeen(readerId, stored.Id, stored.ReferenceId);
+
+        Assert.IsTrue(first.Changed);
+        Assert.IsNotNull(first.Message?.DateSeen);
+        Assert.IsFalse(repeated.Changed);
+        Assert.IsNotNull(repeated.Message);
+        Assert.AreEqual(first.Message.DateSeen, repeated.Message.DateSeen);
+        Assert.AreEqual(first.Message.DateSeen, (await database.Messages.AsNoTracking().SingleAsync()).DateSeen);
+    }
+
+    [TestMethod]
+    public async Task MarkMessageSeen_RequiresActiveChannelMembershipAndDifferentSender()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connection).Options;
+        await using var database = new SqliteDataContext(options);
+        await database.Database.MigrateAsync();
+        var stored = new Message { ChannelId = Guid.NewGuid(), SenderId = Guid.NewGuid() };
+        var formerMemberId = Guid.NewGuid();
+        database.Messages.Add(stored);
+        database.ChannelUsers.AddRange(
+            new ChannelUser { ChannelId = stored.ChannelId, UserId = stored.SenderId },
+            new ChannelUser { ChannelId = stored.ChannelId, UserId = formerMemberId, DateDeleted = DateTimeOffset.UtcNow });
+        await database.SaveChangesAsync();
+
+        var repository = CreateMessageRepository(database);
+        foreach (Guid readerId in new[] { stored.SenderId, formerMemberId, Guid.NewGuid() })
+        {
+            var result = await repository.MarkMessageSeen(readerId, stored.Id, stored.ReferenceId);
+            Assert.IsNull(result.Message);
+            Assert.IsFalse(result.Changed);
+        }
+
+        Assert.IsNull((await database.Messages.AsNoTracking().SingleAsync()).DateSeen);
+    }
+
+    [TestMethod]
     public async Task ExistingPostgreSqlConnectionSelectsPostgreSql()
     {
         var builder = WebApplication.CreateBuilder([]);
