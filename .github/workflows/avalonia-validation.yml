@@ -303,8 +303,10 @@ jobs:
           dotnet workload install ios
       - name: Build and verify arm64 simulator app
         run: |
-          # Exercise the simulator bundle without the Release device AOT pass.
-          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=true -p:CodesignKey=- -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=true
+          # Exercise device-style trimming and the packaged API URL on the simulator.
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=true \
+            -p:CodesignKey=- -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=true \
+            -p:TrimMode=partial -p:EgrooApiUrl=https://egroo-simulator.invalid/
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           test -n "$app"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
@@ -317,8 +319,6 @@ jobs:
       - name: Verify the iOS sign-in screen
         timeout-minutes: 10
         shell: bash
-        env:
-          SIMCTL_CHILD_EGROO_API_URL: https://egroo-simulator.invalid/
         run: |
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
