@@ -149,8 +149,12 @@ jobs:
       - run: dotnet workload install android
       - name: Build and verify APK
         run: |
-          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:RuntimeIdentifier=android-x64 -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
-          test -n "$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*.apk' -size +0c -print -quit)"
+          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk '-p:RuntimeIdentifiers=android-arm64%3Bandroid-x64' -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-test-apk
+          path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
+          if-no-files-found: error
 
   ios:
     name: iOS simulator release build
@@ -176,4 +180,12 @@ jobs:
       - name: Build and verify arm64 simulator app
         run: |
           dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false
-          test -n "$(find bin/Release -type d -name '*.app' -print -quit)"
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          tar -czf "$GITHUB_WORKSPACE/artifacts/egroo-ios-simulator.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-arm64-simulator-app
+          path: artifacts/egroo-ios-simulator.tar.gz
+          if-no-files-found: error
