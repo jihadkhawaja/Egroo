@@ -13,6 +13,7 @@
 **/App_Data/
 **/*.jfm
 **/azds.yaml
+**/artifacts/
 **/bin
 **/charts
 **/docker-compose*

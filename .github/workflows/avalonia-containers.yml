@@ -1,0 +1,79 @@
+name: Avalonia containers
+
+on:
+  pull_request:
+    branches: [avalonia, main]
+    paths:
+      - '.github/workflows/avalonia-containers.yml'
+      - '.dockerignore'
+      - 'Directory.Build.props'
+      - 'scripts/smoke-avalonia-containers.sh'
+      - 'src/Egroo.Avalonia/**'
+      - 'src/Egroo.Client/**'
+      - 'src/Egroo.Contracts/**'
+      - 'src/Egroo.Server/**'
+      - 'src/Egroo.Server.SignalR/**'
+      - 'src/Egroo.UI/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Build and smoke-test API and browser images
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build images
+        run: |
+          docker build --pull -f src/Egroo.Server/Dockerfile -t egroo-api:verified .
+          docker build --pull -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-browser:verified .
+      - name: Smoke-test both containers
+        run: bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
+
+  publish:
+    name: Publish verified images to GHCR
+    if: github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Build release images
+        run: |
+          labels=(
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY"
+            --label "org.opencontainers.image.revision=$GITHUB_SHA"
+          )
+          docker build --pull "${labels[@]}" -f src/Egroo.Server/Dockerfile -t egroo-api:verified .
+          docker build --pull "${labels[@]}" -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-browser:verified .
+      - name: Smoke-test release images
+        run: bash scripts/smoke-avalonia-containers.sh egroo-api:verified egroo-browser:verified
+      - name: Push both images with the same release tag
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          trap 'docker logout ghcr.io' EXIT
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          tag="sha-$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          api="$repo-api:$tag"
+          browser="$repo-browser:$tag"
+          docker tag egroo-api:verified "$api"
+          docker tag egroo-browser:verified "$browser"
+          docker push "$api"
+          docker push "$browser"
+          {
+            printf '### Avalonia container images\n\n'
+            printf -- '- `%s`\n' "$api" "$browser"
+          } >> "$GITHUB_STEP_SUMMARY"
