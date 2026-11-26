@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
+    <PackageReference Include="MailKit" Version="5.0.0" />
     <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.17.2" />
     <PackageReference Include="Microsoft.Agents.AI.Anthropic" Version="1.0.0-rc4" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" Version="1.0.0-rc4" />

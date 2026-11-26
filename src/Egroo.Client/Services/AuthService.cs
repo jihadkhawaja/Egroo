@@ -6,7 +6,7 @@ using Egroo.Contracts.Models;
 namespace Egroo.Client.Services
 {
     [ExcludeFromCodeCoverage]
-    public class AuthService : IAuthClient, ITwoFactorAuth
+    public class AuthService : IAuthClient, ITwoFactorAuth, IIpRegionAuth
     {
         public HttpClient HttpClient { get; }
 
@@ -40,6 +40,24 @@ namespace Egroo.Client.Services
 
             var response = await httpResponse.Content.ReadFromJsonAsync<Operation.Response>();
             return response ?? new Operation.Response { Success = false, Message = "Empty response from API" };
+        }
+
+        public async Task<IpRegionSettings.Status> GetIpRegionStatus()
+        {
+            using var response = await HttpClient.GetAsync("api/v1/Auth/ipregions");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IpRegionSettings.Status>()
+                ?? throw new InvalidOperationException("The API did not return sign-in region status.");
+        }
+
+        public async Task<Operation.Result> UpdateIpRegionSettings(IpRegionSettings.Update settings)
+        {
+            using var response = await HttpClient.PutAsJsonAsync("api/v1/Auth/ipregions", settings);
+            if (!response.IsSuccessStatusCode)
+                return new() { Success = false, Message = $"HTTP error: {response.StatusCode}" };
+
+            return await response.Content.ReadFromJsonAsync<Operation.Result>()
+                ?? new() { Success = false, Message = "Empty response from API." };
         }
 
         public async Task<TwoFactor.Status> GetTwoFactorStatus()

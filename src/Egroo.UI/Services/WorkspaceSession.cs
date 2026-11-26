@@ -30,6 +30,7 @@ internal sealed class WorkspaceSession
         _storage = new StorageService(runtime);
         _tokenKey = "egroo.session:" + api.AbsoluteUri;
         _auth = new AuthService(Http);
+        AccountRecovery = new AccountRecoveryService(Http);
         Encryption = new EndToEndEncryptionService(runtime, _storage, Users);
         Agents = new AgentService(Http);
         AgentTasks = new AgentTaskService(Http);
@@ -40,6 +41,8 @@ internal sealed class WorkspaceSession
     public Uri Api { get; }
     public HttpClient Http { get; }
     public ITwoFactorAuth AccountSecurity => _auth;
+    public AccountRecoveryService AccountRecovery { get; }
+    public IIpRegionAuth IpRegionSecurity => _auth;
     public ChatUserService Users { get; } = new();
     public ChatChannelService Channels { get; } = new();
     public AgentService Agents { get; }

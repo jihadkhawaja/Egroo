@@ -110,6 +110,7 @@ public partial class AuthRepository
         state.TotpEnrollmentExpiresAt = null;
         state.LastTotpStep = null;
         state.RecoveryCodeHashes = null;
+        state.AllowedSignInRegions = null;
         return await TrySaveFactorStateAsync()
             ? new() { Success = true }
             : new() { Success = false, Message = SaveFailure };
@@ -121,21 +122,30 @@ public partial class AuthRepository
             return null;
 
         long revision = state.FactorRevision;
-        var failure = VerifyFactor(user.Id, state, verificationCode, _timeProvider.GetUtcNow(), allowRecovery: true);
+        var requireRegionRecovery = RequiresRegionalRecovery(state);
+        var failure = VerifyFactor(user.Id, state, verificationCode, _timeProvider.GetUtcNow(),
+            allowRecovery: true, requireRegionRecovery: requireRegionRecovery);
         if (failure is null)
             return null;
 
         if (revision != state.FactorRevision && !await TrySaveFactorStateAsync())
             failure = SaveFailure;
 
-        return new() { Success = false, RequiresTwoFactor = true, Message = failure };
+        return new()
+        {
+            RequiresTwoFactor = true, RequiresRecoveryCode = requireRegionRecovery, Message = failure
+        };
     }
 
     private string? VerifyFactor(Guid userId, UserSecurity state, string? verificationCode,
-        DateTimeOffset now, bool allowRecovery)
+        DateTimeOffset now, bool allowRecovery, bool requireRegionRecovery = false)
     {
         if (string.IsNullOrWhiteSpace(verificationCode))
+        {
+            if (requireRegionRecovery)
+                return RegionRecoveryPrompt;
             return allowRecovery ? FactorPrompt : "Enter the six-digit authenticator code.";
+        }
 
         if (state.FactorLockedUntil is { } lockedUntil)
         {
@@ -145,7 +155,8 @@ public partial class AuthRepository
         }
 
         var code = verificationCode.Trim();
-        if (TryUseTotpCode(userId, state, code, now) || (allowRecovery && TryUseRecoveryCode(state, code)))
+        if ((!requireRegionRecovery && TryUseTotpCode(userId, state, code, now))
+            || (allowRecovery && TryUseRecoveryCode(state, code)))
         {
             ResetFactorAttempts(state);
             state.FactorRevision++;
@@ -156,7 +167,7 @@ public partial class AuthRepository
         if (state.FailedFactorAttempts >= MaxFactorAttempts)
             state.FactorLockedUntil = (now + FactorLockout).ToUnixTimeSeconds();
         state.FactorRevision++;
-        return RejectedFactor;
+        return requireRegionRecovery ? RegionRecoveryPrompt : RejectedFactor;
     }
 
     private bool TryUseTotpCode(Guid userId, UserSecurity state, string code, DateTimeOffset now)

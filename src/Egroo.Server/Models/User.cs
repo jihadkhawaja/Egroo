@@ -9,6 +9,9 @@ namespace Egroo.Server.Models
     public class User : UserDto
     {
         public string? Password { get; set; }
+        [ConcurrencyCheck]
+        [JsonIgnore]
+        public long SessionRevision { get; set; }
         [JsonIgnore]
         public UserSecurity? UserSecuriy { get; set; }
     }
@@ -21,6 +24,7 @@ namespace Egroo.Server.Models
         public long? TotpEnrollmentExpiresAt { get; set; }
         public long? LastTotpStep { get; set; }
         public string? RecoveryCodeHashes { get; set; }
+        public string? AllowedSignInRegions { get; set; }
         public int FailedFactorAttempts { get; set; }
         public long? FactorLockedUntil { get; set; }
         [ConcurrencyCheck]

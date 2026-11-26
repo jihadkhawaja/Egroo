@@ -1,3 +1,4 @@
+using Egroo.Client.Services;
 using Egroo.Server.Database;
 using Egroo.Server.Models;
 using Egroo.Server.Repository;
@@ -5,6 +6,7 @@ using Egroo.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +32,207 @@ public class EndpointIntegrationTest
     private const string FakeConnectionString = "Host=localhost;Database=fake";
 
     private static readonly InMemoryDatabaseRoot DatabaseRoot = new();
+
+    [TestMethod]
+    public async Task PasswordRecoveryRequiresVerifiedInboxAndFactorAndRevokesSessions()
+    {
+        var mail = new RecoveryMailbox();
+        var clock = new RecoveryClock();
+        using var factory = CreateFactory(nameof(PasswordRecoveryRequiresVerifiedInboxAndFactorAndRevokesSessions),
+            configureServices: services =>
+            {
+                services.AddSingleton<IRecoveryEmailDelivery>(mail);
+                services.AddSingleton<TimeProvider>(clock);
+            });
+        using var anonymous = factory.CreateClient();
+        const string username = "emailrecovery";
+        const string password = "StrongP@ss1";
+        const string newPassword = "NewStrongP@ss2";
+        const string address = "alice@fixture.invalid";
+        using var unauthenticatedSettings = await anonymous.GetAsync("/api/v1/Auth/recovery/email");
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unauthenticatedSettings.StatusCode);
+        using var signedIn = await SignUpAndGetAuthenticatedClientAsync(factory, username);
+        var recovery = new AccountRecoveryService(signedIn);
+        var auth = new AuthService(signedIn);
+        var enrollment = await auth.BeginTwoFactorEnrollment(password);
+        Assert.IsNotNull(enrollment.SharedKey);
+        var enabled = await auth.EnableTwoFactor(password,
+            TwoFactorAuthTest.CodeForSecret(enrollment.SharedKey, clock.GetUtcNow()));
+        Assert.IsNotNull(enabled.RecoveryCodes);
+        Assert.IsFalse((await recovery.GetRecoveryStatus()).HasVerifiedAddress);
+        Assert.IsTrue((await recovery.GetRecoveryStatus()).RequiresTwoFactor);
+        Assert.IsFalse((await recovery.BeginRecoveryEmailEnrollment(address, password, null)).Success);
+        Assert.IsTrue((await recovery.BeginRecoveryEmailEnrollment(address, password, enabled.RecoveryCodes[0])).Success);
+        var pending = await mail.ReadAsync();
+        Assert.AreEqual(address, pending.Address);
+        Assert.IsTrue((await recovery.GetRecoveryStatus()).AwaitingVerification);
+        Assert.IsFalse((await recovery.GetRecoveryStatus()).HasVerifiedAddress);
+        Assert.IsFalse((await new AccountRecoveryService(anonymous).ResetPassword(username, pending.Code, newPassword, null)).Success);
+        Assert.IsTrue((await recovery.ConfirmRecoveryEmail(pending.Code)).Success);
+        Assert.IsFalse((await recovery.ConfirmRecoveryEmail(pending.Code)).Success);
+        Assert.IsTrue((await recovery.GetRecoveryStatus()).HasVerifiedAddress);
+        Assert.IsFalse((await recovery.RemoveRecoveryEmail(password, null)).Success);
+
+        Guid userId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var state = await database.UserRecoveryStates.SingleAsync();
+            userId = state.UserId;
+            Assert.IsNotNull(state.ProtectedAddress);
+            Assert.IsFalse(state.ProtectedAddress.Contains(address, StringComparison.Ordinal));
+            Assert.IsNull(state.ConfirmationHash);
+            var account = await database.Users.SingleAsync(user => user.Id == userId);
+            account.UserSecuriy!.AllowedSignInRegions = "HM";
+            await database.SaveChangesAsync();
+        }
+        using var legacy = CreateAuthenticatedClient(factory, userId);
+        using var beforeReset = await legacy.GetAsync("/api/v1/Auth/recovery/email");
+        Assert.AreEqual(HttpStatusCode.OK, beforeReset.StatusCode);
+        await using var live = CreateHubConnection(factory, userId);
+        var disconnected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        live.Closed += _ => { disconnected.TrySetResult(); return Task.CompletedTask; };
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await live.StartAsync(timeout.Token);
+        Assert.AreEqual(username, (await live.InvokeAsync<UserDto>("GetUserPrivateDetails", timeout.Token)).Username);
+
+        using var unknown = await anonymous.PostAsJsonAsync("/api/v1/Auth/recovery/request",
+            new { username = "unknownuser", address }, timeout.Token);
+        using var mismatched = await anonymous.PostAsJsonAsync("/api/v1/Auth/recovery/request",
+            new { username, address = "wrong@fixture.invalid" }, timeout.Token);
+        using var requested = await anonymous.PostAsJsonAsync("/api/v1/Auth/recovery/request",
+            new { username, address }, timeout.Token);
+        Assert.AreEqual(unknown.StatusCode, requested.StatusCode);
+        Assert.AreEqual(await unknown.Content.ReadAsStringAsync(timeout.Token), await requested.Content.ReadAsStringAsync(timeout.Token));
+        Assert.AreEqual(await mismatched.Content.ReadAsStringAsync(timeout.Token), await requested.Content.ReadAsStringAsync(timeout.Token));
+        Assert.IsTrue(requested.Headers.CacheControl?.NoStore);
+        var reset = await mail.ReadAsync();
+        Assert.AreEqual(address, reset.Address);
+        StringAssert.Contains(reset.Subject, "Reset");
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var saved = await database.UserRecoveryStates.SingleAsync();
+            Assert.IsNotNull(saved.ResetHash);
+            Assert.IsFalse(saved.ResetHash.Contains(reset.Code, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var anonymousRecovery = new AccountRecoveryService(anonymous);
+        var challenged = await anonymousRecovery.ResetPassword(username, reset.Code, newPassword, null);
+        Assert.IsTrue(challenged.RequiresTwoFactor);
+        Assert.IsFalse(challenged.Success);
+        Assert.IsFalse((await anonymousRecovery.ResetPassword(username, reset.Code, newPassword, enabled.RecoveryCodes[0])).Success);
+        using var changed = await anonymous.PostAsJsonAsync("/api/v1/Auth/recovery/reset",
+            new { username, code = reset.Code, newPassword, verificationCode = enabled.RecoveryCodes[1] }, timeout.Token);
+        var resetJson = JsonNode.Parse(await changed.Content.ReadAsStringAsync(timeout.Token))!;
+        Assert.IsTrue(resetJson["success"]!.GetValue<bool>());
+        Assert.IsNull(resetJson["token"]);
+        Assert.IsTrue(changed.Headers.CacheControl?.NoStore);
+        await disconnected.Task.WaitAsync(timeout.Token);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var account = await database.Users.SingleAsync(user => user.Id == userId, timeout.Token);
+            Assert.IsTrue(account.UserSecuriy?.IsTwoFactorEnabled);
+            Assert.IsNull(account.UserSecuriy?.AllowedSignInRegions);
+        }
+        using var oldHttp = await signedIn.GetAsync("/api/v1/Auth/refreshsession", timeout.Token);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, oldHttp.StatusCode);
+        using var oldLegacy = await legacy.GetAsync("/api/v1/Auth/recovery/email", timeout.Token);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, oldLegacy.StatusCode);
+        using var oldHub = await legacy.PostAsync("/chathub/negotiate?negotiateVersion=1", null, timeout.Token);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, oldHub.StatusCode);
+        await using var staleSocket = CreateHubConnection(factory, userId);
+        var refused = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => staleSocket.StartAsync(timeout.Token));
+        StringAssert.Contains(refused.Message, "status code: 401");
+        Assert.IsFalse((await anonymousRecovery.ResetPassword(username, reset.Code, "AnotherStrongP@ss3", enabled.RecoveryCodes[2])).Success);
+
+        var anonymousAuth = new AuthService(anonymous);
+        Assert.IsFalse((await anonymousAuth.SignIn(username, password, enabled.RecoveryCodes[2])).Success);
+        Assert.IsTrue((await anonymousAuth.SignIn(username, newPassword)).RequiresTwoFactor);
+        Assert.IsNotNull((await anonymousAuth.SignIn(username, newPassword, enabled.RecoveryCodes[2])).Token);
+        Assert.AreEqual("Your Egroo password was reset", (await mail.ReadAsync()).Subject);
+    }
+
+    [TestMethod]
+    public async Task RecoveryReplacementKeepsOldAddressUntilConfirmationAndInvalidatesOutstandingCodes()
+    {
+        var mail = new RecoveryMailbox();
+        var clock = new RecoveryClock();
+        using var factory = CreateFactory(nameof(RecoveryReplacementKeepsOldAddressUntilConfirmationAndInvalidatesOutstandingCodes),
+            configureServices: services =>
+            {
+                services.AddSingleton<IRecoveryEmailDelivery>(mail);
+                services.AddSingleton<TimeProvider>(clock);
+            });
+        using var anonymous = factory.CreateClient();
+        const string username = "replaceaddress";
+        const string password = "StrongP@ss1";
+        const string original = "original@fixture.invalid";
+        const string replacement = "replacement@fixture.invalid";
+        using var signedIn = await SignUpAndGetAuthenticatedClientAsync(factory, username);
+        var recovery = new AccountRecoveryService(signedIn);
+        var anonymousRecovery = new AccountRecoveryService(anonymous);
+        Assert.IsFalse((await recovery.BeginRecoveryEmailEnrollment(original, "wrong-password", null)).Success);
+        Assert.IsTrue((await recovery.BeginRecoveryEmailEnrollment(original, password, null)).Success);
+        var initial = await mail.ReadAsync();
+        clock.Advance(TimeSpan.FromMinutes(15));
+        Assert.IsFalse((await recovery.ConfirmRecoveryEmail(initial.Code)).Success);
+        Assert.IsTrue((await recovery.BeginRecoveryEmailEnrollment(original, password, null)).Success);
+        Assert.IsTrue((await recovery.ConfirmRecoveryEmail((await mail.ReadAsync()).Code)).Success);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.IsTrue((await recovery.BeginRecoveryEmailEnrollment(replacement, password, null)).Success);
+        var change = await mail.ReadAsync();
+        Assert.AreEqual(replacement, change.Address);
+        Assert.IsTrue((await anonymousRecovery.RequestPasswordRecovery(username, replacement)).Success);
+        Assert.IsTrue((await anonymousRecovery.RequestPasswordRecovery(username, original)).Success);
+        var originalReset = await mail.ReadAsync();
+        Assert.AreEqual(original, originalReset.Address);
+        Assert.IsTrue((await recovery.ConfirmRecoveryEmail(change.Code)).Success);
+        Assert.IsFalse((await anonymousRecovery.ResetPassword(username, originalReset.Code, "AnotherStrongP@ss3", null)).Success);
+
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Assert.IsTrue((await anonymousRecovery.RequestPasswordRecovery(username, replacement)).Success);
+        var firstReset = await mail.ReadAsync();
+        Assert.AreEqual(replacement, firstReset.Address);
+        clock.Advance(TimeSpan.FromMinutes(15));
+        Assert.IsFalse((await anonymousRecovery.ResetPassword(username, firstReset.Code, "AnotherStrongP@ss3", null)).Success);
+        Assert.IsTrue((await anonymousRecovery.RequestPasswordRecovery(username, replacement)).Success);
+        var newReset = await mail.ReadAsync();
+        Assert.IsFalse((await recovery.RemoveRecoveryEmail("wrong-password", null)).Success);
+        Assert.IsTrue((await recovery.RemoveRecoveryEmail(password, null)).Success);
+        Assert.IsFalse((await recovery.GetRecoveryStatus()).HasVerifiedAddress);
+        Assert.IsFalse((await anonymousRecovery.ResetPassword(username, newReset.Code, "AnotherStrongP@ss3", null)).Success);
+    }
+
+    private sealed class RecoveryClock : TimeProvider
+    {
+        private long _ticks = DateTimeOffset.UtcNow.UtcTicks;
+        public override DateTimeOffset GetUtcNow() => new(Interlocked.Read(ref _ticks), TimeSpan.Zero);
+        public void Advance(TimeSpan offset) => Interlocked.Add(ref _ticks, offset.Ticks);
+    }
+
+    private sealed class RecoveryMailbox : IRecoveryEmailDelivery
+    {
+        private readonly System.Threading.Channels.Channel<Mail> _messages = System.Threading.Channels.Channel.CreateUnbounded<Mail>();
+
+        public bool Available => true;
+
+        public Task SendAsync(string address, string subject, string text, CancellationToken cancellationToken) =>
+            _messages.Writer.WriteAsync(new(address, subject, text), cancellationToken).AsTask();
+
+        public async Task<Mail> ReadAsync()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            return await _messages.Reader.ReadAsync(timeout.Token);
+        }
+
+        public sealed record Mail(string Address, string Subject, string Text)
+        {
+            public string Code => System.Text.RegularExpressions.Regex.Match(Text, @"\b[0-9A-F]{32}\b").Value;
+        }
+    }
 
     [TestMethod]
     public async Task TwoFactorEndpointsPreservePasswordOnlyClientsAndIssueTokensAfterVerification()
@@ -92,23 +295,24 @@ public class EndpointIntegrationTest
     public async Task PendingReplay_GoesToRequestingWebSocketAndAckClearsUserDelivery()
     {
         await using var factory = CreateFactory(nameof(PendingReplay_GoesToRequestingWebSocketAndAckClearsUserDelivery));
-        var userId = Guid.NewGuid();
+        var user = new User { Username = "pending-replay-user", Role = "Member" };
         var message = new Message { SenderId = Guid.NewGuid(), ChannelId = Guid.NewGuid() };
         using (var scope = factory.Services.CreateScope())
         {
             var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            database.Users.Add(user);
             database.Messages.Add(message);
             database.UsersPendingMessages.Add(new UserPendingMessage
             {
-                UserId = userId,
+                UserId = user.Id,
                 MessageId = message.Id,
                 Content = "ciphertext for user"
             });
             await database.SaveChangesAsync();
         }
 
-        await using var requesting = CreateHubConnection(factory, userId);
-        await using var otherDevice = CreateHubConnection(factory, userId);
+        await using var requesting = CreateHubConnection(factory, user.Id);
+        await using var otherDevice = CreateHubConnection(factory, user.Id);
         var requestingReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         var otherReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var onRequestingReceipt = requesting.On<Message>("ReceiveMessage", incoming => { requestingReceipt.TrySetResult(incoming); });
@@ -203,11 +407,34 @@ public class EndpointIntegrationTest
         Assert.AreEqual(HubConnectionState.Disconnected, connection.State);
     }
 
-    private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid userId, DateTime? expires = null)
+    [TestMethod]
+    public async Task UnauthenticatedWebSocketCanReadPublicProfileButCannotReadPrivateAccount()
+    {
+        await using var factory = CreateFactory(nameof(UnauthenticatedWebSocketCanReadPublicProfileButCannotReadPrivateAccount));
+        var user = new User { Username = "publicprofile", Role = "Member" };
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            database.Users.Add(user);
+            await database.SaveChangesAsync();
+        }
+
+        await using var anonymousHub = CreateHubConnection(factory);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await anonymousHub.StartAsync(timeout.Token);
+        var profile = await anonymousHub.InvokeAsync<UserDto?>("GetUserPublicDetails", user.Id, timeout.Token);
+        Assert.AreEqual(user.Username, profile?.Username);
+        Assert.IsTrue(await anonymousHub.InvokeAsync<bool>("IsUsernameAvailable", "unusedname", timeout.Token));
+        await Assert.ThrowsExactlyAsync<HubException>(() =>
+            anonymousHub.InvokeAsync<UserDto>("GetUserPrivateDetails", timeout.Token));
+    }
+
+    private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid? userId = null, DateTime? expires = null)
     {
         var server = factory.Server;
         var socket = server.CreateWebSocketClient();
-        socket.ConfigureRequest = request => request.Headers.Authorization = "Bearer " + GenerateTestJwt(userId, expires);
+        if (userId is { } id)
+            socket.ConfigureRequest = request => request.Headers.Authorization = "Bearer " + GenerateTestJwt(id, expires);
 
         return new HubConnectionBuilder()
             .WithUrl(new Uri(server.BaseAddress, "/chathub"), options =>
@@ -238,6 +465,9 @@ public class EndpointIntegrationTest
             using (var scope = factory.Services.CreateScope())
             {
                 var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+                database.Users.AddRange(
+                    new User { Id = agent.UserId, Username = "taskowner", Role = "Member" },
+                    new User { Id = otherAgent.UserId, Username = "othertaskowner", Role = "Member" });
                 database.AgentDefinitions.AddRange(agent, otherAgent);
                 await database.SaveChangesAsync();
             }
@@ -336,6 +566,7 @@ public class EndpointIntegrationTest
             using (var scope = factory.Services.CreateScope())
             {
                 var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+                database.Users.Add(new User { Id = agent.UserId, Username = "taskworkerowner", Role = "Member" });
                 database.AgentDefinitions.Add(agent);
                 await database.SaveChangesAsync();
             }
@@ -388,7 +619,7 @@ public class EndpointIntegrationTest
     /// </summary>
     private static WebApplicationFactory<Program> CreateFactory(string dbName,
         IDictionary<string, string?>? configurationOverrides = null, Func<DataContext>? createContext = null,
-        IAgentTaskExecutor? taskExecutor = null)
+        IAgentTaskExecutor? taskExecutor = null, Action<IServiceCollection>? configureServices = null)
     {
         ApplyTestConfigurationToProcessEnvironment();
 
@@ -437,6 +668,8 @@ public class EndpointIntegrationTest
                     {
                         services.AddScoped<DataContext>(_ => createContext());
                     }
+
+                    configureServices?.Invoke(services);
 
                     // Override the JWT signing key (the app captures
                     // appsettings.json at registration time, so PostConfigure

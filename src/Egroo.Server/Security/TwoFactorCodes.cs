@@ -39,62 +39,19 @@ internal static class TwoFactorCodes
         return result.ToString();
     }
 
-    public static string ProtectSecret(byte[] secret, string encryptionKey, Guid userId)
-    {
-        byte[] payload = new byte[NonceSize + TagSize + SecretSize];
-        Span<byte> nonce = payload.AsSpan(0, NonceSize);
-        RandomNumberGenerator.Fill(nonce);
-        byte[] key = DeriveProtectionKey(encryptionKey);
-        try
-        {
-            using var cipher = new AesGcm(key, TagSize);
-            cipher.Encrypt(nonce, secret, payload.AsSpan(NonceSize + TagSize),
-                payload.AsSpan(NonceSize, TagSize), userId.ToByteArray());
-            return Convert.ToBase64String(payload);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(key);
-        }
-    }
+    private static ReadOnlySpan<byte> SecretPurpose => "Egroo two-factor secret v1"u8;
+
+    public static string ProtectSecret(byte[] secret, string encryptionKey, Guid userId) =>
+        ProtectedAccountValue.Protect(secret, encryptionKey, userId, SecretPurpose);
 
     public static byte[] UnprotectSecret(string protectedSecret, string encryptionKey, Guid userId)
     {
-        byte[] payload = Convert.FromBase64String(protectedSecret);
-        if (payload.Length != NonceSize + TagSize + SecretSize)
-            throw new CryptographicException("Invalid two-factor secret.");
-
-        byte[] key = DeriveProtectionKey(encryptionKey);
-        byte[] secret = new byte[SecretSize];
-        try
-        {
-            using var cipher = new AesGcm(key, TagSize);
-            cipher.Decrypt(payload.AsSpan(0, NonceSize), payload.AsSpan(NonceSize + TagSize),
-                payload.AsSpan(NonceSize, TagSize), secret, userId.ToByteArray());
+        var secret = ProtectedAccountValue.Unprotect(protectedSecret, encryptionKey, userId, SecretPurpose, SecretSize);
+        if (secret.Length == SecretSize)
             return secret;
-        }
-        catch (CryptographicException)
-        {
-            CryptographicOperations.ZeroMemory(secret);
-            throw;
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(key);
-        }
-    }
 
-    private static byte[] DeriveProtectionKey(string encryptionKey)
-    {
-        byte[] source = Encoding.UTF8.GetBytes(encryptionKey);
-        try
-        {
-            return HMACSHA256.HashData(source, "Egroo two-factor secret v1"u8);
-        }
-        finally
-        {
-            CryptographicOperations.ZeroMemory(source);
-        }
+        CryptographicOperations.ZeroMemory(secret);
+        throw new CryptographicException("Invalid two-factor secret.");
     }
 
     public static long? MatchTimeStep(byte[] secret, string code, DateTimeOffset now, long? lastUsed)
