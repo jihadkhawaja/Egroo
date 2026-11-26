@@ -131,6 +131,7 @@ public sealed partial class ChatWorkspace
         }));
 
         await AddTwoFactorSettingsAsync(panel);
+        await AddRecoveryEmailSettingsAsync(panel);
 
         var identity = await _session.Encryption.GetLocalIdentityAsync();
         var devices = SettingsGroup(panel, "Encryption devices", "Manage the devices that can decrypt messages sent to you.");

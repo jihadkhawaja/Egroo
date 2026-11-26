@@ -54,6 +54,14 @@ New sign-ins ask for an authenticator code or a recovery code after the password
 
 Accounts without two-factor authentication can still sign in with a password from older clients. Upgrade the client before enabling two-factor authentication if you use more than one device. Self-hosters should retain their `Encryption:Key` with database backups. Changing it prevents decryption of the existing authenticator setup keys. An unused recovery code can still be used with the password to sign in or disable two-factor authentication.
 
+## Recovery email
+
+If your server supports recovery email, open **Settings**, enter an email address and your current password, and select **Send confirmation email**. Enter the code from that inbox to verify it. For accounts with an authenticator, setting, replacing, or removing a recovery address also requires an authenticator or unused recovery code. A replacement takes effect after confirmation.
+
+At sign-in, select **Forgot password?** and enter your username and verified recovery address. Enter the code from the email and choose a new password. If your account uses an authenticator, Egroo also asks for your authenticator code or an unused recovery code. After the reset, sign in again on your devices. The reset leaves your authenticator enrollment and local encryption keys in place.
+
+Confirmation and reset codes expire after 15 minutes. An existing reset code may remain valid when you ask for another during that window.
+
 ## Encrypted channel delivery
 
 Messages from people and configured channel agents are delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.

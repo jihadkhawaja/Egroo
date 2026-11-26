@@ -1,3 +1,5 @@
+using Egroo.Server.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using Egroo.Server;
 using Egroo.Server.API;
 using Egroo.Server.Database;
@@ -6,6 +8,7 @@ using Egroo.Server.Security;
 using Egroo.Server.Services;
 using Egroo.Server.SignalR;
 using Egroo.Contracts.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
@@ -171,7 +174,7 @@ public partial class Program
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = HandleMessageReceivedAsync,
-            OnAuthenticationFailed = HandleAuthenticationFailedAsync
+            OnTokenValidated = ValidateAccountSessionAsync
         };
     }
 
@@ -186,17 +189,14 @@ public partial class Program
         return Task.CompletedTask;
     }
 
-    private static Task HandleAuthenticationFailedAsync(AuthenticationFailedContext context)
+    private static async Task ValidateAccountSessionAsync(TokenValidatedContext context)
     {
-        if (!context.Request.Path.StartsWithSegments("/chathub"))
+        if (!AccountSessions.TryReadSession(context.Principal, out var userId, out var revision)
+            || await AccountSessions.GetRevisionAsync(context.HttpContext.RequestServices.GetRequiredService<DataContext>(),
+                userId, context.HttpContext.RequestAborted) != revision)
         {
-            return Task.CompletedTask;
+            context.Fail("Your session has expired. Sign in again.");
         }
-
-        context.NoResult();
-        context.Response.StatusCode = 200;
-        context.Response.Headers["Content-Type"] = "application/json";
-        return context.Response.WriteAsync("{\"error\":\"Unauthenticated access allowed\"}");
     }
 
     private static bool IsHubOrFilePath(PathString path)
@@ -225,6 +225,10 @@ public partial class Program
         services.AddScoped<AuthRepository>();
         services.AddScoped<IAuth>(provider => provider.GetRequiredService<AuthRepository>());
         services.AddScoped<ITwoFactorAuth>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddScoped<IAccountRecovery>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddSingleton<IRecoveryEmailDelivery, SmtpRecoveryEmailDelivery>();
+        services.AddSingleton<RecoveryEmailQueue>();
+        services.AddHostedService(provider => provider.GetRequiredService<RecoveryEmailQueue>());
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
@@ -245,7 +249,13 @@ public partial class Program
 
         services.AddSingleton<AgentChannelService>();
         services.AddSingleton<IAgentChannelResponder>(sp => sp.GetRequiredService<AgentChannelService>());
-        services.AddChatHub();
+        services.AddSingleton<AccountSessions>();
+        services.AddHostedService(provider => provider.GetRequiredService<AccountSessions>());
+        services.AddChatHub(options =>
+        {
+            options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+            options.AddFilter<AccountSessions>();
+        });
     }
 
     private static EncryptionService CreateEncryptionService(IServiceProvider serviceProvider)
@@ -290,7 +300,20 @@ public partial class Program
         app.UseRateLimiter();
         app.UseCors("CorsPolicy");
         app.UseAuthentication();
+        app.Use(RejectInvalidHubCredentialsAsync);
         app.UseAuthorization();
+    }
+
+    private static async Task RejectInvalidHubCredentialsAsync(HttpContext context, RequestDelegate next)
+    {
+        // Public hub methods accept anonymous callers. A failed bearer credential must not become an anonymous connection.
+        if (context.Request.Path.StartsWithSegments("/chathub") && (await context.AuthenticateAsync()).Failure is not null)
+        {
+            await context.ChallengeAsync();
+            return;
+        }
+
+        await next(context);
     }
 
     private static void ConfigureDevelopmentPipeline(WebApplication app)

@@ -119,6 +119,8 @@ public sealed partial class ChatWorkspace : UserControl
         var submit = PrimaryButton(create ? "Create account" : "Sign in", AuthenticateAsync);
         submit.HorizontalAlignment = HorizontalAlignment.Stretch;
         form.Children.Add(submit);
+        if (!create)
+            form.Children.Add(QuietButton("Forgot password?", () => OpenPasswordRecoveryAsync(username.Text)));
         var switchMode = QuietButton(create ? "Already have an account? Sign in" : "New to Egroo? Create account", () =>
         {
             ShowAuthentication(!create, username.Text);
@@ -128,6 +130,11 @@ public sealed partial class ChatWorkspace : UserControl
         form.Children.Add(switchMode);
         SubmitOnEnter(password, AuthenticateAsync);
         SubmitOnEnter(verificationCode, AuthenticateAsync);
+        DisplayAuthenticationForm(form);
+    }
+
+    private void DisplayAuthenticationForm(StackPanel form)
+    {
         var authCard = Card(form, 28);
         authCard.MaxWidth = 430;
         authCard.VerticalAlignment = VerticalAlignment.Center;

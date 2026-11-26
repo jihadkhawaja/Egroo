@@ -90,6 +90,23 @@ Important distinction:
 - these settings are not the client private keys used for end-to-end message decryption
 - end-to-end message keys are generated per device in the client and only the public key is published back to the server
 
+### Recovery email
+
+Recovery email is optional. Configure an authenticated SMTP relay to enable enrollment and password resets. Egroo requires TLS and validates the relay certificate.
+
+| Setting | Purpose |
+| --- | --- |
+| `RecoveryEmail:Smtp:Host` | SMTP relay hostname |
+| `RecoveryEmail:Smtp:Port` | Relay port, usually `587` |
+| `RecoveryEmail:Smtp:From` | Sender address the relay allows |
+| `RecoveryEmail:Smtp:Username` | Relay credential username |
+| `RecoveryEmail:Smtp:Password` | Relay credential password |
+| `RecoveryEmail:Smtp:ImplicitTls` | Set to `true` for implicit TLS, usually on port `465`. The default requires STARTTLS. |
+
+Set `RecoveryEmail__Smtp__Password` through your deployment's secret store. Preserve `Encryption:Key` with the database backup to recover verified addresses. The API keeps addresses encrypted at rest and only stores hashes of confirmation and reset codes.
+
+Password resets invalidate previous bearer sessions. The API closes live SignalR sessions on the resetting process as soon as the change is committed. Other server processes recheck idle connections every 10 seconds, and validate the current session revision on each authenticated request or hub call.
+
 ### End-To-End Encryption Behavior
 
 Egroo's message delivery can use a device-scoped end-to-end encryption flow:

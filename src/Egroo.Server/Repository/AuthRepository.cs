@@ -1,3 +1,4 @@
+using Egroo.Server.Services;
 using Egroo.Server.Authorization;
 using Egroo.Server.Database;
 using Egroo.Server.Helpers;
@@ -11,19 +12,25 @@ using System.Security.Claims;
 
 namespace Egroo.Server.Repository
 {
-    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth
+    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth, IAccountRecovery
     {
         private readonly TimeProvider _timeProvider;
+        private readonly IRecoveryEmailDelivery? _recoveryEmail;
+        private readonly AccountSessions? _accountSessions;
 
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
             IConnectionTracker connectionTracker,
             ILogger<AuthRepository> logger,
-            TimeProvider? timeProvider = null)
+            TimeProvider? timeProvider = null,
+            IRecoveryEmailDelivery? recoveryEmail = null,
+            AccountSessions? accountSessions = null)
             : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
             _timeProvider = timeProvider ?? TimeProvider.System;
+            _recoveryEmail = recoveryEmail;
+            _accountSessions = accountSessions;
         }
 
         private void UpdateUserStatus(ref User user)
@@ -208,7 +215,7 @@ namespace Egroo.Server.Repository
                 return CreateFailureResponse("Authorization header is missing.");
             }
 
-            if (!TryReadUserIdFromToken(bearerToken, out var userId, out var tokenError))
+            if (!TryReadUserIdFromToken(bearerToken, out var userId, out var revision, out var tokenError))
             {
                 return CreateFailureResponse(tokenError);
             }
@@ -218,6 +225,9 @@ namespace Egroo.Server.Repository
             {
                 return CreateFailureResponse("User not found.");
             }
+
+            if (user.SessionRevision != revision)
+                return CreateFailureResponse("Your session has expired. Sign in again.");
 
             var jwtSecret = GetJwtSecret();
             if (jwtSecret is null)
@@ -270,9 +280,10 @@ namespace Egroo.Server.Repository
             return parts[1];
         }
 
-        private bool TryReadUserIdFromToken(string bearerToken, out Guid userId, out string errorMessage)
+        private bool TryReadUserIdFromToken(string bearerToken, out Guid userId, out long revision, out string errorMessage)
         {
             userId = Guid.Empty;
+            revision = 0;
             errorMessage = bearerToken.Length == 0
                 ? "Invalid Authorization header format."
                 : "Invalid token claims.";
@@ -294,8 +305,8 @@ namespace Egroo.Server.Repository
                 return false;
             }
 
-            var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(userIdClaim, out userId) && userId != Guid.Empty;
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(jwtToken.Claims));
+            return AccountSessions.TryReadSession(principal, out userId, out revision);
         }
 
         private string? GetJwtSecret()

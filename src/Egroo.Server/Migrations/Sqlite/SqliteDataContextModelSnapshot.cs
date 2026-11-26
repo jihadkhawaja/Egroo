@@ -1170,6 +1170,11 @@ namespace Egroo.Server.Migrations.Sqlite
                         .HasColumnType("TEXT")
                         .HasColumnName("role");
 
+                    b.Property<long>("SessionRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("sessionrevision");
+
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("TEXT")
                         .HasColumnName("updatedby");
@@ -1244,6 +1249,54 @@ namespace Egroo.Server.Migrations.Sqlite
                         .IsUnique();
 
                     b.ToTable("userencryptionkeys");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("userid");
+
+                    b.Property<long?>("ConfirmationExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("confirmationexpiresat");
+
+                    b.Property<string>("ConfirmationHash")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("confirmationhash");
+
+                    b.Property<long?>("ConfirmationSentAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("confirmationsentat");
+
+                    b.Property<string>("ProtectedAddress")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protectedaddress");
+
+                    b.Property<string>("ProtectedPendingAddress")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protectedpendingaddress");
+
+                    b.Property<long?>("ResetExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resetexpiresat");
+
+                    b.Property<string>("ResetHash")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resethash");
+
+                    b.Property<long?>("ResetSentAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resetsentat");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("userrecoverystates");
                 });
 
             modelBuilder.Entity("Egroo.Contracts.Models.UserDetail", b =>
@@ -1323,6 +1376,15 @@ namespace Egroo.Server.Migrations.Sqlite
                         });
 
                     b.Navigation("UserSecuriy");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
+                {
+                    b.HasOne("Egroo.Server.Models.User", null)
+                        .WithOne()
+                        .HasForeignKey("Egroo.Server.Models.UserRecovery", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Egroo.Server.Models.User", b =>

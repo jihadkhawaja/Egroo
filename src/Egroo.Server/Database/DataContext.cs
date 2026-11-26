@@ -42,6 +42,12 @@ namespace Egroo.Server.Database
                     b.HasKey("UserId");
                 });
 
+            modelBuilder.Entity<UserRecovery>(state =>
+            {
+                state.HasKey(x => x.UserId);
+                state.HasOne<User>().WithOne().HasForeignKey<UserRecovery>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
+
             // Agent entity indexes
             modelBuilder.Entity<AgentDefinition>()
                 .HasIndex(x => x.UserId)
@@ -100,6 +106,7 @@ namespace Egroo.Server.Database
         }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<UserRecovery> UserRecoveryStates { get; set; }
         public DbSet<UserFriend> UsersFriends { get; set; }
         public DbSet<Channel> Channels { get; set; }
         public DbSet<ChannelUser> ChannelUsers { get; set; }

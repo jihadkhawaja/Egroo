@@ -9,6 +9,9 @@ namespace Egroo.Server.Models
     public class User : UserDto
     {
         public string? Password { get; set; }
+        [ConcurrencyCheck]
+        [JsonIgnore]
+        public long SessionRevision { get; set; }
         [JsonIgnore]
         public UserSecurity? UserSecuriy { get; set; }
     }
