@@ -152,8 +152,18 @@
             }
 
             // v2 envelope: multiple wrapped keys
-            if (payload.v === 2 && payload.keys && payload.keys.length > 0) {
-                const privateKey = await importPrivateKey(request.privateKey);
+            if (payload.v === 2) {
+                if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+                    return { status: "failed", plaintext: null };
+                }
+
+                let privateKey;
+                try {
+                    privateKey = await importPrivateKey(request.privateKey);
+                }
+                catch {
+                    return { status: "failed", plaintext: null };
+                }
 
                 for (const keyEntry of payload.keys) {
                     try {
@@ -178,8 +188,11 @@
             }
 
             // v1 envelope: single wrapped key
-            if (payload.v !== 1 || !payload.wk) {
+            if (payload.v !== 1) {
                 return { status: "plain", plaintext: request.payload };
+            }
+            if (!payload.wk) {
+                return { status: "failed", plaintext: null };
             }
 
             try {

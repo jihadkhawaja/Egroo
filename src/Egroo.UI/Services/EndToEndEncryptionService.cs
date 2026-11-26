@@ -9,6 +9,9 @@ namespace Egroo.UI.Services
     {
         private const string IdentityStorageKey = "egroo.e2ee.identity.v1";
         private const string DecryptionErrorMessage = "[Unable to decrypt this message on this device.]";
+        private const string MissingKeyMessage = "[This device does not have a key for this message.]";
+        private const string DecryptionUnavailableMessage = "[Decryption is temporarily unavailable. Reopen the conversation to retry.]";
+        private static readonly TimeSpan DecryptionAttemptTimeout = TimeSpan.FromSeconds(3);
 
         private readonly ClientRuntime _jsRuntime;
         private readonly StorageService _storageService;
@@ -195,16 +198,28 @@ namespace Egroo.UI.Services
                 return message.DecryptedContent;
             }
 
-            var result = await DecryptTransportContentAsync(message.Content);
-            message.DecryptedContent = result.Status switch
+            for (var attempt = 0; attempt < 2; attempt++)
             {
-                MessageDecryptionStatus.Decrypted => result.Plaintext,
-                MessageDecryptionStatus.Plaintext => result.Plaintext,
-                MessageDecryptionStatus.Empty => string.Empty,
-                _ => DecryptionErrorMessage,
-            };
+                try
+                {
+                    var result = await DecryptTransportContentAsync(message.Content).WaitAsync(DecryptionAttemptTimeout);
+                    return message.DecryptedContent = result.Status switch
+                    {
+                        MessageDecryptionStatus.Decrypted => result.Plaintext,
+                        MessageDecryptionStatus.Plaintext => result.Plaintext,
+                        MessageDecryptionStatus.Empty => string.Empty,
+                        MessageDecryptionStatus.MissingKey => MissingKeyMessage,
+                        _ => DecryptionErrorMessage,
+                    };
+                }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    // A runtime failure gets one retry. A cryptographic failure above is final for this render.
+                    System.Diagnostics.Debug.WriteLine($"Message decryption runtime failure ({ex.GetType().Name}).");
+                }
+            }
 
-            return message.DecryptedContent;
+            return message.DecryptedContent = DecryptionUnavailableMessage;
         }
 
         public async Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent)
