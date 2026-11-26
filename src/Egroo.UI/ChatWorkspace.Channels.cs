@@ -301,13 +301,13 @@ public sealed partial class ChatWorkspace
                 : EmptyState(ChatIcon, "Start the conversation", "Write a message below to get things going.")));
         render.Bubbles = bubbles;
         render.Dates = dates;
-        ApplyTimelineRows(render.Rows, rows);
+        ApplyRows(render.Rows, rows, render.Rows.Move);
     }
 
-    private static void ApplyTimelineRows(ObservableCollection<TimelineRow> children, List<TimelineRow> rows)
+    private static void ApplyRows<T>(IList<T> children, List<T> rows, Action<int, int> move) where T : class
     {
         var desired = rows.ToHashSet();
-        var retained = new HashSet<TimelineRow>();
+        var retained = new HashSet<T>();
         for (var index = children.Count - 1; index >= 0; index--)
         {
             if (desired.Contains(children[index]))
@@ -321,7 +321,7 @@ public sealed partial class ChatWorkspace
             if (!retained.Contains(row))
                 children.Insert(index, row);
             else if (children[index] != row)
-                children.Move(children.IndexOf(row), index);
+                move(children.IndexOf(row), index);
         }
     }
 

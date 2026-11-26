@@ -162,7 +162,7 @@ public sealed partial class ChatWorkspace
                 }
 
                 displayed = current;
-                ApplyTimelineRows(rows.Children, nextRows);
+                ApplyRows(rows.Children, nextRows, rows.Children.Move);
                 status.Text = "No tasks on this page.";
                 status.IsVisible = nextRows.Count == 0;
             }

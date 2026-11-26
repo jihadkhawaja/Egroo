@@ -7,7 +7,7 @@ import { HubConnectionBuilder, HttpTransportType, LogLevel } from '@microsoft/si
 import { PNG } from 'pngjs';
 import { startLoopbackFixture } from './loopback-fixture.mjs';
 
-const [browserPublish, serverPublish] = process.argv.slice(2);
+const [browserPublish, serverPublish, previewMode] = process.argv.slice(2);
 if (!browserPublish || !serverPublish) {
     throw new Error('Pass the published browser wwwroot directory and the published API directory.');
 }
@@ -116,13 +116,31 @@ try {
         samples.push({ attachment, frameMs, receiptMs });
         await delay(120);
         if (file?.previewUrl) {
-            const response = page.waitForResponse(item => item.url() === file.previewUrl && item.ok(), { timeout: 10_000 });
-            await page.mouse.click(367, 726);
-            await (await response).finished();
-            await delay(250);
-            await page.mouse.move(430, 630);
-            await page.mouse.wheel(0, 1000);
-            await delay(120);
+            const action = findPreviewAction(await display.capture());
+            const [response] = await Promise.all([
+                page.waitForResponse(item => item.url() === file.previewUrl && item.ok(), { timeout: 10_000 }),
+                page.mouse.click(action.x, action.y)
+            ]);
+            await response.finished();
+            if (previewMode === '--inline-preview') {
+                await delay(250);
+                await page.mouse.move(430, 630);
+                await page.mouse.wheel(0, 1000);
+            }
+
+            let pixels;
+            for (let attempt = 0; attempt < 12; attempt++) {
+                pixels = previewPixels(await display.capture());
+                if (pixels.every(count => count >= 1000)) break;
+                await delay(120);
+            }
+            assert.ok(pixels.every(count => count >= 1000), 'The decrypted image preview did not paint.');
+
+            if (previewMode !== '--inline-preview') {
+                await page.keyboard.press('Escape');
+                await delay(120);
+                assert.ok(previewPixels(await display.capture()).every(count => count === 0), 'Escape did not close the image preview.');
+            }
         }
     }
     const afterMessages = await display.metrics();
@@ -271,6 +289,37 @@ function fixturePng() {
         image.data[i + 3] = 255;
     }
     return PNG.sync.write(image);
+}
+
+function findPreviewAction(frame) {
+    // The browser renders Avalonia controls onto a canvas. In the fixed light fixture,
+    // this attachment action is the widest gray button in the receiver bubble.
+    for (let y = 731; y >= 620; y--) {
+        let start = 290;
+        for (let x = start; x < 465; x++) {
+            const offset = (y * frame.width + x) * 4;
+            if (frame.data[offset] === 214 && frame.data[offset + 1] === 214 && frame.data[offset + 2] === 214)
+                continue;
+            if (start >= 298 && start <= 320 && x - start >= 105 && x - start <= 140)
+                return { x: Math.floor((start + x) / 2), y: y - 5 };
+            start = x + 1;
+        }
+    }
+    throw new Error('The attachment preview action was not visible in the latest receiver bubble.');
+}
+
+function previewPixels(frame) {
+    const counts = [0, 0];
+    for (let y = 190; y < 730; y++) {
+        for (let x = 295; x < 1180; x++) {
+            const offset = (y * frame.width + x) * 4;
+            if (Math.abs(frame.data[offset + 1] - 110) > 2 || Math.abs(frame.data[offset + 2] - 160) > 2)
+                continue;
+            if (Math.abs(frame.data[offset] - 35) <= 2) counts[0]++;
+            if (Math.abs(frame.data[offset] - 220) <= 2) counts[1]++;
+        }
+    }
+    return counts;
 }
 
 async function observeDisplay(context, page) {
