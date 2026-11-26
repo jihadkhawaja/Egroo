@@ -1198,9 +1198,38 @@ namespace Egroo.Server.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("userid");
 
+                            b1.Property<long?>("FactorLockedUntil")
+                                .HasColumnType("bigint")
+                                .HasColumnName("factorlockeduntil");
+
+                            b1.Property<long>("FactorRevision")
+                                .IsConcurrencyToken()
+                                .HasColumnType("bigint")
+                                .HasColumnName("factorrevision");
+
+                            b1.Property<int>("FailedFactorAttempts")
+                                .HasColumnType("integer")
+                                .HasColumnName("failedfactorattempts");
+
                             b1.Property<bool>("IsTwoFactorEnabled")
                                 .HasColumnType("boolean")
                                 .HasColumnName("istwofactorenabled");
+
+                            b1.Property<long?>("LastTotpStep")
+                                .HasColumnType("bigint")
+                                .HasColumnName("lasttotpstep");
+
+                            b1.Property<string>("ProtectedTotpSecret")
+                                .HasColumnType("text")
+                                .HasColumnName("protectedtotpsecret");
+
+                            b1.Property<string>("RecoveryCodeHashes")
+                                .HasColumnType("text")
+                                .HasColumnName("recoverycodehashes");
+
+                            b1.Property<long?>("TotpEnrollmentExpiresAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("totpenrollmentexpiresat");
 
                             b1.HasKey("UserId");
 

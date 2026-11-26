@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using Egroo.Client.Core;
 using Egroo.Client.Services;
+using Egroo.Contracts.Interfaces;
 using Egroo.Contracts.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -34,6 +35,7 @@ internal sealed class WorkspaceSession
 
     public Uri Api { get; }
     public HttpClient Http { get; }
+    public ITwoFactorAuth AccountSecurity => _auth;
     public ChatUserService Users { get; } = new();
     public ChatChannelService Channels { get; } = new();
     public AgentService Agents { get; }
@@ -74,13 +76,17 @@ internal sealed class WorkspaceSession
             await SignOutAsync();
     }
 
-    public async Task SignInAsync(string username, string password, bool register)
+    public async Task<Operation.Response> SignInAsync(string username, string password, bool register, string? verificationCode)
     {
-        var result = register ? await _auth.SignUp(username, password) : await _auth.SignIn(username, password);
+        var result = register ? await _auth.SignUp(username, password) : await _auth.SignIn(username, password, verificationCode);
+        if (result.RequiresTwoFactor)
+            return result;
+
         if (!result.Success || result.Token is not { } token)
             throw new InvalidOperationException(result.Message ?? "Sign-in failed.");
 
         await ConnectAsync(token);
+        return result;
     }
 
     private async Task ConnectAsync(string token)

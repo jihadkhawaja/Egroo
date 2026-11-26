@@ -130,6 +130,8 @@ public sealed partial class ChatWorkspace
             Notify("Password changed.");
         }));
 
+        await AddTwoFactorSettingsAsync(panel);
+
         var identity = await _session.Encryption.GetLocalIdentityAsync();
         var devices = SettingsGroup(panel, "Encryption devices", "Manage the devices that can decrypt messages sent to you.");
         var keys = await _session.Users.GetEncryptionKeys() ?? [];

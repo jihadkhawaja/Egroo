@@ -29,6 +29,49 @@ public class EndpointIntegrationTest
     private static readonly InMemoryDatabaseRoot DatabaseRoot = new();
 
     [TestMethod]
+    public async Task TwoFactorEndpointsPreservePasswordOnlyClientsAndIssueTokensAfterVerification()
+    {
+        using var factory = CreateFactory(nameof(TwoFactorEndpointsPreservePasswordOnlyClientsAndIssueTokensAfterVerification));
+        using var anonymous = factory.CreateClient();
+        const string username = "totpapitest";
+        const string password = "StrongP@ss1";
+        using var unauthenticated = await anonymous.PostAsJsonAsync("/api/v1/Auth/twofactor/enrollment", new { password });
+        Assert.AreEqual(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+        using var signedIn = await SignUpAndGetAuthenticatedClientAsync(factory, username);
+        var security = new Egroo.Client.Services.AuthService(signedIn);
+        Assert.IsFalse((await security.GetTwoFactorStatus()).Enabled);
+        using var legacy = await anonymous.PostAsJsonAsync("/api/v1/Auth/signin", new { username, password });
+        var legacyResult = await legacy.Content.ReadFromJsonAsync<Operation.Response>();
+        Assert.IsNotNull(legacyResult?.Token);
+
+        using var setup = await signedIn.PostAsJsonAsync("/api/v1/Auth/twofactor/enrollment", new { password });
+        Assert.IsTrue(setup.Headers.CacheControl?.NoStore);
+        var enrollment = await setup.Content.ReadFromJsonAsync<TwoFactor.Enrollment>();
+        Assert.IsNotNull(enrollment?.SharedKey);
+        var code = TwoFactorAuthTest.CodeForSecret(enrollment.SharedKey, DateTimeOffset.UtcNow);
+        using var enable = await signedIn.PostAsJsonAsync("/api/v1/Auth/twofactor/enable", new { password, verificationCode = code });
+        Assert.IsTrue(enable.Headers.CacheControl?.NoStore);
+        var activated = await enable.Content.ReadFromJsonAsync<TwoFactor.Activation>();
+        Assert.IsNotNull(activated);
+        Assert.IsNotNull(activated.RecoveryCodes);
+        Assert.IsTrue((await security.GetTwoFactorStatus()).Enabled);
+        Assert.IsNotNull((await security.RefreshSession()).Token, "Enrollment preserves previously authenticated sessions.");
+
+        using var attempted = await anonymous.PostAsJsonAsync("/api/v1/Auth/signin", new { username, password });
+        Assert.IsTrue(attempted.Headers.CacheControl?.NoStore);
+        var challenged = await attempted.Content.ReadFromJsonAsync<Operation.Response>();
+        Assert.IsNotNull(challenged);
+        Assert.IsTrue(challenged.RequiresTwoFactor);
+        Assert.IsNull(challenged.Token);
+        var anonymousSecurity = new Egroo.Client.Services.AuthService(anonymous);
+        var recovered = await anonymousSecurity.SignIn(username, password, activated.RecoveryCodes[0]);
+        Assert.IsNotNull(recovered.Token);
+        Assert.IsFalse((await anonymousSecurity.SignIn(username, password, activated.RecoveryCodes[0])).Success);
+        Assert.IsTrue((await security.DisableTwoFactor(password, activated.RecoveryCodes[1])).Success);
+        Assert.IsFalse((await security.GetTwoFactorStatus()).Enabled);
+    }
+
+    [TestMethod]
     public async Task ClientRuntimeAssetsAreServedWithoutAuthentication()
     {
         using var factory = CreateFactory(nameof(ClientRuntimeAssetsAreServedWithoutAuthentication));

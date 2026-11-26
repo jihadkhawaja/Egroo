@@ -46,6 +46,14 @@ Serve the published `wwwroot` directory over HTTPS. The API must allow the brows
 
 On an existing production browser session, the new client can import the previous browser's device key and local channel history when served from the same origin. Native app history and private keys in another WebView origin remain in that origin's storage.
 
+## Two-factor authentication
+
+In Settings, open **Two-factor authentication**, enter your current password, and select **Set up authenticator**. Add the setup key to your authenticator app as a time-based account. Use its six-digit code to finish setup. Save the recovery codes when Egroo displays them. Each code can be used once.
+
+New sign-ins ask for an authenticator code or a recovery code after the password. If you just activated the authenticator or signed in, wait for the next code. Your current signed-in sessions continue to work. To turn off two-factor authentication, enter your password and an authenticator code or an unused recovery code in Settings.
+
+Accounts without two-factor authentication can still sign in with a password from older clients. Upgrade the client before enabling two-factor authentication if you use more than one device. Self-hosters should retain their `Encryption:Key` with database backups. Changing it prevents decryption of the existing authenticator setup keys. An unused recovery code can still be used with the password to sign in or disable two-factor authentication.
+
 ## Encrypted channel delivery
 
 Messages from people and configured channel agents are delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
