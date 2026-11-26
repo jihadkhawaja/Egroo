@@ -10,8 +10,9 @@ namespace Egroo.Avalonia.Browser;
 [SupportedOSPlatform("browser")]
 internal static class Program
 {
-    private static Task Main()
+    private static Task Main(string[] args)
     {
+        App.ApiUrlOverride = args.FirstOrDefault();
         App.BrowserRuntime = new BrowserRuntime();
         return AppBuilder.Configure<App>().StartBrowserAppAsync("egroo");
     }

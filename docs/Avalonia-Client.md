@@ -51,3 +51,44 @@ On an existing production browser session, the new client can import the previou
 A message sent by a person is delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
 
 On reconnect, the requesting session receives that user's pending messages in sent order. A message remains pending for the user until one device saves and acknowledges it. Each device keeps its own local message history, and newly enrolled devices start with their own history.
+
+## Container images
+
+The **Avalonia containers** workflow builds and smoke-tests both images on pull requests. After the workflow reaches the default branch, a maintainer can run it there to publish a paired release to GitHub Container Registry. The workflow summary lists the Linux x64 image references.
+
+Both image names share a release tag derived from the source revision, workflow run, and attempt. Use the same tag for the API and browser. Use image digests if your deployment needs immutable references. Public images can be pulled anonymously. For a private package, sign in to `ghcr.io` with a GitHub personal access token (classic) that has `read:packages` and access to the package.
+
+Create `egroo-api.env` with the following settings. Supply your own values and protect the file as you would your server configuration.
+
+```dotenv
+Secrets__Jwt=<random secret of at least 32 characters>
+Encryption__Key=<random 32-character ASCII key>
+Encryption__IV=<random 16-character ASCII IV>
+Api__AllowedOrigins__0=https://chat.example.com
+```
+
+Create `egroo-config.json` beside it with the URL that browsers use to reach the API. This file is served publicly, so keep credentials in the API configuration.
+
+```json
+{
+  "apiUrl": "https://api.example.com/"
+}
+```
+
+Use the tag from the workflow and start the pair. These commands bind locally for a reverse proxy and use SQLite in a persistent Docker volume.
+
+```sh
+tag='<paired release tag>'
+docker run -d --name egroo-api --restart unless-stopped \
+  -p 127.0.0.1:8081:8080 --env-file ./egroo-api.env \
+  --mount type=volume,source=egroo-data,target=/app/App_Data \
+  "ghcr.io/jihadkhawaja/egroo-api:$tag"
+docker run -d --name egroo-browser --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  --mount "type=bind,source=$PWD/egroo-config.json,target=/usr/share/nginx/html/egroo-config.json,readonly" \
+  "ghcr.io/jihadkhawaja/egroo-browser:$tag"
+```
+
+Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time.
+
+Record the installed pair and back up the API database before upgrading. To roll back, recreate both containers with the previous pair and preserve the API settings and persistent volume. If the newer API applied incompatible migrations, restore the corresponding database backup before restarting it.
