@@ -753,86 +753,77 @@ namespace Egroo.Server.Repository
             }
         }
 
-        public async Task<bool> UpdateAvatar(string? avatarBase64)
+        public Task<bool> UpdateAvatar(string? avatarBase64) => UpdateProfileImageAsync(avatarBase64, avatar: true);
+
+        public Task<bool> UpdateCover(string? coverBase64) => UpdateProfileImageAsync(coverBase64, avatar: false);
+
+        private async Task<bool> UpdateProfileImageAsync(string? base64, bool avatar)
         {
-            if (string.IsNullOrWhiteSpace(avatarBase64))
-            {
+            if (base64 is not null && string.IsNullOrWhiteSpace(base64))
                 return false;
-            }
 
-            User? user = await GetConnectedUser(false, x => x.UserStorage);
+            var user = await GetConnectedUser(true, x => x.UserStorage);
             if (user is null)
-            {
                 return false;
-            }
-
-            if (user.UserStorage is null)
-            {
-                user.UserStorage = new UserStorage();
-            }
+            if (base64 is null && user.UserStorage is null)
+                return true;
 
             try
             {
-                byte[] imageBytes = Convert.FromBase64String(avatarBase64);
-
-                using (var image = new MagickImage(imageBytes))
+                string? encoded = null;
+                string? contentType = null;
+                if (base64 is not null)
                 {
-                    image.Resize(new MagickGeometry(128, 128) { IgnoreAspectRatio = false });
+                    var (width, height) = avatar ? (128u, 128u) : (2000u, 600u);
+                    using var image = new MagickImage(Convert.FromBase64String(base64));
+                    image.Resize(new MagickGeometry(width, height) { IgnoreAspectRatio = false });
                     image.Quality = 75;
-
-                    user.UserStorage.AvatarImageBase64 = Convert.ToBase64String(image.ToByteArray());
-                    user.UserStorage.AvatarContentType = image.Format.ToString();
+                    encoded = Convert.ToBase64String(image.ToByteArray());
+                    contentType = image.Format.ToString();
                 }
 
-                _dbContext.Users.Update(user);
+                void SetImage(UserStorage storage)
+                {
+                    if (avatar)
+                    {
+                        storage.AvatarImageBase64 = encoded;
+                        storage.AvatarContentType = contentType;
+                    }
+                    else
+                    {
+                        storage.CoverImageBase64 = encoded;
+                        storage.CoverContentType = contentType;
+                    }
+                }
+
+                if (user.UserStorage is null)
+                {
+                    var storage = new UserStorage { UserId = user.Id };
+                    SetImage(storage);
+                    _dbContext.Set<UserStorage>().Add(storage);
+                    try
+                    {
+                        await _dbContext.SaveChangesAsync();
+                        return true;
+                    }
+                    catch (DbUpdateException)
+                    {
+                        // Another device may have created the storage row while this image was processing.
+                        _dbContext.Entry(storage).State = EntityState.Detached;
+                        user.UserStorage = await _dbContext.Set<UserStorage>().AsTracking()
+                            .SingleOrDefaultAsync(row => row.UserId == user.Id);
+                        if (user.UserStorage is null)
+                            throw;
+                    }
+                }
+
+                SetImage(user.UserStorage);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update avatar image");
-                return false;
-            }
-        }
-
-        public async Task<bool> UpdateCover(string? coverBase64)
-        {
-            if (string.IsNullOrWhiteSpace(coverBase64))
-            {
-                return false;
-            }
-
-            User? user = await GetConnectedUser(false, x => x.UserStorage);
-            if (user is null)
-            {
-                return false;
-            }
-
-            if (user.UserStorage is null)
-            {
-                user.UserStorage = new UserStorage();
-            }
-
-            try
-            {
-                byte[] imageBytes = Convert.FromBase64String(coverBase64);
-
-                using (var image = new MagickImage(imageBytes))
-                {
-                    image.Resize(new MagickGeometry(2000, 600) { IgnoreAspectRatio = false });
-                    image.Quality = 75;
-
-                    user.UserStorage.CoverImageBase64 = Convert.ToBase64String(image.ToByteArray());
-                    user.UserStorage.CoverContentType = image.Format.ToString();
-                }
-
-                _dbContext.Users.Update(user);
-                await _dbContext.SaveChangesAsync();
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to update cover image");
+                _logger.LogError(ex, "Failed to update the {ImageType}", avatar ? "avatar" : "cover");
                 return false;
             }
         }

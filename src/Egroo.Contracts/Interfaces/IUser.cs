@@ -26,7 +26,9 @@ namespace Egroo.Contracts.Interfaces
         Task<bool> AddEncryptionKey(string publicKey, string keyId, string? deviceLabel);
         Task<bool> RemoveEncryptionKey(string keyId);
         Task<UserEncryptionKeyInfo[]?> GetEncryptionKeys();
+        /// <summary>Sets the current user's avatar from base64 image bytes. Pass null to remove it.</summary>
         Task<bool> UpdateAvatar(string? avatarBase64);
+        /// <summary>Sets the current user's cover from base64 image bytes. Pass null to remove it.</summary>
         Task<bool> UpdateCover(string? coverBase64);
         Task<bool> SendFeedback(string text);
     }

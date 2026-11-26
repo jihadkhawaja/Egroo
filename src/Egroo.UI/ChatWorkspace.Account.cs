@@ -114,8 +114,8 @@ public sealed partial class ChatWorkspace
         }));
         profile.Children.Add(Actions(Button("Change avatar", () => UploadProfileImageAsync(true)),
             Button("Change cover", () => UploadProfileImageAsync(false)),
-            Button("Remove avatar", () => RequireAsync(_session.Users.UpdateAvatar(null))),
-            Button("Remove cover", () => RequireAsync(_session.Users.UpdateCover(null)))));
+            Button("Remove avatar", () => RemoveProfileImageAsync(true)),
+            Button("Remove cover", () => RemoveProfileImageAsync(false))));
 
         var password = Field("Current password", secret: true);
         var newPassword = Field("New password", secret: true);
@@ -175,9 +175,15 @@ public sealed partial class ChatWorkspace
         if (image is null)
             return;
         var bytes = await ReadFileAsync(image, MaxAttachmentBytes);
-        var data = $"data:{FileContentType(image.Name)};base64,{Convert.ToBase64String(bytes)}";
+        var data = Convert.ToBase64String(bytes);
         await RequireAsync(avatar ? _session.Users.UpdateAvatar(data) : _session.Users.UpdateCover(data));
         Notify("Image saved.");
+    }
+
+    private async Task RemoveProfileImageAsync(bool avatar)
+    {
+        await RequireAsync(avatar ? _session.Users.UpdateAvatar(null) : _session.Users.UpdateCover(null));
+        Notify(avatar ? "Avatar removed." : "Cover removed.");
     }
 
     private static Guid OtherUser(UserFriend relation, Guid user) =>

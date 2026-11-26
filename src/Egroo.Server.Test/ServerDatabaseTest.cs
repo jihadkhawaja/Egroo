@@ -3,13 +3,16 @@ using Egroo.Server.Models;
 using Egroo.Server.Repository;
 using Egroo.Server.Security;
 using Egroo.Server.SignalR.Services;
+using ImageMagick;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Security.Claims;
 
 namespace Egroo.Server.Test;
 
@@ -215,6 +218,68 @@ public class ServerDatabaseTest
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DataContext>();
         Assert.IsTrue(db.Database.IsNpgsql());
+    }
+
+    [TestMethod]
+    public async Task ConcurrentFirstProfileUploadsPreserveBothImages()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var gate = new FirstProfileSaveGate();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connection).AddInterceptors(gate).Options;
+        var user = new User { Username = "profileimages", Role = "Member" };
+        await using (var setup = new SqliteDataContext(options))
+        {
+            await setup.Database.MigrateAsync();
+            setup.Users.Add(user);
+            await setup.SaveChangesAsync();
+        }
+
+        var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())], "TestAuth");
+        var http = new HttpContextAccessor { HttpContext = new DefaultHttpContext { User = new ClaimsPrincipal(identity) } };
+        UserRepository Repository(SqliteDataContext db) => new(db, http, new ConfigurationBuilder().Build(),
+            new InMemoryConnectionTracker(), NullLogger<UserRepository>.Instance);
+
+        await using var avatarDb = new SqliteDataContext(options);
+        await using var coverDb = new SqliteDataContext(options);
+        using var image = new MagickImage(MagickColors.SteelBlue, 32, 24);
+        var encoded = Convert.ToBase64String(image.ToByteArray(MagickFormat.Png));
+        var avatarUpload = Repository(avatarDb).UpdateAvatar(encoded);
+        bool coverSaved;
+        try
+        {
+            await gate.WaitForSaveAsync();
+            coverSaved = await Repository(coverDb).UpdateCover(encoded);
+        }
+        finally
+        {
+            gate.Continue();
+        }
+
+        Assert.IsTrue(await avatarUpload);
+        Assert.IsTrue(coverSaved);
+        await using var readDb = new SqliteDataContext(options);
+        var reader = Repository(readDb);
+        Assert.IsNotNull(await reader.GetAvatar(user.Id));
+        Assert.IsNotNull(await reader.GetCover(user.Id));
+    }
+
+    private sealed class FirstProfileSaveGate : SaveChangesInterceptor
+    {
+        private readonly TaskCompletionSource _waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _proceed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task WaitForSaveAsync() => _waiting.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        public void Continue() => _proceed.TrySetResult();
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (eventData.Context?.ChangeTracker.Entries<UserStorage>().Any(item => item.State == EntityState.Added) == true
+                && _waiting.TrySetResult())
+                await _proceed.Task.WaitAsync(cancellationToken);
+            return result;
+        }
     }
 
     private static MessageRepository CreateMessageRepository(DataContext db) => new(
