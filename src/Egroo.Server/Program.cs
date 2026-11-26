@@ -1,3 +1,4 @@
+using Egroo.Server;
 using Egroo.Server.API;
 using Egroo.Server.Database;
 using Egroo.Server.Repository;
@@ -23,6 +24,12 @@ public partial class Program
 {
     public static async Task MainAsync(string[] args)
     {
+        if (args.FirstOrDefault() is "setup" or "doctor")
+        {
+            Environment.ExitCode = await MaintenanceCommands.RunAsync(args[0], args[1..]);
+            return;
+        }
+
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         ConfigureInfrastructure(builder);
@@ -49,7 +56,7 @@ public partial class Program
         ServerDatabase.Register(builder);
     }
 
-    private static void ConfigureLocalDebug(WebApplicationBuilder builder)
+    internal static void ConfigureLocalDebug(WebApplicationBuilder builder, bool createSecrets = true)
     {
         if (!builder.Configuration.GetValue<bool>("Egroo:LocalDebug"))
         {
@@ -63,7 +70,7 @@ public partial class Program
         }
 
         const string localDataDirectory = "App_Data/local-debug";
-        LocalDebugSecrets.Apply(builder.Configuration, Path.Combine(builder.Environment.ContentRootPath, localDataDirectory));
+        LocalDebugSecrets.Apply(builder.Configuration, Path.Combine(builder.Environment.ContentRootPath, localDataDirectory), createSecrets);
         builder.Configuration["Database:Provider"] = "SQLite";
         if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Sqlite")))
         {
@@ -239,7 +246,7 @@ public partial class Program
         return new EncryptionService(key, iv);
     }
 
-    private static async Task ApplyMigrationsAsync(WebApplication app)
+    internal static async Task ApplyMigrationsAsync(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DataContext>();

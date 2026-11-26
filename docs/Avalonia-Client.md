@@ -46,6 +46,12 @@ Serve the published `wwwroot` directory over HTTPS. The API must allow the brows
 
 On an existing production browser session, the new client can import the previous browser's device key and local channel history when served from the same origin. Native app history and private keys in another WebView origin remain in that origin's storage.
 
+## Encrypted channel delivery
+
+Messages from people and configured channel agents are delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
+
+On reconnect, the requesting session receives that user's pending messages in sent order. A message remains pending for the user until one device saves and acknowledges it. Each device keeps its own local message history, and newly enrolled devices start with their own history.
+
 ## Container images
 
 The **Avalonia containers** workflow builds and smoke-tests both images on pull requests. After the workflow reaches the default branch, a maintainer can run it there to publish a paired release to GitHub Container Registry. The workflow summary lists the Linux x64 image references.
@@ -83,6 +89,6 @@ docker run -d --name egroo-browser --restart unless-stopped \
   "ghcr.io/jihadkhawaja/egroo-browser:$tag"
 ```
 
-Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time.
+Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time. The browser container serves the precompressed WebAssembly assets when the client accepts gzip.
 
 Record the installed pair and back up the API database before upgrading. To roll back, recreate both containers with the previous pair and preserve the API settings and persistent volume. If the newer API applied incompatible migrations, restore the corresponding database backup before restarting it.

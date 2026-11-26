@@ -5,7 +5,7 @@ namespace Egroo.Server.Database;
 
 internal static class ServerDatabase
 {
-    internal static void Register(WebApplicationBuilder builder)
+    internal static void Register(WebApplicationBuilder builder, bool readOnly = false)
     {
         string? postgresConnection = builder.Configuration.GetConnectionString("DefaultConnection");
         string? configuredProvider = builder.Configuration["Database:Provider"];
@@ -17,7 +17,7 @@ internal static class ServerDatabase
         switch (provider.ToUpperInvariant())
         {
             case "SQLITE":
-                string sqliteConnection = GetSqliteConnection(builder);
+                string sqliteConnection = GetSqliteConnection(builder, readOnly);
                 builder.Services.AddDbContext<DataContext, SqliteDataContext>(options => options.UseSqlite(sqliteConnection));
                 break;
             case "POSTGRESQL":
@@ -33,7 +33,7 @@ internal static class ServerDatabase
         }
     }
 
-    internal static string GetSqliteConnection(WebApplicationBuilder builder)
+    internal static string GetSqliteConnection(WebApplicationBuilder builder, bool readOnly = false)
     {
         var connection = new SqliteConnectionStringBuilder(builder.Configuration.GetConnectionString("Sqlite") ?? "");
         if (connection.DataSource.Length == 0)
@@ -49,8 +49,12 @@ internal static class ServerDatabase
         if (!connection.DataSource.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
         {
             connection.DataSource = Path.GetFullPath(connection.DataSource, builder.Environment.ContentRootPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(connection.DataSource)!);
+            if (!readOnly)
+                Directory.CreateDirectory(Path.GetDirectoryName(connection.DataSource)!);
         }
+
+        if (readOnly)
+            connection.Mode = SqliteOpenMode.ReadOnly;
 
         connection.ForeignKeys ??= true;
         return connection.ToString();

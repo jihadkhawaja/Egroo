@@ -1,0 +1,192 @@
+name: Avalonia validation
+
+on:
+  push:
+    branches: [avalonia, main]
+  pull_request:
+    branches: [avalonia, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalonia-validation-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Solution and server tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: egroo
+          POSTGRES_DB: egroo
+          POSTGRES_PASSWORD: egroo-ci
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U egroo -d egroo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build src/Egroo.slnx -c Release
+      - run: dotnet test src/Egroo.Server.Test -c Release --no-build --logger trx --results-directory TestResults
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: server-test-results
+          path: TestResults/*.trx
+      - name: Smoke test PostgreSQL setup and diagnostics
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5175
+          Database__Provider: PostgreSQL
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=${{ job.services.postgres.ports['5432'] }};Database=egroo;Username=egroo;Password=egroo-ci
+          Secrets__Jwt: egroo-disposable-ci-jwt-signing-secret
+          Encryption__Key: 0123456789abcdef0123456789abcdef
+          Encryption__IV: 0123456789abcdef
+          Api__AllowedOrigins__0: https://chat.example.test
+          Logging__LogLevel__Default: Warning
+        run: |
+          server=src/Egroo.Server/bin/Release/net10.0/Egroo.Server.dll
+          dotnet "$server" setup
+          dotnet "$server" setup
+          dotnet "$server" > "$RUNNER_TEMP/egroo-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          if ! curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 --max-time 3 \
+            "$ASPNETCORE_URLS/runtime/index.html" > /dev/null; then
+            cat "$RUNNER_TEMP/egroo-api.log"
+            exit 1
+          fi
+          dotnet "$server" doctor --api-url "$ASPNETCORE_URLS" --browser-origin https://chat.example.test
+
+  desktop:
+    name: Desktop publish (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            executable: desktop/Egroo.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            executable: desktop/Egroo
+          - os: macos-15
+            rid: osx-arm64
+            executable: Egroo.app/Contents/MacOS/Egroo
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish and verify executable
+        shell: pwsh
+        env:
+          EGROO_RID: ${{ matrix.rid }}
+          EGROO_EXECUTABLE: ${{ matrix.executable }}
+        run: |
+          dotnet publish src/Egroo.Avalonia/Desktop -c Release -r $env:EGROO_RID --self-contained -o artifacts/desktop/
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path -LiteralPath "artifacts/$env:EGROO_EXECUTABLE" -PathType Leaf)) {
+            throw "Expected desktop executable was not published: $env:EGROO_EXECUTABLE"
+          }
+
+  browser:
+    name: Browser publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install wasm-tools
+      - run: dotnet publish src/Egroo.Avalonia/Browser -c Release -o artifacts/browser
+      - name: Verify static app assets
+        shell: pwsh
+        run: |
+          $root = 'artifacts/browser/wwwroot'
+          $page = Get-Content (Join-Path $root 'index.html') -Raw
+          $scripts = [regex]::Matches($page, '<script\b[^>]*\bsrc="([^"]+)"')
+          if ($scripts.Count -eq 0) { throw 'The published page declares no scripts.' }
+          foreach ($script in $scripts) {
+            $asset = Get-Item -LiteralPath (Join-Path $root $script.Groups[1].Value)
+            if ($asset.Length -eq 0) { throw "Published script is empty: $($asset.Name)" }
+          }
+          $wasm = Get-ChildItem (Join-Path $root '_framework') -Recurse -File -Filter '*.wasm' |
+            Where-Object Length -gt 0 | Select-Object -First 1
+          if (!$wasm) { throw 'The published bundle contains no WebAssembly runtime.' }
+
+  android:
+    name: Android release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install android
+      - name: Build and verify APK
+        run: |
+          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-test-apk
+          path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS simulator release build
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: src/Egroo.Avalonia/iOS
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.401
+      - name: Install iOS workload for Xcode 26.6
+        run: |
+          xcodebuild -version
+          printf '%s\n' '{"sdk":{"version":"10.0.401","rollForward":"disable","workloadVersion":"10.0.401"}}' > global.json
+          dotnet workload install ios
+      - name: Build and verify arm64 simulator app
+        run: |
+          # Exercise the simulator bundle without the Release device AOT pass.
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false -p:UseInterpreter=true
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          tar -czf "$GITHUB_WORKSPACE/artifacts/egroo-ios-simulator.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-arm64-simulator-app
+          path: artifacts/egroo-ios-simulator.tar.gz
+          if-no-files-found: error

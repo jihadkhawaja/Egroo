@@ -23,7 +23,9 @@ namespace Egroo.Server.Repository
 
         public string DecryptContent(string content) => _encryptionService.Decrypt(content);
 
-        public async Task<bool> SendMessage(Message message)
+        public Task<bool> SendMessage(Message message) => SendMessage(message, []);
+
+        public async Task<bool> SendMessage(Message message, IReadOnlyCollection<MessageRecipientContent> deliveries)
         {
             bool hasTransportContent = !string.IsNullOrWhiteSpace(message?.Content)
                 || (message?.RecipientContents?.Count > 0)
@@ -33,60 +35,77 @@ namespace Egroo.Server.Repository
                 return false;
 
             message.Id = Guid.NewGuid();
-            message.DateSent = DateTime.UtcNow;
+            message.DateSent = DateTimeOffset.UtcNow;
+            var pendingMessages = deliveries.Select(delivery => new UserPendingMessage
+            {
+                UserId = delivery.UserId,
+                MessageId = message.Id,
+                Content = delivery.Content,
+            }).ToArray();
 
             try
             {
-                await _dbContext.Messages.AddAsync(message);
+                _dbContext.Messages.Add(message);
+                _dbContext.UsersPendingMessages.AddRange(pendingMessages);
                 await _dbContext.SaveChangesAsync();
                 return true;
             }
             catch (Exception ex)
             {
+                _dbContext.Entry(message).State = EntityState.Detached;
+                foreach (var pendingMessage in pendingMessages)
+                {
+                    _dbContext.Entry(pendingMessage).State = EntityState.Detached;
+                }
                 _logger.LogError(ex, "Error sending message");
                 return false;
             }
         }
 
-        public async Task<bool> UpdateMessage(Message message)
+        public async Task<(Message? Message, bool Changed)> MarkMessageSeen(Guid readerId, Guid messageId, Guid referenceId)
         {
-            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
-                return false;
-
-            Message? dbMessage = await _dbContext.Messages.FirstOrDefaultAsync(x => x.ReferenceId == message.ReferenceId);
-            if (dbMessage is null)
-                return false;
-
-            dbMessage.DateSeen = DateTimeOffset.UtcNow;
-            dbMessage.DateUpdated = DateTimeOffset.UtcNow;
+            var authorizedMessage = _dbContext.Messages.Where(message =>
+                message.Id == messageId && message.ReferenceId == referenceId && message.DateDeleted == null
+                && message.SenderId != readerId && _dbContext.ChannelUsers.Any(member =>
+                    member.UserId == readerId && member.ChannelId == message.ChannelId && member.DateDeleted == null));
 
             try
             {
-                _dbContext.Messages.Update(dbMessage);
-                await _dbContext.SaveChangesAsync();
-                return true;
+                var seenAt = DateTimeOffset.UtcNow;
+                int changed = await authorizedMessage.Where(message => message.DateSeen == null)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(message => message.DateSeen, seenAt)
+                        .SetProperty(message => message.DateUpdated, seenAt));
+
+                return (await authorizedMessage.AsNoTracking().SingleOrDefaultAsync(), changed == 1);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating message");
-                return false;
+                _logger.LogError(ex, "Error recording a read receipt for message {MessageId}", messageId);
+                return default;
             }
         }
 
-        public async Task UpdatePendingMessage(Guid messageid)
+        public async Task UpdatePendingMessage(Guid userId, Guid messageId)
         {
             try
             {
-                var pendingMessage = await _dbContext.UsersPendingMessages.FirstOrDefaultAsync(x =>
-                    x.MessageId == messageid &&
-                    x.DateUserReceivedOn == null &&
-                    x.DateDeleted == null);
+                var pendingMessages = await _dbContext.UsersPendingMessages
+                    .Where(x => x.UserId == userId
+                        && x.MessageId == messageId
+                        && x.DateUserReceivedOn == null
+                        && x.DateDeleted == null)
+                    .ToListAsync();
 
-                if (pendingMessage is not null)
-                {
-                    _dbContext.UsersPendingMessages.Remove(pendingMessage);
-                    await _dbContext.SaveChangesAsync();
-                }
+                if (pendingMessages.Count == 0)
+                    return;
+
+                _dbContext.UsersPendingMessages.RemoveRange(pendingMessages);
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                // Another receipt already removed the pending delivery.
             }
             catch (Exception ex)
             {
@@ -103,6 +122,33 @@ namespace Egroo.Server.Repository
         public async Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId)
         {
             return await _dbContext.UsersPendingMessages.Where(x => x.UserId == userId).ToListAsync();
+        }
+
+        public async Task<IReadOnlyList<(Message Message, string? Content)>> GetPendingMessageDeliveries(Guid userId)
+        {
+            var deliveries = await (
+                from pending in _dbContext.UsersPendingMessages
+                join message in _dbContext.Messages on pending.MessageId equals message.Id
+                where pending.UserId == userId && pending.DateUserReceivedOn == null
+                    && pending.DateDeleted == null && message.DateDeleted == null
+                    && pending.Content != null
+                orderby message.DateSent ?? message.DateCreated, message.Id, pending.Id
+                select new
+                {
+                    Message = message,
+                    pending.Content,
+                    AgentName = _dbContext.AgentDefinitions
+                        .Where(agent => agent.Id == message.AgentDefinitionId)
+                        .Select(agent => agent.Name).FirstOrDefault()
+                }
+            ).AsNoTracking().ToArrayAsync();
+
+            foreach (var delivery in deliveries)
+            {
+                delivery.Message.DisplayName = delivery.AgentName;
+            }
+
+            return deliveries.Select(delivery => (delivery.Message, delivery.Content)).ToArray();
         }
 
         public async Task<Message?> GetMessageById(Guid messageId)

@@ -88,7 +88,7 @@ public sealed partial class ChatWorkspace
         AddDestination(WorkspaceSection.Settings, SettingsIcon, ShowSettingsAsync);
 
         var breadcrumb = Inline(Text("Egroo", 13, Muted, FontWeight.Medium), Icon(ForwardIcon, Muted, 11), _sectionName);
-        _reconnect = StyledButton("Reconnect", RestoreAsync, "quiet", serialize: false);
+        _reconnect = StyledButton("Reconnect", ReconnectAsync, "quiet", serialize: false);
         _reconnect.IsVisible = false;
         var connection = Inline(_connectionDot, _connectionText, _reconnect);
         connection.HorizontalAlignment = HorizontalAlignment.Right;
@@ -109,6 +109,8 @@ public sealed partial class ChatWorkspace
         main.Children.Add(_titleBar);
         Grid.SetRow(_body, 1);
         main.Children.Add(_body);
+        Grid.SetRow(_publicProfileView, 1);
+        main.Children.Add(_publicProfileView);
         Grid.SetRow(_notice, 2);
         main.Children.Add(_notice);
         Grid.SetColumn(main, 1);
@@ -148,6 +150,7 @@ public sealed partial class ChatWorkspace
 
     private void SetWorkspaceOpen(bool open)
     {
+        ClosePublicProfile();
         _workspaceOpen = open;
         _profile.Children.Clear();
         if (open && _session.User is { } user)
@@ -172,6 +175,7 @@ public sealed partial class ChatWorkspace
 
     private void SelectSection(WorkspaceSection section)
     {
+        ClosePublicProfile();
         _sectionName.Text = section.ToString();
         foreach (var (destination, buttons) in _destinations)
         {
@@ -186,7 +190,10 @@ public sealed partial class ChatWorkspace
         _connectionText.Text = connected ? "Connected" : "Offline";
         _connectionDot.Background = connected ? Muted : Brushes.Transparent;
         if (_reconnect is not null)
-            _reconnect.IsVisible = !connected && _workspaceOpen;
+        {
+            _reconnect.Content = connected ? "Retry messages" : "Reconnect";
+            _reconnect.IsVisible = _workspaceOpen && (!connected || PendingReplayFailed);
+        }
     }
 
     private StackPanel Page(string title, string? description = null, Button? action = null)

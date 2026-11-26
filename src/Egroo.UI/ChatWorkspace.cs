@@ -12,6 +12,14 @@ namespace Egroo.UI;
 
 public sealed partial class ChatWorkspace : UserControl
 {
+    private static readonly TimeSpan[] PendingReplayRetryDelays =
+        [TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2)];
+    private CancellationTokenSource? _pendingReplayCancellation;
+    private long? _pendingReplayGeneration;
+    private long? _replayedGeneration;
+    private long? _failedReplayGeneration;
+    private bool PendingReplayFailed => _failedReplayGeneration == _session.ConnectionGeneration;
+
     private readonly ClientRuntime _runtime;
     private readonly WorkspaceSession _session;
     private readonly Func<string, byte[], Task>? _exportFile;
@@ -36,7 +44,7 @@ public sealed partial class ChatWorkspace : UserControl
         _session.Received += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message));
         _session.Updated += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message, updateOnly: true));
         _session.Typing += (state, starts) => Dispatcher.UIThread.Post(() => UpdateTyping(state, starts));
-        _session.ConnectionChanged += () => Dispatcher.UIThread.Post(() => _ = ConnectionChangedAsync());
+        _session.ConnectionChanged += () => Dispatcher.UIThread.Post(ConnectionChanged);
         _session.Voice.StateChanged += () => Dispatcher.UIThread.Post(UpdateVoice);
 
         BuildShell();
@@ -61,6 +69,11 @@ public sealed partial class ChatWorkspace : UserControl
             await _session.RestoreAsync();
             if (_session.User is not null)
                 await OpenWorkspaceAsync();
+            else if (_workspaceOpen)
+            {
+                await CloseChannelViewAsync();
+                ShowAuthentication();
+            }
         });
     }
 
@@ -119,41 +132,96 @@ public sealed partial class ChatWorkspace : UserControl
         _wasConnected = true;
         SetWorkspaceOpen(true);
         await ShowChannelsAsync();
-        await _session.Messages.SendPendingMessages();
+        _ = ReplayPendingMessagesAsync();
     }
 
     private async Task SignOutAsync()
     {
+        _pendingReplayCancellation?.Cancel();
         await CloseChannelViewAsync();
         await _session.SignOutAsync();
         _wasConnected = false;
         ShowAuthentication();
     }
 
-    private async Task ConnectionChangedAsync()
+    private void ConnectionChanged()
     {
         if (_session.User is null)
             return;
+
         UpdateConnectionIndicator();
         if (!_session.Connected)
         {
+            _pendingReplayCancellation?.Cancel();
             _wasConnected = false;
             Notify("Connection interrupted. Use Reconnect if the server stays offline.");
             return;
         }
+
         if (!_wasConnected)
         {
             _wasConnected = true;
             Notify(string.Empty);
-            try
+        }
+
+        _ = ReplayPendingMessagesAsync();
+    }
+
+    private Task ReconnectAsync() => _session.Connected ? ReplayPendingMessagesAsync() : RestoreAsync();
+
+    private async Task ReplayPendingMessagesAsync()
+    {
+        var generation = _session.ConnectionGeneration;
+        if (!_workspaceOpen || !_session.Connected || _replayedGeneration == generation
+            || (_pendingReplayCancellation is not null && _pendingReplayGeneration == generation))
+            return;
+
+        _pendingReplayCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _pendingReplayCancellation = cancellation;
+        _pendingReplayGeneration = generation;
+        var messages = _session.Messages;
+        if (PendingReplayFailed)
+        {
+            _failedReplayGeneration = null;
+            UpdateConnectionIndicator();
+            Notify(string.Empty);
+        }
+
+        try
+        {
+            for (int retry = 0; IsCurrentConnection(); retry++)
             {
-                await _session.Messages.SendPendingMessages();
-            }
-            catch (Exception ex)
-            {
-                Notify(ex.Message);
+                try
+                {
+                    await messages.SendPendingMessages(cancellation.Token);
+                    if (IsCurrentConnection())
+                        _replayedGeneration = generation;
+                    return;
+                }
+                catch (Exception) when (retry < PendingReplayRetryDelays.Length && IsCurrentConnection())
+                {
+                    await Task.Delay(PendingReplayRetryDelays[retry], cancellation.Token);
+                }
             }
         }
+        catch (Exception) when (!IsCurrentConnection())
+        {
+        }
+        catch (Exception)
+        {
+            _failedReplayGeneration = generation;
+            UpdateConnectionIndicator();
+            Notify("Couldn’t retrieve queued messages. Select Retry messages to try again.");
+        }
+        finally
+        {
+            if (ReferenceEquals(_pendingReplayCancellation, cancellation))
+                _pendingReplayCancellation = null;
+        }
+
+        bool IsCurrentConnection() => !cancellation.IsCancellationRequested
+            && _workspaceOpen && _session.Connected && _session.ConnectionGeneration == generation;
     }
 
     private async Task PollMediaAsync()

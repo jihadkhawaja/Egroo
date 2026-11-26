@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/avalonia-containers.yml'
       - '.dockerignore'
+      - 'global.json'
       - 'Directory.Build.props'
       - 'scripts/smoke-avalonia-containers.sh'
       - 'src/Egroo.Avalonia/**'

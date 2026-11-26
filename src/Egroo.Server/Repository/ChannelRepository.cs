@@ -151,13 +151,16 @@ namespace Egroo.Server.Repository
 
         public async Task<bool> ChannelContainUser(Guid channelId, Guid userId)
         {
-            return await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelId && x.UserId == userId) != null;
+            return await _dbContext.ChannelUsers.AnyAsync(x =>
+                x.ChannelId == channelId && x.UserId == userId && x.DateDeleted == null);
         }
 
         public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
             HashSet<UserDto> channelUsers = new();
-            var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
+            var currentChannelUsers = await _dbContext.ChannelUsers
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .ToListAsync();
             if (currentChannelUsers is null)
             {
                 return null;
