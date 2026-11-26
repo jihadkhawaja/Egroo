@@ -4,11 +4,63 @@
     const results = new Map();
     let database;
 
+    const historyIndex = "historyByChannelAndDate";
+
+    function putHistory(store, scope, message, key) {
+        const date = Date.parse(message.dateSent ?? message.dateCreated);
+        message._egrooHistoryScope = scope;
+        message._egrooHistoryDate = Number.isFinite(date) ? date : 0;
+        store.put(message, key);
+    }
+
+    function backfillHistoryIndex(store, range) {
+        const batchSize = 512;
+        const keys = store.getAllKeys(range, batchSize);
+        const records = store.getAll(range, batchSize);
+        records.onsuccess = () => {
+            for (let index = 0; index < records.result.length; index++) {
+                const message = records.result[index];
+                const key = keys.result[index];
+                const suffix = "/" + message?.referenceId;
+                if (message?.referenceId && typeof key === "string" && key.endsWith(suffix))
+                    putHistory(store, key.slice(0, -suffix.length), message, key);
+            }
+
+            if (keys.result.length === batchSize)
+                backfillHistoryIndex(store, IDBKeyRange.lowerBound(keys.result.at(-1), true));
+        };
+    }
+
     function openCache() {
         database ??= new Promise((resolve, reject) => {
-            const request = indexedDB.open("EgrooNative", 1);
-            request.onupgradeneeded = () => request.result.createObjectStore("cache");
-            request.onsuccess = () => resolve(request.result);
+            const request = indexedDB.open("EgrooNative", 2);
+            let blocked = false;
+            request.onupgradeneeded = event => {
+                const store = event.oldVersion === 0
+                    ? request.result.createObjectStore("cache")
+                    : request.transaction.objectStore("cache");
+                store.createIndex(historyIndex, ["_egrooHistoryScope", "_egrooHistoryDate"]);
+                if (event.oldVersion === 0) return;
+
+                backfillHistoryIndex(store);
+            };
+            request.onblocked = () => {
+                blocked = true;
+                reject(new Error("Close any other Egroo tabs or windows and retry to update local history."));
+            };
+            request.onsuccess = () => {
+                const db = request.result;
+                if (blocked) {
+                    db.close();
+                    database = undefined;
+                    return;
+                }
+                db.onversionchange = () => {
+                    db.close();
+                    database = undefined;
+                };
+                resolve(db);
+            };
             request.onerror = () => { database = undefined; reject(request.error); };
         });
         return database;
@@ -38,12 +90,34 @@
                     current.content = message.content ?? current.content;
                     current.dateSeen = message.dateSeen ?? current.dateSeen;
                     current.dateSent = message.dateSent ?? current.dateSent;
-                    store.put(current, id);
+                    putHistory(store, scope, current, id);
                 } else if (!updateOnly && message.content !== null) {
-                    store.put(message, id);
+                    putHistory(store, scope, message, id);
                 }
             };
             tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error);
+        });
+    }
+
+    async function readHistory(scope, limit) {
+        if (limit !== null && limit <= 0) return [];
+        const range = IDBKeyRange.bound([scope, Number.MIN_SAFE_INTEGER], [scope, Number.MAX_SAFE_INTEGER]);
+        if (limit === null)
+            return cache("readonly", store => store.index(historyIndex).getAll(range));
+
+        const db = await openCache();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction("cache", "readonly");
+            const request = tx.objectStore("cache").index(historyIndex).openCursor(range, "prev");
+            const messages = [];
+            request.onsuccess = () => {
+                const cursor = request.result;
+                if (!cursor) return;
+                messages.push(cursor.value);
+                if (messages.length < limit) cursor.continue();
+            };
+            tx.oncomplete = () => resolve(messages.reverse());
             tx.onabort = () => reject(tx.error);
         });
     }
@@ -78,7 +152,7 @@
                             const existing = store.get(key);
                             existing.onsuccess = () => {
                                 if (!existing.result && reference && record.content)
-                                    store.put({ ...record, referenceId: reference }, key);
+                                    putHistory(store, scope, { ...record, referenceId: reference }, key);
                             };
                         }
                         tx.oncomplete = resolve;
@@ -103,12 +177,7 @@
         ["storage.get", key => localStorage.getItem(key)],
         ["storage.set", (key, value) => localStorage.setItem(key, value)],
         ["storage.remove", key => localStorage.removeItem(key)],
-        ["history.get", async (scope, limit) => {
-            const range = IDBKeyRange.bound(scope + "/", scope + "/\uffff");
-            const messages = await cache("readonly", store => store.getAll(range));
-            messages.sort((a, b) => Date.parse(a.dateSent ?? a.dateCreated) - Date.parse(b.dateSent ?? b.dateCreated));
-            return limit === null ? messages : messages.slice(-limit);
-        }],
+        ["history.get", readHistory],
         ["history.put", storeMessage],
         ["history.importLegacy", importLegacyHistory],
         ["media.events", () => events.splice(0)],
