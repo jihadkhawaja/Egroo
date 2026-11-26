@@ -1,6 +1,8 @@
 using Egroo.Server.Database;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
@@ -37,6 +39,68 @@ public class EndpointIntegrationTest
         using var script = await client.GetAsync("/runtime/clientRuntime.js");
         Assert.AreEqual(HttpStatusCode.OK, script.StatusCode);
         StringAssert.Contains(await script.Content.ReadAsStringAsync(), "globalThis.egrooRuntime");
+    }
+
+    [TestMethod]
+    public async Task PendingReplay_GoesToRequestingWebSocketAndAckClearsUserDelivery()
+    {
+        await using var factory = CreateFactory(nameof(PendingReplay_GoesToRequestingWebSocketAndAckClearsUserDelivery));
+        var userId = Guid.NewGuid();
+        var message = new Message { SenderId = Guid.NewGuid(), ChannelId = Guid.NewGuid() };
+        using (var scope = factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            database.Messages.Add(message);
+            database.UsersPendingMessages.Add(new UserPendingMessage
+            {
+                UserId = userId,
+                MessageId = message.Id,
+                Content = "ciphertext for user"
+            });
+            await database.SaveChangesAsync();
+        }
+
+        await using var requesting = CreateHubConnection(factory, userId);
+        await using var otherDevice = CreateHubConnection(factory, userId);
+        var requestingReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var otherReceipt = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var onRequestingReceipt = requesting.On<Message>("ReceiveMessage", incoming => { requestingReceipt.TrySetResult(incoming); });
+        using var onOtherReceipt = otherDevice.On<Message>("ReceiveMessage", incoming => { otherReceipt.TrySetResult(incoming); });
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await requesting.StartAsync(timeout.Token);
+        await otherDevice.StartAsync(timeout.Token);
+
+        await requesting.InvokeAsync(nameof(IMessageHub.SendPendingMessages), timeout.Token);
+        var firstReceipt = await Task.WhenAny(requestingReceipt.Task, otherReceipt.Task).WaitAsync(timeout.Token);
+        Assert.AreSame(requestingReceipt.Task, firstReceipt);
+        var delivered = await requestingReceipt.Task;
+        Assert.AreEqual(message.Id, delivered.Id);
+        Assert.AreEqual("ciphertext for user", delivered.Content);
+
+        await otherDevice.InvokeAsync(nameof(IMessageHub.SendPendingMessages), timeout.Token);
+        Assert.AreEqual(message.Id, (await otherReceipt.Task.WaitAsync(timeout.Token)).Id);
+
+        await requesting.InvokeAsync(nameof(IMessageHub.UpdatePendingMessage), message.Id, timeout.Token);
+        using var verificationScope = factory.Services.CreateScope();
+        var verification = verificationScope.ServiceProvider.GetRequiredService<DataContext>();
+        Assert.IsFalse(await verification.UsersPendingMessages.AnyAsync(pending => pending.MessageId == message.Id));
+    }
+
+    private static HubConnection CreateHubConnection(WebApplicationFactory<Program> factory, Guid userId)
+    {
+        var server = factory.Server;
+        var socket = server.CreateWebSocketClient();
+        socket.ConfigureRequest = request => request.Headers.Authorization = "Bearer " + GenerateTestJwt(userId);
+
+        return new HubConnectionBuilder()
+            .WithUrl(new Uri(server.BaseAddress, "/chathub"), options =>
+            {
+                options.SkipNegotiation = true;
+                options.Transports = HttpTransportType.WebSockets;
+                options.WebSocketFactory = (context, cancellationToken) =>
+                    new ValueTask<System.Net.WebSockets.WebSocket>(socket.ConnectAsync(context.Uri, cancellationToken));
+            })
+            .Build();
     }
 
     static EndpointIntegrationTest()

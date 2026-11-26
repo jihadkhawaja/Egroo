@@ -20,6 +20,7 @@ namespace Egroo.Contracts.Interfaces
         Task UpdatePendingMessage(Guid userId, Guid messageId);
         Task<Message?> GetMessageByReferenceId(Guid referenceId);
         Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId);
+        Task<IReadOnlyList<(Message Message, string? Content)>> GetPendingMessageDeliveries(Guid userId);
         Task<Message?> GetMessageById(Guid messageId);
         Task<bool> AddPendingMessage(UserPendingMessage pendingMessage);
         string DecryptContent(string content);

@@ -139,13 +139,13 @@ namespace Egroo.Server.SignalR.Hubs
             if (!userId.HasValue)
                 return;
 
-            IEnumerable<UserPendingMessage> pendingMessages = await _messageRepository.GetPendingMessagesForUser(userId.Value);
-            foreach (var pending in pendingMessages)
+            var deliveries = await _messageRepository.GetPendingMessageDeliveries(userId.Value);
+            foreach (var (message, content) in deliveries)
             {
-                var message = await _messageRepository.GetMessageById(pending.MessageId);
-                if (message == null)
-                    continue;
-                await SendClientMessage(userId.Value, message, pending.Content);
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    await Clients.Caller.SendAsync("ReceiveMessage", CloneForDelivery(message, content), Context.ConnectionAborted);
+                }
             }
         }
 

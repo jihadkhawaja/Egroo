@@ -185,6 +185,9 @@ public class ChatHubTest
         public Task<Message?> GetMessageById(Guid messageId) => Task.FromResult<Message?>(null);
         public Task<Message?> GetMessageByReferenceId(Guid referenceId) => Task.FromResult<Message?>(null);
         public Task<IEnumerable<UserPendingMessage>> GetPendingMessagesForUser(Guid userId) => Task.FromResult<IEnumerable<UserPendingMessage>>(Array.Empty<UserPendingMessage>());
+        public Dictionary<Guid, IReadOnlyList<(Message Message, string? Content)>> PendingDeliveries { get; } = new();
+        public Task<IReadOnlyList<(Message Message, string? Content)>> GetPendingMessageDeliveries(Guid userId) =>
+            Task.FromResult(PendingDeliveries.GetValueOrDefault(userId) ?? []);
         public Task UpdatePendingMessage(Guid userId, Guid messageId)
         {
             PendingReceipt = (userId, messageId);
@@ -812,6 +815,30 @@ public class ChatHubTest
         var hub = CreateHub(Guid.NewGuid());
         // stub returns empty list
         await hub.SendPendingMessages();
+    }
+
+    [TestMethod]
+    public async Task SendPendingMessages_OnlySendsToRequestingConnection()
+    {
+        var userId = Guid.NewGuid();
+        var tracker = new InMemoryConnectionTracker();
+        tracker.TrackConnection(userId, "replay-caller");
+        tracker.TrackConnection(userId, "other-device");
+        var repository = new StubMessageRepository();
+        var first = new Message();
+        var second = new Message();
+        repository.PendingDeliveries[userId] = [(first, "first ciphertext"), (second, "second ciphertext")];
+        var hub = CreateHub(userId, tracker: tracker, messageRepo: repository, connectionId: "replay-caller");
+
+        await hub.SendPendingMessages();
+
+        var clients = GetClients(hub);
+        Assert.HasCount(0, clients.ClientCalls);
+        Assert.IsTrue(clients.CallerProxy.Calls.All(call => call.Method == "ReceiveMessage"));
+        CollectionAssert.AreEqual(
+            new[] { (first.Id, "first ciphertext"), (second.Id, "second ciphertext") },
+            clients.CallerProxy.Calls.Select(call => (Message)call.Args.Single()!)
+                .Select(delivered => (delivered.Id, delivered.Content)).ToArray());
     }
 
     [TestMethod]

@@ -125,6 +125,21 @@ namespace Egroo.Server.Repository
             return await _dbContext.UsersPendingMessages.Where(x => x.UserId == userId).ToListAsync();
         }
 
+        public async Task<IReadOnlyList<(Message Message, string? Content)>> GetPendingMessageDeliveries(Guid userId)
+        {
+            var deliveries = await (
+                from pending in _dbContext.UsersPendingMessages
+                join message in _dbContext.Messages on pending.MessageId equals message.Id
+                where pending.UserId == userId && pending.DateUserReceivedOn == null
+                    && pending.DateDeleted == null && message.DateDeleted == null
+                    && pending.Content != null
+                orderby message.DateSent ?? message.DateCreated, message.Id, pending.Id
+                select new { Message = message, Content = pending.Content }
+            ).AsNoTracking().ToArrayAsync();
+
+            return deliveries.Select(delivery => (delivery.Message, delivery.Content)).ToArray();
+        }
+
         public async Task<Message?> GetMessageById(Guid messageId)
         {
             return await _dbContext.Messages.FirstOrDefaultAsync(x => x.Id == messageId);

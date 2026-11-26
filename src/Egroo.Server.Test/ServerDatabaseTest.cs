@@ -105,13 +105,7 @@ public class ServerDatabaseTest
                         """);
                 }
 
-                var repository = new MessageRepository(
-                    writer,
-                    new HttpContextAccessor(),
-                    new ConfigurationBuilder().Build(),
-                    new InMemoryConnectionTracker(),
-                    new EncryptionService(TestServiceProvider.EncryptionKey, TestServiceProvider.EncryptionIV),
-                    NullLogger<MessageRepository>.Instance);
+                var repository = CreateMessageRepository(writer);
                 bool sent = await repository.SendMessage(message, deliveries);
                 Assert.AreEqual(!rejectSecondDelivery, sent);
             }
@@ -175,6 +169,41 @@ public class ServerDatabaseTest
     }
 
     [TestMethod]
+    public async Task PendingMessageReplay_IsOrderedAndExcludesOtherUsersAndInactiveRows()
+    {
+        // This SQLite connection keeps the relational test database alive across the two contexts.
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<SqliteDataContext>().UseSqlite(connection).Options;
+        var userId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var newer = new Message { DateSent = now, DateCreated = now };
+        var older = new Message { DateSent = now.AddMinutes(-1), DateCreated = now.AddMinutes(-1) };
+        var deleted = new Message { DateSent = now, DateDeleted = now };
+
+        await using (var writer = new SqliteDataContext(options))
+        {
+            await writer.Database.MigrateAsync();
+            writer.Messages.AddRange(newer, older, deleted);
+            writer.UsersPendingMessages.AddRange(
+                new UserPendingMessage { UserId = userId, MessageId = newer.Id, Content = "newer" },
+                new UserPendingMessage { UserId = userId, MessageId = older.Id, Content = "older" },
+                new UserPendingMessage { UserId = Guid.NewGuid(), MessageId = older.Id, Content = "other recipient" },
+                new UserPendingMessage { UserId = userId, MessageId = older.Id, Content = "acknowledged", DateUserReceivedOn = now },
+                new UserPendingMessage { UserId = userId, MessageId = older.Id, Content = "removed", DateDeleted = now },
+                new UserPendingMessage { UserId = userId, MessageId = deleted.Id, Content = "deleted message" });
+            await writer.SaveChangesAsync();
+        }
+
+        await using var reader = new SqliteDataContext(options);
+        var deliveries = await CreateMessageRepository(reader).GetPendingMessageDeliveries(userId);
+
+        CollectionAssert.AreEqual(
+            new[] { (older.Id, "older"), (newer.Id, "newer") },
+            deliveries.Select(delivery => (delivery.Message.Id, delivery.Content)).ToArray());
+    }
+
+    [TestMethod]
     public async Task ExistingPostgreSqlConnectionSelectsPostgreSql()
     {
         var builder = WebApplication.CreateBuilder([]);
@@ -187,4 +216,12 @@ public class ServerDatabaseTest
         var db = scope.ServiceProvider.GetRequiredService<DataContext>();
         Assert.IsTrue(db.Database.IsNpgsql());
     }
+
+    private static MessageRepository CreateMessageRepository(DataContext db) => new(
+        db,
+        new HttpContextAccessor(),
+        new ConfigurationBuilder().Build(),
+        new InMemoryConnectionTracker(),
+        new EncryptionService(TestServiceProvider.EncryptionKey, TestServiceProvider.EncryptionIV),
+        NullLogger<MessageRepository>.Instance);
 }
