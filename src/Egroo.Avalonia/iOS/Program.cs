@@ -8,6 +8,7 @@ internal static class Program
 {
     private static void Main(string[] args)
     {
+        App.ApiUrlOverride = Environment.GetEnvironmentVariable("EGROO_API_URL");
         App.ExportFile = ShareAsync;
         UIApplication.Main(args, null, typeof(AppDelegate));
     }

@@ -235,7 +235,7 @@ jobs:
       - name: Build and verify arm64 simulator app
         run: |
           # Exercise the simulator bundle without the Release device AOT pass.
-          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=false -p:UseInterpreter=true
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=true -p:CodesignKey=- -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=true
           app="$(find bin/Release -type d -name '*.app' -print -quit)"
           test -n "$app"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
@@ -245,3 +245,39 @@ jobs:
           name: ios-arm64-simulator-app
           path: artifacts/egroo-ios-simulator.tar.gz
           if-no-files-found: error
+      - name: Launch Egroo on the iOS simulator
+        timeout-minutes: 10
+        shell: bash
+        env:
+          SIMCTL_CHILD_EGROO_API_URL: https://egroo-simulator.invalid/
+        run: |
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
+          runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-5"))) | .identifier')"
+          simulator="$(xcrun simctl list devices available --json | jq -er --arg runtime "$runtime" '.devices[$runtime][] | select(.name == "iPhone 17") | .udid')"
+          trap 'xcrun simctl shutdown "$simulator" || true' EXIT
+
+          echo "Booting the hosted iPhone 17 simulator with iOS 26.5."
+          xcrun simctl bootstatus "$simulator" -b
+          echo "Installing Egroo."
+          codesign --verify --deep --strict "$app"
+          xcrun simctl install "$simulator" "$app"
+          stdout="$RUNNER_TEMP/egroo-ios.stdout"
+          stderr="$RUNNER_TEMP/egroo-ios.stderr"
+          launch="$(xcrun simctl launch --stdout="$stdout" --stderr="$stderr" "$simulator" "$bundle")"
+          echo "$launch"
+          pid="${launch##* }"
+          sleep 5
+          if ! kill -0 "$pid" 2>/dev/null && ! xcrun simctl spawn "$simulator" launchctl list \
+            | awk -v pid="$pid" '$1 == pid { alive = 1 } END { exit !alive }'; then
+            cat "$stdout" "$stderr" 2>/dev/null || true
+            xcrun simctl spawn "$simulator" log show --last 3m --style compact \
+              --predicate "processIdentifier == $pid OR eventMessage CONTAINS[c] '$bundle'" | tail -n 100 || true
+            for reports in "$HOME/Library/Logs/DiagnosticReports" \
+              "$HOME/Library/Developer/CoreSimulator/Devices/$simulator/data/Library/Logs/CrashReporter"; do
+              if [[ -d "$reports" ]]; then
+                find "$reports" -iname '*egroo*.ips' -print -exec head -c 12000 {} \;
+              fi
+            done
+            exit 1
+          fi
