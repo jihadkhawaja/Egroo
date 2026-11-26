@@ -185,6 +185,32 @@ jobs:
           test -n "$app"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
           tar -czf "$GITHUB_WORKSPACE/artifacts/egroo-ios-simulator.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+      - name: Launch Egroo on the iOS simulator
+        shell: bash
+        env:
+          SIMCTL_CHILD_EGROO_API_URL: https://egroo-simulator.invalid/
+        run: |
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
+          runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-6"))) | .identifier')"
+          device="$(xcrun simctl list devicetypes --json | jq -er '.devicetypes[] | select(.name == "iPhone 17") | .identifier')"
+          simulator="$(xcrun simctl create Egroo-CI "$device" "$runtime")"
+          cleanup() {
+            xcrun simctl shutdown "$simulator" || true
+            xcrun simctl delete "$simulator" || true
+          }
+          trap cleanup EXIT
+
+          xcrun simctl boot "$simulator"
+          xcrun simctl bootstatus "$simulator" -b
+          xcrun simctl install "$simulator" "$app"
+          launch="$(xcrun simctl launch "$simulator" "$bundle")"
+          pid="${launch##* }"
+          sleep 5
+          if ! kill -0 "$pid" 2>/dev/null; then
+            xcrun simctl spawn "$simulator" log show --last 1m --predicate "processIdentifier == $pid" --style compact | tail -n 100 || true
+            exit 1
+          fi
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: ios-arm64-simulator-app
