@@ -155,6 +155,61 @@ jobs:
           name: android-test-apk
           path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
           if-no-files-found: error
+      - name: Launch Egroo on an offline Android emulator
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          sudo chown "$(id -u):$(id -g)" /dev/kvm
+          image='system-images;android-35;default;x86_64'
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [[ -z "$sdkmanager_path" ]]; then
+            echo "The Android SDK command-line tools were unavailable at $ANDROID_HOME."
+            exit 1
+          fi
+          export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager --install emulator "$image"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/egroo-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image" --path "$ANDROID_AVD_HOME/egroo-ci.avd"
+          if ! "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx egroo-ci; then
+            find "$ANDROID_USER_HOME" -maxdepth 3 -type f -print
+            exit 1
+          fi
+          "$ANDROID_HOME/emulator/emulator" -avd egroo-ci -port 5554 -no-window -no-snapshot \
+            -no-audio -no-boot-anim -gpu swiftshader > "$RUNNER_TEMP/egroo-emulator.log" 2>&1 &
+          adb_device=emulator-5554
+          cleanup() {
+            adb -s "$adb_device" emu kill >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          if ! timeout 5m bash -c '
+            adb -s emulator-5554 wait-for-device
+            until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do
+              sleep 2
+            done
+          '; then
+            tail -n 150 "$RUNNER_TEMP/egroo-emulator.log"
+            exit 1
+          fi
+
+          adb -s "$adb_device" shell cmd connectivity airplane-mode enable
+          adb -s "$adb_device" shell svc wifi disable
+          adb -s "$adb_device" shell svc data disable
+          apk="$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*-Signed.apk' -print -quit)"
+          test -n "$apk"
+          adb -s "$adb_device" install "$apk"
+          package=com.jihadkhawaja.egroo
+          activity="$(adb -s "$adb_device" shell cmd package resolve-activity --brief \
+            -a android.intent.action.MAIN -c android.intent.category.LAUNCHER "$package" | tail -n 1 | tr -d '\r')"
+          [[ "$activity" == "$package/"* ]]
+          adb -s "$adb_device" shell am start -W -n "$activity"
+          sleep 5
+          if ! adb -s "$adb_device" shell pidof "$package"; then
+            adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
+            exit 1
+          fi
 
   ios:
     name: iOS simulator release build
