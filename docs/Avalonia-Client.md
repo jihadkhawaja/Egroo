@@ -35,6 +35,8 @@ dotnet workload install ios
 dotnet build src/Egroo.Avalonia/iOS -t:Run -p:RuntimeIdentifier=iossimulator-arm64
 ```
 
+Use the [physical-device release checklist](Release-Acceptance.md) for signed-device testing and release handoff.
+
 ## WebAssembly
 
 ```sh

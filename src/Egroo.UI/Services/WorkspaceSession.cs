@@ -177,8 +177,7 @@ internal sealed class WorkspaceSession
         if (_hub is not { } hub)
             return;
         _hub = null;
-        if (Voice.IsInCall)
-            await Voice.LeaveCallAsync(false);
+        await Voice.LeaveCallAsync(false);
         Messages.Dispose();
         await hub.DisposeAsync();
     }

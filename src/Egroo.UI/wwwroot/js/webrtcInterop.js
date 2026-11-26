@@ -1,4 +1,4 @@
-﻿/**
+/**
  * WebRTC Interop for Channel-Based Multi-Peer Voice Calling.
  * Manages one RTCPeerConnection per remote peer (mesh topology).
  *
@@ -12,6 +12,9 @@ window.webrtcInterop = {
     // Map of peerId (GUID string) -> { pc: RTCPeerConnection, iceCandidateQueue: [] }
     peers: new Map(),
     localStream: null,
+    callGeneration: 0,
+    pendingAudioStreams: new Set(),
+    audioSettingsUpdate: null,
     dotNetObject: null,
     channelId: null,
     selfUserId: null,
@@ -47,11 +50,21 @@ window.webrtcInterop = {
      * Returns true if microphone was successfully acquired.
      */
     joinCall: async function (channelId, selfUserId) {
+        if (this.channelId === channelId && this.selfUserId === (selfUserId || null) && this.localStream)
+            return true;
+        if (this.channelId !== null)
+            this.leaveCall();
+
+        const generation = ++this.callGeneration;
         this.channelId = channelId;
         this.selfUserId = selfUserId || null;
-        this._loadPersistedAudioProcessingPreferences();
-        const acquired = await this.acquireLocalStream();
-        if (!acquired) return false;
+        const acquired = await this.acquireLocalStream(generation);
+        if (generation !== this.callGeneration)
+            return false;
+        if (!acquired) {
+            this.leaveCall();
+            return false;
+        }
 
         // Start stats polling
         if (this.statsInterval) clearInterval(this.statsInterval);
@@ -64,6 +77,13 @@ window.webrtcInterop = {
      * Leave the call entirely: close all peer connections and release microphone.
      */
     leaveCall: function () {
+        ++this.callGeneration;
+        this.channelId = null;
+        this.selfUserId = null;
+        this.audioSettingsUpdate = null;
+        for (const stream of this.pendingAudioStreams)
+            stream.getTracks().forEach(track => track.stop());
+        this.pendingAudioStreams.clear();
         // Collect peer IDs first to avoid mutating the map during iteration
         const peerIds = Array.from(this.peers.keys());
         for (const peerId of peerIds) {
@@ -85,13 +105,8 @@ window.webrtcInterop = {
         }
 
         // Remove all dynamically created remote audio elements
-        const container = document.getElementById(this.remoteAudioContainerId);
-        if (container) {
-            container.innerHTML = "";
-        }
+        document.getElementById(this.remoteAudioContainerId)?.remove();
 
-        this.channelId = null;
-        this.selfUserId = null;
         this.isMuted = false;
         console.log("[WebRTC] Left call.");
     },

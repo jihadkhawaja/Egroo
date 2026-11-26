@@ -145,7 +145,7 @@ public sealed partial class ChatWorkspace
                 await _session.Voice.LeaveCallAsync();
             else
                 await _session.Voice.JoinCallAsync(channel.Id, ChannelTitle(channel));
-        });
+        }, serialize: false);
         _muteAction = Button("Mute", () => _session.Voice.ToggleMuteAsync());
         var more = MenuButton("More", ("Older messages", async () =>
             {
