@@ -48,7 +48,7 @@ On an existing production browser session, the new client can import the previou
 
 ## Encrypted channel delivery
 
-A message sent by a person is delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
+Messages from people and configured channel agents are delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
 
 On reconnect, the requesting session receives that user's pending messages in sent order. A message remains pending for the user until one device saves and acknowledges it. Each device keeps its own local message history, and newly enrolled devices start with their own history.
 

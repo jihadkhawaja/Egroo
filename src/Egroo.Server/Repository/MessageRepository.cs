@@ -133,8 +133,20 @@ namespace Egroo.Server.Repository
                     && pending.DateDeleted == null && message.DateDeleted == null
                     && pending.Content != null
                 orderby message.DateSent ?? message.DateCreated, message.Id, pending.Id
-                select new { Message = message, Content = pending.Content }
+                select new
+                {
+                    Message = message,
+                    pending.Content,
+                    AgentName = _dbContext.AgentDefinitions
+                        .Where(agent => agent.Id == message.AgentDefinitionId)
+                        .Select(agent => agent.Name).FirstOrDefault()
+                }
             ).AsNoTracking().ToArrayAsync();
+
+            foreach (var delivery in deliveries)
+            {
+                delivery.Message.DisplayName = delivery.AgentName;
+            }
 
             return deliveries.Select(delivery => (delivery.Message, delivery.Content)).ToArray();
         }

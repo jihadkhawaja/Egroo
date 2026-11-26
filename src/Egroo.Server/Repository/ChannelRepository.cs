@@ -158,7 +158,9 @@ namespace Egroo.Server.Repository
         public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
             HashSet<UserDto> channelUsers = new();
-            var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
+            var currentChannelUsers = await _dbContext.ChannelUsers
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .ToListAsync();
             if (currentChannelUsers is null)
             {
                 return null;
