@@ -21,7 +21,9 @@ dotnet publish src/Egroo.Avalonia/Desktop -c Release -r osx-arm64 --self-contain
 dotnet publish src/Egroo.Avalonia/Desktop -c Release -r linux-x64 --self-contained
 ```
 
-The macOS publish also creates `Egroo.app`. Windows uses the Edge WebView2 Runtime. Linux uses WPE WebKit or WebKitGTK for the media runtime. [Avalonia WebView prerequisites](https://docs.avaloniaui.net/docs/app-development/embedding-web-content)
+The macOS publish also creates `Egroo.app`. Linux and macOS hosts place managed assets in `Contents/Resources` and native libraries in `Contents/Frameworks`, with relative links for the .NET host. A Windows cross-publish creates a staging bundle. Publish on macOS to seal the finished app ad hoc for local use and CI. Public distribution outside the Mac App Store requires Developer ID signing and Apple notarization. [Apple notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+
+Windows uses the Edge WebView2 Runtime. Linux uses WPE WebKit or WebKitGTK for the media runtime. [Avalonia WebView prerequisites](https://docs.avaloniaui.net/docs/app-development/embedding-web-content)
 
 ## Android and iOS
 
