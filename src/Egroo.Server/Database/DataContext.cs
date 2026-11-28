@@ -1,5 +1,5 @@
 using Egroo.Server.Models;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
@@ -9,6 +9,11 @@ namespace Egroo.Server.Database
     public class DataContext : DbContext, IDataEntities
     {
         public DataContext(DbContextOptions<DataContext> options)
+            : this((DbContextOptions)options)
+        {
+        }
+
+        protected DataContext(DbContextOptions options)
             : base(options)
         {
         }
@@ -36,6 +41,12 @@ namespace Egroo.Server.Database
                     b.WithOwner().HasForeignKey("UserId");
                     b.HasKey("UserId");
                 });
+
+            modelBuilder.Entity<UserRecovery>(state =>
+            {
+                state.HasKey(x => x.UserId);
+                state.HasOne<User>().WithOne().HasForeignKey<UserRecovery>(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            });
 
             // Agent entity indexes
             modelBuilder.Entity<AgentDefinition>()
@@ -65,6 +76,13 @@ namespace Egroo.Server.Database
             modelBuilder.Entity<AgentConversationMessage>()
                 .HasIndex(x => x.AgentConversationId)
                 .IsUnique(false);
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.OwnerId, x.RequestId })
+                .IsUnique();
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.OwnerId, x.CreatedAt, x.Id });
+            modelBuilder.Entity<AgentTaskRecord>()
+                .HasIndex(x => new { x.Status, x.CreatedAt, x.Id });
 
             modelBuilder.Entity<AgentPendingMessage>()
                 .HasIndex(x => new { x.AgentDefinitionId, x.MessageId })
@@ -88,6 +106,7 @@ namespace Egroo.Server.Database
         }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<UserRecovery> UserRecoveryStates { get; set; }
         public DbSet<UserFriend> UsersFriends { get; set; }
         public DbSet<Channel> Channels { get; set; }
         public DbSet<ChannelUser> ChannelUsers { get; set; }
@@ -103,6 +122,7 @@ namespace Egroo.Server.Database
         public DbSet<AgentMcpServer> AgentMcpServers { get; set; }
         public DbSet<AgentConversation> AgentConversations { get; set; }
         public DbSet<AgentConversationMessage> AgentConversationMessages { get; set; }
+        internal DbSet<AgentTaskRecord> AgentTasks => Set<AgentTaskRecord>();
         public DbSet<ChannelAgent> ChannelAgents { get; set; }
         public DbSet<UserAgentFriend> UserAgentFriends { get; set; }
         public DbSet<UserEncryptionKey> UserEncryptionKeys { get; set; }

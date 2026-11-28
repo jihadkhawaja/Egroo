@@ -1,8 +1,6 @@
-using jihadkhawaja.chat.client.Services;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
-using Microsoft.JSInterop;
-using MudBlazor;
+using Egroo.Client.Services;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using System.Net.Http.Json;
 
 namespace Egroo.UI.Services
@@ -13,18 +11,20 @@ namespace Egroo.UI.Services
         private readonly ChatCallService _chatCallService;
         private readonly IUser _chatUserService;
         private readonly HttpClient _httpClient;
-        private readonly IJSRuntime _jsRuntime;
-        private readonly ISnackbar _snackbar;
+        private readonly ClientRuntime _jsRuntime;
+        private readonly Action<string> _notify;
 
         private readonly HashSet<Guid> _participantIds = new();
         private readonly Dictionary<Guid, UserDto> _participantUsers = new();
 
-        private DotNetObjectReference<VoiceCallSessionService>? _dotNetRef;
         private System.Timers.Timer? _callTimer;
         private DateTime? _callStartTime;
         private bool _initialized;
         private bool _iceConfigurationLoaded;
         private bool _disposed;
+        private Task? _initializationTask;
+        private CancellationTokenSource? _joinCancellation;
+        private Task? _leaveTask;
 
         private Func<Guid, Guid[], Task>? _onExistingCallParticipants;
         private Func<Guid, Guid, Task>? _onUserJoinedCall;
@@ -39,15 +39,15 @@ namespace Egroo.UI.Services
             ChatCallService chatCallService,
             IUser chatUserService,
             HttpClient httpClient,
-            IJSRuntime jsRuntime,
-            ISnackbar snackbar)
+            ClientRuntime jsRuntime,
+            Action<string> notify)
         {
             _sessionStorage = sessionStorage;
             _chatCallService = chatCallService;
             _chatUserService = chatUserService;
             _httpClient = httpClient;
             _jsRuntime = jsRuntime;
-            _snackbar = snackbar;
+            _notify = notify;
         }
 
         public event Action? StateChanged;
@@ -72,13 +72,27 @@ namespace Egroo.UI.Services
         public async Task EnsureInitializedAsync()
         {
             if (_initialized || _disposed)
-            {
                 return;
-            }
 
+            var initializing = _initializationTask ??= InitializeAsync();
+            try
+            {
+                await initializing;
+            }
+            finally
+            {
+                if (_initializationTask == initializing)
+                    _initializationTask = null;
+            }
+        }
+
+        private async Task InitializeAsync()
+        {
             await ConfigureIceServersAsync();
-            _dotNetRef = DotNetObjectReference.Create(this);
-            await _jsRuntime.InvokeVoidAsync("webrtcInterop.registerDotNetObject", _dotNetRef);
+            if (_disposed)
+                return;
+
+            _jsRuntime.MediaEvent += OnMediaEvent;
             RegisterCallEvents();
             _initialized = true;
             await SyncAudioProcessingStateAsync();
@@ -111,12 +125,11 @@ namespace Egroo.UI.Services
 
         public async Task<bool> JoinCallAsync(Guid channelId, string? channelTitle)
         {
-            if (_disposed || channelId == Guid.Empty)
+            if (_disposed || channelId == Guid.Empty || _sessionStorage.User is not { } user
+                || _joinCancellation is not null)
             {
                 return false;
             }
-
-            await EnsureInitializedAsync();
 
             if (IsCurrentChannel(channelId))
             {
@@ -125,91 +138,122 @@ namespace Egroo.UI.Services
 
             if (IsInCall)
             {
-                _snackbar.Add("Leave your current voice call before joining another channel.", Severity.Warning);
+                _notify("Leave your current voice call before joining another channel.");
                 return false;
             }
 
+            using var joining = new CancellationTokenSource();
+            _joinCancellation = joining;
+            var cancellationToken = joining.Token;
             try
             {
-                string selfUserId = _sessionStorage.User?.Id.ToString() ?? string.Empty;
-                bool acquired = await _jsRuntime.InvokeAsync<bool>("webrtcInterop.joinCall", channelId.ToString(), selfUserId);
+                if (_leaveTask is { } releasing)
+                {
+                    await releasing.WaitAsync(cancellationToken);
+                    if (_leaveTask == releasing)
+                        _leaveTask = null;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                await EnsureInitializedAsync().WaitAsync(cancellationToken);
+                bool acquired = await _jsRuntime.InvokeAsync<bool>(
+                    "webrtcInterop.joinCall", cancellationToken, channelId.ToString(), user.Id.ToString());
                 if (!acquired)
                 {
-                    _snackbar.Add("Could not access microphone. Please check permissions.", Severity.Error);
+                    await StopCallAsync();
+                    _notify("Could not access microphone. Please check permissions.");
                     return false;
                 }
 
                 CurrentChannelId = channelId;
                 CurrentChannelTitle = channelTitle;
                 IsInCall = true;
-                IsMuted = false;
+                _participantIds.Add(user.Id);
 
-                _participantIds.Clear();
-                _participantUsers.Clear();
-
-                if (_sessionStorage.User is not null)
-                {
-                    _participantIds.Add(_sessionStorage.User.Id);
-                    await FetchAndCacheParticipantAsync(_sessionStorage.User.Id);
-                }
-
-                await SyncAudioProcessingStateAsync();
+                await FetchAndCacheParticipantAsync(user.Id).WaitAsync(cancellationToken);
+                await SyncAudioProcessingStateAsync().WaitAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 StartCallTimer();
                 NotifyStateChanged();
 
                 await _chatCallService.JoinChannelCall(channelId);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                _snackbar.Add("Joined voice call", Severity.Success);
+                _notify("Joined voice call");
                 return true;
+            }
+            catch (Exception) when (cancellationToken.IsCancellationRequested)
+            {
+                return false;
             }
             catch (Exception ex)
             {
-                _snackbar.Add($"Failed to join call: {ex.Message}", Severity.Error);
-
-                try
-                {
-                    await _jsRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
-                }
-                catch { }
-
-                ResetCallState();
-                NotifyStateChanged();
-
+                await StopCallAsync();
+                _notify($"Failed to join call: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                if (_joinCancellation == joining)
+                    _joinCancellation = null;
             }
         }
 
         public async Task LeaveCallAsync(bool notifyUser = true)
         {
-            if (_disposed)
+            if (!_disposed && await StopCallAsync() && notifyUser)
+                _notify("Left voice call");
+        }
+
+        private async Task<bool> StopCallAsync()
+        {
+            var joining = _joinCancellation;
+            _joinCancellation = null;
+            joining?.Cancel();
+
+            if (_leaveTask is { } pending)
             {
-                return;
+                await pending;
+                return false;
             }
 
-            Guid channelId = CurrentChannelId;
+            if (!IsInCall && joining is null)
+                return false;
 
+            var channelId = CurrentChannelId;
+            ResetCallState();
+
+            // Release capture independently of the network round trip.
+            var releasing = _leaveTask = ReleaseCallAsync(channelId);
             try
             {
-                if (channelId != Guid.Empty)
-                {
-                    await _chatCallService.LeaveChannelCall(channelId);
-                }
+                await releasing;
             }
-            catch { }
+            finally
+            {
+                if (_leaveTask == releasing)
+                    _leaveTask = null;
+            }
 
+            return true;
+        }
+
+        private async Task ReleaseCallAsync(Guid channelId)
+        {
             try
             {
                 await _jsRuntime.InvokeVoidAsync("webrtcInterop.leaveCall");
             }
             catch { }
 
-            ResetCallState();
             NotifyStateChanged();
 
-            if (notifyUser)
+            try
             {
-                _snackbar.Add("Left voice call", Severity.Info);
+                if (channelId != Guid.Empty)
+                    await _chatCallService.LeaveChannelCall(channelId);
             }
+            catch { }
         }
 
         public async Task ToggleMuteAsync()
@@ -235,13 +279,20 @@ namespace Egroo.UI.Services
 
             if (state?.WasApplied == false)
             {
-                _snackbar.Add($"{displayName} could not be changed on this browser/device.", Severity.Warning);
+                _notify($"{displayName} could not be changed on this browser/device.");
             }
 
             NotifyStateChanged();
         }
 
-        [JSInvokable]
+        private Task OnMediaEvent(string name, string peerId, string value) => name switch
+        {
+            nameof(OnIceCandidateGenerated) => OnIceCandidateGenerated(peerId, value),
+            nameof(OnPeerDisconnected) => OnPeerDisconnected(peerId),
+            nameof(OnOfferGenerated) => OnOfferGenerated(peerId, value),
+            _ => Task.CompletedTask
+        };
+
         public async Task OnIceCandidateGenerated(string peerId, string candidateJson)
         {
             if (_disposed || !IsInCall || !Guid.TryParse(peerId, out Guid targetUserId))
@@ -256,7 +307,6 @@ namespace Egroo.UI.Services
             catch { }
         }
 
-        [JSInvokable]
         public async Task OnPeerDisconnected(string peerId)
         {
             if (_disposed || !Guid.TryParse(peerId, out Guid userId))
@@ -278,14 +328,11 @@ namespace Egroo.UI.Services
 
         public async ValueTask DisposeAsync()
         {
+            if (_disposed)
+                return;
+
             _disposed = true;
-
-            if (IsInCall)
-            {
-                await LeaveCallAsync(false);
-            }
-
-            StopCallTimer();
+            await StopCallAsync();
 
             if (_onExistingCallParticipants is not null)
                 _chatCallService.OnExistingCallParticipants -= _onExistingCallParticipants;
@@ -302,7 +349,7 @@ namespace Egroo.UI.Services
             if (_onChannelCallParticipantsChanged is not null)
                 _chatCallService.OnChannelCallParticipantsChanged -= _onChannelCallParticipantsChanged;
 
-            _dotNetRef?.Dispose();
+            _jsRuntime.MediaEvent -= OnMediaEvent;
         }
 
         private void RegisterCallEvents()
@@ -472,7 +519,8 @@ namespace Egroo.UI.Services
                     user.AvatarPreview = user.CombineAvatarForPreview(avatar);
                 }
 
-                _participantUsers[userId] = user;
+                if (_participantIds.Contains(userId))
+                    _participantUsers[userId] = user;
             }
             catch { }
         }
@@ -504,7 +552,6 @@ namespace Egroo.UI.Services
             }
         }
 
-        [JSInvokable]
         public async Task OnOfferGenerated(string peerId, string offerSdp)
         {
             if (_disposed || !IsInCall || !Guid.TryParse(peerId, out Guid targetUserId) || string.IsNullOrWhiteSpace(offerSdp))

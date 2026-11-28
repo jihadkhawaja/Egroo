@@ -1,19 +1,27 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$MigrationName
+    [string]$MigrationName,
+
+    [ValidateSet('Both', 'SQLite', 'PostgreSQL')]
+    [string]$Provider = 'Both'
 )
 
-$ProjectPath = "$PSScriptRoot\..\src\Egroo.Server\Egroo.Server.csproj"
+$projectDirectory = Join-Path $PSScriptRoot '../src/Egroo.Server'
+$contexts = switch ($Provider) {
+    'SQLite' { 'SqliteDataContext' }
+    'PostgreSQL' { 'DataContext' }
+    'Both' { 'SqliteDataContext'; 'DataContext' }
+}
 
-Write-Host "Adding migration '$MigrationName'..." -ForegroundColor Cyan
-
-dotnet ef migrations add $MigrationName `
-    --project $ProjectPath `
-    --context DataContext
-
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "Migration '$MigrationName' added successfully." -ForegroundColor Green
-} else {
-    Write-Host "Failed to add migration." -ForegroundColor Red
-    exit $LASTEXITCODE
+Push-Location -LiteralPath $projectDirectory
+try {
+    foreach ($context in $contexts) {
+        Write-Host "Adding migration '$MigrationName' for $context..." -ForegroundColor Cyan
+        dotnet ef migrations add $MigrationName --context $context
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
+} finally {
+    Pop-Location
 }

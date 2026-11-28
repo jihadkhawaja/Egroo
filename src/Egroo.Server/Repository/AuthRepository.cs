@@ -1,25 +1,40 @@
+using Egroo.Server.Services;
 using Egroo.Server.Authorization;
 using Egroo.Server.Database;
 using Egroo.Server.Helpers;
 using Egroo.Server.Models;
-using jihadkhawaja.chat.shared.Helpers;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Server.Security;
+using Egroo.Contracts.Helpers;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Egroo.Server.Repository
 {
-    public class AuthRepository : BaseRepository, IAuth
+    public partial class AuthRepository : BaseRepository, IAuth, ITwoFactorAuth, IAccountRecovery, IIpRegionAuth
     {
+        private readonly TimeProvider _timeProvider;
+        private readonly IRecoveryEmailDelivery? _recoveryEmail;
+        private readonly AccountSessions? _accountSessions;
+        private readonly IpRegionPolicy _ipRegionPolicy;
+
         public AuthRepository(DataContext dbContext,
             IHttpContextAccessor httpContextAccessor,
             IConfiguration configuration,
             IConnectionTracker connectionTracker,
-            ILogger<AuthRepository> logger)
+            ILogger<AuthRepository> logger,
+            TimeProvider? timeProvider = null,
+            IRecoveryEmailDelivery? recoveryEmail = null,
+            AccountSessions? accountSessions = null,
+            IpRegionPolicy? ipRegionPolicy = null)
             : base(dbContext, httpContextAccessor, configuration, connectionTracker, logger)
         {
+            _timeProvider = timeProvider ?? TimeProvider.System;
+            _recoveryEmail = recoveryEmail;
+            _accountSessions = accountSessions;
+            _ipRegionPolicy = ipRegionPolicy ?? IpRegionPolicy.Disabled;
         }
 
         private void UpdateUserStatus(ref User user)
@@ -108,7 +123,10 @@ namespace Egroo.Server.Repository
             }
         }
 
-        public async Task<Operation.Response> SignIn(string username, string password)
+        public Task<Operation.Response> SignIn(string username, string password) =>
+            SignIn(username, password, verificationCode: null);
+
+        public async Task<Operation.Response> SignIn(string username, string password, string? verificationCode)
         {
             username = username.ToLower();
 
@@ -149,8 +167,6 @@ namespace Egroo.Server.Repository
                 };
             }
 
-            UpdateUserStatus(ref user);
-
             var jwtSecret = _configuration.GetSection("Secrets")["Jwt"];
             if (string.IsNullOrEmpty(jwtSecret))
             {
@@ -161,12 +177,15 @@ namespace Egroo.Server.Repository
                 };
             }
 
+            if (await CheckSignInFactorAsync(user, verificationCode) is { } failure)
+                return failure;
+
+            UpdateUserStatus(ref user);
             var generatedToken = await TokenGenerator.GenerateJwtToken(user, jwtSecret);
             string token = generatedToken.Access_Token;
 
             try
             {
-                _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
 
                 return new Operation.Response
@@ -175,6 +194,16 @@ namespace Egroo.Server.Repository
                     Message = "Sign in successful.",
                     UserId = user.Id,
                     Token = token
+                };
+            }
+            catch (DbUpdateConcurrencyException) when (user.UserSecuriy is { IsTwoFactorEnabled: true } state)
+            {
+                bool requiresRecovery = RequiresRegionalRecovery(state);
+                return new Operation.Response
+                {
+                    RequiresTwoFactor = true,
+                    RequiresRecoveryCode = requiresRecovery,
+                    Message = requiresRecovery ? RegionRecoveryPrompt : RejectedFactor
                 };
             }
             catch (Exception ex)
@@ -196,7 +225,7 @@ namespace Egroo.Server.Repository
                 return CreateFailureResponse("Authorization header is missing.");
             }
 
-            if (!TryReadUserIdFromToken(bearerToken, out var userId, out var tokenError))
+            if (!TryReadUserIdFromToken(bearerToken, out var userId, out var revision, out var tokenError))
             {
                 return CreateFailureResponse(tokenError);
             }
@@ -206,6 +235,9 @@ namespace Egroo.Server.Repository
             {
                 return CreateFailureResponse("User not found.");
             }
+
+            if (user.SessionRevision != revision)
+                return CreateFailureResponse("Your session has expired. Sign in again.");
 
             var jwtSecret = GetJwtSecret();
             if (jwtSecret is null)
@@ -220,7 +252,6 @@ namespace Egroo.Server.Repository
 
             try
             {
-                _dbContext.Users.Update(user);
                 await _dbContext.SaveChangesAsync();
 
                 return new Operation.Response
@@ -259,9 +290,10 @@ namespace Egroo.Server.Repository
             return parts[1];
         }
 
-        private bool TryReadUserIdFromToken(string bearerToken, out Guid userId, out string errorMessage)
+        private bool TryReadUserIdFromToken(string bearerToken, out Guid userId, out long revision, out string errorMessage)
         {
             userId = Guid.Empty;
+            revision = 0;
             errorMessage = bearerToken.Length == 0
                 ? "Invalid Authorization header format."
                 : "Invalid token claims.";
@@ -283,8 +315,8 @@ namespace Egroo.Server.Repository
                 return false;
             }
 
-            var userIdClaim = jwtToken.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-            return Guid.TryParse(userIdClaim, out userId) && userId != Guid.Empty;
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(jwtToken.Claims));
+            return AccountSessions.TryReadSession(principal, out userId, out revision);
         }
 
         private string? GetJwtSecret()

@@ -1,8 +1,8 @@
 using Egroo.Server.Security;
 using Egroo.Server.Services;
 using Egroo.Server.Tools;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 

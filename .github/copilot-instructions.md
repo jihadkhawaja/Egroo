@@ -1,6 +1,6 @@
 # Egroo — Workspace Guidelines
 
-Egroo is a self-hosted, open-source real-time chat platform built on .NET 10, Blazor Auto, ASP.NET Core, SignalR, and PostgreSQL.
+Egroo is a self-hosted, open-source real-time chat platform built on .NET 10, Avalonia, ASP.NET Core, SignalR, and PostgreSQL.
 
 ## Architecture
 
@@ -8,19 +8,18 @@ The solution lives in `src/Egroo.slnx`. Projects and their roles:
 
 | Project | Role |
 |---|---|
-| `Egroo/Egroo` | Blazor Server host; serves SSR + switches to WASM. No DB access — delegates to API. |
-| `Egroo.Client` | Blazor WebAssembly client-side project |
+| `Egroo.Avalonia` | Desktop, mobile, and browser entry points. |
 | `Egroo.Server` | ASP.NET Core API: REST endpoints, SignalR hub, PostgreSQL via EF Core |
-| `Egroo.UI` | Shared Razor component library (MudBlazor, BlazorDexie). Consumed by Blazor host & WASM. |
-| `jihadkhawaja.chat.shared` | Internal NuGet package: models, interfaces, DTOs shared across client & server |
-| `jihadkhawaja.chat.server` | Internal NuGet package: `ChatHub` (partial classes) + `InMemoryConnectionTracker` |
-| `jihadkhawaja.chat.client` | Internal NuGet package: client-side services wrapping `HubConnection` and HTTP auth |
+| `Egroo.UI` | Shared Avalonia controls and presentation services. |
+| `Egroo.Contracts` | Internal NuGet package: models, interfaces, DTOs shared across client & server |
+| `Egroo.Server.SignalR` | Internal NuGet package: `ChatHub` (partial classes) + `InMemoryConnectionTracker` |
+| `Egroo.Client` | Internal NuGet package: client-side services wrapping `HubConnection` and HTTP auth |
 | `Egroo.Server.Test` | MSTest unit tests using in-memory EF Core |
 
 **Dependency flow:**
 ```
-Egroo (Blazor) → Egroo.UI → jihadkhawaja.chat.client → jihadkhawaja.chat.shared
-Egroo.Server   → jihadkhawaja.chat.server → jihadkhawaja.chat.shared
+Egroo (Avalonia) → Egroo.UI → Egroo.Client → Egroo.Contracts
+Egroo.Server   → Egroo.Server.SignalR → Egroo.Contracts
 Egroo.Server   → Repositories (IAuth, IUser, IChannel, IMessageRepository)
 ```
 
@@ -35,7 +34,7 @@ dotnet test src/Egroo.Server.Test/Egroo.Server.Test.csproj --verbosity normal
 
 # Hot reload (separate terminals)
 dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 
 # EF Core migrations (use PowerShell scripts)
 .\scripts\add-migration.ps1 "<MigrationName>"
@@ -76,11 +75,11 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 - `IConnectionTracker` (default: `InMemoryConnectionTracker`) is not distributed. For multi-server deployments, inject a Redis-backed implementation.
 - Client-side message event subscriptions should go through `ChatMessageService` rather than direct component-level `HubConnection.On(...)` handlers.
 
-### Blazor / UI
+### Avalonia UI
 - UI reusable components live in `Egroo.UI/Components/` (subdirs: `Base/`, `Layout/`, `View/`).
-- Use **MudBlazor** components for all UI elements. Add `FluentValidation` validators for new forms.
-- Client-side state caching uses **BlazorDexie** (IndexedDB wrapper `EgrooDB`). Auth token/session is stored in `SessionStorage`.
-- Service calls from UI: use `jihadkhawaja.chat.client` services (`ChatMessageService`, `AuthService`, `ChatChannelService`, etc.) — don't call SignalR `HubConnection` directly.
+- Use Avalonia controls for application screens.
+- The platform runtime uses IndexedDB for encrypted message history and local storage for session state.
+- Service calls from UI: use `Egroo.Client` services (`ChatMessageService`, `AuthService`, `ChatChannelService`, etc.) — don't call SignalR `HubConnection` directly.
 - Treat markdown rendering as a presentation layer. Message content should stay transport-safe and portable.
 - User mentions and agent mentions may share UI affordances, but only configured channel agents should trigger agent-response flows.
 - Prefer HTTP upload plus durable links for files rather than binary SignalR payloads.
@@ -107,7 +106,7 @@ Migrations target `Egroo.Server`. Auto-migration runs at startup via `db.Databas
 - **ImplicitUsings**: `enable`
 
 ## Pitfalls
-- **`jihadkhawaja.chat.*` packages**: These are referenced as `ProjectReference` locally (not from NuGet feed). Changes to `jihadkhawaja.chat.shared` affect all three packages — rebuild in order: shared → server/client.
-- **Blazor Auto Mode**: Components rendered interactively server-side first, then re-hydrated as WASM. Avoid direct server-only APIs (e.g., HttpContext) inside components without SSR guards.
+- **`jihadkhawaja.chat.*` packages**: These are referenced as `ProjectReference` locally (not from NuGet feed). Changes to `Egroo.Contracts` affect all three packages — rebuild in order: shared → server/client.
+- The browser target publishes static WebAssembly assets and connects directly to the API.
 - **Connection tracker is in-memory**: Not safe for horizontal scale-out without replacing `IConnectionTracker`.
 - **CORS**: Allowed origins are configured in `Api:AllowedOrigins` — update `appsettings.json` when deploying to a new domain.

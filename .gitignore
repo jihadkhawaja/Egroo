@@ -6,6 +6,7 @@
 # Custom-specific files
 appsettings.json
 appsettings.Development.json
+/src/Egroo.Server/App_Data/
 appsecrets.json
 images/
 [Ll]ogs/

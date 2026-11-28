@@ -1,7 +1,8 @@
 using Egroo.Server.Database;
+using Egroo.Server.Models;
 using Egroo.Server.Security;
 using Egroo.Server.Tools;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.Agents.AI;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.AI;
@@ -13,7 +14,7 @@ namespace Egroo.Server.Services
     /// Service that creates and runs AI agents using Microsoft Agent Framework.
     /// Builds AIAgent instances on-the-fly from user-defined AgentDefinition configurations.
     /// </summary>
-    public class AgentRuntimeService
+    public class AgentRuntimeService : IAgentTaskExecutor
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly AgentSkillsService _agentSkillsService;
@@ -39,6 +40,24 @@ namespace Egroo.Server.Services
             _loggerFactory = loggerFactory;
             _serviceProvider = serviceProvider;
             _logger = logger;
+        }
+
+        async Task<string?> IAgentTaskExecutor.ExecuteAsync(AgentTaskRecord task, CancellationToken cancellationToken)
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var database = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var definition = await database.AgentDefinitions.AsNoTracking().SingleOrDefaultAsync(agent =>
+                agent.Id == task.AgentId && agent.UserId == task.OwnerId && agent.IsActive && agent.DateDeleted == null,
+                cancellationToken);
+            if (definition is null)
+                return null;
+
+            string? apiKey = string.IsNullOrWhiteSpace(definition.ApiKey) ? null : _encryptionService.Decrypt(definition.ApiKey);
+            var agent = CreateAgentStatic(definition, apiKey, definition.Instructions ?? string.Empty, [],
+                loggerFactory: _loggerFactory);
+            var response = await agent.RunAsync(new ChatMessage(ChatRole.User, task.Prompt),
+                cancellationToken: cancellationToken);
+            return response.Text ?? string.Empty;
         }
 
         /// <summary>
@@ -395,12 +414,12 @@ namespace Egroo.Server.Services
 
             // Separate built-in and MCP tools
             var builtinToolNames = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin)
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Builtin)
                 .Select(t => t.Name)
                 .ToList();
 
             var mcpToolDefs = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Mcp && t.McpServerId.HasValue)
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Mcp && t.McpServerId.HasValue)
                 .ToList();
 
             // Add enabled built-in tools
@@ -414,7 +433,7 @@ namespace Egroo.Server.Services
             if (mcpToolDefs.Count > 0)
             {
                 var serverIds = mcpToolDefs.Select(t => t.McpServerId!.Value).Distinct().ToList();
-                var servers = await dbContext.Set<jihadkhawaja.chat.shared.Models.AgentMcpServer>()
+                var servers = await dbContext.Set<Egroo.Contracts.Models.AgentMcpServer>()
                     .Where(s => serverIds.Contains(s.Id) && s.IsActive && s.DateDeleted == null)
                     .ToListAsync();
 
@@ -453,7 +472,7 @@ namespace Egroo.Server.Services
             var scopedToolNames = BuiltinTools.GetScopedToolNames();
 
             var enabledScopedTools = toolDefs
-                .Where(t => t.Source == jihadkhawaja.chat.shared.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
+                .Where(t => t.Source == Egroo.Contracts.Models.AgentToolSource.Builtin && scopedToolNames.Contains(t.Name))
                 .Select(t => t.Name)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

@@ -23,137 +23,7 @@ namespace Egroo.Server.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("Egroo.Server.Models.User", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("createdby");
-
-                    b.Property<DateTimeOffset>("DateCreated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
-
-                    b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
-
-                    b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deletedby");
-
-                    b.Property<string>("EncryptionKeyId")
-                        .HasColumnType("text")
-                        .HasColumnName("encryptionkeyid");
-
-                    b.Property<DateTimeOffset?>("EncryptionKeyUpdatedOn")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("encryptionkeyupdatedon");
-
-                    b.Property<string>("EncryptionPublicKey")
-                        .HasColumnType("text")
-                        .HasColumnName("encryptionpublickey");
-
-                    b.Property<DateTimeOffset?>("LastLoginDate")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("lastlogindate");
-
-                    b.Property<string>("Password")
-                        .HasColumnType("text")
-                        .HasColumnName("password");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("role");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updatedby");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("username");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Username")
-                        .IsUnique();
-
-                    b.ToTable("users");
-                });
-
-            modelBuilder.Entity("Egroo.Server.Models.UserEncryptionKey", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<Guid?>("CreatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("createdby");
-
-                    b.Property<DateTimeOffset>("DateCreated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datecreated");
-
-                    b.Property<DateTimeOffset?>("DateDeleted")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("datedeleted");
-
-                    b.Property<DateTimeOffset?>("DateUpdated")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("dateupdated");
-
-                    b.Property<Guid?>("DeletedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("deletedby");
-
-                    b.Property<string>("DeviceLabel")
-                        .HasColumnType("text")
-                        .HasColumnName("devicelabel");
-
-                    b.Property<string>("KeyId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("keyid");
-
-                    b.Property<string>("PublicKey")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("publickey");
-
-                    b.Property<Guid?>("UpdatedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("updatedby");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("userid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("UserId", "KeyId")
-                        .IsUnique();
-
-                    b.ToTable("userencryptionkeys");
-                });
-
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentConversation", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentConversation", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -208,7 +78,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentconversations");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentConversationMessage", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentConversationMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -275,7 +145,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentconversationmessages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentDefinition", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentDefinition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -395,7 +265,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentdefinitions");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentKnowledge", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentKnowledge", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -452,7 +322,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentknowledgeitems");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentMcpServer", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentMcpServer", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -518,7 +388,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentmcpservers");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentPendingMessage", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentPendingMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -569,7 +439,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentpendingmessages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentSkillDirectory", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentSkillDirectory", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -627,7 +497,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agentskilldirectories");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.AgentTool", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.AgentTool", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -697,7 +567,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("agenttools");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Channel", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.Channel", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -741,7 +611,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("channels");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelAgent", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.ChannelAgent", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -792,7 +662,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("channelagents");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.ChannelUser", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.ChannelUser", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -840,7 +710,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("channelusers");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.Message", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.Message", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -900,7 +770,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("messages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserAgentFriend", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserAgentFriend", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -947,7 +817,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("useragentfriends");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserDetail", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserDetail", b =>
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1014,7 +884,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("userdetail");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserFeedback", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1063,7 +933,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("userfeedback");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFriend", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserFriend", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1111,7 +981,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("usersfriends");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserPendingMessage", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserPendingMessage", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -1163,7 +1033,7 @@ namespace Egroo.Server.Migrations
                     b.ToTable("userspendingmessages");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserStorage", b =>
+            modelBuilder.Entity("Egroo.Contracts.Models.UserStorage", b =>
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
@@ -1190,6 +1060,282 @@ namespace Egroo.Server.Migrations
                     b.ToTable("userstorage");
                 });
 
+            modelBuilder.Entity("Egroo.Server.Models.AgentTaskRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("agentid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("createdat");
+
+                    b.Property<DateTimeOffset?>("ExecutionDeadline")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("executiondeadline");
+
+                    b.Property<int?>("Failure")
+                        .HasColumnType("integer")
+                        .HasColumnName("failure");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finishedat");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("ownerid");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("character varying(8192)")
+                        .HasColumnName("prompt");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("requestid");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(65536)
+                        .HasColumnType("character varying(65536)")
+                        .HasColumnName("result");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("startedat");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt", "Id");
+
+                    b.HasIndex("Status", "CreatedAt", "Id");
+
+                    b.ToTable("agenttasks");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("EncryptionKeyId")
+                        .HasColumnType("text")
+                        .HasColumnName("encryptionkeyid");
+
+                    b.Property<DateTimeOffset?>("EncryptionKeyUpdatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("encryptionkeyupdatedon");
+
+                    b.Property<string>("EncryptionPublicKey")
+                        .HasColumnType("text")
+                        .HasColumnName("encryptionpublickey");
+
+                    b.Property<DateTimeOffset?>("LastLoginDate")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lastlogindate");
+
+                    b.Property<string>("Password")
+                        .HasColumnType("text")
+                        .HasColumnName("password");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<long>("SessionRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("sessionrevision");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("username");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("users");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.UserEncryptionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("createdby");
+
+                    b.Property<DateTimeOffset>("DateCreated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datecreated");
+
+                    b.Property<DateTimeOffset?>("DateDeleted")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("datedeleted");
+
+                    b.Property<DateTimeOffset?>("DateUpdated")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dateupdated");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deletedby");
+
+                    b.Property<string>("DeviceLabel")
+                        .HasColumnType("text")
+                        .HasColumnName("devicelabel");
+
+                    b.Property<string>("KeyId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("keyid");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("publickey");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updatedby");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "KeyId")
+                        .IsUnique();
+
+                    b.ToTable("userencryptionkeys");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("userid");
+
+                    b.Property<long?>("ConfirmationExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("confirmationexpiresat");
+
+                    b.Property<string>("ConfirmationHash")
+                        .HasColumnType("text")
+                        .HasColumnName("confirmationhash");
+
+                    b.Property<long?>("ConfirmationSentAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("confirmationsentat");
+
+                    b.Property<string>("ProtectedAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("protectedaddress");
+
+                    b.Property<string>("ProtectedPendingAddress")
+                        .HasColumnType("text")
+                        .HasColumnName("protectedpendingaddress");
+
+                    b.Property<long?>("ResetExpiresAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resetexpiresat");
+
+                    b.Property<string>("ResetHash")
+                        .HasColumnType("text")
+                        .HasColumnName("resethash");
+
+                    b.Property<long?>("ResetSentAt")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resetsentat");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint")
+                        .HasColumnName("revision");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("userrecoverystates");
+                });
+
+            modelBuilder.Entity("Egroo.Contracts.Models.UserDetail", b =>
+                {
+                    b.HasOne("Egroo.Server.Models.User", null)
+                        .WithOne("UserDetail")
+                        .HasForeignKey("Egroo.Contracts.Models.UserDetail", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Egroo.Contracts.Models.UserFeedback", b =>
+                {
+                    b.HasOne("Egroo.Server.Models.User", null)
+                        .WithMany("UserFeedbacks")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Egroo.Contracts.Models.UserStorage", b =>
+                {
+                    b.HasOne("Egroo.Server.Models.User", null)
+                        .WithOne("UserStorage")
+                        .HasForeignKey("Egroo.Contracts.Models.UserStorage", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Egroo.Server.Models.User", b =>
                 {
                     b.OwnsOne("Egroo.Server.Models.UserSecurity", "UserSecuriy", b1 =>
@@ -1198,9 +1344,42 @@ namespace Egroo.Server.Migrations
                                 .HasColumnType("uuid")
                                 .HasColumnName("userid");
 
+                            b1.Property<string>("AllowedSignInRegions")
+                                .HasColumnType("text")
+                                .HasColumnName("allowedsigninregions");
+
+                            b1.Property<long?>("FactorLockedUntil")
+                                .HasColumnType("bigint")
+                                .HasColumnName("factorlockeduntil");
+
+                            b1.Property<long>("FactorRevision")
+                                .IsConcurrencyToken()
+                                .HasColumnType("bigint")
+                                .HasColumnName("factorrevision");
+
+                            b1.Property<int>("FailedFactorAttempts")
+                                .HasColumnType("integer")
+                                .HasColumnName("failedfactorattempts");
+
                             b1.Property<bool>("IsTwoFactorEnabled")
                                 .HasColumnType("boolean")
                                 .HasColumnName("istwofactorenabled");
+
+                            b1.Property<long?>("LastTotpStep")
+                                .HasColumnType("bigint")
+                                .HasColumnName("lasttotpstep");
+
+                            b1.Property<string>("ProtectedTotpSecret")
+                                .HasColumnType("text")
+                                .HasColumnName("protectedtotpsecret");
+
+                            b1.Property<string>("RecoveryCodeHashes")
+                                .HasColumnType("text")
+                                .HasColumnName("recoverycodehashes");
+
+                            b1.Property<long?>("TotpEnrollmentExpiresAt")
+                                .HasColumnType("bigint")
+                                .HasColumnName("totpenrollmentexpiresat");
 
                             b1.HasKey("UserId");
 
@@ -1213,29 +1392,11 @@ namespace Egroo.Server.Migrations
                     b.Navigation("UserSecuriy");
                 });
 
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserDetail", b =>
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
                 {
                     b.HasOne("Egroo.Server.Models.User", null)
-                        .WithOne("UserDetail")
-                        .HasForeignKey("jihadkhawaja.chat.shared.Models.UserDetail", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserFeedback", b =>
-                {
-                    b.HasOne("Egroo.Server.Models.User", null)
-                        .WithMany("UserFeedbacks")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("jihadkhawaja.chat.shared.Models.UserStorage", b =>
-                {
-                    b.HasOne("Egroo.Server.Models.User", null)
-                        .WithOne("UserStorage")
-                        .HasForeignKey("jihadkhawaja.chat.shared.Models.UserStorage", "UserId")
+                        .WithOne()
+                        .HasForeignKey("Egroo.Server.Models.UserRecovery", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

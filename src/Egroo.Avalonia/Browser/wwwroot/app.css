@@ -1,0 +1,24 @@
+html, body, #egroo {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+}
+
+body {
+    background: #f7f7f7;
+    color: #191919;
+    font: 1rem system-ui, sans-serif;
+}
+
+.avalonia-splash {
+    display: grid;
+    height: 100%;
+    place-items: center;
+    color: #252525;
+    font-weight: 600;
+}
+
+a {
+    color: #252525;
+}

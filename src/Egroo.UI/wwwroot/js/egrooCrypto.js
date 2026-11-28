@@ -24,19 +24,6 @@
         return bytes;
     }
 
-    function base64UrlToText(base64Url) {
-        let padded = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-        while (padded.length % 4 !== 0) {
-            padded += "=";
-        }
-
-        return textDecoder.decode(base64ToBytes(padded));
-    }
-
-    function parseEncryptedFileMetadata(tokenBase64Url) {
-        return JSON.parse(base64UrlToText(tokenBase64Url));
-    }
-
     async function importPublicKey(publicKeyBase64) {
         return crypto.subtle.importKey(
             "spki",
@@ -62,95 +49,98 @@
             .join("");
     }
 
-    async function decryptEncryptedFileToBlob(tokenBase64Url) {
-        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
-        const jwt = localStorage.getItem("token");
-
-        if (!jwt) {
-            throw new Error("Missing access token.");
+    function checkCancellation(signal) {
+        if (signal?.aborted) {
+            throw new DOMException("Decryption was canceled.", "AbortError");
         }
+    }
 
-        const response = await fetch(metadata.Url, {
-            headers: {
-                Authorization: `Bearer ${jwt}`
-            }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to download encrypted file: ${response.status}`);
-        }
-
-        const cipherBytes = new Uint8Array(await response.arrayBuffer());
-        const aesKey = await crypto.subtle.importKey(
-            "raw",
-            base64ToBytes(metadata.Key),
-            { name: "AES-GCM" },
-            false,
-            ["decrypt"]);
-
+    async function decryptUsingWrappedKey(payload, wrappedKey, privateKey, signal) {
+        checkCancellation(signal);
+        const rawAesKey = await crypto.subtle.decrypt(
+            { name: "RSA-OAEP" },
+            privateKey,
+            base64ToBytes(wrappedKey));
+        checkCancellation(signal);
+        const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
+        checkCancellation(signal);
         const plainBuffer = await crypto.subtle.decrypt(
-            { name: "AES-GCM", iv: base64ToBytes(metadata.Iv) },
+            { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
             aesKey,
-            cipherBytes);
-
-        return new Blob([plainBuffer], { type: metadata.ContentType || "application/octet-stream" });
+            base64ToBytes(payload.ct));
+        checkCancellation(signal);
+        return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
     }
 
-    async function downloadEncryptedFile(tokenBase64Url) {
-        const metadata = parseEncryptedFileMetadata(tokenBase64Url);
-        const blob = await decryptEncryptedFileToBlob(tokenBase64Url);
-        const objectUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = objectUrl;
-        anchor.download = metadata.FileName || "download";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-        URL.revokeObjectURL(objectUrl);
+    function createPrivateKeyLoader(encodedKey) {
+        if (!encodedKey) return null;
+        let key;
+        return () => key ??= importPrivateKey(encodedKey);
     }
 
-    async function renderEncryptedImage(imageElement) {
-        if (!(imageElement instanceof HTMLImageElement)) {
-            return;
+    async function readMessage(payloadText, loadPrivateKey, signal) {
+        checkCancellation(signal);
+        if (!payloadText) {
+            return { status: "empty", plaintext: "" };
         }
 
-        const token = imageElement.getAttribute("data-egroo-file");
-        if (!token || imageElement.dataset.egrooLoaded === "true") {
-            return;
+        let payload;
+        try {
+            payload = JSON.parse(payloadText);
+        }
+        catch {
+            return { status: "plain", plaintext: payloadText };
         }
 
-        imageElement.dataset.egrooLoaded = "loading";
+        if (!payload || !payload.iv || !payload.ct) {
+            return { status: "plain", plaintext: payloadText };
+        }
+        if (!loadPrivateKey) {
+            return { status: "missing-key", plaintext: null };
+        }
+
+        // v2 contains one wrapped key per enrolled device.
+        if (payload.v === 2) {
+            if (!Array.isArray(payload.keys) || payload.keys.length === 0) {
+                return { status: "failed", plaintext: null };
+            }
+
+            let privateKey;
+            try {
+                privateKey = await loadPrivateKey();
+            }
+            catch {
+                checkCancellation(signal);
+                return { status: "failed", plaintext: null };
+            }
+
+            for (const keyEntry of payload.keys) {
+                try {
+                    return await decryptUsingWrappedKey(payload, keyEntry.wk, privateKey, signal);
+                }
+                catch {
+                    checkCancellation(signal);
+                    // This wrapped key doesn't match our private key, try next.
+                }
+            }
+            return { status: "failed", plaintext: null };
+        }
+
+        // v1 contains one wrapped key.
+        if (payload.v !== 1) {
+            return { status: "plain", plaintext: payloadText };
+        }
+        if (!payload.wk) {
+            return { status: "failed", plaintext: null };
+        }
 
         try {
-            const metadata = parseEncryptedFileMetadata(token);
-            const blob = await decryptEncryptedFileToBlob(token);
-            const objectUrl = URL.createObjectURL(blob);
-            const previousObjectUrl = imageElement.dataset.egrooObjectUrl;
-
-            if (previousObjectUrl) {
-                URL.revokeObjectURL(previousObjectUrl);
-            }
-
-            imageElement.src = objectUrl;
-            imageElement.alt = metadata.FileName || imageElement.alt || "Encrypted image";
-            imageElement.dataset.egrooObjectUrl = objectUrl;
-            imageElement.dataset.egrooLoaded = "true";
+            return await decryptUsingWrappedKey(payload, payload.wk, await loadPrivateKey(), signal);
         }
-        catch (error) {
-            imageElement.dataset.egrooLoaded = "error";
-            imageElement.alt = imageElement.alt || "Failed to load image";
-            console.error(error);
+        catch {
+            checkCancellation(signal);
+            return { status: "failed", plaintext: null };
         }
-    }
-
-    function hydrateEncryptedImages(root) {
-        if (!(root instanceof Element || root instanceof Document)) {
-            return;
-        }
-
-        root.querySelectorAll(".egroo-encrypted-image[data-egroo-file]").forEach(element => {
-            renderEncryptedImage(element).catch(console.error);
-        });
     }
 
     window.egrooCrypto = {
@@ -234,75 +224,13 @@
             return results;
         },
 
-        async decryptMessage(request) {
-            if (!request || !request.payload) {
-                return { status: "empty", plaintext: "" };
-            }
+        decryptMessage(request, signal) {
+            return readMessage(request?.payload, createPrivateKeyLoader(request?.privateKey), signal);
+        },
 
-            let payload;
-            try {
-                payload = JSON.parse(request.payload);
-            }
-            catch {
-                return { status: "plain", plaintext: request.payload };
-            }
-
-            if (!payload || !payload.iv || !payload.ct) {
-                return { status: "plain", plaintext: request.payload };
-            }
-
-            if (!request.privateKey) {
-                return { status: "missing-key", plaintext: null };
-            }
-
-            // v2 envelope: multiple wrapped keys
-            if (payload.v === 2 && payload.keys && payload.keys.length > 0) {
-                const privateKey = await importPrivateKey(request.privateKey);
-
-                for (const keyEntry of payload.keys) {
-                    try {
-                        const rawAesKey = await crypto.subtle.decrypt(
-                            { name: "RSA-OAEP" },
-                            privateKey,
-                            base64ToBytes(keyEntry.wk));
-                        const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
-                        const plainBuffer = await crypto.subtle.decrypt(
-                            { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
-                            aesKey,
-                            base64ToBytes(payload.ct));
-
-                        return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
-                    }
-                    catch {
-                        // This wrapped key doesn't match our private key, try next
-                    }
-                }
-
-                return { status: "failed", plaintext: null };
-            }
-
-            // v1 envelope: single wrapped key
-            if (payload.v !== 1 || !payload.wk) {
-                return { status: "plain", plaintext: request.payload };
-            }
-
-            try {
-                const privateKey = await importPrivateKey(request.privateKey);
-                const rawAesKey = await crypto.subtle.decrypt(
-                    { name: "RSA-OAEP" },
-                    privateKey,
-                    base64ToBytes(payload.wk));
-                const aesKey = await crypto.subtle.importKey("raw", rawAesKey, { name: "AES-GCM" }, false, ["decrypt"]);
-                const plainBuffer = await crypto.subtle.decrypt(
-                    { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
-                    aesKey,
-                    base64ToBytes(payload.ct));
-
-                return { status: "decrypted", plaintext: textDecoder.decode(plainBuffer) };
-            }
-            catch {
-                return { status: "failed", plaintext: null };
-            }
+        decryptMessages(request, signal) {
+            const loadPrivateKey = createPrivateKeyLoader(request.privateKey);
+            return Promise.all(request.payloads.map(payload => readMessage(payload, loadPrivateKey, signal)));
         },
 
         async encryptFile(request) {
@@ -319,42 +247,12 @@
             };
         },
 
-        downloadEncryptedFile
+        async decryptFile({ encryptedBase64, keyBase64, ivBase64 }) {
+            const key = await crypto.subtle.importKey("raw", base64ToBytes(keyBase64), "AES-GCM", false, ["decrypt"]);
+            const bytes = await crypto.subtle.decrypt(
+                { name: "AES-GCM", iv: base64ToBytes(ivBase64) }, key, base64ToBytes(encryptedBase64));
+            return bytesToBase64(new Uint8Array(bytes));
+        }
     };
 
-    hydrateEncryptedImages(document);
-
-    const observer = new MutationObserver(mutations => {
-        for (const mutation of mutations) {
-            mutation.addedNodes.forEach(node => {
-                if (node instanceof Element) {
-                    if (node.matches(".egroo-encrypted-image[data-egroo-file]")) {
-                        renderEncryptedImage(node).catch(console.error);
-                    }
-
-                    hydrateEncryptedImages(node);
-                }
-            });
-        }
-    });
-
-    observer.observe(document.documentElement, { childList: true, subtree: true });
-
-    document.addEventListener("click", function (event) {
-        const target = event.target instanceof Element
-            ? event.target.closest(".egroo-encrypted-file")
-            : null;
-
-        if (!target) {
-            return;
-        }
-
-        event.preventDefault();
-        const token = target.getAttribute("data-egroo-file");
-        if (!token) {
-            return;
-        }
-
-        downloadEncryptedFile(token).catch(console.error);
-    });
 })();

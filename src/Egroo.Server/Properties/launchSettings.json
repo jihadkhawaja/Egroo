@@ -1,5 +1,15 @@
 {
   "profiles": {
+    "Local Debug": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5176",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "Egroo__LocalDebug": "true",
+        "Logging__LogLevel__Microsoft.Hosting.Lifetime": "Information"
+      }
+    },
     "Server": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -8,6 +18,16 @@
       "applicationUrl": "http://localhost:5175",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "PostgreSQL": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:5175",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development",
+        "Database__Provider": "PostgreSQL",
+        "Logging__LogLevel__Microsoft.Hosting.Lifetime": "Information"
       }
     }
   }

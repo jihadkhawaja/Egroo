@@ -1,9 +1,9 @@
 using Egroo.Server.Database;
 using Egroo.Server.Security;
 using Egroo.Server.Tools;
-using jihadkhawaja.chat.server.Hubs;
-using jihadkhawaja.chat.shared.Interfaces;
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Server.SignalR.Hubs;
+using Egroo.Contracts.Interfaces;
+using Egroo.Contracts.Models;
 using Microsoft.Agents.AI;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -159,7 +159,8 @@ namespace Egroo.Server.Services
                 }
 
                 var responseMessage = CreateAgentResponseMessage(agentDef, triggerMessage.ChannelId, responseText);
-                await SaveAndBroadcastAgentMessageAsync(dbContext, responseMessage);
+                var channels = scope.ServiceProvider.GetRequiredService<IChannel>();
+                await SaveAndBroadcastAgentMessageAsync(dbContext, channels, responseMessage);
             }
             catch (Exception ex)
             {
@@ -445,100 +446,56 @@ namespace Egroo.Server.Services
             };
         }
 
-        private async Task SaveAndBroadcastAgentMessageAsync(DataContext dbContext, Message responseMessage)
+        internal async Task SaveAndBroadcastAgentMessageAsync(DataContext dbContext, IChannel channels, Message message)
         {
-            await dbContext.Messages.AddAsync(responseMessage);
-            await dbContext.SaveChangesAsync();
-            await BroadcastAgentMessage(dbContext, responseMessage);
-        }
-
-        private async Task BroadcastAgentMessage(DataContext dbContext, Message message)
-        {
-            var channelUsers = await dbContext.ChannelUsers
-                .Where(x => x.ChannelId == message.ChannelId)
-                .Join(dbContext.Users,
-                    channelUser => channelUser.UserId,
-                    user => user.Id,
-                    (_, user) => new UserDto
-                    {
-                        Id = user.Id,
-                        Username = user.Username,
-                        EncryptionPublicKey = user.EncryptionPublicKey,
-                        EncryptionKeyId = user.EncryptionKeyId,
-                        EncryptionKeyUpdatedOn = user.EncryptionKeyUpdatedOn
-                    })
-                .ToListAsync();
+            var channelUsers = await channels.GetChannelUsers(message.ChannelId);
+            if (channelUsers is null || channelUsers.Length == 0)
+                return;
 
             var channelAgents = await dbContext.ChannelAgents
-                .Where(x => x.ChannelId == message.ChannelId && x.DateDeleted == null)
+                .Where(link => link.ChannelId == message.ChannelId && link.DateDeleted == null)
                 .Join(dbContext.AgentDefinitions,
-                    channelAgent => channelAgent.AgentDefinitionId,
+                    link => link.AgentDefinitionId,
                     definition => definition.Id,
                     (_, definition) => definition)
-                .Where(x => x.IsActive && x.DateDeleted == null)
+                .Where(definition => definition.IsActive && definition.DateDeleted == null)
                 .ToListAsync();
 
-            EndToEndEncryptionService.ChannelEncryptionResult encryptedPayload;
-            try
-            {
-                encryptedPayload = _endToEndEncryptionService.EncryptForChannelRecipients(message.Content!, channelUsers, channelAgents);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to encrypt agent response for channel {ChannelId}", message.ChannelId);
+            if (!channelAgents.Any(definition => definition.Id == message.AgentDefinitionId))
                 return;
-            }
 
-            message.RecipientContents = encryptedPayload.UserRecipientContents;
-            message.AgentRecipientContents = encryptedPayload.AgentRecipientContents;
-
-            foreach (var user in channelUsers)
+            var encryptedPayload = _endToEndEncryptionService.EncryptForChannelRecipients(message.Content!, channelUsers, channelAgents);
+            dbContext.Messages.Add(message);
+            dbContext.UsersPendingMessages.AddRange(encryptedPayload.UserRecipientContents.Select(delivery => new UserPendingMessage
             {
-                string? deliveryContent = encryptedPayload.UserRecipientContents.FirstOrDefault(x => x.UserId == user.Id)?.Content;
-                if (string.IsNullOrWhiteSpace(deliveryContent))
-                {
-                    continue;
-                }
-
-                var pendingMsg = new UserPendingMessage
-                {
-                    Id = Guid.NewGuid(),
-                    UserId = user.Id,
-                    MessageId = message.Id,
-                    Content = deliveryContent,
-                    DateCreated = DateTimeOffset.UtcNow
-                };
-
-                await dbContext.UsersPendingMessages.AddAsync(pendingMsg);
-
-                var connectionIds = _connectionTracker.GetUserConnectionIds(user.Id);
-                if (connectionIds.Count > 0)
-                {
-                    var lastConnection = connectionIds.Last();
-                    try
-                    {
-                        await _hubContext.Clients.Client(lastConnection).SendAsync("ReceiveMessage", CloneForUserDelivery(message, deliveryContent));
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to send agent message to user {UserId}", user.Id);
-                    }
-                }
-            }
-
-            foreach (var agentRecipient in encryptedPayload.AgentRecipientContents)
+                UserId = delivery.UserId,
+                MessageId = message.Id,
+                Content = delivery.Content,
+            }));
+            dbContext.AgentPendingMessages.AddRange(encryptedPayload.AgentRecipientContents.Select(delivery => new AgentPendingMessage
             {
-                await dbContext.AgentPendingMessages.AddAsync(new AgentPendingMessage
-                {
-                    Id = Guid.NewGuid(),
-                    AgentDefinitionId = agentRecipient.AgentDefinitionId,
-                    MessageId = message.Id,
-                    Content = agentRecipient.Content,
-                    DateCreated = DateTimeOffset.UtcNow
-                });
-            }
-
+                AgentDefinitionId = delivery.AgentDefinitionId,
+                MessageId = message.Id,
+                Content = delivery.Content,
+            }));
             await dbContext.SaveChangesAsync();
+
+            foreach (var delivery in encryptedPayload.UserRecipientContents)
+            {
+                var connections = _connectionTracker.GetUserConnectionIds(delivery.UserId);
+                if (connections.Count == 0)
+                    continue;
+
+                try
+                {
+                    await _hubContext.Clients.Clients(connections)
+                        .SendAsync("ReceiveMessage", CloneForUserDelivery(message, delivery.Content));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send agent message to user {UserId}", delivery.UserId);
+                }
+            }
         }
 
         private string? GetAgentMessageContent(Message message, AgentDefinition agent)

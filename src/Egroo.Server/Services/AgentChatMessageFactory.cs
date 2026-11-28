@@ -1,4 +1,4 @@
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using Microsoft.Extensions.AI;
 using System.Net;
 using System.Text.RegularExpressions;

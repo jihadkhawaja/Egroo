@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/Client/">
-    <Project Path="Egroo/Egroo.Client/Egroo.Client.csproj" />
-    <Project Path="Egroo/Egroo/Egroo.csproj" />
+    <Project Path="Egroo.Avalonia/App/Egroo.Avalonia.csproj" />
+    <Project Path="Egroo.Avalonia/Desktop/Egroo.Avalonia.Desktop.csproj" />
   </Folder>
   <Folder Name="/Github/">
     <File Path="../LICENSE" />
@@ -12,16 +12,10 @@
     <File Path="../docs/CONTRIBUTING.md" />
     <File Path="../docs/pull_request_template.md" />
   </Folder>
-  <Folder Name="/Github/workflow/">
-    <File Path="../.github/workflows/Deploy-Chat.yml" />
-    <File Path="../.github/workflows/Docker.yml" />
-    <File Path="../.github/workflows/MSTest.yml" />
-    <File Path="../.github/workflows/Nuget.yml" />
-  </Folder>
   <Folder Name="/Libs (NuGet Package)/">
-    <Project Path="jihadkhawaja.chat.client/jihadkhawaja.chat.client.csproj" />
-    <Project Path="jihadkhawaja.chat.server/jihadkhawaja.chat.server.csproj" />
-    <Project Path="jihadkhawaja.chat.shared/jihadkhawaja.chat.shared.csproj" />
+    <Project Path="Egroo.Client/Egroo.Client.csproj" />
+    <Project Path="Egroo.Server.SignalR/Egroo.Server.SignalR.csproj" />
+    <Project Path="Egroo.Contracts/Egroo.Contracts.csproj" />
   </Folder>
   <Folder Name="/Server/">
     <Project Path="Egroo.Server/Egroo.Server.csproj" />

@@ -6,7 +6,7 @@ This page explains the setup options that exist in the repository today and whic
 
 | Goal | Recommended path |
 |---|---|
-| Run Egroo locally for the first time | Manual .NET plus PostgreSQL setup |
+| Run Egroo locally for the first time | .NET SDK and the default SQLite launch profile |
 | Contribute to the codebase | Manual setup plus the [Development Setup](Development-Setup) guide |
 | Run only the backend in containers | `src/Egroo.Server/docker-compose.yaml` |
 | Deploy prebuilt web and API images into an existing Docker environment | `docker-compose-egroo.yml` |
@@ -18,7 +18,6 @@ For most newcomers, start with the manual path.
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
 ### 1. Clone The Repository
@@ -28,40 +27,13 @@ git clone https://github.com/jihadkhawaja/Egroo.git
 cd Egroo
 ```
 
-### 2. Create The Database
-
-```sql
-CREATE DATABASE egroo_local;
-CREATE USER egroo_local_user WITH PASSWORD 'change-me';
-GRANT ALL PRIVILEGES ON DATABASE egroo_local TO egroo_local_user;
-```
-
-### 3. Configure The API
-
-Edit `src/Egroo.Server/appsettings.Development.json`.
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
-  },
-  "Secrets": {
-    "Jwt": "development-jwt-secret-at-least-32-characters"
-  },
-  "Encryption": {
-    "Key": "12345678901234567890123456789012",
-    "IV": "1234567890123456"
-  }
-}
-```
-
-### 4. Build The Solution
+### 2. Build The Solution
 
 ```bash
 dotnet build src/Egroo.slnx --configuration Debug
 ```
 
-### 5. Start The API And Web App
+### 3. Start the API and desktop client
 
 Terminal 1:
 
@@ -72,13 +44,14 @@ dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
 Terminal 2:
 
 ```bash
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
-### 6. Open The App
+### 4. Open The App
 
-- Web app: `http://localhost:5068`
-- API Swagger: `http://localhost:5175/swagger`
+- The desktop client opens in its own window.
+- API Swagger: `http://localhost:5176/swagger`
+- The API creates and migrates its local SQLite database on startup. See [Configuration](Configuration) for the PostgreSQL option.
 
 After sign-in, the client can publish a device encryption key for end-to-end encrypted message delivery. If you clear browser storage later, regenerate the device key from the app settings on that device.
 
@@ -136,7 +109,7 @@ From the repository root:
 
 ```bash
 docker build -f src/Egroo.Server/Dockerfile -t egroo-server .
-docker build -f src/Egroo/Egroo/Dockerfile -t egroo-web .
+docker build -f src/Egroo.Avalonia/Browser/Dockerfile -t egroo-web .
 ```
 
 This is useful when you want local images without pulling from a registry.
@@ -145,9 +118,9 @@ This is useful when you want local images without pulling from a registry.
 
 Your setup is ready when all of these are true:
 
-1. PostgreSQL is reachable with the connection string you configured.
-2. `http://localhost:5175/swagger` opens in development.
-3. `http://localhost:5068` loads the UI.
+1. The local API can write to its SQLite data directory, or reach the configured PostgreSQL database.
+2. `http://localhost:5176/swagger` opens under the `Local Debug` profile.
+3. The Avalonia window loads the UI.
 4. You can sign up and sign in.
 5. You can send a message successfully after sign-in.
 

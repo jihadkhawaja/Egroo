@@ -1,10 +1,10 @@
-using jihadkhawaja.chat.server.Services;
+using Egroo.Server.SignalR.Services;
 
 namespace Egroo.Server.Test
 {
     /// <summary>
     /// Tests <see cref="InMemoryConnectionTracker"/> from the
-    /// <c>jihadkhawaja.chat.server</c> NuGet library.
+    /// <c>Egroo.Server.SignalR</c> NuGet library.
     /// </summary>
     [TestClass]
     public class ConnectionTrackerTest

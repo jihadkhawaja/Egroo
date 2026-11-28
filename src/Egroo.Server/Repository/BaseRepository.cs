@@ -1,6 +1,6 @@
 using Egroo.Server.Database;
 using Egroo.Server.Models;
-using jihadkhawaja.chat.shared.Interfaces;
+using Egroo.Contracts.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq.Expressions;

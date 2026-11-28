@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="App/Egroo.Avalonia.csproj" />
+  <Project Path="Desktop/Egroo.Avalonia.Desktop.csproj" />
+  <Project Path="Browser/Egroo.Avalonia.Browser.csproj" />
+  <Project Path="Android/Egroo.Avalonia.Android.csproj" />
+  <Project Path="iOS/Egroo.Avalonia.iOS.csproj" />
+</Solution>

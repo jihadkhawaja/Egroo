@@ -6,28 +6,27 @@ This page is the fastest reliable path from a fresh clone to a working local Egr
 
 For local development, Egroo runs as:
 
-- a PostgreSQL database
+- a local SQLite database
 - the API and SignalR backend from `src/Egroo.Server`
-- the Blazor web host from `src/Egroo/Egroo`
+- the Avalonia desktop client from `src/Egroo.Avalonia/Desktop`
 
 Default development URLs:
 
-- API: `http://localhost:5175`
-- Swagger: `http://localhost:5175/swagger`
-- Web app: `http://localhost:5068`
+- API: `http://localhost:5176`
+- Swagger: `http://localhost:5176/swagger`
+- Desktop app: the Avalonia window opens when the client starts
 
 ## Prerequisites
 
 Install these first:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- [PostgreSQL](https://www.postgresql.org/download/)
 - [Git](https://git-scm.com/downloads)
 
 Optional but useful:
 
 - Visual Studio 2022 or Visual Studio Code
-- pgAdmin or another PostgreSQL client
+- PostgreSQL and a database client when using that provider
 - Docker Desktop if you want container-based database or deployment workflows
 
 ## 1. Clone The Repository
@@ -37,56 +36,9 @@ git clone https://github.com/jihadkhawaja/Egroo.git
 cd Egroo
 ```
 
-## 2. Create A PostgreSQL Database
+## 2. Start The API
 
-Example SQL:
-
-```sql
-CREATE DATABASE egroo_local;
-CREATE USER egroo_local_user WITH PASSWORD 'change-me';
-GRANT ALL PRIVILEGES ON DATABASE egroo_local TO egroo_local_user;
-```
-
-If you prefer Docker for the database only:
-
-```bash
-docker run --name egroo-postgres \
-  -e POSTGRES_DB=egroo_local \
-  -e POSTGRES_USER=egroo_local_user \
-  -e POSTGRES_PASSWORD=change-me \
-  -p 5432:5432 \
-  -d postgres:16
-```
-
-## 3. Configure The API
-
-Edit `src/Egroo.Server/appsettings.Development.json`.
-
-Minimum example:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=localhost;Port=5432;User Id=egroo_local_user;Password=change-me;Database=egroo_local;"
-  },
-  "Secrets": {
-    "Jwt": "development-jwt-secret-at-least-32-characters"
-  },
-  "Encryption": {
-    "Key": "12345678901234567890123456789012",
-    "IV": "1234567890123456"
-  }
-}
-```
-
-Notes:
-
-- `Secrets:Jwt` should be at least 32 characters.
-- `Encryption:Key` must be exactly 32 characters.
-- `Encryption:IV` must be exactly 16 characters.
-- Migrations run automatically when the API starts.
-
-## 4. Start The API
+In VS Code, open `Egroo.code-workspace` and press **F5** with **Egroo (Desktop + API)** selected to start both projects. To start the API from a terminal, run this command.
 
 ```bash
 dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
@@ -94,23 +46,23 @@ dotnet watch --project src/Egroo.Server/Egroo.Server.csproj
 
 What to expect:
 
-- the API listens on `http://localhost:5175`
+- the API listens on `http://localhost:5176`
 - Swagger is available in development
-- the database is migrated automatically on startup
+- the API creates and migrates `src/Egroo.Server/App_Data/local-debug/egroo.db` and stores its generated credentials in the same directory
 
-## 5. Start The Web App
+## 3. Start The Desktop App
 
 Open a second terminal:
 
 ```bash
-dotnet watch --project src/Egroo/Egroo/Egroo.csproj
+dotnet run --project src/Egroo.Avalonia/Desktop
 ```
 
-Open `http://localhost:5068` in your browser.
+Open the Avalonia desktop window.
 
-The UI connects to the API base URL configured in `src/Egroo.UI/Constants/Source.cs`. In debug builds, that value is already `http://localhost:5175/`.
+The default desktop profile connects to `http://localhost:5176/`. See [Configuration](Configuration) to use PostgreSQL instead.
 
-## 6. Create An Account And Publish Your Device Key
+## 4. Create An Account And Publish Your Device Key
 
 Create an account and sign in.
 
@@ -128,21 +80,21 @@ If you sign in from another browser or device, that device can publish its own k
 
 If you later clear browser storage or move to another device, you may need to regenerate or republish the device key from the app settings before encrypted messages can be decrypted on that device.
 
-## 7. Verify The Setup
+## 5. Verify The Setup
 
 Use this quick checklist:
 
-1. `http://localhost:5175/swagger` opens.
-2. `http://localhost:5068` loads the web app.
+1. `http://localhost:5176/swagger` opens.
+2. The Avalonia window opens.
 3. You can create an account and sign in.
 4. You can create a channel and send a test message.
 5. The API console shows no database connection errors.
 
 ## Common First-Run Problems
 
-- Database connection failure: the connection string or PostgreSQL credentials are wrong.
-- API starts but crashes immediately: the JWT or encryption settings are missing.
-- Web app loads but chat fails: the API is not running on `http://localhost:5175`.
+- SQLite startup failure can indicate that the API cannot write to the database directory.
+- When starting the API without `Local Debug`, set the JWT and encryption secrets in server configuration.
+- If the client cannot connect, check that the API is listening on the port configured by the desktop profile.
 - Messages arrive but cannot be decrypted: the device is missing the current private key.
 - Docker compose confusion: the root `docker-compose-egroo.yml` is not the recommended first-run path for contributors.
 

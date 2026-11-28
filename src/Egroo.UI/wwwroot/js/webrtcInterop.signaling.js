@@ -116,6 +116,9 @@ Object.assign(window.webrtcInterop, {
      * Add an ICE candidate received from a specific peer.
      */
     addIceCandidateForPeer: async function (peerId, candidateJson) {
+        if (!this.channelId)
+            return;
+
         const peerData = this.peers.get(peerId);
 
         let candidate;

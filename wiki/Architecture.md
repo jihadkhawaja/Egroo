@@ -6,30 +6,29 @@ This document summarizes the current Egroo runtime, project boundaries, encrypti
 
 ```mermaid
 flowchart TD
-    Browser["Browser / PWA"]
-    Db[("PostgreSQL")]
+    Browser["Browser / WebAssembly"]
+    Db[("SQLite or PostgreSQL")]
 
     subgraph PresentationLayer["Presentation Layer"]
         direction TB
-        Host["Egroo Host"]
+        Host["Avalonia platform hosts"]
         UI["Egroo.UI"]
-        Client["Egroo.Client"]
     end
 
     subgraph ClientServicesLayer["Client Services Layer"]
         direction TB
-        ChatClient["jihadkhawaja.chat.client"]
+        ChatClient["Egroo.Client"]
     end
 
     subgraph ServerLayer["Server Layer"]
         direction TB
         Api["Egroo.Server"]
-        ChatServer["jihadkhawaja.chat.server"]
+        ChatServer["Egroo.Server.SignalR"]
     end
 
     subgraph SharedLayer["Shared Contracts Layer"]
         direction TB
-        Shared["jihadkhawaja.chat.shared"]
+        Shared["Egroo.Contracts"]
     end
 
     Browser --> PresentationLayer
@@ -44,32 +43,31 @@ flowchart TD
 
 | Project | Role |
 |---|---|
-| `src/Egroo/Egroo` | Blazor host application that serves SSR output and the WASM app |
-| `src/Egroo/Egroo.Client` | Client-side WebAssembly project |
-| `src/Egroo.UI` | Shared Razor component library and client-side UI services |
+| `src/Egroo.Avalonia` | Desktop, mobile, and browser entry points |
+| `src/Egroo.UI` | Shared Avalonia controls and client-side presentation services |
 | `src/Egroo.Server` | ASP.NET Core backend with Minimal APIs, SignalR, EF Core, repositories, and agent services |
-| `src/jihadkhawaja.chat.client` | Client chat services that wrap auth, user, channel, message, and call operations |
-| `src/jihadkhawaja.chat.server` | SignalR `ChatHub` implementation and connection tracking |
-| `src/jihadkhawaja.chat.shared` | Shared models, DTOs, and interfaces |
+| `src/Egroo.Client` | Client chat services that wrap auth, user, channel, message, and call operations |
+| `src/Egroo.Server.SignalR` | SignalR `ChatHub` implementation and connection tracking |
+| `src/Egroo.Contracts` | Shared models, DTOs, and interfaces |
 | `src/Egroo.Server.Test` | MSTest coverage for server behavior |
 
 ## Runtime Principles
 
-### Blazor Auto
+### Avalonia client
 
-- the host serves the initial experience quickly with SSR
-- the app then hydrates into the WebAssembly client
+- desktop and mobile builds use their platform's Avalonia host
+- the browser build runs as a static WebAssembly application
 - shared UI components live in `Egroo.UI`
 
 ### SignalR-First Chat
 
 - most interactive user, channel, message, and call behavior flows through `/chathub`
 - the hub is configured for WebSockets-only transport
-- `jihadkhawaja.chat.client` keeps component code away from raw `HubConnection` details
+- `Egroo.Client` keeps component code away from raw `HubConnection` details
 
 ### Self-Hosted Data Ownership
 
-- PostgreSQL is the authoritative store
+- SQLite is the default authoritative store, with PostgreSQL available as an alternative
 - the platform does not depend on a third-party message relay
 - production deployment is controlled by your own infrastructure choices
 
@@ -108,7 +106,7 @@ sequenceDiagram
 - each device can register its own public key and `keyId`
 - user profiles still expose legacy single-key fields for backward compatibility, but the active model supports multiple device keys per user
 - multi-device recipients use a v2 envelope that carries multiple wrapped AES keys for a single ciphertext payload
-- device private keys stay in client storage and are not persisted in PostgreSQL
+- device private keys stay in client storage
 - `Message.Content` is not stored in the `Messages` table for encrypted delivery
 - recipient-specific ciphertext is stored temporarily in `UserPendingMessage` records until acknowledged
 - agent recipients use the same transport model, but their private keys are stored server-side in encrypted form
@@ -128,7 +126,7 @@ sequenceDiagram
 sequenceDiagram
     actor User
     participant UI as Egroo.UI
-    participant Client as chat.client
+    participant Client as Egroo.Client
     participant Hub as ChatHub
     participant Repo as Server Repository
     participant Recipient as Recipient Client
@@ -211,7 +209,7 @@ sequenceDiagram
 
 ### Agent Architecture Notes
 
-- agent definitions live in shared models and are persisted in PostgreSQL
+- agent definitions live in shared models and are persisted by the configured database provider
 - `AgentChannelService` loads context, executes the agent runtime, and broadcasts replies
 - agent API keys and agent private keys are protected with server-side encryption
 - agent replies can also be encrypted for recipients before delivery

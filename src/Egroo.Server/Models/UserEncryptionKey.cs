@@ -1,4 +1,4 @@
-using jihadkhawaja.chat.shared.Models;
+using Egroo.Contracts.Models;
 using System.ComponentModel.DataAnnotations;
 
 namespace Egroo.Server.Models

@@ -8,10 +8,10 @@ Egroo is a real-time chat system. Work should preserve fast message flow, readab
 
 ## Architecture Expectations
 
-- Keep UI behavior in `src/Egroo.UI` and transport/service logic in `src/jihadkhawaja.chat.client`.
+- Keep UI behavior in `src/Egroo.UI` and transport/service logic in `src/Egroo.Client`.
 - Keep server-side persistence and authorization in `src/Egroo.Server`.
-- Keep shared models/contracts in `src/jihadkhawaja.chat.shared`.
-- Keep SignalR hub logic split by concern in `src/jihadkhawaja.chat.server/Hubs` partial classes.
+- Keep shared models/contracts in `src/Egroo.Contracts`.
+- Keep SignalR hub logic split by concern in `src/Egroo.Server.SignalR/Hubs` partial classes.
 
 ## Communication Model
 
@@ -39,7 +39,7 @@ Egroo is a real-time chat system. Work should preserve fast message flow, readab
 ## Editing Rules
 
 - Prefer focused changes over broad rewrites.
-- Preserve existing MudBlazor patterns unless there is a clear UX issue.
+- Preserve existing Avalonia control patterns unless there is a clear UX issue.
 - When changing chat rendering, verify sender bubble, receiver bubble, and agent bubble contrast separately.
 - When adding new HTTP endpoints, follow the minimal API grouping pattern under `/api/v1/{Feature}`.
 - When changing persisted EF Core entities or schema mappings, add a migration and update the database before considering the work complete.

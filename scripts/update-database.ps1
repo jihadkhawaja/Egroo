@@ -1,24 +1,20 @@
 param(
-    [string]$Migration = ""
+    [string]$Migration = '',
+
+    [ValidateSet('SQLite', 'PostgreSQL')]
+    [string]$Provider = 'SQLite'
 )
 
-$ProjectPath = "$PSScriptRoot\..\src\Egroo.Server\Egroo.Server.csproj"
+$projectDirectory = Join-Path $PSScriptRoot '../src/Egroo.Server'
+$context = if ($Provider -eq 'SQLite') { 'SqliteDataContext' } else { 'DataContext' }
+[string[]]$migrationArgs = if ($Migration) { @($Migration) } else { @() }
 
-if ($Migration -ne "") {
-    Write-Host "Updating database to migration '$Migration'..." -ForegroundColor Cyan
-    dotnet ef database update $Migration `
-        --project $ProjectPath `
-        --context DataContext
-} else {
-    Write-Host "Updating database to latest migration..." -ForegroundColor Cyan
-    dotnet ef database update `
-        --project $ProjectPath `
-        --context DataContext
+Push-Location -LiteralPath $projectDirectory
+try {
+    dotnet ef database update @migrationArgs --context $context
+    $updateExitCode = $LASTEXITCODE
+} finally {
+    Pop-Location
 }
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "Database updated successfully." -ForegroundColor Green
-} else {
-    Write-Host "Failed to update database." -ForegroundColor Red
-    exit $LASTEXITCODE
-}
+exit $updateExitCode

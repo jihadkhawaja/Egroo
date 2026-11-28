@@ -1,13 +1,13 @@
-using jihadkhawaja.chat.shared.Helpers;
+using Egroo.Contracts.Helpers;
 using Microsoft.AspNetCore.Http;
 
 namespace Egroo.Server.Test
 {
     /// <summary>
     /// Tests the auth flow (sign-up / sign-in / change password) using the
-    /// <c>jihadkhawaja.chat.server</c> hub backed by an in-memory EF Core database.
+    /// <c>Egroo.Server.SignalR</c> hub backed by an in-memory EF Core database.
     /// These tests exercise <c>AuthRepository</c> which implements the
-    /// <see cref="IAuth"/> interface defined in <c>jihadkhawaja.chat.shared</c>.
+    /// <see cref="IAuth"/> interface defined in <c>Egroo.Contracts</c>.
     /// </summary>
     [TestClass]
     public class AuthTest
@@ -118,7 +118,7 @@ namespace Egroo.Server.Test
             Assert.IsFalse(result.Success, "Expected failure for non-existent user.");
         }
 
-        // ── PatternMatchHelper (jihadkhawaja.chat.shared) ───────────────────────────
+        // ── PatternMatchHelper (Egroo.Contracts) ───────────────────────────
 
         // ── Change password ──────────────────────────────────────────────────────
 
@@ -226,7 +226,7 @@ namespace Egroo.Server.Test
             Assert.IsTrue(result.Success, "SignIn should be case-insensitive.");
         }
 
-        // ── PatternMatchHelper (jihadkhawaja.chat.shared) ───────────────────────────
+        // ── PatternMatchHelper (Egroo.Contracts) ───────────────────────────
 
         [TestMethod]
         public void PatternMatch_ValidUsername_ReturnsTrue()

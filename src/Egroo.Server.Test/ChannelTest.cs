@@ -1,10 +1,13 @@
+using Egroo.Server.Database;
+using Microsoft.EntityFrameworkCore;
+
 namespace Egroo.Server.Test
 {
     /// <summary>
-    /// Tests the channel CRUD flow using the <c>jihadkhawaja.chat.server</c> hub
+    /// Tests the channel CRUD flow using the <c>Egroo.Server.SignalR</c> hub
     /// backed by an in-memory EF Core database.
     /// These tests exercise <c>ChannelRepository</c> which implements
-    /// <see cref="IChannel"/> defined in <c>jihadkhawaja.chat.shared</c>.
+    /// <see cref="IChannel"/> defined in <c>Egroo.Contracts</c>.
     /// </summary>
     [TestClass]
     public class ChannelTest
@@ -61,6 +64,54 @@ namespace Egroo.Server.Test
                                      .CreateChannel();  // no usernames
 
             Assert.IsNull(channel, "Expected null when no usernames are supplied.");
+        }
+
+        [TestMethod]
+        public async Task CreateChannel_OnlyInviteesSupplied_AddsCreatorAsTheOnlyAdminAndDeduplicates()
+        {
+            var username = $"peer_{Guid.NewGuid():N}"[..15];
+            using var inviteeScope = TestServiceProvider.Build(dbName: DbName).CreateScope();
+            var invitee = await inviteeScope.ServiceProvider.GetRequiredService<IAuth>()
+                .SignUp(username, "ValidP@ss1!");
+            Assert.IsTrue(invitee.Success);
+
+            using var scope = _authenticatedServices.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IChannel>();
+            var created = await repository.CreateChannel(username, $" {username.ToUpperInvariant()} ");
+            Assert.IsNotNull(created);
+            Assert.IsFalse(created.IsPublic);
+
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var members = await db.ChannelUsers.Where(member => member.ChannelId == created.Id).AsNoTracking().ToArrayAsync();
+            CollectionAssert.AreEquivalent(new[] { _userId, invitee.UserId!.Value }, members.Select(member => member.UserId).ToArray());
+            Assert.AreEqual(_userId, members.Single(member => member.IsAdmin).UserId);
+        }
+
+        [TestMethod]
+        [DataRow("missinguser")]
+        [DataRow("   ")]
+        public async Task CreateChannel_InvalidInviteLeavesNoChannelOrMembers(string invalidUsername)
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var channelCount = await db.Channels.CountAsync();
+            var memberCount = await db.ChannelUsers.CountAsync();
+
+            var repository = scope.ServiceProvider.GetRequiredService<IChannel>();
+            Assert.IsNull(await repository.CreateChannel("channeltester", invalidUsername));
+            Assert.AreEqual(channelCount, await db.Channels.CountAsync());
+            Assert.AreEqual(memberCount, await db.ChannelUsers.CountAsync());
+        }
+
+        [TestMethod]
+        public async Task CreateChannel_SignedOut_DoesNotCreateChannel()
+        {
+            using var scope = TestServiceProvider.Build(dbName: DbName).CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<DataContext>();
+            var count = await db.Channels.CountAsync();
+
+            Assert.IsNull(await scope.ServiceProvider.GetRequiredService<IChannel>().CreateChannel("channeltester"));
+            Assert.AreEqual(count, await db.Channels.CountAsync());
         }
 
         // ── Read ────────────────────────────────────────────────────────────────────
