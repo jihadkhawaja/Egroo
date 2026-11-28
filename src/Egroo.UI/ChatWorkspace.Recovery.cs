@@ -19,7 +19,6 @@ public sealed partial class ChatWorkspace
         SetWorkspaceOpen(false);
         var form = new StackPanel { Spacing = 16 };
         form.Children.Add(Brand());
-        form.Children.Add(Text("Reset your password", 31, Ink, FontWeight.Bold));
 
         var username = Field("", usernameValue);
         var address = Field("");
@@ -27,6 +26,14 @@ public sealed partial class ChatWorkspace
         var password = Field("", secret: true);
         var factor = VerificationCodeField();
 
+        var back = BackButton("sign in", () =>
+        {
+            address.Text = code.Text = password.Text = factor.Text = null;
+            ShowAuthentication(usernameValue: username.Text);
+            Notify(string.Empty);
+            return Task.CompletedTask;
+        });
+        form.Children.Add(HeadingWithBack(Text("Reset your password", 31, Ink, FontWeight.Bold), back));
         form.Children.Add(LabeledField("Username", username));
         var addressRow = LabeledField("Verified recovery email", address);
         form.Children.Add(addressRow);
@@ -82,13 +89,6 @@ public sealed partial class ChatWorkspace
         reset.HorizontalAlignment = HorizontalAlignment.Stretch;
         resetFields.Children.Add(reset);
         form.Children.Add(resetFields);
-        form.Children.Add(QuietButton("Back to sign in", () =>
-        {
-            address.Text = code.Text = password.Text = factor.Text = null;
-            ShowAuthentication(usernameValue: username.Text);
-            Notify(string.Empty);
-            return Task.CompletedTask;
-        }));
         SubmitOnEnter(address, RequestAsync);
         SubmitOnEnter(password, ResetAsync);
         SubmitOnEnter(factor, ResetAsync);

@@ -42,8 +42,8 @@ public sealed partial class ChatWorkspace
         working.IsVisible = false;
         AutomationProperties.SetLiveSetting(working, AutomationLiveSetting.Polite);
         var flow = new StackPanel { Spacing = 14 };
-        var back = NearbyButton(NearbyBackLabel, () => ExitNearbyAsync(usedRuntime));
-        var page = Page("Nearby chat", "Use the same Wi-Fi, hotspot, or wired network.", back);
+        var back = NearbyBackButton(() => ExitNearbyAsync(usedRuntime));
+        var page = Page("Nearby chat", "Use the same Wi-Fi, hotspot, or wired network.", back: back);
         page.MaxWidth = 740;
         page.Children.Add(working);
         page.Children.Add(flow);
@@ -280,7 +280,7 @@ public sealed partial class ChatWorkspace
         AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
         var input = ComposerField();
         input.MaxLength = 8000;
-        var back = NearbyButton(NearbyBackLabel, () => ExitNearbyAsync(reset: true));
+        var back = NearbyBackButton(() => ExitNearbyAsync(reset: true));
         var newPairing = NearbyButton("New pairing", () => RestartPairingAsync(reset: true), "primary");
         var disconnect = NearbyButton("Disconnect", "quiet");
         var join = NearbyButton("Join voice", async () =>
@@ -298,8 +298,8 @@ public sealed partial class ChatWorkspace
             Spacing = 8,
             Children =
             {
-                Text("Nearby chat", 23, Ink, FontWeight.Bold), status,
-                Actions(join, leave, mute, play, disconnect, retry, newPairing, back)
+                HeadingWithBack(Text("Nearby chat", 23, Ink, FontWeight.Bold), back), status,
+                Actions(join, leave, mute, play, disconnect, retry, newPairing)
             }
         };
         ScrollViewer? timeline = null;
@@ -395,7 +395,8 @@ public sealed partial class ChatWorkspace
         }
     }
 
-    private string NearbyBackLabel => _session.User is null ? "Sign in" : "Workspace";
+    private Button NearbyBackButton(Func<Task> action) =>
+        BackButton(_session.User is null ? "sign in" : "workspace", () => RunNearbyAsync(action), serialize: false);
 
     private async Task ExitNearbyAsync(bool reset)
     {

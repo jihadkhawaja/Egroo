@@ -94,7 +94,11 @@ public sealed partial class ChatWorkspace : UserControl
         form.Children.Add(Brand());
         var heading = Text(create ? "Create an account" : "Sign in", 31, Ink, FontWeight.Bold);
         heading.Margin = new Thickness(0, 7, 0, 3);
-        form.Children.Add(heading);
+        form.Children.Add(create ? HeadingWithBack(heading, BackButton("sign in", () =>
+        {
+            ShowAuthentication(usernameValue: username.Text);
+            return Task.CompletedTask;
+        })) : heading);
         form.Children.Add(LabeledField("Username", username));
         if (create)
             form.Children.Add(Text("Use 3–16 letters, numbers, or underscores.", 12, Muted));
@@ -132,14 +136,16 @@ public sealed partial class ChatWorkspace : UserControl
         submit.HorizontalAlignment = HorizontalAlignment.Stretch;
         form.Children.Add(submit);
         if (!create)
-            form.Children.Add(QuietButton("Forgot password?", () => OpenPasswordRecoveryAsync(username.Text)));
-        var switchMode = QuietButton(create ? "Already have an account? Sign in" : "New to Egroo? Create account", () =>
         {
-            ShowAuthentication(!create, username.Text);
-            return Task.CompletedTask;
-        });
-        switchMode.HorizontalAlignment = HorizontalAlignment.Center;
-        form.Children.Add(switchMode);
+            form.Children.Add(QuietButton("Forgot password?", () => OpenPasswordRecoveryAsync(username.Text)));
+            var createAccount = QuietButton("New to Egroo? Create account", () =>
+            {
+                ShowAuthentication(create: true, usernameValue: username.Text);
+                return Task.CompletedTask;
+            });
+            createAccount.HorizontalAlignment = HorizontalAlignment.Center;
+            form.Children.Add(createAccount);
+        }
         var nearby = StyledButton("Nearby chat without an account", ShowNearbyAsync, "quiet", serialize: false);
         nearby.HorizontalAlignment = HorizontalAlignment.Center;
         form.Children.Add(nearby);

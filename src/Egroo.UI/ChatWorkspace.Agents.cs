@@ -81,7 +81,7 @@ public sealed partial class ChatWorkspace
         var service = _session.Agents;
         var agent = id.HasValue ? await service.GetAgent(id.Value)
             ?? throw new InvalidOperationException("Could not load the agent.") : new AgentDefinition();
-        var panel = Page(id.HasValue ? agent.Name : "Create agent", null, IconButton("Back to agents", BackIcon, ShowAgentsAsync));
+        var panel = Page(id.HasValue ? agent.Name : "Create agent", back: BackButton("agents", ShowAgentsAsync));
         var name = Field("Name", agent.Name);
         var description = Field("Description", agent.Description);
         var instructions = Field("Instructions", agent.Instructions);
@@ -146,7 +146,7 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowAgentResourcesAsync(AgentDefinition agent)
     {
-        var panel = Page("Skills and knowledge", agent.Name, IconButton("Back to agent", BackIcon, () => EditAgentAsync(agent.Id)));
+        var panel = Page("Skills and knowledge", agent.Name, back: BackButton("agent", () => EditAgentAsync(agent.Id)));
         var skills = SettingsGroup(panel, "Skills");
         var service = _session.Agents;
         foreach (var skill in await service.GetSkillDirectories(agent.Id) ?? [])
@@ -218,7 +218,7 @@ public sealed partial class ChatWorkspace
     private async Task ShowAgentToolsAsync(AgentDefinition agent)
     {
         var service = _session.Agents;
-        var panel = Page("Tools and MCP", agent.Name, IconButton("Back to agent", BackIcon, () => EditAgentAsync(agent.Id)));
+        var panel = Page("Tools and MCP", agent.Name, back: BackButton("agent", () => EditAgentAsync(agent.Id)));
         var tools = SettingsGroup(panel, "Tools");
         tools.Children.Add(Button("Add built-in tools", async () =>
         {
@@ -280,7 +280,7 @@ public sealed partial class ChatWorkspace
     private async Task ShowConversationsAsync(AgentDefinition agent)
     {
         SelectSection(WorkspaceSection.Agents);
-        var panel = Page("Conversations", agent.Name, IconButton("Back to agents", BackIcon, ShowAgentsAsync));
+        var panel = Page("Conversations", agent.Name, back: BackButton("agents", ShowAgentsAsync));
         var service = _session.Agents;
         var title = Field("Give it a name");
         var create = SettingsGroup(panel, "New conversation");

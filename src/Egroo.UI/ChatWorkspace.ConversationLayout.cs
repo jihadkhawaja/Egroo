@@ -17,7 +17,7 @@ public sealed partial class ChatWorkspace
         var details = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center,
             Children = { name, Text(subtitle, 12, Muted) } };
         var identity = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), ColumnSpacing = 10 };
-        identity.Children.Add(GlyphButton($"Back to {backLabel.ToLowerInvariant()}", BackIcon, back));
+        identity.Children.Add(BackButton(backLabel.ToLowerInvariant(), back));
         Grid.SetColumn(badge, 1);
         identity.Children.Add(badge);
         Grid.SetColumn(details, 2);

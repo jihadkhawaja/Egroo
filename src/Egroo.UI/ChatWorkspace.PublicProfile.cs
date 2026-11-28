@@ -32,7 +32,7 @@ public sealed partial class ChatWorkspace
         var focus = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
         var scroll = origin as ScrollViewer ?? (origin as Grid)?.Children.OfType<ScrollViewer>().FirstOrDefault();
         var offset = scroll?.Offset;
-        var back = IconButton("Back", BackIcon, () =>
+        var back = BackButton(originName, () =>
         {
             ClosePublicProfile();
             focus?.Focus();
@@ -40,10 +40,9 @@ public sealed partial class ChatWorkspace
                 scroll.Offset = position;
             return Task.CompletedTask;
         });
-        AutomationProperties.SetName(back, $"Back to {originName}");
         var content = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch };
         var page = new StackPanel { Spacing = 18, MaxWidth = 1150, Classes = { "workspace-page" } };
-        page.Children.Add(PageHeading("Profile", null, back));
+        page.Children.Add(PageHeading("Profile", back: back));
         page.Children.Add(content);
         var view = new ScrollViewer { Content = page };
         _publicProfileView.Child = view;

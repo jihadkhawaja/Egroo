@@ -198,23 +198,27 @@ public sealed partial class ChatWorkspace
         }
     }
 
-    private StackPanel Page(string title, string? description = null, Button? action = null)
+    private StackPanel Page(string title, string? description = null, Button? action = null, Button? back = null)
     {
         var panel = new StackPanel { Spacing = 18, MaxWidth = 1150 };
         panel.Classes.Add("workspace-page");
-        panel.Children.Add(PageHeading(title, description, action));
+        panel.Children.Add(PageHeading(title, description, action, back));
         _body.Content = new ScrollViewer { Content = panel };
         return panel;
     }
 
-    private static Grid PageHeading(string title, string? description, Button? action)
+    private static Grid PageHeading(string title, string? description = null, Button? action = null, Button? back = null)
     {
         var heading = new TextBlock { Text = title, Foreground = Ink, FontWeight = FontWeight.Bold,
             TextWrapping = TextWrapping.Wrap, Classes = { "page-title" } };
         var text = new StackPanel { Spacing = 6, Children = { heading } };
         if (description is not null)
             text.Children.Add(Text(description, 14, Muted));
-        var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12, Children = { text } };
+        var header = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,Auto"), ColumnSpacing = 12,
+            Children = { back is null ? text : HeadingWithBack(text, back) }
+        };
         if (action is not null)
         {
             action.VerticalAlignment = VerticalAlignment.Center;
@@ -222,6 +226,15 @@ public sealed partial class ChatWorkspace
             header.Children.Add(action);
         }
         return header;
+    }
+
+    private static Grid HeadingWithBack(Control heading, Button back)
+    {
+        back.Margin = new Thickness(0, 0, 10, 0);
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Children = { back } };
+        Grid.SetColumn(heading, 1);
+        row.Children.Add(heading);
+        return row;
     }
 
     private Border EmptyState(string glyph, string title, string detail, params Control[] actions)
@@ -345,9 +358,18 @@ public sealed partial class ChatWorkspace
         return button;
     }
 
-    private Button GlyphButton(string label, string glyph, Func<Task> action, string style = "quiet")
+    private Button BackButton(string destination, Func<Task> action, bool serialize = true)
     {
-        var button = StyledButton(label, action, style);
+        var back = GlyphButton($"Back to {destination}", BackIcon, action, serialize: serialize);
+        back.MinWidth = 40;
+        back.HorizontalAlignment = HorizontalAlignment.Left;
+        back.VerticalAlignment = VerticalAlignment.Center;
+        return back;
+    }
+
+    private Button GlyphButton(string label, string glyph, Func<Task> action, string style = "quiet", bool serialize = true)
+    {
+        var button = StyledButton(label, action, style, serialize: serialize);
         button.Padding = new Thickness(8);
         button.Content = Icon(glyph, style == "sidebar-action" ? SidebarInk : AccentInk, 17);
         AutomationProperties.SetName(button, label);

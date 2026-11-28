@@ -40,12 +40,19 @@ public sealed partial class ChatWorkspace
 
         void ShowEditor(IpRegionSettings.Status status)
         {
+            var password = Field("", secret: true);
+            var factor = VerificationCodeField();
             details.Children.Clear();
+            details.Children.Add(BackButton("sign-in region settings", () =>
+            {
+                password.Text = factor.Text = null;
+                ShowOverview(status);
+                return Task.CompletedTask;
+            }));
             details.Children.Add(Label("Keep your one-time recovery codes accessible when you travel. A new sign-in from another or unknown region requires one."));
             if (!status.CanEnable && !status.Enabled)
             {
                 details.Children.Add(Label("Enable two-factor authentication, save your recovery codes, and connect from a configured region."));
-                details.Children.Add(QuietButton("Back", () => { ShowOverview(status); return Task.CompletedTask; }));
                 return;
             }
 
@@ -59,8 +66,6 @@ public sealed partial class ChatWorkspace
             else
                 details.Children.Add(Label("Connect from a configured region to change the allowed regions. You can turn off the restriction here."));
 
-            var password = Field("", secret: true);
-            var factor = VerificationCodeField();
             details.Children.Add(LabeledField("Current password", password));
             if (status.CanEnable)
                 details.Children.Add(Label("Use an authenticator code to save allowed regions."));
@@ -94,12 +99,6 @@ public sealed partial class ChatWorkspace
                 }));
             if (status.Enabled)
                 buttons.Children.Add(Button("Turn off region protection", () => UpdateAsync([])));
-            buttons.Children.Add(QuietButton("Back", () =>
-            {
-                password.Text = factor.Text = null;
-                ShowOverview(status);
-                return Task.CompletedTask;
-            }));
             details.Children.Add(buttons);
         }
     }

@@ -829,7 +829,7 @@ public sealed partial class ChatWorkspace
         var members = await _session.Channels.GetChannelUsers(channel.Id) ?? [];
         var agentList = await _session.Agents.GetChannelAgents(channel.Id) ?? [];
         var admin = await _session.Channels.IsChannelAdmin(channel.Id, _session.User!.Id);
-        var panel = Page("Channel members", ChannelTitle(channel), IconButton("Back to chat", BackIcon, () => OpenChannelAsync(channel)));
+        var panel = Page("Channel members", ChannelTitle(channel), back: BackButton("chat", () => OpenChannelAsync(channel)));
         var participants = SettingsGroup(panel, "People and agents");
         foreach (var member in members)
         {
@@ -905,7 +905,7 @@ public sealed partial class ChatWorkspace
 
     private async Task ShowAudioSettingsAsync(Channel channel)
     {
-        var panel = Page("Audio settings", ChannelTitle(channel), IconButton("Back to chat", BackIcon, () => OpenChannelAsync(channel)));
+        var panel = Page("Audio settings", ChannelTitle(channel), back: BackButton("chat", () => OpenChannelAsync(channel)));
         var processing = SettingsGroup(panel, "Microphone processing");
         var voice = _session.Voice;
         foreach (var (name, label, enabled) in new[]

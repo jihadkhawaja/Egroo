@@ -17,7 +17,7 @@ public sealed partial class ChatWorkspace
         await CloseChannelViewAsync();
         SelectSection(WorkspaceSection.Agents);
         var panel = Page("Agent tasks", "Assign a one-time task to an agent you own.",
-            IconButton("Back to agents", BackIcon, ShowAgentsAsync));
+            back: BackButton("agents", ShowAgentsAsync));
         var lifetime = new CancellationTokenSource();
         var token = lifetime.Token;
         panel.DetachedFromVisualTree += (_, _) =>
