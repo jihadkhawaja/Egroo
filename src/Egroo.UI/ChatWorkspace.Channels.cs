@@ -241,7 +241,7 @@ public sealed partial class ChatWorkspace
         return new Border { Child = row };
     }
 
-    private TextBlock RenderMessage(string text, IBrush foreground)
+    private TextBlock RenderMessage(string text, IBrush foreground, bool includeChannelTokens = true)
     {
         var block = new TextBlock { Foreground = foreground, TextWrapping = TextWrapping.Wrap };
         var position = 0;
@@ -249,6 +249,11 @@ public sealed partial class ChatWorkspace
         {
             block.Inlines!.Add(new Run(text[position..token.Index]));
             position = token.Index + token.Length;
+            if (!includeChannelTokens && (token.Groups["mention"].Success || token.Groups["file"].Success))
+            {
+                block.Inlines.Add(new Run(token.Value));
+                continue;
+            }
             if (token.Groups["mention"].Success)
             {
                 block.Inlines.Add(new InlineUIContainer(new Border

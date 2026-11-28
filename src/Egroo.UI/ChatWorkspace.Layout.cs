@@ -10,7 +10,7 @@ namespace Egroo.UI;
 
 public sealed partial class ChatWorkspace
 {
-    private enum WorkspaceSection { Channels, Friends, Agents, Settings }
+    private enum WorkspaceSection { Channels, Friends, Agents, Nearby, Settings }
 
     private const double CompactWidth = 720;
     private const string ChatIcon = "M4,5 H20 Q21,5 21,6 V16 Q21,17 20,17 H10 L5,21 V17 H4 Q3,17 3,16 V6 Q3,5 4,5 M7,10 H17 M7,13 H14";
@@ -72,7 +72,7 @@ public sealed partial class ChatWorkspace
         _sidebar.Child = sidebarContent;
         _root.Children.Add(_sidebar);
 
-        var mobileNavigation = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*"), ColumnSpacing = 4 };
+        var mobileNavigation = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*,*,*"), ColumnSpacing = 4 };
         _mobileBar.Background = Surface;
         _mobileBar.BorderBrush = Line;
         _mobileBar.BorderThickness = new Thickness(0, 1, 0, 0);
@@ -85,6 +85,7 @@ public sealed partial class ChatWorkspace
         AddDestination(WorkspaceSection.Channels, ChatIcon, ShowChannelsAsync);
         AddDestination(WorkspaceSection.Friends, FriendsIcon, ShowFriendsAsync);
         AddDestination(WorkspaceSection.Agents, AgentIcon, ShowAgentsAsync);
+        AddDestination(WorkspaceSection.Nearby, LockIcon, ShowNearbyAsync);
         AddDestination(WorkspaceSection.Settings, SettingsIcon, ShowSettingsAsync);
 
         var breadcrumb = Inline(Text("Egroo", 13, Muted, FontWeight.Medium), Icon(ForwardIcon, Muted, 11), _sectionName);
@@ -120,10 +121,11 @@ public sealed partial class ChatWorkspace
 
         void AddDestination(WorkspaceSection destination, string glyph, Func<Task> open)
         {
-            var desktop = IconButton(destination.ToString(), glyph, open, "sidebar-action");
+            var desktop = IconButton(destination.ToString(), glyph, open, "sidebar-action", serialize: destination != WorkspaceSection.Nearby);
             desktop.HorizontalAlignment = HorizontalAlignment.Stretch;
             navigation.Children.Add(desktop);
-            var mobile = StyledButton(destination.ToString(), open, "quiet", "mobile-action");
+            var mobile = StyledButton(destination.ToString(), open, "quiet", "mobile-action",
+                serialize: destination != WorkspaceSection.Nearby);
             mobile.Content = new StackPanel
             {
                 Spacing = 4, HorizontalAlignment = HorizontalAlignment.Center,
@@ -327,9 +329,9 @@ public sealed partial class ChatWorkspace
         return button;
     }
 
-    private Button IconButton(string label, string glyph, Func<Task> action, string style = "quiet")
+    private Button IconButton(string label, string glyph, Func<Task> action, string style = "quiet", bool serialize = true)
     {
-        var button = StyledButton(label, action, style);
+        var button = StyledButton(label, action, style, serialize: serialize);
         var foreground = style == "primary" ? Brushes.White : style == "sidebar-action" ? SidebarInk : AccentInk;
         button.Content = Inline(Icon(glyph, foreground, 17), Text(label, 13, foreground, FontWeight.SemiBold));
         AutomationProperties.SetName(button, label);

@@ -12,7 +12,7 @@
     <ProjectReference Include="../App/Egroo.Avalonia.csproj" />
     <StaticWebAssetFingerprintPattern Include="JS" Pattern="*.js" Expression="#[.{fingerprint}]!" />
     <Content Include="../../Egroo.UI/wwwroot/favicon.ico" Link="wwwroot/favicon.ico" />
-    <Content Include="../../Egroo.UI/wwwroot/js/clientRuntime.js;../../Egroo.UI/wwwroot/js/egrooCrypto.js;../../Egroo.UI/wwwroot/js/webrtcInterop*.js"
+    <Content Include="../../Egroo.UI/wwwroot/js/clientRuntime.js;../../Egroo.UI/wwwroot/js/egrooCrypto.js;../../Egroo.UI/wwwroot/js/webrtcInterop*.js;../../Egroo.Client/Realtime/nearbyRtc.js"
              Link="wwwroot/runtime/%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

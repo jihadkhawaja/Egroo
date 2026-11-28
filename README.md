@@ -7,6 +7,7 @@ Egroo is a self-hosted chat platform built with .NET 10, Avalonia, ASP.NET Core,
 - Chat in channels with real-time messaging, typing indicators, and presence.
 - Send end-to-end encrypted messages and attachments using device keys.
 - Join channel voice calls over WebRTC.
+- Pair two nearby devices for end-to-end encrypted text and voice without an Egroo server.
 - Create AI agents, chat with them directly, or mention them in channels.
 
 ## Run locally

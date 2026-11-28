@@ -11,13 +11,16 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
 {
     private readonly NativeWebView _view;
     private readonly Uri _runtimePage;
+    private readonly string _unavailableMessage;
     private TaskCompletionSource<bool> _navigation = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private bool _retryNavigation;
 
-    public MediaWebViewRuntime(NativeWebView view, Uri runtimePage)
+    public MediaWebViewRuntime(NativeWebView view, Uri runtimePage,
+        string unavailableMessage = "Could not load the Egroo runtime. Check that the API is running, then try again.")
     {
         _view = view;
         _runtimePage = runtimePage;
+        _unavailableMessage = unavailableMessage;
         _view.NavigationStarted += (_, args) =>
         {
             if (args.Request == _runtimePage || args.Request?.Scheme == "about")
@@ -116,7 +119,7 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             _retryNavigation = !_navigation.Task.IsCompleted;
-            throw new TimeoutException("Could not load the Egroo runtime. Check that the API is running, then try again.");
+            throw new TimeoutException(_unavailableMessage);
         }
     }
 

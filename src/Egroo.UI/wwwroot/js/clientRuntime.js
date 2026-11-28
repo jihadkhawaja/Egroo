@@ -92,7 +92,11 @@
         await cache("readwrite", store => store.put(true, marker));
     }
 
-    webrtcInterop.registerDotNetObject({
+    const voice = globalThis.webrtcInterop;
+    const encryption = globalThis.egrooCrypto;
+    const nearby = globalThis.egrooNearby;
+
+    voice?.registerDotNetObject({
         invokeMethodAsync(name, ...args) {
             events.push([name, String(args[0] ?? ""), String(args[1] ?? "")]);
             return Promise.resolve();
@@ -112,11 +116,6 @@
         ["history.put", storeMessage],
         ["history.importLegacy", importLegacyHistory],
         ["media.events", () => events.splice(0)],
-        ["egrooCrypto.generateIdentity", egrooCrypto.generateIdentity],
-        ["egrooCrypto.encryptMessageForRecipients", egrooCrypto.encryptMessageForRecipients],
-        ["egrooCrypto.decryptMessage", egrooCrypto.decryptMessage],
-        ["egrooCrypto.encryptFile", egrooCrypto.encryptFile],
-        ["egrooCrypto.decryptFile", egrooCrypto.decryptFile],
         ["file.save", (base64, name) => {
             const url = URL.createObjectURL(new Blob([Uint8Array.from(atob(base64), char => char.charCodeAt(0))]));
             const link = document.createElement("a");
@@ -134,8 +133,19 @@
         "getAudioProcessingState", "removePeer", "createOfferForPeer", "handleOfferFromPeer",
         "handleAnswerFromPeer", "addIceCandidateForPeer", "ensurePeerForParticipant"
     ]) {
-        if (typeof webrtcInterop[name] === "function")
-            methods.set("webrtcInterop." + name, webrtcInterop[name].bind(webrtcInterop));
+        if (typeof voice?.[name] === "function")
+            methods.set("webrtcInterop." + name, voice[name].bind(voice));
+    }
+
+    if (encryption) {
+        for (const name of ["generateIdentity", "encryptMessageForRecipients", "decryptMessage", "encryptFile", "decryptFile"])
+            methods.set("egrooCrypto." + name, encryption[name]);
+    }
+
+    if (nearby) {
+        for (const name of ["invite", "reply", "accept", "confirm", "send", "joinVoice", "leaveVoice", "toggleMute",
+            "playAudio", "reset", "poll"])
+            methods.set("nearby." + name, nearby[name].bind(nearby));
     }
 
     async function invoke(request) {

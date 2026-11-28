@@ -28,10 +28,12 @@ public sealed partial class ChatWorkspace : UserControl
     private bool _wasConnected;
     private Channel? _channel;
 
-    public ChatWorkspace(Uri api, ClientRuntime runtime, Func<string, byte[], Task>? exportFile = null)
+    public ChatWorkspace(Uri api, ClientRuntime runtime, Func<string, byte[], Task>? exportFile = null,
+        Func<ClientRuntime>? nearbyRuntime = null)
     {
         _runtime = runtime;
         _exportFile = exportFile;
+        _nearby = new NearbySessionService(nearbyRuntime ?? (() => runtime));
         _session = new WorkspaceSession(api, runtime, Notify);
         _session.Received += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message));
         _session.Updated += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message, updateOnly: true));
@@ -42,6 +44,7 @@ public sealed partial class ChatWorkspace : UserControl
         BuildShell();
         ShowAuthentication();
         _mediaTimer.Tick += (_, _) => _ = PollMediaAsync();
+        _nearbyTimer.Tick += (_, _) => PollNearby();
         AttachedToVisualTree += (_, _) =>
         {
             _mediaTimer.Start();
@@ -51,7 +54,11 @@ public sealed partial class ChatWorkspace : UserControl
                 _ = RestoreAsync();
             }
         };
-        DetachedFromVisualTree += (_, _) => _mediaTimer.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _mediaTimer.Stop();
+            _nearbyTimer.Stop();
+        };
     }
 
     private async Task RestoreAsync()
@@ -99,6 +106,9 @@ public sealed partial class ChatWorkspace : UserControl
         });
         switchMode.HorizontalAlignment = HorizontalAlignment.Center;
         form.Children.Add(switchMode);
+        var nearby = StyledButton("Nearby chat without an account", ShowNearbyAsync, "quiet", serialize: false);
+        nearby.HorizontalAlignment = HorizontalAlignment.Center;
+        form.Children.Add(nearby);
         SubmitOnEnter(password, AuthenticateAsync);
         var authCard = Card(form, 28);
         authCard.MaxWidth = 430;
@@ -117,6 +127,8 @@ public sealed partial class ChatWorkspace : UserControl
     private async Task OpenWorkspaceAsync()
     {
         _wasConnected = true;
+        if (_nearbyOpen)
+            return;
         SetWorkspaceOpen(true);
         await ShowChannelsAsync();
         await _session.Messages.SendPendingMessages();
@@ -325,7 +337,9 @@ public sealed partial class ChatWorkspace : UserControl
         }
     }
 
-    private void Notify(string text)
+    private void Notify(string text) => SetNotice(text, nearby: false);
+
+    private void SetNotice(string text, bool nearby)
     {
         if (Dispatcher.UIThread.CheckAccess())
             SetNotice();
@@ -334,6 +348,8 @@ public sealed partial class ChatWorkspace : UserControl
 
         void SetNotice()
         {
+            if (_nearbyOpen != nearby)
+                return;
             _status.Text = text;
             _notice.IsVisible = !string.IsNullOrWhiteSpace(text);
         }

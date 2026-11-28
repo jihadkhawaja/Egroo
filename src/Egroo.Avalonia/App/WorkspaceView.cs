@@ -23,7 +23,44 @@ internal sealed class WorkspaceView : UserControl
         api = new Uri(api.GetLeftPart(UriPartial.Authority) + "/");
         var surface = new Grid();
         TopLevel.SetAutoSafeAreaPadding(surface, true);
-        if (browserRuntime is null)
+        NearbyRuntimePage? nearbyPage = null;
+        ClientRuntime? nearbyRuntime = browserRuntime;
+        NativeWebView? nearbyView = null;
+        var workspaceRuntime = browserRuntime ?? CreateWebRuntime(new Uri(api, "runtime/index.html"));
+        surface.Children.Add(new ChatWorkspace(api, workspaceRuntime, exportFile, GetNearbyRuntime));
+        Content = surface;
+        DetachedFromVisualTree += (_, _) =>
+        {
+            if (nearbyView is null)
+                return;
+            surface.Children.Remove(nearbyView);
+            nearbyPage?.Dispose();
+            nearbyPage = null;
+            nearbyView = null;
+            nearbyRuntime = null;
+        };
+
+        ClientRuntime GetNearbyRuntime()
+        {
+            if (nearbyRuntime is not null)
+                return nearbyRuntime;
+
+            nearbyPage = new NearbyRuntimePage();
+            try
+            {
+                nearbyRuntime = CreateWebRuntime(nearbyPage.Address,
+                    "Could not load the local Nearby runtime on this device.");
+                return nearbyRuntime;
+            }
+            catch
+            {
+                nearbyPage.Dispose();
+                nearbyPage = null;
+                throw;
+            }
+        }
+
+        ClientRuntime CreateWebRuntime(Uri runtimePage, string? unavailableMessage = null)
         {
             var media = new NativeWebView
             {
@@ -31,7 +68,6 @@ internal sealed class WorkspaceView : UserControl
                 VerticalAlignment = VerticalAlignment.Bottom, IsHitTestVisible = false,
                 Focusable = false
             };
-            var runtimePage = new Uri(api, "runtime/index.html");
             media.EnvironmentRequested += (_, args) =>
             {
                 var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Egroo", "WebView");
@@ -44,13 +80,15 @@ internal sealed class WorkspaceView : UserControl
             };
             media.NavigationStarted += (_, args) => args.Cancel = args.Request != runtimePage
                 && args.Request?.Scheme != "about";
-            configureWebView?.Invoke(media, api);
-            browserRuntime = new MediaWebViewRuntime(media, runtimePage);
-            surface.Children.Add(media);
+            configureWebView?.Invoke(media, runtimePage);
+            var webRuntime = unavailableMessage is null
+                ? new MediaWebViewRuntime(media, runtimePage)
+                : new MediaWebViewRuntime(media, runtimePage, unavailableMessage);
+            surface.Children.Insert(0, media);
             media.Source = runtimePage;
+            if (unavailableMessage is not null)
+                nearbyView = media;
+            return webRuntime;
         }
-
-        surface.Children.Add(new ChatWorkspace(api, browserRuntime, exportFile));
-        Content = surface;
     }
 }

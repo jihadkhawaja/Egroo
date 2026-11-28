@@ -1,8 +1,21 @@
 # Avalonia client
 
-Egroo uses the shared Avalonia controls in `src/Egroo.UI` on Windows, macOS, Linux, Android, iOS, and WebAssembly. The client connects directly to `Egroo.Server` for HTTP and SignalR. Native targets use the API's small `/runtime/` page for WebRTC, Web Crypto, and local persistence. The WebAssembly build includes the runtime scripts and serves the chat interface from static files.
+Egroo uses the shared Avalonia controls in `src/Egroo.UI` on Windows, macOS, Linux, Android, iOS, and WebAssembly. The client connects directly to `Egroo.Server` for HTTP and SignalR. Native targets use the API's small `/runtime/` page for channel calls, Web Crypto, and local persistence. The WebAssembly build includes the runtime scripts and serves the chat interface from static files.
 
 The main solution is `src/Egroo.slnx`. The Avalonia solution at `src/Egroo.Avalonia/Egroo.Avalonia.slnx` includes the desktop, mobile, and browser targets.
+
+## Nearby chat
+
+Connect two devices to the same Wi-Fi, hotspot, or wired network. Open **Nearby chat without an account** on the sign-in screen or **Nearby** in the workspace. Bluetooth tethering can also provide a shared network when both devices can reach each other over IP.
+
+1. On the first device, select **Create invitation** and share the code with the other person.
+2. On the second device, select **I have an invitation**, paste the invitation, and select **Create reply**. Copy the reply and send it back.
+3. On the first device, paste the reply and select **Continue to verification**. On both devices, compare the entire verification code in person or over a channel you already trust. Select **Codes match** if every group matches. If a group differs, select **Codes don’t match** to cancel the pairing.
+4. Send messages directly or select **Join voice** on both devices and allow microphone access. Disconnect when finished.
+
+Pairing uses direct WebRTC with no configured STUN or TURN servers. The verification code binds the exchanged connection descriptions, including the peers' WebRTC certificate fingerprints. Messages use the WebRTC encrypted data channel, and voice uses DTLS-SRTP. Both devices must confirm before Egroo enables either feature. The conversation is held in memory for the session. [WebRTC security architecture](https://www.rfc-editor.org/rfc/rfc8827.html)
+
+Native apps bundle a local media page, so Nearby can start with the Egroo API offline. In a browser, open the Egroo page while its hosting site is reachable. The devices need a network that permits peer-to-peer traffic. Guest Wi-Fi can isolate clients. Bluetooth-only connections without an IP network are outside the supported transports.
 
 ## Desktop
 
