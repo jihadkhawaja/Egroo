@@ -18,31 +18,52 @@ namespace Egroo.Server.Repository
 
         public async Task<Channel?> CreateChannel(params string[] usernames)
         {
-            if (usernames.Length == 0)
-            {
+            if (usernames is not { Length: > 0 } || usernames.Any(string.IsNullOrWhiteSpace)
+                || _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated != true)
                 return null;
-            }
 
             var channel = new Channel
             {
-                Id = Guid.NewGuid(),
-                DateCreated = DateTime.UtcNow,
+                DateCreated = DateTimeOffset.UtcNow,
             };
+            ChannelUser[] members = [];
 
             try
             {
-                await _dbContext.AddAsync(channel);
+                var creator = await GetConnectedUser();
+                if (creator is null || creator.DateDeleted is not null)
+                    return null;
+
+                var names = usernames.Select(name => name.Trim().ToLower()).Distinct().ToArray();
+                var invitees = await _dbContext.Users
+                    .Where(user => user.DateDeleted == null && user.Username != null && names.Contains(user.Username))
+                    .Select(user => user.Id)
+                    .ToArrayAsync();
+                if (invitees.Length != names.Length)
+                    return null;
+
+                members = invitees.Append(creator.Id).Distinct().Select(userId => new ChannelUser
+                {
+                    ChannelId = channel.Id,
+                    UserId = userId,
+                    IsAdmin = userId == creator.Id,
+                    DateCreated = channel.DateCreated
+                }).ToArray();
+
+                _dbContext.Channels.Add(channel);
+                _dbContext.ChannelUsers.AddRange(members);
                 await _dbContext.SaveChangesAsync();
+                return channel;
             }
             catch (Exception ex)
             {
+                _dbContext.Entry(channel).State = EntityState.Detached;
+                foreach (var member in members)
+                    _dbContext.Entry(member).State = EntityState.Detached;
+
                 _logger.LogError(ex, "Failed to create channel.");
                 return null;
             }
-
-            await AddChannelUsers(channel.Id, usernames);
-
-            return channel;
         }
 
         public async Task<bool> AddChannelUsers(Guid channelId, params string[] usernames)
@@ -151,13 +172,16 @@ namespace Egroo.Server.Repository
 
         public async Task<bool> ChannelContainUser(Guid channelId, Guid userId)
         {
-            return await _dbContext.ChannelUsers.FirstOrDefaultAsync(x => x.ChannelId == channelId && x.UserId == userId) != null;
+            return await _dbContext.ChannelUsers.AnyAsync(x =>
+                x.ChannelId == channelId && x.UserId == userId && x.DateDeleted == null);
         }
 
         public async Task<UserDto[]?> GetChannelUsers(Guid channelId)
         {
             HashSet<UserDto> channelUsers = new();
-            var currentChannelUsers = await _dbContext.ChannelUsers.Where(x => x.ChannelId == channelId).ToListAsync();
+            var currentChannelUsers = await _dbContext.ChannelUsers
+                .Where(x => x.ChannelId == channelId && x.DateDeleted == null)
+                .ToListAsync();
             if (currentChannelUsers is null)
             {
                 return null;

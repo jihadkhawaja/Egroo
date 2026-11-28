@@ -6,7 +6,7 @@ using Egroo.Contracts.Models;
 namespace Egroo.Client.Services
 {
     [ExcludeFromCodeCoverage]
-    public class AuthService : IAuthClient
+    public class AuthService : IAuthClient, ITwoFactorAuth, IIpRegionAuth
     {
         public HttpClient HttpClient { get; }
 
@@ -27,9 +27,12 @@ namespace Egroo.Client.Services
             return response ?? new Operation.Response { Success = false, Message = "Empty response from API" };
         }
 
-        public async Task<Operation.Response> SignIn(string username, string password)
+        public Task<Operation.Response> SignIn(string username, string password) =>
+            SignIn(username, password, verificationCode: null);
+
+        public async Task<Operation.Response> SignIn(string username, string password, string? verificationCode)
         {
-            var req = new { Username = username, Password = password };
+            var req = new { Username = username, Password = password, VerificationCode = verificationCode };
             var httpResponse = await HttpClient.PostAsJsonAsync("api/v1/Auth/signin", req);
 
             if (!httpResponse.IsSuccessStatusCode)
@@ -37,6 +40,52 @@ namespace Egroo.Client.Services
 
             var response = await httpResponse.Content.ReadFromJsonAsync<Operation.Response>();
             return response ?? new Operation.Response { Success = false, Message = "Empty response from API" };
+        }
+
+        public async Task<IpRegionSettings.Status> GetIpRegionStatus()
+        {
+            using var response = await HttpClient.GetAsync("api/v1/Auth/ipregions");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<IpRegionSettings.Status>()
+                ?? throw new InvalidOperationException("The API did not return sign-in region status.");
+        }
+
+        public async Task<Operation.Result> UpdateIpRegionSettings(IpRegionSettings.Update settings)
+        {
+            using var response = await HttpClient.PutAsJsonAsync("api/v1/Auth/ipregions", settings);
+            if (!response.IsSuccessStatusCode)
+                return new() { Success = false, Message = $"HTTP error: {response.StatusCode}" };
+
+            return await response.Content.ReadFromJsonAsync<Operation.Result>()
+                ?? new() { Success = false, Message = "Empty response from API." };
+        }
+
+        public async Task<TwoFactor.Status> GetTwoFactorStatus()
+        {
+            using var response = await HttpClient.GetAsync("api/v1/Auth/twofactor");
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<TwoFactor.Status>()
+                ?? throw new InvalidOperationException("The API did not return two-factor status.");
+        }
+
+        public Task<TwoFactor.Enrollment> BeginTwoFactorEnrollment(string password) =>
+            PostTwoFactorAsync("enrollment", new { Password = password },
+                message => new TwoFactor.Enrollment(false, message));
+
+        public Task<TwoFactor.Activation> EnableTwoFactor(string password, string verificationCode) =>
+            PostTwoFactorAsync("enable", new { Password = password, VerificationCode = verificationCode },
+                message => new TwoFactor.Activation(false, message));
+
+        public Task<Operation.Result> DisableTwoFactor(string password, string verificationCode) =>
+            PostTwoFactorAsync("disable", new { Password = password, VerificationCode = verificationCode },
+                message => new Operation.Result { Success = false, Message = message });
+
+        private async Task<T> PostTwoFactorAsync<T>(string path, object request, Func<string, T> failure) where T : class
+        {
+            using var response = await HttpClient.PostAsJsonAsync("api/v1/Auth/twofactor/" + path, request);
+            return !response.IsSuccessStatusCode
+                ? failure($"HTTP error: {response.StatusCode}")
+                : await response.Content.ReadFromJsonAsync<T>() ?? failure("Empty response from API.");
         }
 
         public async Task<Operation.Response> RefreshSession()

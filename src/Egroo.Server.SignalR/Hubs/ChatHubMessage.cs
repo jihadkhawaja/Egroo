@@ -13,15 +13,19 @@ namespace Egroo.Server.SignalR.Hubs
             if (!await CanSendMessageAsync(message))
                 return false;
 
-            bool dbResult = await _messageRepository.SendMessage(message);
-            if (!dbResult)
-                return false;
-
             UserDto[]? users = await GetChannelUsers(message.ChannelId);
-            if (users == null)
+            if (users is null)
                 return false;
 
-            await DeliverMessageToUsersAsync(users, message);
+            var deliveries = GetUserDeliveries(users, message);
+            if (deliveries.Count == 0 || !await _messageRepository.SendMessage(message, deliveries))
+                return false;
+
+            foreach (var delivery in deliveries)
+            {
+                await SendClientMessage(delivery.UserId, message, delivery.Content);
+            }
+
             await NotifyAgentsAsync(message);
 
             return true;
@@ -54,18 +58,19 @@ namespace Egroo.Server.SignalR.Hubs
                 || message.RecipientContents?.Count > 0;
         }
 
-        private async Task DeliverMessageToUsersAsync(IEnumerable<UserDto> users, Message message)
+        private static List<MessageRecipientContent> GetUserDeliveries(UserDto[] users, Message message)
         {
-            foreach (UserDto user in users)
+            var deliveries = new List<MessageRecipientContent>(users.Length);
+            foreach (var user in users)
             {
                 string? deliveryContent = GetDeliveryContentForUser(message, user.Id);
-                if (string.IsNullOrWhiteSpace(deliveryContent))
+                if (!string.IsNullOrWhiteSpace(deliveryContent))
                 {
-                    continue;
+                    deliveries.Add(new MessageRecipientContent { UserId = user.Id, Content = deliveryContent });
                 }
-
-                await SendClientMessage(user, message, ignorePendingMessages: false, deliveryContent);
             }
+
+            return deliveries;
         }
 
         private async Task NotifyAgentsAsync(Message message)
@@ -79,66 +84,43 @@ namespace Egroo.Server.SignalR.Hubs
             _ = Task.Run(() => _agentChannelResponder.ProcessMentionsAsync(message));
         }
 
-        private async Task<bool> SendClientMessage(UserDto user, Message message, bool ignorePendingMessages, string deliveryContent)
+        private async Task SendClientMessage(Guid userId, Message message, string? deliveryContent)
         {
             if (string.IsNullOrWhiteSpace(deliveryContent))
-                return false;
+                return;
 
-            UserPendingMessage pendingMsg = new()
-            {
-                UserId = user.Id,
-                MessageId = message.Id,
-                Content = deliveryContent,
-            };
-
-            if (!ignorePendingMessages)
-            {
-                bool pendingSaved = await _messageRepository.AddPendingMessage(pendingMsg);
-                if (!pendingSaved)
-                    return false;
-            }
-
-            string? connectionId = _connectionTracker.GetUserConnectionIds(user.Id).LastOrDefault();
-            if (string.IsNullOrEmpty(connectionId))
-                return false;
+            var connectionIds = _connectionTracker.GetUserConnectionIds(userId);
+            if (connectionIds.Count == 0)
+                return;
 
             try
             {
-                await Clients.Client(connectionId).SendAsync("ReceiveMessage", CloneForDelivery(message, deliveryContent));
-                return true;
+                await Clients.Clients(connectionIds).SendAsync("ReceiveMessage", CreateClientMessage(message, deliveryContent));
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Failed to send message: {ex}");
             }
-
-            return false;
         }
 
         [Authorize]
         public async Task<bool> UpdateMessage(Message message)
         {
-            if (message.Id == Guid.Empty || string.IsNullOrWhiteSpace(message.Content))
+            var readerId = GetUserIdFromContext();
+            if (!readerId.HasValue || message is null || message.Id == Guid.Empty || message.ReferenceId == Guid.Empty)
                 return false;
 
-            bool dbResult = await _messageRepository.UpdateMessage(message);
-            if (!dbResult)
+            var (receipt, changed) = await _messageRepository.MarkMessageSeen(readerId.Value, message.Id, message.ReferenceId);
+            if (receipt is null)
                 return false;
 
-            Message? updatedMessage = await _messageRepository.GetMessageByReferenceId(message.ReferenceId);
-            if (updatedMessage == null)
-                return false;
-
-            UserDto[]? users = await GetChannelUsers(updatedMessage.ChannelId);
-            if (users == null)
-                return false;
-
-            foreach (UserDto user in users)
+            if (changed && await ChannelContainUser(receipt.ChannelId, receipt.SenderId))
             {
-                string? connectionId = _connectionTracker.GetUserConnectionIds(user.Id).LastOrDefault();
-                if (string.IsNullOrEmpty(connectionId))
-                    continue;
-                await Clients.Client(connectionId).SendAsync("UpdateMessage", updatedMessage);
+                var connections = _connectionTracker.GetUserConnectionIds(receipt.SenderId);
+                if (connections.Count > 0)
+                {
+                    await Clients.Clients(connections).SendAsync("UpdateMessage", CreateClientMessage(receipt, content: null));
+                }
             }
 
             return true;
@@ -151,15 +133,13 @@ namespace Egroo.Server.SignalR.Hubs
             if (!userId.HasValue)
                 return;
 
-            IEnumerable<UserPendingMessage> pendingMessages = await _messageRepository.GetPendingMessagesForUser(userId.Value);
-            foreach (var pending in pendingMessages)
+            var deliveries = await _messageRepository.GetPendingMessageDeliveries(userId.Value);
+            foreach (var (message, content) in deliveries)
             {
-                var message = await _messageRepository.GetMessageById(pending.MessageId);
-                if (message == null)
-                    continue;
-                message.Content = pending.Content;
-                var userDto = new UserDto { Id = userId.Value };
-                await SendClientMessage(userDto, message, ignorePendingMessages: true, pending.Content ?? string.Empty);
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    await Clients.Caller.SendAsync("ReceiveMessage", CreateClientMessage(message, content), Context.ConnectionAborted);
+                }
             }
         }
 
@@ -173,7 +153,7 @@ namespace Egroo.Server.SignalR.Hubs
             return message.Content;
         }
 
-        private static Message CloneForDelivery(Message source, string deliveryContent)
+        private static Message CreateClientMessage(Message source, string? content)
         {
             return new Message
             {
@@ -188,7 +168,7 @@ namespace Egroo.Server.SignalR.Hubs
                 DateDeleted = source.DateDeleted,
                 AgentDefinitionId = source.AgentDefinitionId,
                 DisplayName = source.DisplayName,
-                Content = deliveryContent,
+                Content = content,
             };
         }
 
@@ -199,7 +179,7 @@ namespace Egroo.Server.SignalR.Hubs
             if (!userId.HasValue)
                 return;
 
-            await _messageRepository.UpdatePendingMessage(messageid);
+            await _messageRepository.UpdatePendingMessage(userId.Value, messageid);
         }
 
         [Authorize]

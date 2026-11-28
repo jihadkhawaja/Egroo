@@ -6,13 +6,23 @@
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Controls.WebView" Version="$(AvaloniaWebViewVersion)" />
-    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-      <_Parameter1>EgrooApiUrl</_Parameter1>
-      <_Parameter2>$(EgrooApiUrl)</_Parameter2>
-    </AssemblyAttribute>
     <AvaloniaResource Include="../../Egroo.UI/wwwroot/favicon.ico" Link="Assets/egroo.ico" />
     <EmbeddedResource Include="../../Egroo.Client/Realtime/nearbyRtc.js;../../Egroo.UI/wwwroot/js/clientRuntime.js"
                       LogicalName="Egroo.Avalonia.Nearby.%(Filename)%(Extension)" />
     <ProjectReference Include="../../Egroo.UI/Egroo.UI.csproj" />
   </ItemGroup>
+  <Target Name="GenerateEgrooApiUrlResource" BeforeTargets="AssignTargetPaths">
+    <PropertyGroup>
+      <_EgrooApiUrlResource>$(IntermediateOutputPath)EgrooApiUrl.txt</_EgrooApiUrlResource>
+    </PropertyGroup>
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteLinesToFile File="$(_EgrooApiUrlResource)"
+                      Lines="$([MSBuild]::Escape('$(EgrooApiUrl)'))"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(_EgrooApiUrlResource)" LogicalName="Egroo.Avalonia.EgrooApiUrl.txt" />
+      <FileWrites Include="$(_EgrooApiUrlResource)" />
+    </ItemGroup>
+  </Target>
 </Project>

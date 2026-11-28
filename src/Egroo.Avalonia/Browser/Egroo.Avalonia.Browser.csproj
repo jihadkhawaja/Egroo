@@ -5,6 +5,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- SignalR DTOs and the media runtime use reflection-based JSON serialization. -->
     <PublishTrimmed>false</PublishTrimmed>
+    <!-- Avalonia needs the native SkiaSharp and HarfBuzz assets linked into the runtime. -->
+    <WasmBuildNative>true</WasmBuildNative>
     <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
   </PropertyGroup>
   <ItemGroup>

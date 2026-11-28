@@ -48,6 +48,7 @@ namespace Egroo.Server.SignalR
             app.MapHub<ChatHub>(pattern, options =>
             {
                 options.Transports = HttpTransportType.WebSockets;
+                options.CloseOnAuthenticationExpiration = true;
             });
 
             return app;

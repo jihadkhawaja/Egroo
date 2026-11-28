@@ -34,7 +34,9 @@ dotnet publish src/Egroo.Avalonia/Desktop -c Release -r osx-arm64 --self-contain
 dotnet publish src/Egroo.Avalonia/Desktop -c Release -r linux-x64 --self-contained
 ```
 
-The macOS publish also creates `Egroo.app`. Windows uses the Edge WebView2 Runtime. Linux uses WPE WebKit or WebKitGTK for the media runtime. [Avalonia WebView prerequisites](https://docs.avaloniaui.net/docs/app-development/embedding-web-content)
+The macOS publish also creates `Egroo.app`. Linux and macOS hosts place managed assets in `Contents/Resources` and native libraries in `Contents/Frameworks`, with relative links for the .NET host. A Windows cross-publish creates a staging bundle. Publish on macOS to seal the finished app ad hoc for local use and CI. Public distribution outside the Mac App Store requires Developer ID signing and Apple notarization. [Apple notarization documentation](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+
+Windows uses the Edge WebView2 Runtime. Linux uses WPE WebKit or WebKitGTK for the media runtime. [Avalonia WebView prerequisites](https://docs.avaloniaui.net/docs/app-development/embedding-web-content)
 
 ## Android and iOS
 
@@ -48,6 +50,8 @@ dotnet workload install ios
 dotnet build src/Egroo.Avalonia/iOS -t:Run -p:RuntimeIdentifier=iossimulator-arm64
 ```
 
+Use the [physical-device release checklist](Release-Acceptance.md) for signed-device testing and release handoff.
+
 ## WebAssembly
 
 ```sh
@@ -58,3 +62,66 @@ dotnet publish src/Egroo.Avalonia/Browser -c Release -p:EgrooApiUrl=https://api.
 Serve the published `wwwroot` directory over HTTPS. The API must allow the browser origin in `Api:AllowedOrigins`. The browser Dockerfile builds and serves these static assets on port 8080. Set its `EGROO_API_URL` build argument for a self-hosted API.
 
 On an existing production browser session, the new client can import the previous browser's device key and local channel history when served from the same origin. Native app history and private keys in another WebView origin remain in that origin's storage.
+
+## Two-factor authentication
+
+In Settings, open **Two-factor authentication**, enter your current password, and select **Set up authenticator**. Add the setup key to your authenticator app as a time-based account. Use its six-digit code to finish setup. Save the recovery codes when Egroo displays them. Each code can be used once.
+
+New sign-ins ask for an authenticator code or a recovery code after the password. If you just activated the authenticator or signed in, wait for the next code. Your current signed-in sessions continue to work. To turn off two-factor authentication, enter your password and an authenticator code or an unused recovery code in Settings.
+
+Accounts without two-factor authentication can still sign in with a password from older clients. Upgrade the client before enabling two-factor authentication if you use more than one device. Self-hosters should retain their `Encryption:Key` with database backups. Changing it prevents decryption of the existing authenticator setup keys. An unused recovery code can still be used with the password to sign in or disable two-factor authentication.
+
+## Recovery email
+
+If your server supports recovery email, open **Settings**, enter an email address and your current password, and select **Send confirmation email**. Enter the code from that inbox to verify it. For accounts with an authenticator, setting, replacing, or removing a recovery address also requires an authenticator or unused recovery code. A replacement takes effect after confirmation.
+
+At sign-in, select **Forgot password?** and enter your username and verified recovery address. Enter the code from the email and choose a new password. If your account uses an authenticator, Egroo also asks for your authenticator code or an unused recovery code. After the reset, sign in again on your devices. The reset leaves your authenticator enrollment and local encryption keys in place.
+
+Confirmation and reset codes expire after 15 minutes. An existing reset code may remain valid when you ask for another during that window.
+
+## Encrypted channel delivery
+
+Messages from people and configured channel agents are delivered to every active session for each addressed channel member. A device can decrypt its copy when the message includes that device's enrolled key.
+
+On reconnect, the requesting session receives that user's pending messages in sent order. A message remains pending for the user until one device saves and acknowledges it. Each device keeps its own local message history, and newly enrolled devices start with their own history.
+
+## Container images
+
+The **Avalonia containers** workflow builds and smoke-tests both images on pull requests. After the workflow reaches the default branch, a maintainer can run it there to publish a paired release to GitHub Container Registry. A separate runner pulls both Linux x64 images by their registry digests and smoke-tests the pair. The workflow summary lists the paired tags and immutable references after verification succeeds.
+
+Both image names share a release tag derived from the source revision, workflow run, and attempt. Use the same tag for the API and browser. Use image digests if your deployment needs immutable references. Public images can be pulled anonymously. For a private package, sign in to `ghcr.io` with a GitHub personal access token (classic) that has `read:packages` and access to the package.
+
+Create `egroo-api.env` with the following settings. Supply your own values and protect the file as you would your server configuration.
+
+```dotenv
+Secrets__Jwt=<random secret of at least 32 characters>
+Encryption__Key=<random 32-character ASCII key>
+Encryption__IV=<random 16-character ASCII IV>
+Api__AllowedOrigins__0=https://chat.example.com
+```
+
+Create `egroo-config.json` beside it with the URL that browsers use to reach the API. This file is served publicly, so keep credentials in the API configuration.
+
+```json
+{
+  "apiUrl": "https://api.example.com/"
+}
+```
+
+Use the tag from the workflow and start the pair. These commands bind locally for a reverse proxy and use SQLite in a persistent Docker volume.
+
+```sh
+tag='<paired release tag>'
+docker run -d --name egroo-api --restart unless-stopped \
+  -p 127.0.0.1:8081:8080 --env-file ./egroo-api.env \
+  --mount type=volume,source=egroo-data,target=/app/App_Data \
+  "ghcr.io/jihadkhawaja/egroo-api:$tag"
+docker run -d --name egroo-browser --restart unless-stopped \
+  -p 127.0.0.1:8080:8080 \
+  --mount "type=bind,source=$PWD/egroo-config.json,target=/usr/share/nginx/html/egroo-config.json,readonly" \
+  "ghcr.io/jihadkhawaja/egroo-browser:$tag"
+```
+
+Serve the browser and API over HTTPS and forward WebSocket upgrades to the API's `/chathub` endpoint. A static deployment can set the same `egroo-config.json` beside `index.html`. An empty JSON object (`{}`) uses the API URL selected at build time. The browser container serves the precompressed WebAssembly assets when the client accepts gzip.
+
+Record the installed pair and back up the API database before upgrading. To roll back, recreate both containers with the previous pair and preserve the API settings and persistent volume. If the newer API applied incompatible migrations, restore the corresponding database backup before restarting it.

@@ -10,9 +10,18 @@ public abstract class ClientRuntime
 
     protected abstract Task<string> CallAsync(string request);
 
-    public async Task<T> InvokeAsync<T>(string method, params object?[] args)
+    protected virtual Task<string> CallAsync(string request, CancellationToken cancellationToken) =>
+        CallAsync(request).WaitAsync(cancellationToken);
+
+    public Task<T> InvokeAsync<T>(string method, params object?[] args) =>
+        InvokeAsync<T>(method, CancellationToken.None, args);
+
+    public async Task<T> InvokeAsync<T>(string method, CancellationToken cancellationToken, params object?[] args)
     {
-        using var response = JsonDocument.Parse(await CallAsync(JsonSerializer.Serialize(new { method, args }, JsonOptions)));
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = await CallAsync(JsonSerializer.Serialize(new { method, args }, JsonOptions), cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        using var response = JsonDocument.Parse(result);
         if (response.RootElement.TryGetProperty("error", out var error))
             throw new InvalidOperationException(error.GetString());
 
@@ -20,6 +29,9 @@ public abstract class ClientRuntime
     }
 
     public Task InvokeVoidAsync(string method, params object?[] args) => InvokeAsync<JsonElement>(method, args);
+
+    public Task InvokeVoidAsync(string method, CancellationToken cancellationToken, params object?[] args) =>
+        InvokeAsync<JsonElement>(method, cancellationToken, args);
 
     public async Task DispatchMediaEventsAsync()
     {

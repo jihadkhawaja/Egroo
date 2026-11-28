@@ -1,4 +1,5 @@
 using Egroo.Server.Database;
+using ImageMagick;
 using Microsoft.EntityFrameworkCore;
 
 namespace Egroo.Server.Test
@@ -163,6 +164,34 @@ namespace Egroo.Server.Test
             Assert.IsNotNull(cover);
             Assert.AreEqual("jpeg", cover.ContentType);
             Assert.AreEqual("cover-base64", cover.ImageBase64);
+        }
+
+        [TestMethod]
+        public async Task AvatarAndCover_UploadAndRemoveIndependently()
+        {
+            using var scope = _authenticatedServices.CreateScope();
+            var repo = scope.ServiceProvider.GetRequiredService<IUser>();
+            using var image = new MagickImage(MagickColors.SteelBlue, 32, 24);
+            var encoded = Convert.ToBase64String(image.ToByteArray(MagickFormat.Png));
+
+            Assert.IsTrue(await repo.UpdateAvatar(null));
+            Assert.IsTrue(await repo.UpdateCover(null));
+            Assert.IsTrue(await repo.UpdateAvatar(encoded));
+            Assert.IsTrue(await repo.UpdateCover(encoded));
+            Assert.IsNotNull(await repo.GetAvatar(_currentUserId));
+            var cover = await repo.GetCover(_currentUserId);
+            Assert.IsNotNull(cover);
+
+            Assert.IsTrue(await repo.UpdateAvatar(null));
+            Assert.IsNull(await repo.GetAvatar(_currentUserId));
+            Assert.AreEqual(cover, await repo.GetCover(_currentUserId));
+
+            Assert.IsTrue(await repo.UpdateAvatar(encoded));
+            var avatar = await repo.GetAvatar(_currentUserId);
+            Assert.IsNotNull(avatar);
+            Assert.IsTrue(await repo.UpdateCover(null));
+            Assert.IsNull(await repo.GetCover(_currentUserId));
+            Assert.AreEqual(avatar, await repo.GetAvatar(_currentUserId));
         }
 
         [TestMethod]
@@ -563,6 +592,7 @@ namespace Egroo.Server.Test
             var repo = scope.ServiceProvider.GetRequiredService<IUser>();
 
             Assert.IsFalse(await repo.UpdateAvatar("dGVzdA=="));
+            Assert.IsFalse(await repo.UpdateAvatar(null));
         }
 
         [TestMethod]
@@ -582,6 +612,7 @@ namespace Egroo.Server.Test
             var repo = scope.ServiceProvider.GetRequiredService<IUser>();
 
             Assert.IsFalse(await repo.UpdateCover("dGVzdA=="));
+            Assert.IsFalse(await repo.UpdateCover(null));
         }
 
         // ── CloseUserSession edge case ──────────────────────────────────────────────

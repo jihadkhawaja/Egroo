@@ -70,11 +70,17 @@ internal sealed class WorkspaceView : UserControl
             };
             media.EnvironmentRequested += (_, args) =>
             {
-                var profile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Egroo", "WebView");
+                var dataDirectory = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData,
+                    Environment.SpecialFolderOption.DoNotVerify);
+                var profile = Path.Combine(dataDirectory, "Egroo", "WebView");
                 if (args is WindowsWebView2EnvironmentRequestedEventArgs windows)
                     windows.UserDataFolder = profile;
                 if (args is GtkWebViewEnvironmentRequestedEventArgs gtk)
+                {
+                    // WebKitGTK needs the data directory before it initializes persistent storage.
+                    Directory.CreateDirectory(profile);
                     gtk.BaseDataDirectory = profile;
+                }
                 if (args is LinuxWpeWebViewEnvironmentRequestedEventArgs wpe)
                     wpe.DataDirectory = profile;
             };

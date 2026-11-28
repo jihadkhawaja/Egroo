@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Egroo.Contracts.Models
 {
     public class Operation
@@ -8,6 +10,10 @@ namespace Egroo.Contracts.Models
             public string? Message { get; set; }
             public Guid? UserId { get; set; }
             public string? Token { get; set; }
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool RequiresTwoFactor { get; set; }
+            [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+            public bool RequiresRecoveryCode { get; set; }
         }
 
         public class Result

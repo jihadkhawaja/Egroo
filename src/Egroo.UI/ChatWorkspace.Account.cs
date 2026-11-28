@@ -32,11 +32,12 @@ public sealed partial class ChatWorkspace
             foreach (var person in results)
             {
                 var name = UserName(person);
-                panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, $"@{person.Username}"), Button("Add friend", async () =>
-                {
-                    await RequireAsync(_session.Users.AddFriend(person.Username!));
-                    Notify("Friend request sent.");
-                })));
+                panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, $"@{person.Username}"),
+                    PublicProfileButton(person.Id, name), Button("Add friend", async () =>
+                    {
+                        await RequireAsync(_session.Users.AddFriend(person.Username!));
+                        Notify("Friend request sent.");
+                    })));
             }
             if (results.Length == 0)
                 panel.Children.Add(Card(EmptyState(FriendsIcon, "No matching people", "Try a different username."), 0));
@@ -52,6 +53,7 @@ public sealed partial class ChatWorkspace
             var person = await _session.Users.GetUserPublicDetails(id);
             var name = person is null ? "User" : UserName(person);
             panel.Children.Add(RecordCard(RecordTitle(Avatar(name), name, "Sent you a friend request"),
+                PublicProfileButton(id, name),
                 PrimaryButton("Accept", async () =>
                 {
                     await RequireAsync(_session.Users.AcceptFriend(id));
@@ -68,7 +70,8 @@ public sealed partial class ChatWorkspace
             panel.Children.Add(Text("Your friends", 17, Ink, FontWeight.SemiBold));
         foreach (var relation in relations)
         {
-            var person = await _session.Users.GetUserPublicDetails(OtherUser(relation, user.Id));
+            var id = OtherUser(relation, user.Id);
+            var person = await _session.Users.GetUserPublicDetails(id);
             if (person?.Username is not { } username)
                 continue;
             var name = UserName(person);
@@ -80,6 +83,7 @@ public sealed partial class ChatWorkspace
                         throw new InvalidOperationException("Could not open the conversation.");
                     await OpenChannelAsync(channel);
                 }),
+                PublicProfileButton(id, name),
                 Button("Remove", async () =>
                 {
                     await RequireAsync(_session.Users.RemoveFriend(username));
@@ -110,8 +114,8 @@ public sealed partial class ChatWorkspace
         }));
         profile.Children.Add(Actions(Button("Change avatar", () => UploadProfileImageAsync(true)),
             Button("Change cover", () => UploadProfileImageAsync(false)),
-            Button("Remove avatar", () => RequireAsync(_session.Users.UpdateAvatar(null))),
-            Button("Remove cover", () => RequireAsync(_session.Users.UpdateCover(null)))));
+            Button("Remove avatar", () => RemoveProfileImageAsync(true)),
+            Button("Remove cover", () => RemoveProfileImageAsync(false))));
 
         var password = Field("Current password", secret: true);
         var newPassword = Field("New password", secret: true);
@@ -125,6 +129,10 @@ public sealed partial class ChatWorkspace
             password.Text = newPassword.Text = null;
             Notify("Password changed.");
         }));
+
+        await AddTwoFactorSettingsAsync(panel);
+        await AddRecoveryEmailSettingsAsync(panel);
+        await AddIpRegionSettingsAsync(panel);
 
         var identity = await _session.Encryption.GetLocalIdentityAsync();
         var devices = SettingsGroup(panel, "Encryption devices", "Manage the devices that can decrypt messages sent to you.");
@@ -171,9 +179,15 @@ public sealed partial class ChatWorkspace
         if (image is null)
             return;
         var bytes = await ReadFileAsync(image, MaxAttachmentBytes);
-        var data = $"data:{FileContentType(image.Name)};base64,{Convert.ToBase64String(bytes)}";
+        var data = Convert.ToBase64String(bytes);
         await RequireAsync(avatar ? _session.Users.UpdateAvatar(data) : _session.Users.UpdateCover(data));
         Notify("Image saved.");
+    }
+
+    private async Task RemoveProfileImageAsync(bool avatar)
+    {
+        await RequireAsync(avatar ? _session.Users.UpdateAvatar(null) : _session.Users.UpdateCover(null));
+        Notify(avatar ? "Avatar removed." : "Cover removed.");
     }
 
     private static Guid OtherUser(UserFriend relation, Guid user) =>

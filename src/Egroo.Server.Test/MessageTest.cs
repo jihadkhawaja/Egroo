@@ -187,37 +187,6 @@ namespace Egroo.Server.Test
             Assert.IsNull(fetched, "Expected null for an unknown message Id.");
         }
 
-        // ── Update ──────────────────────────────────────────────────────────────────
-
-        [TestMethod]
-        public async Task UpdateMessage_ExistingMessage_Succeeds()
-        {
-            var original = new Message
-            {
-                ChannelId = _channelId,
-                SenderId = _userId,
-                Content = "Original content",
-                ReferenceId = Guid.NewGuid(),
-            };
-
-            using var sendScope = _authenticatedServices.CreateScope();
-            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                           .SendMessage(original);
-
-            var updated = new Message
-            {
-                Id = original.Id,
-                ReferenceId = original.ReferenceId,
-                Content = "Updated content",
-            };
-
-            using var updateScope = _authenticatedServices.CreateScope();
-            bool result = await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                                           .UpdateMessage(updated);
-
-            Assert.IsTrue(result, "UpdateMessage should return true for an existing message.");
-        }
-
         // ── Pending messages ─────────────────────────────────────────────────────────
 
         [TestMethod]
@@ -310,8 +279,9 @@ namespace Egroo.Server.Test
         }
 
         [TestMethod]
-        public async Task UpdatePendingMessage_RemovesPending()
+        public async Task UpdatePendingMessage_OnlyRemovesAcknowledgingRecipientsDelivery()
         {
+            var offlineRecipientId = Guid.NewGuid();
             var message = new Message
             {
                 ChannelId = _channelId,
@@ -319,47 +289,45 @@ namespace Egroo.Server.Test
                 Content = "Pending update test",
             };
 
-            using var sendScope = _authenticatedServices.CreateScope();
-            await sendScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                           .SendMessage(message);
-
-            var pending = new UserPendingMessage
+            using (var seedScope = _authenticatedServices.CreateScope())
             {
-                Id = Guid.NewGuid(),
-                UserId = _userId,
-                MessageId = message.Id,
-                Content = message.Content,
-            };
+                var repository = seedScope.ServiceProvider.GetRequiredService<IMessageRepository>();
+                Assert.IsTrue(await repository.SendMessage(message));
+                Assert.IsTrue(await repository.AddPendingMessage(new UserPendingMessage
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = offlineRecipientId,
+                    MessageId = message.Id,
+                    Content = "encrypted-for-offline-recipient",
+                }));
+                Assert.IsTrue(await repository.AddPendingMessage(new UserPendingMessage
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = _userId,
+                    MessageId = message.Id,
+                    Content = "encrypted-for-acknowledging-recipient",
+                }));
+            }
 
-            using var addScope = _authenticatedServices.CreateScope();
-            await addScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                          .AddPendingMessage(pending);
+            using (var updateScope = _authenticatedServices.CreateScope())
+            {
+                await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                 .UpdatePendingMessage(_userId, message.Id);
+            }
 
-            using var updateScope = _authenticatedServices.CreateScope();
-            await updateScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                             .UpdatePendingMessage(message.Id);
+            using (var retryScope = _authenticatedServices.CreateScope())
+            {
+                await retryScope.ServiceProvider.GetRequiredService<IMessageRepository>()
+                                .UpdatePendingMessage(_userId, message.Id);
+            }
 
             using var queryScope = _authenticatedServices.CreateScope();
-            var remainingPending = await queryScope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                                                    .GetPendingMessagesForUser(_userId);
-            Assert.IsFalse(remainingPending.Any(p => p.MessageId == message.Id),
-                "Pending message should be removed after UpdatePendingMessage.");
-        }
+            var queries = queryScope.ServiceProvider.GetRequiredService<IMessageRepository>();
+            var acknowledged = await queries.GetPendingMessagesForUser(_userId);
+            Assert.IsFalse(acknowledged.Any(p => p.MessageId == message.Id));
 
-        [TestMethod]
-        public async Task UpdateMessage_NonExistentId_ReturnsFalse()
-        {
-            var updated = new Message
-            {
-                Id = Guid.NewGuid(),
-                Content = "Won't update",
-            };
-
-            using var scope = _authenticatedServices.CreateScope();
-            bool result = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()
-                                     .UpdateMessage(updated);
-
-            Assert.IsFalse(result);
+            var stillPending = await queries.GetPendingMessagesForUser(offlineRecipientId);
+            Assert.AreEqual("encrypted-for-offline-recipient", stillPending.Single(p => p.MessageId == message.Id).Content);
         }
     }
 }

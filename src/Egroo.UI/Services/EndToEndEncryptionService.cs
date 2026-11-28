@@ -9,6 +9,11 @@ namespace Egroo.UI.Services
     {
         private const string IdentityStorageKey = "egroo.e2ee.identity.v1";
         private const string DecryptionErrorMessage = "[Unable to decrypt this message on this device.]";
+        private const string MissingKeyMessage = "[This device does not have a key for this message.]";
+        private const string DecryptionUnavailableMessage = "[Decryption is temporarily unavailable. Reopen the conversation to retry.]";
+        private const int MaxBatchMessages = 32;
+        private const int MaxBatchCharacters = 64 * 1024;
+        private static readonly TimeSpan DecryptionAttemptTimeout = TimeSpan.FromSeconds(3);
 
         private readonly ClientRuntime _jsRuntime;
         private readonly StorageService _storageService;
@@ -29,9 +34,9 @@ namespace Egroo.UI.Services
 
         public Task<EncryptionIdentity?> GetLocalIdentityAsync() => ReadIdentityAsync(_identityKey);
 
-        private async Task<EncryptionIdentity?> ReadIdentityAsync(string key)
+        private async Task<EncryptionIdentity?> ReadIdentityAsync(string key, CancellationToken cancellationToken = default)
         {
-            string? raw = await _storageService.GetFromLocalStorage(key);
+            string? raw = await _storageService.GetFromLocalStorage(key, cancellationToken);
             if (string.IsNullOrWhiteSpace(raw))
             {
                 return null;
@@ -190,40 +195,118 @@ namespace Egroo.UI.Services
 
         public async Task<string?> GetDisplayContentAsync(Message message)
         {
-            if (!string.IsNullOrWhiteSpace(message.DecryptedContent))
-            {
-                return message.DecryptedContent;
-            }
-
-            var result = await DecryptTransportContentAsync(message.Content);
-            message.DecryptedContent = result.Status switch
-            {
-                MessageDecryptionStatus.Decrypted => result.Plaintext,
-                MessageDecryptionStatus.Plaintext => result.Plaintext,
-                MessageDecryptionStatus.Empty => string.Empty,
-                _ => DecryptionErrorMessage,
-            };
-
+            await PopulateDisplayContentsAsync([message], runtimeAvailable: true, CancellationToken.None);
             return message.DecryptedContent;
         }
 
-        public async Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent)
+        internal static IEnumerable<Message[]> DecryptionBatches(IEnumerable<Message> messages)
+        {
+            var batch = new List<Message>(MaxBatchMessages);
+            var characters = 0;
+            foreach (var message in messages)
+            {
+                var length = message.Content?.Length ?? 0;
+                if (batch.Count == MaxBatchMessages || batch.Count > 0 && length > MaxBatchCharacters - characters)
+                {
+                    yield return batch.ToArray();
+                    batch.Clear();
+                    characters = 0;
+                }
+
+                batch.Add(message);
+                characters += length;
+            }
+            if (batch.Count > 0)
+                yield return batch.ToArray();
+        }
+
+        internal async Task<bool> PopulateDisplayContentsAsync(
+            IReadOnlyList<Message> batch, bool runtimeAvailable, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var pending = new List<Message>(batch.Count);
+            foreach (var message in batch)
+            {
+                if (!string.IsNullOrWhiteSpace(message.DecryptedContent))
+                    continue;
+                if (string.IsNullOrWhiteSpace(message.Content))
+                    message.DecryptedContent = string.Empty;
+                else
+                    pending.Add(message);
+            }
+            if (pending.Count == 0)
+                return false;
+
+            if (runtimeAvailable)
+            {
+                var payloads = pending.Select(message => message.Content!).ToArray();
+                for (var attempt = 0; attempt < 2; attempt++)
+                {
+                    using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    attemptTimeout.CancelAfter(DecryptionAttemptTimeout);
+                    try
+                    {
+                        var identity = await ReadIdentityAsync(_identityKey, attemptTimeout.Token);
+                        var results = await _jsRuntime.InvokeAsync<BrowserDecryptionResult[]>(
+                            "egrooCrypto.decryptMessages", attemptTimeout.Token,
+                            new { payloads, privateKey = identity?.PrivateKey });
+                        if (results is null || results.Length != pending.Count)
+                            throw new InvalidOperationException("The decryption runtime returned an incomplete batch.");
+
+                        for (var index = 0; index < pending.Count; index++)
+                        {
+                            var result = ReadDecryptionResult(results[index], payloads[index]);
+                            pending[index].DecryptedContent = result.Status switch
+                            {
+                                MessageDecryptionStatus.Decrypted or MessageDecryptionStatus.Plaintext => result.Plaintext,
+                                MessageDecryptionStatus.Empty => string.Empty,
+                                MessageDecryptionStatus.MissingKey => MissingKeyMessage,
+                                _ => DecryptionErrorMessage,
+                            };
+                        }
+                        return false;
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex) when (ex is not OutOfMemoryException)
+                    {
+                        // Runtime failures get one retry. Individual invalid messages already have their own results.
+                        System.Diagnostics.Debug.WriteLine($"Message decryption runtime failure ({ex.GetType().Name}).");
+                    }
+                }
+            }
+
+            foreach (var message in pending)
+                message.DecryptedContent = DecryptionUnavailableMessage;
+            return true;
+        }
+
+        public Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent) =>
+            DecryptTransportContentAsync(transportContent, CancellationToken.None);
+
+        private async Task<MessageDecryptionResult> DecryptTransportContentAsync(string? transportContent, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(transportContent))
             {
                 return new MessageDecryptionResult(MessageDecryptionStatus.Empty, string.Empty);
             }
 
-            var identity = await GetLocalIdentityAsync();
+            var identity = await ReadIdentityAsync(_identityKey, cancellationToken);
             var result = await _jsRuntime.InvokeAsync<BrowserDecryptionResult>(
-                "egrooCrypto.decryptMessage",
+                "egrooCrypto.decryptMessage", cancellationToken,
                 new
                 {
                     payload = transportContent,
                     privateKey = identity?.PrivateKey
                 });
 
-            return result.Status switch
+            return ReadDecryptionResult(result, transportContent);
+        }
+
+        private static MessageDecryptionResult ReadDecryptionResult(BrowserDecryptionResult? result, string transportContent) =>
+            result?.Status switch
             {
                 "decrypted" => new MessageDecryptionResult(MessageDecryptionStatus.Decrypted, result.Plaintext ?? string.Empty),
                 "plain" => new MessageDecryptionResult(MessageDecryptionStatus.Plaintext, result.Plaintext ?? transportContent),
@@ -231,7 +314,6 @@ namespace Egroo.UI.Services
                 "missing-key" => new MessageDecryptionResult(MessageDecryptionStatus.MissingKey, null),
                 _ => new MessageDecryptionResult(MessageDecryptionStatus.Failed, null),
             };
-        }
 
         public async Task<EncryptedFileUpload> EncryptFileAsync(byte[] fileBytes, string originalFileName, string? contentType)
         {

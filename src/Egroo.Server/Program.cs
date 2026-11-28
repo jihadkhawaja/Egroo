@@ -1,3 +1,6 @@
+using Egroo.Server.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using Egroo.Server;
 using Egroo.Server.API;
 using Egroo.Server.Database;
 using Egroo.Server.Repository;
@@ -5,6 +8,7 @@ using Egroo.Server.Security;
 using Egroo.Server.Services;
 using Egroo.Server.SignalR;
 using Egroo.Contracts.Interfaces;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.RateLimiting;
@@ -23,10 +27,16 @@ public partial class Program
 {
     public static async Task MainAsync(string[] args)
     {
+        if (args.FirstOrDefault() is "setup" or "doctor")
+        {
+            Environment.ExitCode = await MaintenanceCommands.RunAsync(args[0], args[1..]);
+            return;
+        }
+
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
         ConfigureInfrastructure(builder);
-        ConfigureServerServices(builder.Services);
+        ConfigureServerServices(builder.Services, builder.Configuration);
 
         WebApplication app = builder.Build();
 
@@ -45,11 +55,12 @@ public partial class Program
         ConfigureAuthentication(builder.Services, builder.Configuration);
         builder.Services.AddAuthorization();
         builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSingleton(IpRegionPolicy.FromConfiguration(builder.Configuration));
         ConfigureRateLimiting(builder.Services);
         ServerDatabase.Register(builder);
     }
 
-    private static void ConfigureLocalDebug(WebApplicationBuilder builder)
+    internal static void ConfigureLocalDebug(WebApplicationBuilder builder, bool createSecrets = true)
     {
         if (!builder.Configuration.GetValue<bool>("Egroo:LocalDebug"))
         {
@@ -63,7 +74,7 @@ public partial class Program
         }
 
         const string localDataDirectory = "App_Data/local-debug";
-        LocalDebugSecrets.Apply(builder.Configuration, Path.Combine(builder.Environment.ContentRootPath, localDataDirectory));
+        LocalDebugSecrets.Apply(builder.Configuration, Path.Combine(builder.Environment.ContentRootPath, localDataDirectory), createSecrets);
         builder.Configuration["Database:Provider"] = "SQLite";
         if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("Sqlite")))
         {
@@ -164,7 +175,7 @@ public partial class Program
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = HandleMessageReceivedAsync,
-            OnAuthenticationFailed = HandleAuthenticationFailedAsync
+            OnTokenValidated = ValidateAccountSessionAsync
         };
     }
 
@@ -179,17 +190,14 @@ public partial class Program
         return Task.CompletedTask;
     }
 
-    private static Task HandleAuthenticationFailedAsync(AuthenticationFailedContext context)
+    private static async Task ValidateAccountSessionAsync(TokenValidatedContext context)
     {
-        if (!context.Request.Path.StartsWithSegments("/chathub"))
+        if (!AccountSessions.TryReadSession(context.Principal, out var userId, out var revision)
+            || await AccountSessions.GetRevisionAsync(context.HttpContext.RequestServices.GetRequiredService<DataContext>(),
+                userId, context.HttpContext.RequestAborted) != revision)
         {
-            return Task.CompletedTask;
+            context.Fail("Your session has expired. Sign in again.");
         }
-
-        context.NoResult();
-        context.Response.StatusCode = 200;
-        context.Response.Headers["Content-Type"] = "application/json";
-        return context.Response.WriteAsync("{\"error\":\"Unauthenticated access allowed\"}");
     }
 
     private static bool IsHubOrFilePath(PathString path)
@@ -211,24 +219,45 @@ public partial class Program
         });
     }
 
-    private static void ConfigureServerServices(IServiceCollection services)
+    private static void ConfigureServerServices(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton(CreateEncryptionService);
         services.AddSingleton<EndToEndEncryptionService>();
-        services.AddScoped<IAuth, AuthRepository>();
+        services.AddScoped<AuthRepository>();
+        services.AddScoped<IAuth>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddScoped<ITwoFactorAuth>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddScoped<IAccountRecovery>(provider => provider.GetRequiredService<AuthRepository>());
+        services.AddSingleton<IRecoveryEmailDelivery, SmtpRecoveryEmailDelivery>();
+        services.AddSingleton<RecoveryEmailQueue>();
+        services.AddHostedService(provider => provider.GetRequiredService<RecoveryEmailQueue>());
+        services.AddScoped<IIpRegionAuth>(provider => provider.GetRequiredService<AuthRepository>());
         services.AddScoped<IUser, UserRepository>();
         services.AddScoped<IChannel, ChannelRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddScoped<IAgentRepository, AgentRepository>();
+        services.AddScoped<AgentTaskRepository>();
+        services.AddSingleton(TimeProvider.System);
         services.AddHttpClient("McpClient");
         services.AddSingleton<ChannelFileStorageService>();
         services.AddSingleton<AgentSkillsService>();
         services.AddSingleton<AgentManagedSkillsService>();
         services.AddSingleton<McpClientService>();
         services.AddSingleton<AgentRuntimeService>();
+        if (configuration.GetValue("AgentTasks:WorkerEnabled", true))
+        {
+            services.AddSingleton<IAgentTaskExecutor>(provider => provider.GetRequiredService<AgentRuntimeService>());
+            services.AddHostedService<AgentTaskWorker>();
+        }
+
         services.AddSingleton<AgentChannelService>();
         services.AddSingleton<IAgentChannelResponder>(sp => sp.GetRequiredService<AgentChannelService>());
-        services.AddChatHub();
+        services.AddSingleton<AccountSessions>();
+        services.AddHostedService(provider => provider.GetRequiredService<AccountSessions>());
+        services.AddChatHub(options =>
+        {
+            options.MaximumReceiveMessageSize = 10 * 1024 * 1024;
+            options.AddFilter<AccountSessions>();
+        });
     }
 
     private static EncryptionService CreateEncryptionService(IServiceProvider serviceProvider)
@@ -239,7 +268,7 @@ public partial class Program
         return new EncryptionService(key, iv);
     }
 
-    private static async Task ApplyMigrationsAsync(WebApplication app)
+    internal static async Task ApplyMigrationsAsync(WebApplication app)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DataContext>();
@@ -255,6 +284,16 @@ public partial class Program
 
     private static void ConfigurePipeline(WebApplication app)
     {
+        var regionPolicy = app.Services.GetRequiredService<IpRegionPolicy>();
+        if (regionPolicy.ConfigurationError is { } error)
+            app.Logger.LogWarning("IP-region protection needs a configuration correction. {Reason}", error);
+
+        if (regionPolicy.CreateForwardedHeadersOptions() is { } forwarding)
+        {
+            app.UseWhen(context => regionPolicy.IsTrustedProxy(context.Connection.RemoteIpAddress),
+                proxy => proxy.UseForwardedHeaders(forwarding));
+        }
+
         if (app.Environment.IsDevelopment())
         {
             ConfigureDevelopmentPipeline(app);
@@ -273,7 +312,20 @@ public partial class Program
         app.UseRateLimiter();
         app.UseCors("CorsPolicy");
         app.UseAuthentication();
+        app.Use(RejectInvalidHubCredentialsAsync);
         app.UseAuthorization();
+    }
+
+    private static async Task RejectInvalidHubCredentialsAsync(HttpContext context, RequestDelegate next)
+    {
+        // Public hub methods accept anonymous callers. A failed bearer credential must not become an anonymous connection.
+        if (context.Request.Path.StartsWithSegments("/chathub") && (await context.AuthenticateAsync()).Failure is not null)
+        {
+            await context.ChallengeAsync();
+            return;
+        }
+
+        await next(context);
     }
 
     private static void ConfigureDevelopmentPipeline(WebApplication app)
@@ -289,6 +341,7 @@ public partial class Program
         app.MapChatHub();
         app.MapAuthentication();
         app.MapAgents();
+        app.MapAgentTasks();
         app.MapChannelFiles();
         app.MapVoiceCall();
     }

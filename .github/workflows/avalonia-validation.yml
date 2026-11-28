@@ -1,0 +1,435 @@
+name: Avalonia validation
+
+on:
+  push:
+    branches: [avalonia, main]
+  pull_request:
+    branches: [avalonia, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: avalonia-validation-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Test, Coverage & Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: egroo
+          POSTGRES_DB: egroo
+          POSTGRES_PASSWORD: egroo-ci
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U egroo -d egroo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - run: dotnet build src/Egroo.slnx -c Release
+      - name: Test with coverage
+        run: >
+          dotnet test src/Egroo.Server.Test -c Release --no-build
+          --logger trx --results-directory TestResults
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=cobertura
+          /p:CoverletOutput=TestResults/Coverage/coverage
+      - name: Summarize server coverage
+        shell: pwsh
+        run: |
+          ./scripts/generate-coverage-report.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $summary = Get-Content src/Egroo.Server.Test/TestResults/CoverageReport/Summary.txt |
+            Select-Object -First 20
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value @('## Server coverage', '```text')
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $summary
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value '```'
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: server-test-results
+          path: TestResults/*.trx
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: server-coverage
+          path: |
+            src/Egroo.Server.Test/TestResults/Coverage/coverage.cobertura.xml
+            src/Egroo.Server.Test/TestResults/CoverageReport/
+      - name: Smoke test PostgreSQL setup and diagnostics
+        env:
+          ASPNETCORE_URLS: http://127.0.0.1:5175
+          Database__Provider: PostgreSQL
+          ConnectionStrings__DefaultConnection: Host=127.0.0.1;Port=${{ job.services.postgres.ports['5432'] }};Database=egroo;Username=egroo;Password=egroo-ci
+          Secrets__Jwt: egroo-disposable-ci-jwt-signing-secret
+          Encryption__Key: 0123456789abcdef0123456789abcdef
+          Encryption__IV: 0123456789abcdef
+          Api__AllowedOrigins__0: https://chat.example.test
+          Logging__LogLevel__Default: Warning
+        run: |
+          server=src/Egroo.Server/bin/Release/net10.0/Egroo.Server.dll
+          dotnet "$server" setup
+          dotnet "$server" setup
+          dotnet "$server" > "$RUNNER_TEMP/egroo-api.log" 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          if ! curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 --max-time 3 \
+            "$ASPNETCORE_URLS/runtime/index.html" > /dev/null; then
+            cat "$RUNNER_TEMP/egroo-api.log"
+            exit 1
+          fi
+          dotnet "$server" doctor --api-url "$ASPNETCORE_URLS" --browser-origin https://chat.example.test
+
+  desktop:
+    name: Desktop publish (${{ matrix.rid }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            executable: desktop/Egroo.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            executable: desktop/Egroo
+          - os: macos-15
+            rid: osx-arm64
+            executable: Egroo.app/Contents/MacOS/Egroo
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Publish and verify executable
+        shell: pwsh
+        env:
+          EGROO_RID: ${{ matrix.rid }}
+          EGROO_EXECUTABLE: ${{ matrix.executable }}
+        run: |
+          dotnet publish src/Egroo.Avalonia/Desktop -c Release -r $env:EGROO_RID --self-contained -o artifacts/desktop/
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (!(Test-Path -LiteralPath "artifacts/$env:EGROO_EXECUTABLE" -PathType Leaf)) {
+            throw "Expected desktop executable was not published: $env:EGROO_EXECUTABLE"
+          }
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        if: matrix.rid == 'osx-arm64'
+        with:
+          node-version: 24
+      - name: Verify the bundled macOS runtime
+        if: matrix.rid == 'osx-arm64'
+        run: node scripts/performance/macos-desktop-smoke.mjs artifacts/Egroo.app src/Egroo.UI/wwwroot "$RUNNER_TEMP/egroo-macos-smoke.json"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always() && matrix.rid == 'osx-arm64'
+        with:
+          name: macos-runtime-evidence
+          path: ${{ runner.temp }}/egroo-macos-smoke.json
+          if-no-files-found: ignore
+
+  browser:
+    name: Browser publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install wasm-tools
+      - run: dotnet publish src/Egroo.Avalonia/Browser -c Release -o artifacts/browser
+      - name: Verify static app assets
+        shell: pwsh
+        run: |
+          $root = 'artifacts/browser/wwwroot'
+          $page = Get-Content (Join-Path $root 'index.html') -Raw
+          $scripts = [regex]::Matches($page, '<script\b[^>]*\bsrc="([^"]+)"')
+          if ($scripts.Count -eq 0) { throw 'The published page declares no scripts.' }
+          foreach ($script in $scripts) {
+            $asset = Get-Item -LiteralPath (Join-Path $root $script.Groups[1].Value)
+            if ($asset.Length -eq 0) { throw "Published script is empty: $($asset.Name)" }
+          }
+          $wasm = Get-ChildItem (Join-Path $root '_framework') -Recurse -File -Filter '*.wasm' |
+            Where-Object Length -gt 0 | Select-Object -First 1
+          if (!$wasm) { throw 'The published bundle contains no WebAssembly runtime.' }
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - name: Verify browser history migration and paging
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          runtime=$(find artifacts/browser/wwwroot/runtime -maxdepth 1 -type f -name 'clientRuntime*.js' -print -quit)
+          test -n "$runtime"
+          EGROO_PERF_RUNTIME="$runtime" node scripts/performance/browser-history.mjs
+          EGROO_PERF_RUNTIME="$runtime" node scripts/performance/browser-history.mjs --cursor
+
+  android:
+    name: Android release build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet workload install android
+      - name: Build and verify APK
+        run: |
+          dotnet build src/Egroo.Avalonia/Android -c Release -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: android-test-apk
+          path: src/Egroo.Avalonia/Android/bin/Release/**/*-Signed.apk
+          if-no-files-found: error
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+      - name: Build the isolated Android conversation fixture
+        shell: bash
+        run: |
+          npm ci --prefix scripts/performance --ignore-scripts
+          dotnet publish src/Egroo.Server -c Release -o "$RUNNER_TEMP/egroo-android-api"
+          manifest="src/Egroo.Avalonia/Android/Smoke.AndroidManifest.xml"
+          python3 - "$manifest" <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          android = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android)
+          manifest = ET.parse("src/Egroo.Avalonia/Android/AndroidManifest.xml")
+          manifest.getroot().set("package", "com.jihadkhawaja.egroo.smoke")
+          manifest.find("application").set(f"{{{android}}}usesCleartextTraffic", "true")
+          manifest.write(sys.argv[1], encoding="utf-8", xml_declaration=True)
+          PY
+          # Keep the loopback address and manifest out of the uploaded default Release package.
+          dotnet build src/Egroo.Avalonia/Android -c Release -r android-x64 \
+            --artifacts-path "$RUNNER_TEMP/egroo-android-smoke" \
+            -p:AndroidPackageFormats=apk -p:JavaSdkDirectory="$JAVA_HOME_17_X64" \
+            -p:AndroidManifest=Smoke.AndroidManifest.xml -p:ApplicationId=com.jihadkhawaja.egroo.smoke \
+            -p:EgrooApiUrl=http://127.0.0.1:5187/
+      - name: Verify offline startup and authenticated native chat
+        shell: bash
+        timeout-minutes: 18
+        run: |
+          sudo chown "$(id -u):$(id -g)" /dev/kvm
+          image='system-images;android-35;default;x86_64'
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [[ -z "$sdkmanager_path" ]]; then
+            echo "The Android SDK command-line tools were unavailable at $ANDROID_HOME."
+            exit 1
+          fi
+          export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$PATH"
+          sdkmanager --install emulator "$image"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/egroo-android"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | avdmanager create avd --name egroo-ci --package "$image" --path "$ANDROID_AVD_HOME/egroo-ci.avd"
+          if ! "$ANDROID_HOME/emulator/emulator" -list-avds | grep -Fx egroo-ci; then
+            find "$ANDROID_USER_HOME" -maxdepth 3 -type f -print
+            exit 1
+          fi
+          "$ANDROID_HOME/emulator/emulator" -avd egroo-ci -port 5554 -no-window -no-snapshot \
+            -no-audio -no-boot-anim -gpu swiftshader > "$RUNNER_TEMP/egroo-emulator.log" 2>&1 &
+          adb_device=emulator-5554
+          cleanup() {
+            adb -s "$adb_device" emu kill >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          if ! timeout 5m bash -c '
+            adb -s emulator-5554 wait-for-device
+            until [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do
+              sleep 2
+            done
+          '; then
+            tail -n 150 "$RUNNER_TEMP/egroo-emulator.log"
+            exit 1
+          fi
+
+          adb -s "$adb_device" shell cmd connectivity airplane-mode enable
+          adb -s "$adb_device" shell svc wifi disable
+          adb -s "$adb_device" shell svc data disable
+          adb -s "$adb_device" shell wm size 1080x1920
+          adb -s "$adb_device" shell wm density 420
+          apk="$(find src/Egroo.Avalonia/Android/bin/Release -type f -name '*-Signed.apk' -print -quit)"
+          smoke_apk="$(find "$RUNNER_TEMP/egroo-android-smoke/bin" -name 'com.jihadkhawaja.egroo.smoke-Signed.apk' -print -quit)"
+          test -n "$apk" && test -n "$smoke_apk"
+          if ! node scripts/performance/android-conversation.mjs "$adb_device" "$apk" "$smoke_apk" \
+            "$RUNNER_TEMP/egroo-android-api" "$RUNNER_TEMP/egroo-android-results"; then
+            adb -s "$adb_device" logcat -d -s AndroidRuntime ActivityManager | tail -n 100
+            exit 1
+          fi
+          {
+            echo '## Android emulator conversation'
+            echo '~~~json'
+            cat "$RUNNER_TEMP/egroo-android-results/android-conversation.json"
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: android-conversation-smoke
+          path: ${{ runner.temp }}/egroo-android-results/
+
+  ios:
+    name: iOS simulator release build
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: src/Egroo.Avalonia/iOS
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.401
+      - name: Install iOS workload for Xcode 26.6
+        run: |
+          xcodebuild -version
+          printf '%s\n' '{"sdk":{"version":"10.0.401","rollForward":"disable","workloadVersion":"10.0.401"}}' > global.json
+          dotnet workload install ios
+      - name: Build and verify arm64 simulator app
+        run: |
+          # Exercise device-style trimming and the packaged API URL on the simulator.
+          dotnet build -c Release -r iossimulator-arm64 -p:EnableCodeSigning=true \
+            -p:CodesignKey=- -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=true \
+            -p:TrimMode=partial -p:EgrooApiUrl=https://egroo-simulator.invalid/
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          test -n "$app"
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          tar -czf "$GITHUB_WORKSPACE/artifacts/egroo-ios-simulator.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ios-arm64-simulator-app
+          path: artifacts/egroo-ios-simulator.tar.gz
+          if-no-files-found: error
+      - name: Verify the iOS sign-in screen
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          app="$(find bin/Release -type d -name '*.app' -print -quit)"
+          bundle="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")"
+          runtime="$(xcrun simctl list runtimes --json | jq -er '.runtimes[] | select(.isAvailable and (.identifier | endswith(".iOS-26-5"))) | .identifier')"
+          simulator="$(xcrun simctl list devices available --json | jq -er --arg runtime "$runtime" '.devices[$runtime][] | select(.name == "iPhone 17") | .udid')"
+          trap 'xcrun simctl shutdown "$simulator" || true' EXIT
+
+          smoke_dir="$RUNNER_TEMP/egroo-ios-smoke"
+          mkdir -p "$smoke_dir"
+          screenshot="$smoke_dir/ios-sign-in.png"
+          stdout="$smoke_dir/ios.stdout"
+          stderr="$smoke_dir/ios.stderr"
+          checker="$smoke_dir/verify-ios-sign-in"
+          xcrun --sdk macosx swiftc "$GITHUB_WORKSPACE/scripts/verify-ios-sign-in.swift" -o "$checker"
+
+          echo "Booting the hosted iPhone 17 simulator with iOS 26.5."
+          xcrun simctl bootstatus "$simulator" -b
+          echo "Installing Egroo."
+          codesign --verify --deep --strict "$app"
+          xcrun simctl uninstall "$simulator" "$bundle" 2>/dev/null || true
+          xcrun simctl install "$simulator" "$app"
+          if ! launch="$(xcrun simctl launch --stdout="$stdout" --stderr="$stderr" "$simulator" "$bundle")"; then
+            xcrun simctl io "$simulator" screenshot "$screenshot" || true
+            tail -n 100 "$stdout" "$stderr" 2>/dev/null || true
+            exit 1
+          fi
+          echo "$launch"
+          pid="${launch##*: }"
+
+          check_process() {
+            kill -0 "$pid" 2>/dev/null || xcrun simctl spawn "$simulator" launchctl list \
+              | awk -v pid="$pid" '$1 == pid { alive = 1 } END { exit !alive }'
+          }
+
+          for attempt in {1..5}; do
+            sleep 2
+            if xcrun simctl io "$simulator" screenshot "$screenshot" \
+              && check_process \
+              && "$checker" "$screenshot"; then
+              exit 0
+            fi
+          done
+
+          echo "Egroo did not reach a visible sign-in screen."
+          tail -n 100 "$stdout" "$stderr" 2>/dev/null || true
+          xcrun simctl spawn "$simulator" log show --last 3m --style compact \
+            --predicate "processIdentifier == $pid OR eventMessage CONTAINS[c] '$bundle'" | tail -n 100 || true
+          for reports in "$HOME/Library/Logs/DiagnosticReports" "$HOME/Library/Developer/CoreSimulator/Devices/$simulator/data/Library/Logs/CrashReporter"; do
+            if [[ -d "$reports" ]]; then
+              find "$reports" -iname '*egroo*.ips' -print -exec head -c 12000 {} \;
+            fi
+          done
+          exit 1
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: failure()
+        with:
+          name: ios-sign-in-failure
+          path: ${{ runner.temp }}/egroo-ios-smoke/ios-sign-in.png
+          if-no-files-found: ignore
+          retention-days: 5
+
+  ios-device:
+    name: iOS device release build
+    runs-on: macos-26
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: src/Egroo.Avalonia/iOS
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.401
+      - name: Install iOS workload for Xcode 26.6
+        run: |
+          xcodebuild -version
+          printf '%s\n' '{"sdk":{"version":"10.0.401","rollForward":"disable","workloadVersion":"10.0.401"}}' > global.json
+          dotnet workload install ios
+      - name: Compile and link the unsigned device app
+        shell: bash
+        run: |
+          dotnet build -c Release -r ios-arm64 \
+            -p:EnableCodeSigning=false -p:CodesignRequireProvisioningProfile=false -p:UseInterpreter=false
+
+          app="$(find bin/Release -path '*/ios-arm64/*.app' -type d -print -quit)"
+          test -n "$app"
+          plist="$app/Info.plist"
+          executable="$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$plist")"
+          test -n "$executable"
+          xcrun lipo "$app/$executable" -verify_arch arm64
+          build="$(xcrun vtool -show-build "$app/$executable")"
+          printf '%s\n' "$build"
+          grep -E '^[[:space:]]*platform[[:space:]]+IOS[[:space:]]*$' <<<"$build" >/dev/null
+
+          printf 'iOS device Release app built and linked for arm64. The unsigned build is for compile verification.\n' \
+            >> "$GITHUB_STEP_SUMMARY"

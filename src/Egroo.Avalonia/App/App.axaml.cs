@@ -1,4 +1,3 @@
-using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -19,8 +18,7 @@ public sealed partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        var configuredUrl = ApiUrlOverride ?? typeof(App).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Single(attribute => attribute.Key == "EgrooApiUrl").Value;
+        var configuredUrl = ApiUrlOverride ?? ReadBuildApiUrl();
         var view = new WorkspaceView();
         view.Connect(configuredUrl, BrowserRuntime, ConfigureWebView, ExportFile);
 
@@ -44,5 +42,15 @@ public sealed partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static string? ReadBuildApiUrl()
+    {
+        using var resource = typeof(App).Assembly.GetManifestResourceStream("Egroo.Avalonia.EgrooApiUrl.txt");
+        if (resource is null)
+            return null;
+
+        using var reader = new StreamReader(resource);
+        return reader.ReadLine();
     }
 }

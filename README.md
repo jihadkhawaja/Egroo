@@ -48,6 +48,30 @@ dotnet run --project src/Egroo.Avalonia/Desktop --launch-profile 'Egroo local'
 
 See the [Avalonia build and hosting guide](docs/Avalonia-Client.md) for desktop prerequisites, mobile workloads, platform signing, and API address overrides.
 
+### Setup and diagnostics
+
+Run these commands from the repository root on Windows, macOS, or Linux with the .NET 10 SDK. `setup` creates or migrates the configured database and exits. It can be rerun without replacing existing users, messages, or local debug secrets.
+
+```sh
+dotnet run --project src/Egroo.Server -- setup
+dotnet run --project src/Egroo.Server
+```
+
+In a separate terminal, check the running local API and its database.
+
+```sh
+dotnet run --project src/Egroo.Server -- doctor
+```
+
+For self-hosting, supply the same settings as the service, including its database and secrets. Set `DOTNET_ENVIRONMENT` when your service loads an environment-specific configuration file. For a published server, run `dotnet Egroo.Server.dll setup` or `dotnet Egroo.Server.dll doctor` from its content root.
+
+```sh
+dotnet run --project src/Egroo.Server -c Release --no-launch-profile -- setup
+dotnet run --project src/Egroo.Server -c Release --no-launch-profile -- doctor --api-url https://api.example.com/ --browser-origin https://chat.example.com
+```
+
+`doctor` reads configuration and checks database connectivity, applied migrations, the HTTP runtime, and optionally the browser CORS preflight. It exits with `0` when all requested checks pass, `1` when a check fails, or `2` for invalid or missing arguments.
+
 ## Build and test
 
 ```sh

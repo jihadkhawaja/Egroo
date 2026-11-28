@@ -1052,6 +1052,72 @@ namespace Egroo.Server.Migrations.Sqlite
                     b.ToTable("userstorage");
                 });
 
+            modelBuilder.Entity("Egroo.Server.Models.AgentTaskRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AgentId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("agentid");
+
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("createdat");
+
+                    b.Property<long?>("ExecutionDeadline")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("executiondeadline");
+
+                    b.Property<int?>("Failure")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("failure");
+
+                    b.Property<long?>("FinishedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("finishedat");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ownerid");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(8192)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("prompt");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("requestid");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(65536)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("result");
+
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("startedat");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("OwnerId", "CreatedAt", "Id");
+
+                    b.HasIndex("Status", "CreatedAt", "Id");
+
+                    b.ToTable("agenttasks");
+                });
+
             modelBuilder.Entity("Egroo.Server.Models.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1103,6 +1169,11 @@ namespace Egroo.Server.Migrations.Sqlite
                         .IsRequired()
                         .HasColumnType("TEXT")
                         .HasColumnName("role");
+
+                    b.Property<long>("SessionRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("sessionrevision");
 
                     b.Property<Guid?>("UpdatedBy")
                         .HasColumnType("TEXT")
@@ -1180,6 +1251,54 @@ namespace Egroo.Server.Migrations.Sqlite
                     b.ToTable("userencryptionkeys");
                 });
 
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("userid");
+
+                    b.Property<long?>("ConfirmationExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("confirmationexpiresat");
+
+                    b.Property<string>("ConfirmationHash")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("confirmationhash");
+
+                    b.Property<long?>("ConfirmationSentAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("confirmationsentat");
+
+                    b.Property<string>("ProtectedAddress")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protectedaddress");
+
+                    b.Property<string>("ProtectedPendingAddress")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("protectedpendingaddress");
+
+                    b.Property<long?>("ResetExpiresAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resetexpiresat");
+
+                    b.Property<string>("ResetHash")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("resethash");
+
+                    b.Property<long?>("ResetSentAt")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("resetsentat");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("revision");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("userrecoverystates");
+                });
+
             modelBuilder.Entity("Egroo.Contracts.Models.UserDetail", b =>
                 {
                     b.HasOne("Egroo.Server.Models.User", null)
@@ -1215,9 +1334,42 @@ namespace Egroo.Server.Migrations.Sqlite
                                 .HasColumnType("TEXT")
                                 .HasColumnName("userid");
 
+                            b1.Property<string>("AllowedSignInRegions")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("allowedsigninregions");
+
+                            b1.Property<long?>("FactorLockedUntil")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("factorlockeduntil");
+
+                            b1.Property<long>("FactorRevision")
+                                .IsConcurrencyToken()
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("factorrevision");
+
+                            b1.Property<int>("FailedFactorAttempts")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("failedfactorattempts");
+
                             b1.Property<bool>("IsTwoFactorEnabled")
                                 .HasColumnType("INTEGER")
                                 .HasColumnName("istwofactorenabled");
+
+                            b1.Property<long?>("LastTotpStep")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("lasttotpstep");
+
+                            b1.Property<string>("ProtectedTotpSecret")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("protectedtotpsecret");
+
+                            b1.Property<string>("RecoveryCodeHashes")
+                                .HasColumnType("TEXT")
+                                .HasColumnName("recoverycodehashes");
+
+                            b1.Property<long?>("TotpEnrollmentExpiresAt")
+                                .HasColumnType("INTEGER")
+                                .HasColumnName("totpenrollmentexpiresat");
 
                             b1.HasKey("UserId");
 
@@ -1228,6 +1380,15 @@ namespace Egroo.Server.Migrations.Sqlite
                         });
 
                     b.Navigation("UserSecuriy");
+                });
+
+            modelBuilder.Entity("Egroo.Server.Models.UserRecovery", b =>
+                {
+                    b.HasOne("Egroo.Server.Models.User", null)
+                        .WithOne()
+                        .HasForeignKey("Egroo.Server.Models.UserRecovery", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Egroo.Server.Models.User", b =>

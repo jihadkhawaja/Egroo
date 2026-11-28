@@ -37,32 +37,35 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
         _view.AdapterDestroyed += (_, _) => ResetNavigation();
     }
 
-    protected override async Task<string> CallAsync(string request)
+    protected override Task<string> CallAsync(string request) => CallAsync(request, CancellationToken.None);
+
+    protected override async Task<string> CallAsync(string request, CancellationToken cancellationToken)
     {
         if (!Dispatcher.UIThread.CheckAccess())
-            return await Dispatcher.UIThread.InvokeAsync(() => CallAsync(request));
+            return await Dispatcher.UIThread.InvokeAsync(() => CallAsync(request, cancellationToken));
 
-        var navigation = await WaitForRuntimeAsync();
+        var navigation = await WaitForRuntimeAsync(cancellationToken);
         var id = Guid.NewGuid().ToString("N");
         try
         {
             var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(request));
             for (var offset = 0; offset < encoded.Length; offset += 16384)
-                await EvaluateAsync($"egrooRuntime.append('{id}', '{encoded.Substring(offset, Math.Min(16384, encoded.Length - offset))}')", navigation);
-            await EvaluateAsync($"void egrooRuntime.start('{id}')", navigation);
+                await EvaluateAsync($"egrooRuntime.append('{id}', '{encoded.Substring(offset, Math.Min(16384, encoded.Length - offset))}')",
+                    navigation, cancellationToken);
+            await EvaluateAsync($"void egrooRuntime.start('{id}')", navigation, cancellationToken);
 
             var timeout = DateTime.UtcNow.AddMinutes(2);
             var result = new StringBuilder();
             while (DateTime.UtcNow < timeout)
             {
-                if (await EvaluateAsync($"egrooRuntime.read('{id}', {result.Length})", navigation) is { } part)
+                if (await EvaluateAsync($"egrooRuntime.read('{id}', {result.Length})", navigation, cancellationToken) is { } part)
                 {
                     result.Append(part);
                     if (part.Length < 16384)
                         return result.ToString();
                 }
                 else
-                    await Task.Delay(35);
+                    await Task.Delay(35, cancellationToken);
             }
 
             throw new TimeoutException("The Egroo media operation timed out.");
@@ -73,7 +76,8 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
             {
                 try
                 {
-                    await EvaluateAsync($"globalThis.egrooRuntime?.clear('{id}')", navigation);
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
+                    await EvaluateAsync($"globalThis.egrooRuntime?.clear('{id}')", navigation, cleanup.Token);
                 }
                 catch (Exception ex)
                 {
@@ -84,12 +88,14 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
         }
     }
 
-    private async Task<TaskCompletionSource<bool>> WaitForRuntimeAsync()
+    private async Task<TaskCompletionSource<bool>> WaitForRuntimeAsync(CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (_retryNavigation)
             ReloadRuntime();
 
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(15));
         try
         {
             while (true)
@@ -101,7 +107,7 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
                     var scriptWait = Stopwatch.StartNew();
                     while (navigation == _navigation && scriptWait.Elapsed < TimeSpan.FromSeconds(3))
                     {
-                        var runtimeType = await EvaluateAsync("typeof globalThis.egrooRuntime", navigation).WaitAsync(timeout.Token);
+                        var runtimeType = await EvaluateAsync("typeof globalThis.egrooRuntime", navigation, timeout.Token);
                         if (runtimeType == "object" && navigation == _navigation)
                             return navigation;
                         await Task.Delay(100, timeout.Token);
@@ -119,6 +125,7 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
         {
             _retryNavigation = !_navigation.Task.IsCompleted;
+            cancellationToken.ThrowIfCancellationRequested();
             throw new TimeoutException(_unavailableMessage);
         }
     }
@@ -136,11 +143,12 @@ internal sealed class MediaWebViewRuntime : ClientRuntime
         _view.Navigate(_runtimePage);
     }
 
-    private async Task<string?> EvaluateAsync(string expression, TaskCompletionSource<bool> navigation)
+    private async Task<string?> EvaluateAsync(string expression, TaskCompletionSource<bool> navigation, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (navigation != _navigation)
             throw new InvalidOperationException("The Egroo runtime page changed. Try again.");
-        var value = await _view.InvokeScript(expression);
+        var value = await _view.InvokeScript(expression).WaitAsync(cancellationToken);
         if (value?.StartsWith('"') == true)
             return JsonSerializer.Deserialize<string>(value);
         return value is "null" or "undefined" ? null : value;

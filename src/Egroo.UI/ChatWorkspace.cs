@@ -12,6 +12,14 @@ namespace Egroo.UI;
 
 public sealed partial class ChatWorkspace : UserControl
 {
+    private static readonly TimeSpan[] PendingReplayRetryDelays =
+        [TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(2)];
+    private CancellationTokenSource? _pendingReplayCancellation;
+    private long? _pendingReplayGeneration;
+    private long? _replayedGeneration;
+    private long? _failedReplayGeneration;
+    private bool PendingReplayFailed => _failedReplayGeneration == _session.ConnectionGeneration;
+
     private readonly ClientRuntime _runtime;
     private readonly WorkspaceSession _session;
     private readonly Func<string, byte[], Task>? _exportFile;
@@ -38,7 +46,7 @@ public sealed partial class ChatWorkspace : UserControl
         _session.Received += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message));
         _session.Updated += message => Dispatcher.UIThread.Post(() => _ = ReceiveAsync(message, updateOnly: true));
         _session.Typing += (state, starts) => Dispatcher.UIThread.Post(() => UpdateTyping(state, starts));
-        _session.ConnectionChanged += () => Dispatcher.UIThread.Post(() => _ = ConnectionChangedAsync());
+        _session.ConnectionChanged += () => Dispatcher.UIThread.Post(ConnectionChanged);
         _session.Voice.StateChanged += () => Dispatcher.UIThread.Post(UpdateVoice);
 
         BuildShell();
@@ -68,6 +76,11 @@ public sealed partial class ChatWorkspace : UserControl
             await _session.RestoreAsync();
             if (_session.User is not null)
                 await OpenWorkspaceAsync();
+            else if (_workspaceOpen)
+            {
+                await CloseChannelViewAsync();
+                ShowAuthentication();
+            }
         });
     }
 
@@ -88,17 +101,38 @@ public sealed partial class ChatWorkspace : UserControl
         form.Children.Add(LabeledField("Password", password));
         if (create)
             form.Children.Add(Text("Use at least 8 characters with uppercase and lowercase letters, a number, and a symbol.", 12, Muted));
+        var verificationCode = VerificationCodeField();
+        var verificationCaption = Text("Authenticator or recovery code", 13, Ink, FontWeight.SemiBold);
+        var verification = new StackPanel { Spacing = 5, Children = { verificationCaption, verificationCode }, IsVisible = false };
+        form.Children.Add(verification);
         async Task AuthenticateAsync()
         {
             if (string.IsNullOrWhiteSpace(username.Text) || string.IsNullOrWhiteSpace(password.Text))
                 throw new InvalidOperationException("Enter a username and password.");
-            await _session.SignInAsync(username.Text.Trim(), password.Text, create);
+            var result = await _session.SignInAsync(username.Text.Trim(), password.Text, create, verificationCode.Text);
+            verificationCode.Text = null;
+            if (result.RequiresTwoFactor)
+            {
+                var label = result.RequiresRecoveryCode ? "Recovery code" : "Authenticator or recovery code";
+                verificationCaption.Text = label;
+                AutomationProperties.SetName(verificationCode, label);
+                verification.IsVisible = true;
+                verificationCode.Focus();
+                Notify(result.Message ?? (result.RequiresRecoveryCode
+                    ? "Enter an unused recovery code."
+                    : "Enter an authenticator code or a recovery code."));
+                return;
+            }
+
+            Notify(string.Empty);
             password.Text = null;
             await OpenWorkspaceAsync();
         }
         var submit = PrimaryButton(create ? "Create account" : "Sign in", AuthenticateAsync);
         submit.HorizontalAlignment = HorizontalAlignment.Stretch;
         form.Children.Add(submit);
+        if (!create)
+            form.Children.Add(QuietButton("Forgot password?", () => OpenPasswordRecoveryAsync(username.Text)));
         var switchMode = QuietButton(create ? "Already have an account? Sign in" : "New to Egroo? Create account", () =>
         {
             ShowAuthentication(!create, username.Text);
@@ -110,6 +144,12 @@ public sealed partial class ChatWorkspace : UserControl
         nearby.HorizontalAlignment = HorizontalAlignment.Center;
         form.Children.Add(nearby);
         SubmitOnEnter(password, AuthenticateAsync);
+        SubmitOnEnter(verificationCode, AuthenticateAsync);
+        DisplayAuthenticationForm(form);
+    }
+
+    private void DisplayAuthenticationForm(StackPanel form)
+    {
         var authCard = Card(form, 28);
         authCard.MaxWidth = 430;
         authCard.VerticalAlignment = VerticalAlignment.Center;
@@ -131,45 +171,137 @@ public sealed partial class ChatWorkspace : UserControl
             return;
         SetWorkspaceOpen(true);
         await ShowChannelsAsync();
-        await _session.Messages.SendPendingMessages();
+        _ = ReplayPendingMessagesAsync();
     }
 
     private async Task SignOutAsync()
     {
+        _pendingReplayCancellation?.Cancel();
         await CloseChannelViewAsync();
         await _session.SignOutAsync();
         _wasConnected = false;
         ShowAuthentication();
     }
 
-    private async Task ConnectionChangedAsync()
+    private void ConnectionChanged()
     {
         if (_session.User is null)
             return;
+
+        if (_session.HasExpired)
+        {
+            _ = ExpireSessionAsync();
+            return;
+        }
+
         UpdateConnectionIndicator();
         if (!_session.Connected)
         {
+            _pendingReplayCancellation?.Cancel();
             _wasConnected = false;
             Notify("Connection interrupted. Use Reconnect if the server stays offline.");
             return;
         }
+
         if (!_wasConnected)
         {
             _wasConnected = true;
             Notify(string.Empty);
-            try
+        }
+
+        _ = ReplayPendingMessagesAsync();
+    }
+
+    private Task ReconnectAsync()
+    {
+        if (_session.HasExpired)
+            return ExpireSessionAsync();
+        return _session.Connected ? ReplayPendingMessagesAsync() : RestoreAsync();
+    }
+
+    private Task ExpireSessionAsync() => RunAsync(async () =>
+    {
+        if (!_session.HasExpired)
+            return;
+
+        var username = _session.User?.Username;
+        _pendingReplayCancellation?.Cancel();
+        try
+        {
+            await _session.SignOutAsync();
+        }
+        finally
+        {
+            await CloseChannelViewAsync();
+            _wasConnected = false;
+            ShowAuthentication(usernameValue: username);
+            Notify("Your session expired. Sign in again.");
+        }
+    });
+
+    private async Task ReplayPendingMessagesAsync()
+    {
+        var generation = _session.ConnectionGeneration;
+        if (!_workspaceOpen || !_session.Connected || _replayedGeneration == generation
+            || (_pendingReplayCancellation is not null && _pendingReplayGeneration == generation))
+            return;
+
+        _pendingReplayCancellation?.Cancel();
+        using var cancellation = new CancellationTokenSource();
+        _pendingReplayCancellation = cancellation;
+        _pendingReplayGeneration = generation;
+        var messages = _session.Messages;
+        if (PendingReplayFailed)
+        {
+            _failedReplayGeneration = null;
+            UpdateConnectionIndicator();
+            Notify(string.Empty);
+        }
+
+        try
+        {
+            for (int retry = 0; IsCurrentConnection(); retry++)
             {
-                await _session.Messages.SendPendingMessages();
-            }
-            catch (Exception ex)
-            {
-                Notify(ex.Message);
+                try
+                {
+                    await messages.SendPendingMessages(cancellation.Token);
+                    if (IsCurrentConnection())
+                        _replayedGeneration = generation;
+                    return;
+                }
+                catch (Exception) when (retry < PendingReplayRetryDelays.Length && IsCurrentConnection())
+                {
+                    await Task.Delay(PendingReplayRetryDelays[retry], cancellation.Token);
+                }
             }
         }
+        catch (Exception) when (!IsCurrentConnection())
+        {
+        }
+        catch (Exception)
+        {
+            _failedReplayGeneration = generation;
+            UpdateConnectionIndicator();
+            Notify("Couldn’t retrieve queued messages. Select Retry messages to try again.");
+        }
+        finally
+        {
+            if (ReferenceEquals(_pendingReplayCancellation, cancellation))
+                _pendingReplayCancellation = null;
+        }
+
+        bool IsCurrentConnection() => !cancellation.IsCancellationRequested
+            && _workspaceOpen && _session.Connected && _session.ConnectionGeneration == generation;
     }
 
     private async Task PollMediaAsync()
     {
+        if (_session.HasExpired)
+        {
+            await ExpireSessionAsync();
+            return;
+        }
+
         if (_receivingMedia || !_session.Voice.IsInCall)
             return;
         _receivingMedia = true;

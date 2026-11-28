@@ -102,10 +102,13 @@ namespace Egroo.Client.Services
             return await HubConnection.InvokeAsync<bool>(nameof(UpdateMessage), message);
         }
 
-        public async Task SendPendingMessages()
+        public Task SendPendingMessages() => SendPendingMessages(CancellationToken.None);
+
+        public async Task SendPendingMessages(CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnsureSubscriptions();
-            await HubConnection.InvokeAsync(nameof(SendPendingMessages));
+            await HubConnection.InvokeAsync(nameof(SendPendingMessages), cancellationToken);
         }
 
         public async Task UpdatePendingMessage(Guid messageid)
